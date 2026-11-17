@@ -481,3 +481,29 @@ to stderr and exit 1. `.deviceBusy` prints
   with Developer ID and notarize, make the DMG, the Homebrew cask, and LGPL
   notices. It also needs the owner's App ID, app group and provisioning
   profile.
+
+### Plan 2 entry rows (from the final review of this plan)
+
+These must be done or decided before Plan 2's agent ships.
+
+- **Operation gate and fresh existence checks.** Each session gets a gate so
+  that one operation finishes before the next starts, with no actor
+  reentrancy across awaits. The parent listing is invalidated before every
+  existence check. `list()` treats a partially failed listing as a failure,
+  never as a shorter result.
+- **Move fallback partials in the registry.** The partial that
+  `copyThenDelete` uploads is registered in SafeWriter's in-flight registry,
+  so a concurrent `visibleList` cannot reap it.
+- **Fail fast after a disconnect.** A device that reports `.deviceDisconnected`
+  releases its libmtp handle, so later calls fail at once instead of timing
+  out on USB.
+- **`DeviceSession.download` gains `replacing:`.** When it is false, the
+  partial is moved into place with `renamex_np(RENAME_EXCL)`, which closes
+  the race between `get`'s existence check and the rename.
+- **Process-wide registry of held devices.** A device this process already
+  holds is not reported as `.deviceBusy` when it is opened again.
+- **Replace order (owner decision, open).** Today a replacing write deletes
+  the old file and then renames the partial over its name. The alternative is
+  to rename the old file aside first, so a failed rename can restore it.
+- **Private file names in logs.** Every file name logged with
+  `privacy: .public` becomes private before the agent ships.
