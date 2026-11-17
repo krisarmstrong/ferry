@@ -7,9 +7,10 @@ identifier_name:
     - io
     - id
 
-# swift-format puts the brace of a wrapped signature on its own line.
+# An exhaustive switch over an error enum is one decision per case, not branching logic.
 cyclomatic_complexity:
   ignores_case_statements: true
 
+# swift-format puts the brace of a wrapped signature on its own line.
 opening_brace:
   ignore_multiline_function_signatures: true

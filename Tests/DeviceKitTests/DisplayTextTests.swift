@@ -14,7 +14,19 @@ struct DisplayTextTests {
   static let bidi: [(String, String)] = [("a\u{202E}b", "a\\u{202E}b")]
   static let isolates: [(String, String)] = [("\u{2066}b\u{2069}", "\\u{2066}b\\u{2069}")]
   static let marks: [(String, String)] = [("a\u{200E}\u{200F}", "a\\u{200E}\\u{200F}")]
-  static let cases = ascii + more + del + c1Control + bidi + isolates + marks
+  static let separators: [(String, String)] = [("a\u{2028}b", "a\\u{2028}b")]
+  static let paragraph: [(String, String)] = [("a\u{2029}b", "a\\u{2029}b")]
+  static let arabicMark: [(String, String)] = [("a\u{61C}b", "a\\u{61C}b")]
+  static let backslash: [(String, String)] = [("a\\b", "a\\\\b")]
+  static let literalEscape: [(String, String)] = [("\\u{1B}", "\\\\u{1B}")]
+  static let cases =
+    ascii + separators + paragraph + arabicMark + backslash + literalEscape
+    + more + del + c1Control + bidi + isolates + marks
+
+  @Test func joinersAndVariationSelectorsSurvive() {
+    let name = "👩\u{200D}💻 क्\u{200C}ष ✈\u{FE0F}.jpg"
+    #expect(DisplayText.escaped(name) == name)
+  }
 
   @Test(arguments: cases)
   func controlsAreEscaped(input: String, expected: String) {
