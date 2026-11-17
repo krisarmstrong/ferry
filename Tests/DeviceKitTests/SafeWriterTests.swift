@@ -149,6 +149,22 @@ struct SafeWriterTests {
     #expect(await partials(device).isEmpty)
   }
 
+  @Test(arguments: [false, true])
+  func folderAtTargetIsNeverReplaced(replacing: Bool) async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let folder = try RemotePath("/A")
+    let inside = try RemotePath("/A/b.txt")
+    try await device.seed(inside, in: storageID, contents: Data([9]))
+    try await withTempFile(Data([1, 2])) { file in
+      await #expect(throws: TransportError.alreadyExists(folder)) {
+        _ = try await writer.write(from: file, to: folder, replacing: replacing)
+      }
+    }
+    #expect(await device.allPaths(in: storageID) == [folder, inside])
+    #expect(await device.contents(of: inside, in: storageID) == Data([9]))
+  }
+
   @Test func renameFailureFallsBackToDirectUpload() async throws {
     let device = makeDevice()
     let writer = SafeWriter(session: device)

@@ -25,7 +25,7 @@ public struct SafeWriter: Sendable {
   }
 
   /// Upload `file` to `path`. If `replacing`, an existing file at `path` is replaced;
-  /// otherwise `.alreadyExists`.
+  /// otherwise `.alreadyExists`. A folder at `path` is never replaced.
   public func write(
     from file: URL, to path: RemotePath, in storage: StorageID, replacing: Bool,
     progress: ProgressHandler
@@ -40,8 +40,11 @@ public struct SafeWriter: Sendable {
     if let free = storages.first(where: { $0.id == storage })?.free, size > free {
       throw .insufficientSpace(needed: size, free: free)
     }
-    if !replacing, try await exists(path, in: storage) {
-      throw .alreadyExists(path)
+    // Read once: the item seen here is the one `commit` deletes, so a folder that appears at
+    // `path` later can never be taken for the file being replaced.
+    let existing = try await existing(path, in: storage)
+    if let existing, existing.kind == .folder || !replacing {
+      throw .alreadyExists(existing.path)
     }
 
     let partial = try parent.appending(Self.partialPrefix + UUID().uuidString)
@@ -49,7 +52,7 @@ public struct SafeWriter: Sendable {
     do {
       let item = try await commit(
         Source(file: file, size: size), via: partial,
-        to: Destination(path: path, name: name, replacing: replacing), in: storage,
+        to: Destination(path: path, name: name, replacing: existing), in: storage,
         progress: progress)
       await registry.unregister(storage, partial)
       return item
@@ -85,7 +88,8 @@ public struct SafeWriter: Sendable {
   private struct Destination {
     let path: RemotePath
     let name: String
-    let replacing: Bool
+    /// The file this write replaces, deleted just before the rename.
+    let replacing: RemoteItem?
   }
 
   // MARK: Steps
@@ -97,14 +101,13 @@ public struct SafeWriter: Sendable {
     let (file, size) = (source.file, source.size)
     try await upload(file, size: size, to: partial, in: storage, progress: progress)
 
-    let path = destination.path
-    do {
-      if destination.replacing, try await exists(path, in: storage) {
-        try await session.delete(path, in: storage)
+    if let replaced = destination.replacing {
+      do {
+        try await session.delete(replaced.path, in: storage)
+      } catch {
+        await discard(partial, in: storage)
+        throw error
       }
-    } catch {
-      await discard(partial, in: storage)
-      throw error
     }
 
     let renamed: RemoteItem
@@ -116,7 +119,8 @@ public struct SafeWriter: Sendable {
       // (the name appeared, the device went away, a cancel) must surface unchanged.
       switch error {
       case .unsupported, .io:
-        return try await upload(file, size: size, to: path, in: storage, progress: progress)
+        return try await upload(
+          file, size: size, to: destination.path, in: storage, progress: progress)
       default:
         throw error
       }
@@ -152,14 +156,14 @@ public struct SafeWriter: Sendable {
     return item
   }
 
-  private func exists(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
-    -> Bool
+  /// The item at `path`, or `nil` if there is none.
+  private func existing(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
+    -> RemoteItem?
   {
     do {
-      _ = try await session.item(at: path, in: storage)
-      return true
+      return try await session.item(at: path, in: storage)
     } catch .notFound {
-      return false
+      return nil
     }
   }
 
