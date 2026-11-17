@@ -36,6 +36,9 @@ actor StubMTPDevice: MTPDeviceOperations {
   private var uploadLimit: Int?
   /// The next upload stores its object, then throws this.
   private var uploadFailure: TransportError?
+  /// Names the device stores differently from what it was sent, as a FAT card or 7-bit
+  /// firmware does.
+  private var storedNames: [String: String] = [:]
 
   init(
     info: DeviceInfo, storages: [(raw: UInt32, info: StorageInfo)],
@@ -64,6 +67,10 @@ actor StubMTPDevice: MTPDeviceOperations {
 
   func failNextUpload(with error: TransportError) {
     uploadFailure = error
+  }
+
+  func storeName(_ requested: String, as actual: String) {
+    storedNames[requested] = actual
   }
 
   var uploadCount: Int {
@@ -115,7 +122,9 @@ actor StubMTPDevice: MTPDeviceOperations {
     do { data = try Data(contentsOf: file) } catch { throw .io(error.localizedDescription) }
     if let uploadLimit { data = data.prefix(uploadLimit) }
     let id = insert(
-      Object(parent: parent, name: name, isFolder: false, data: data, modified: Self.epoch))
+      Object(
+        parent: parent, name: storedNames[name] ?? name, isFolder: false, data: data,
+        modified: Self.epoch))
     if let failure = uploadFailure {
       uploadFailure = nil
       throw failure
@@ -128,13 +137,13 @@ actor StubMTPDevice: MTPDeviceOperations {
   {
     try requireOpen()
     calls.append(.createFolder(name: name, parent: parent))
-    return addFolder(name, parent: parent)
+    return addFolder(storedNames[name] ?? name, parent: parent)
   }
 
   func rename(objectID: UInt32, to name: String) throws(TransportError) {
     _ = try object(objectID)
     calls.append(.rename(objectID, name: name))
-    objects[objectID]?.name = name
+    objects[objectID]?.name = storedNames[name] ?? name
   }
 
   func move(objectID: UInt32, storage: UInt32, newParent: UInt32) throws(TransportError) {

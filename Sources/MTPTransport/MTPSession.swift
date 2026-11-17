@@ -89,11 +89,29 @@ actor MTPSession: DeviceSession {
     return try result.get()
   }
 
-  /// The object `id` as the device now reports it, placed at `path`.
-  private func item(_ id: UInt32, at path: RemotePath) async throws(TransportError)
-    -> RemoteItem
+  /// The object `id` as the device now reports it, placed at `path`. If the device stored it
+  /// under another name, it is not at `path`, so that is an error rather than a quiet success.
+  /// `discardIfRenamed` deletes it first; only a fresh upload may be removed, since anything
+  /// else is the user's data. Callers run inside `mutating`, which invalidates the folder.
+  private func stored(_ id: UInt32, at path: RemotePath, discardIfRenamed: Bool = false)
+    async throws(TransportError) -> RemoteItem
   {
-    Self.item(try await device.metadata(objectID: id), at: path)
+    let entry = try await device.metadata(objectID: id)
+    let actual = entry.name.precomposedStringWithCanonicalMapping
+    guard let requested = path.name, actual != requested else {
+      return Self.item(entry, at: path)
+    }
+    if discardIfRenamed {
+      do {
+        try await device.delete(objectID: id)
+      } catch {
+        let reason = String(describing: error)
+        Self.log.error(
+          "could not delete renamed upload \(entry.name, privacy: .public): \(reason, privacy: .public)"
+        )
+      }
+    }
+    throw .nameChangedByDevice(requested: requested, actual: entry.name)
   }
 
   private static func item(_ entry: MTPEntry, at path: RemotePath) -> RemoteItem {
@@ -182,7 +200,7 @@ extension MTPSession {
     return try await mutating([parent], storage: raw) { () throws(TransportError) in
       let id = try await device.upload(
         from: file, name: name, parent: target.id, storage: raw, progress: progress)
-      return try await item(id, at: path)
+      return try await stored(id, at: path, discardIfRenamed: true)
     }
   }
 
@@ -196,7 +214,7 @@ extension MTPSession {
     try target.requireFree(path)
     return try await mutating([parent], storage: raw) { () throws(TransportError) in
       let id = try await device.createFolder(name: name, parent: target.id, storage: raw)
-      return try await item(id, at: path)
+      return try await stored(id, at: path)
     }
   }
 
@@ -211,7 +229,7 @@ extension MTPSession {
     try await folder(parent, storage: raw).requireFree(renamed, except: source.objectID)
     return try await mutating([parent], storage: raw) { () throws(TransportError) in
       try await device.rename(objectID: source.objectID, to: name)
-      return try await item(source.objectID, at: renamed)
+      return try await stored(source.objectID, at: renamed)
     }
   }
 
@@ -259,7 +277,7 @@ extension MTPSession {
     }
     return try await mutating([parent, toFolder], storage: raw) { () throws(TransportError) in
       try await device.move(objectID: source.objectID, storage: raw, newParent: destination.id)
-      return try await item(source.objectID, at: target)
+      return try await stored(source.objectID, at: target)
     }
   }
 
@@ -294,7 +312,7 @@ extension MTPSession {
           throw .sizeMismatch(expected: source.size, actual: uploaded.size)
         }
         try await device.rename(objectID: id, to: placement.name)
-        return try await item(id, at: placement.target)
+        return try await stored(id, at: placement.target)
       }
     } catch {
       await discard(partialName, in: placement.folder, storage: storage)
