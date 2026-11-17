@@ -21,7 +21,7 @@ and choose "File transfer" first.
 swift run ferryctl devices
 swift run ferryctl storages
 swift run ferryctl ls /DCIM
-swift run ferryctl get /DCIM/Camera/photo.jpg ./photo.jpg
+swift run ferryctl get /DCIM/Camera/photo.jpg ./photo.jpg [--replace]
 swift run ferryctl put ./notes.md /Download/notes.md [--replace]
 swift run ferryctl mkdir /Download/new
 swift run ferryctl mv /Download/notes.md /Download/new
