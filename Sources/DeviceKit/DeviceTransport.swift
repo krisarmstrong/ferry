@@ -4,7 +4,11 @@ import Foundation
 public typealias ProgressHandler = @Sendable (_ done: UInt64, _ total: UInt64) -> Bool
 
 public protocol DeviceTransport: Sendable {
-  func connectedDevices() async throws(TransportError) -> [DeviceInfo]
+  /// Finds attached devices. A device this process already holds is reported without being
+  /// touched.
+  func scan() async throws(TransportError) -> DeviceScan
+  /// Opens a device the most recent `scan()` reported in `devices`. A device this process
+  /// already holds is `.deviceBusy`.
   func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession
 }
 

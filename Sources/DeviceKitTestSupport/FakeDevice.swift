@@ -34,6 +34,7 @@ public actor FakeDevice: DeviceSession {
   private var uploadTruncation: UInt64?
   private var renameFailure: TransportError?
   private var listFailure: TransportError?
+  private var storagesFailure: TransportError?
 
   public init(
     info: DeviceInfo, storages: [StorageInfo],
@@ -57,6 +58,10 @@ public actor FakeDevice: DeviceSession {
   public func storages() async throws(TransportError) -> [StorageInfo] {
     storagesCallCount += 1
     await pauseIfSuspended(.storages)
+    if let failure = storagesFailure {
+      storagesFailure = nil
+      throw failure
+    }
     try requireAvailable()
     return storageInfos
   }
@@ -329,6 +334,11 @@ extension FakeDevice {
   /// The next rename throws `error`. `nil` clears a pending failure.
   public func failRename(with error: TransportError?) {
     renameFailure = error
+  }
+
+  /// The next `storages()` throws `error`.
+  public func failNextStorages(with error: TransportError) {
+    storagesFailure = error
   }
 
   /// The next `list(_:in:)` throws `error`. `nil` clears a pending failure.

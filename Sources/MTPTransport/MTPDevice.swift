@@ -296,21 +296,22 @@ actor MTPDevice {
     _ handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>, raw: LIBMTP_raw_device_t
   ) -> DeviceInfo {
     let serial = takeString(LIBMTP_Get_Serialnumber(handle))
-    let manufacturer =
-      takeString(LIBMTP_Get_Manufacturername(handle))
-      ?? raw.device_entry.vendor.map {
-        String(cString: $0)
-      }
-    let model =
-      takeString(LIBMTP_Get_Modelname(handle))
-      ?? raw.device_entry.product.map {
-        String(cString: $0)
-      }
+    let fallback = describe(RawDeviceRef(raw: raw))
     return DeviceInfo(
       // A device without a serial falls back to its USB location, which is not stable across
       // ports but is unique while connected.
-      id: DeviceID(serial: serial ?? "usb-\(raw.bus_location)-\(raw.devnum)"),
-      manufacturer: manufacturer ?? "Unknown", model: model ?? "MTP device")
+      id: serial.map(DeviceID.init(serial:)) ?? fallback.id,
+      manufacturer: takeString(LIBMTP_Get_Manufacturername(handle)) ?? fallback.manufacturer,
+      model: takeString(LIBMTP_Get_Modelname(handle)) ?? fallback.model)
+  }
+
+  /// Names a device from its USB location and libmtp's device table, without opening it.
+  static func describe(_ raw: RawDeviceRef) -> DeviceInfo {
+    let entry = raw.raw.device_entry
+    return DeviceInfo(
+      id: DeviceID(serial: "usb-\(raw.raw.bus_location)-\(raw.raw.devnum)"),
+      manufacturer: entry.vendor.map { String(cString: $0) } ?? "Unknown",
+      model: entry.product.map { String(cString: $0) } ?? "MTP device")
   }
 
   /// Copies and frees a malloc'd C string from libmtp; empty strings count as absent.

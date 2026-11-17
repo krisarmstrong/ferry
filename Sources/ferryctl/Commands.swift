@@ -91,7 +91,7 @@ private func report(_ error: any Error) -> ExitCode {
 private func open(_ options: DeviceOptions) async throws -> any DeviceSession {
   let transport = MTPTransport()
   let device = try DeviceSelection.pickDevice(
-    serial: options.device, from: await transport.connectedDevices())
+    serial: options.device, from: await transport.scan())
   return try await transport.open(device.id)
 }
 
@@ -104,7 +104,7 @@ struct Devices: AsyncParsableCommand {
 
   func run() async throws {
     do {
-      for device in try DeviceSelection.requireAny(await MTPTransport().connectedDevices()) {
+      for device in try DeviceSelection.requireAny(await MTPTransport().scan()) {
         show(device.id.serial, "\(device.manufacturer) \(device.model)")
       }
     } catch {

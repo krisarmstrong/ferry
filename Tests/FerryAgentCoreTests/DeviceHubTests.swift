@@ -31,8 +31,8 @@ private struct Harness {
   private let ticks: AsyncStream<Void>.Continuation
   var events: AsyncStream<HubEvent>.Iterator
 
-  init(devices: [FakeDevice] = [], exclusive: Bool = false) {
-    transport = FakeTransport(devices: devices, exclusive: exclusive)
+  init(devices: [FakeDevice] = []) {
+    transport = FakeTransport(devices: devices)
     let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
     self.ticks = ticks
     hub = DeviceHub(transport: transport, arrivals: arrivals, clock: clock)
@@ -93,12 +93,9 @@ struct DeviceHubTests {
     #expect(await harness.transport.openCount(of: device.info.id) == 1)
   }
 
-  /// Exclusive is how `MTPTransport` behaves; non-exclusive lists the held device, so a hub
-  /// that re-opened it would show up in the open count.
-  @Test(arguments: [true, false])
-  func heldDeviceIsNeverBusy(exclusive: Bool) async {
+  @Test func heldDeviceIsNeverBusy() async {
     let device = await makeDevice("A")
-    var harness = Harness(devices: [device], exclusive: exclusive)
+    var harness = Harness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(device)))
 
@@ -124,6 +121,80 @@ struct DeviceHubTests {
     #expect(await harness.next() == .changed(ready(device)))
   }
 
+  @Test func anotherAppHoldingDeviceIsReportedBusy() async {
+    let device = await makeDevice("A")
+    let busy = AttachedDevice(
+      info: DeviceInfo(
+        id: FakeTransport.busyID(for: device.info.id), manufacturer: "Fake", model: "Phone"),
+      state: .busy)
+    var harness = Harness()
+    defer { harness.finish() }
+    await harness.transport.attach(device)
+    await harness.transport.setHeldByAnotherApp(device.info.id, true)
+    harness.tick()
+
+    #expect(await harness.next() == .attached(busy))
+    #expect(await harness.transport.openCount(of: device.info.id) == 0)
+    harness.tick()
+    let barrier = await harness.barrier()
+    #expect(barrier?.isAttached(serial: "BARRIER") == true)
+
+    await harness.transport.setHeldByAnotherApp(device.info.id, false)
+    harness.tick()
+    #expect(await harness.next() == .detached(busy.id))
+    #expect(await harness.next() == .attached(ready(device)))
+  }
+
+  @Test func scanNeverOpensHeldDevice() async {
+    let device = await makeDevice("A")
+    var harness = Harness(devices: [device])
+    defer { harness.finish() }
+    #expect(await harness.next() == .attached(ready(device)))
+    let probes = await harness.transport.probeCount(of: device.info.id)
+
+    for _ in 0..<5 { harness.tick() }
+    _ = await harness.barrier()
+
+    #expect(await harness.transport.probeCount(of: device.info.id) == probes)
+    #expect(await harness.transport.openCount(of: device.info.id) == 1)
+  }
+
+  @Test func noRepeatedOpensPerTick() async {
+    let devices = [await makeDevice("A"), await makeDevice("B"), await makeDevice("C")]
+    var harness = Harness()
+    defer { harness.finish() }
+    for device in devices { await harness.transport.attach(device) }
+    let scansBefore = await harness.transport.scanCount
+    harness.tick()
+    for _ in devices { _ = await harness.next() }
+
+    #expect(await harness.transport.scanCount == scansBefore + 1)
+    for device in devices {
+      #expect(await harness.transport.openCount(of: device.info.id) == 1)
+      #expect(await harness.transport.probeCount(of: device.info.id) == 1)
+    }
+  }
+
+  @Test func failedStoragesReleasesSessionForRetry() async {
+    let device = await makeDevice("A")
+    var harness = Harness(devices: [device])
+    defer { harness.finish() }
+    #expect(await harness.next() == .attached(ready(device)))
+
+    await device.failNextStorages(with: .io("stall"))
+    await harness.hub.recheck(device.info.id)
+
+    let failed = AttachedDevice(info: device.info, state: .failed(.io("stall")))
+    #expect(await harness.next() == .changed(failed))
+    #expect(await device.closeCount == 1)
+    await #expect(throws: TransportError.io("stall")) {
+      _ = try await harness.hub.session(for: device.info.id)
+    }
+    harness.tick()
+    #expect(await harness.next() == .changed(ready(device)))
+    #expect(await harness.transport.openCount(of: device.info.id) == 2)
+  }
+
   @Test func detachClosesSessionAndEmits() async {
     let device = await makeDevice("A")
     var harness = Harness(devices: [device])
@@ -143,7 +214,7 @@ struct DeviceHubTests {
 
   @Test func replugBeforeTickIsReattached() async {
     let device = await makeDevice("A")
-    var harness = Harness(devices: [device], exclusive: true)
+    var harness = Harness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(device)))
 
@@ -161,7 +232,7 @@ struct DeviceHubTests {
   /// reported before the departure it follows.
   @Test func replugDuringCloseIsReportedAfterDetach() async {
     let device = await makeDevice("A")
-    var harness = Harness(devices: [device], exclusive: true)
+    var harness = Harness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(device)))
 

@@ -12,10 +12,12 @@ public enum HubEvent: Sendable, Equatable {
 
 /// The one owner of every open device session in the agent.
 ///
-/// Each USB tick on `arrivals` makes the hub list the attached devices, open the new ones, and
-/// ask each held session for its storages. A held device's departure is learned only from its
-/// own session reporting `.deviceDisconnected`: a transport cannot list a device this process
-/// already holds open, so absence from the list says nothing about it.
+/// Each USB tick on `arrivals` makes the hub scan the bus once, open the new devices, and ask
+/// each held session for its storages. A held device's departure is learned only from its own
+/// session reporting `.deviceDisconnected`: the transport reports a held device from its record
+/// without touching it, so a scan says nothing about whether it is still there. A device another
+/// app holds is listed as `.busy` until it leaves a scan. A held session whose storages fail for
+/// any other reason than a lock or a departure is closed, so a later scan can open it afresh.
 ///
 /// A device that is attached but not sharing files is re-checked every two seconds. MTP has no
 /// event for "file transfer turned on", so this is the hub's one poll, and it runs only while
@@ -102,6 +104,11 @@ public actor DeviceHub {
     let reading = await Self.read(session)
     guard let current = entries[id], current.generation == entry.generation else { return }
     switch reading {
+    case .state(.failed(let error)):
+      // Let the session go, so a later scan can open the device afresh.
+      await session.close()
+      guard let latest = entries[id], latest.generation == current.generation else { return }
+      store(latest.info, .failed(error), .unheld)
     case .state(let state):
       store(current.info, state, current.holding)
     case .gone:
@@ -143,24 +150,24 @@ public actor DeviceHub {
     for (id, entry) in entries {
       if case .held = entry.holding { probe(id) }
     }
-    let listed: [DeviceInfo]
+    let scan: DeviceScan
     do throws(TransportError) {
-      listed = try await transport.connectedDevices()
-    } catch .deviceBusy {
-      // Every attached device is open somewhere, ours included.
-      listed = []
+      scan = try await transport.scan()
     } catch {
-      log.error("listing devices failed: \(String(describing: error), privacy: .public)")
+      log.error("scanning devices failed: \(String(describing: error), privacy: .public)")
       return
     }
-    let present = Set(listed.map(\.id))
+    let present = Set((scan.devices + scan.busy).map(\.id))
     for (id, entry) in entries where !present.contains(id) {
       guard case .unheld = entry.holding else { continue }
       entries[id] = nil
       log.info("device \(id.serial, privacy: .private) detached")
       continuation.yield(.detached(id))
     }
-    for info in listed {
+    for info in scan.busy where entries[info.id] == nil {
+      store(info, .busy, .unheld)
+    }
+    for info in scan.devices {
       await admit(info)
     }
   }
@@ -189,6 +196,12 @@ public actor DeviceHub {
     let reading = await Self.read(session)
     guard entries[info.id]?.generation == generation, case .state(let state) = reading else {
       await session.close()
+      return
+    }
+    if case .failed = state {
+      await session.close()
+      guard entries[info.id]?.generation == generation else { return }
+      store(info, state, .unheld)
       return
     }
     log.info("device \(info.id.serial, privacy: .private) opened")

@@ -155,7 +155,7 @@ struct FakeTransportTests {
 
   @Test func transportOpensKnownDevicesOnly() async throws {
     let transport = FakeTransport(devices: [makeDevice()])
-    #expect(try await transport.connectedDevices().map(\.id) == [deviceID])
+    #expect(try await transport.scan().devices.map(\.id) == [deviceID])
     let session = try await transport.open(deviceID)
     #expect(session.info.id == deviceID)
     let missing = DeviceID(serial: "nope")

@@ -181,4 +181,26 @@ struct MTPSessionGateTests {
     #expect(await session.capabilities().isEmpty)
     #expect(await device.callCount == 0)
   }
+
+  @Test func closeReleasesTheDeviceOnce() async {
+    let releases = Log<Int>()
+    let session = MTPSession(device: SessionFixture.makeDevice()) { await releases.append(1) }
+
+    await session.close()
+    await session.close()
+
+    #expect(await releases.values == [1])
+  }
+
+  @Test func disconnectReleasesTheDeviceOnce() async {
+    let device = SessionFixture.makeDevice()
+    let releases = Log<Int>()
+    let session = MTPSession(device: device) { await releases.append(1) }
+
+    await device.unplug()
+    _ = try? await session.storages()
+    #expect(await releases.values == [1])
+    await session.close()
+    #expect(await releases.values == [1])
+  }
 }

@@ -13,32 +13,51 @@ struct DeviceSelectionTests {
   }
 
   @Test func defaultsToFirstDevice() throws {
-    #expect(try DeviceSelection.pickDevice(serial: nil, from: [first, second]) == first)
+    #expect(
+      try DeviceSelection.pickDevice(serial: nil, from: DeviceScan(devices: [first, second]))
+        == first)
   }
 
   @Test func matchesDeviceBySerial() throws {
-    #expect(try DeviceSelection.pickDevice(serial: "B2", from: [first, second]) == second)
+    #expect(
+      try DeviceSelection.pickDevice(serial: "B2", from: DeviceScan(devices: [first, second]))
+        == second)
   }
 
   @Test func noDevicesThrowsNoDeviceConnected() {
     #expect(throws: TransportError.noDeviceConnected) {
-      try DeviceSelection.pickDevice(serial: nil, from: [])
+      try DeviceSelection.pickDevice(serial: nil, from: DeviceScan(devices: []))
     }
   }
 
   @Test func listingNoDevicesThrowsNoDeviceConnected() {
     #expect(throws: TransportError.noDeviceConnected) {
-      try DeviceSelection.requireAny([])
+      try DeviceSelection.requireAny(DeviceScan(devices: []))
     }
   }
 
   @Test func listingDevicesReturnsThemAll() throws {
-    #expect(try DeviceSelection.requireAny([first, second]) == [first, second])
+    #expect(
+      try DeviceSelection.requireAny(DeviceScan(devices: [first, second])) == [first, second])
+  }
+
+  @Test func onlyBusyDevicesThrowsDeviceBusy() {
+    let held = DeviceInfo(id: DeviceID(serial: "usb-1-2"), manufacturer: "Acme", model: "Two")
+    let scan = DeviceScan(devices: [], busy: [held])
+    #expect(throws: TransportError.deviceBusy) { try DeviceSelection.requireAny(scan) }
+    #expect(throws: TransportError.deviceBusy) {
+      try DeviceSelection.pickDevice(serial: nil, from: scan)
+    }
+  }
+
+  @Test func busyDeviceDoesNotHideUsableOnes() throws {
+    let held = DeviceInfo(id: DeviceID(serial: "usb-1-2"), manufacturer: "Acme", model: "Two")
+    #expect(try DeviceSelection.requireAny(DeviceScan(devices: [first], busy: [held])) == [first])
   }
 
   @Test func unknownSerialThrowsDeviceNotFound() {
     #expect(throws: TransportError.deviceNotFound(DeviceID(serial: "ZZ"))) {
-      try DeviceSelection.pickDevice(serial: "ZZ", from: [first])
+      try DeviceSelection.pickDevice(serial: "ZZ", from: DeviceScan(devices: [first]))
     }
   }
 

@@ -13,7 +13,7 @@ extension DeviceTests {
 
     func openFirstSession() async throws -> any DeviceSession {
       let transport = MTPTransport()
-      let device = try #require(try await transport.connectedDevices().first, "no MTP device")
+      let device = try #require(try await transport.scan().devices.first, "no MTP device")
       return try await transport.open(device.id)
     }
 
@@ -105,6 +105,29 @@ extension DeviceTests {
           #expect(item.size == size)
         }
       }
+    }
+
+    /// A scan while the phone is held reports it from the registry, untouched, and does not
+    /// disturb the open session.
+    @Test func heldDeviceIsScannedWithoutBeingOpened() async throws {
+      let transport = MTPTransport()
+      let device = try #require(try await transport.scan().devices.first, "no MTP device")
+      let session = try await transport.open(device.id)
+      do {
+        let before = try await session.storages()
+        let scan = try await transport.scan()
+        #expect(scan.devices.contains(device))
+        #expect(scan.busy.isEmpty)
+        await #expect(throws: TransportError.deviceBusy) {
+          _ = try await transport.open(device.id)
+        }
+        #expect(try await session.storages() == before)
+      } catch {
+        await session.close()
+        throw error
+      }
+      await session.close()
+      #expect(try await transport.scan().devices.contains(device))
     }
 
     @Test func storageKeysStableAcrossReopen() async throws {

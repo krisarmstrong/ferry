@@ -1,19 +1,18 @@
 /// Picks the device and storage a command or app acts on from what the transport reported.
 public enum DeviceSelection {
-  /// `devices`, which must not be empty: listing no phones is an error, not an empty answer.
-  public static func requireAny(_ devices: [DeviceInfo]) throws(TransportError) -> [DeviceInfo] {
-    guard !devices.isEmpty else { throw .noDeviceConnected }
-    return devices
+  /// The usable devices, which must not be empty: listing no phones is an error, not an empty
+  /// answer. When the only phones are held by another app, the error says so.
+  public static func requireAny(_ scan: DeviceScan) throws(TransportError) -> [DeviceInfo] {
+    guard !scan.devices.isEmpty else { throw scan.busy.isEmpty ? .noDeviceConnected : .deviceBusy }
+    return scan.devices
   }
 
   /// The device with `serial`, or the first one when `serial` is nil.
-  public static func pickDevice(serial: String?, from devices: [DeviceInfo])
+  public static func pickDevice(serial: String?, from scan: DeviceScan)
     throws(TransportError) -> DeviceInfo
   {
-    guard let serial else {
-      guard let first = devices.first else { throw .noDeviceConnected }
-      return first
-    }
+    let devices = try requireAny(scan)
+    guard let serial else { return devices[0] }
     guard let match = devices.first(where: { $0.id.serial == serial }) else {
       throw .deviceNotFound(DeviceID(serial: serial))
     }

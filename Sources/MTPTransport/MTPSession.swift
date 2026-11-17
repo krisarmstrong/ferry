@@ -24,11 +24,17 @@ actor MTPSession: DeviceSession {
   /// Raw storage ID by `StorageID.key`, refreshed by `refreshStorages()`.
   private var rawStorages: [String: UInt32] = [:]
   private var disconnected = false
+  /// Tells the transport the device is free again; runs once, when the handle is released.
+  private var onRelease: (@Sendable () async -> Void)?
 
-  init(device: any MTPDeviceOperations, partials: PartialRegistry = PartialRegistry()) {
+  init(
+    device: any MTPDeviceOperations, partials: PartialRegistry = PartialRegistry(),
+    onRelease: @escaping @Sendable () async -> Void = {}
+  ) {
     self.info = device.info
     self.partials = partials
     self.device = device
+    self.onRelease = onRelease
     self.resolver = PathResolver { storage, parent throws(TransportError) in
       try await device.list(storage: storage, parent: parent)
     }
@@ -48,10 +54,22 @@ actor MTPSession: DeviceSession {
     await gate.run { () async in
       await resolver.invalidateAll()
       await device.close()
+      await released()
     }
   }
 
+  isolated deinit {
+    // Dropped without `close()`: the device's own deinit releases the handle.
+    if let onRelease { Task { await onRelease() } }
+  }
+
   // MARK: Helpers
+
+  private func released() async {
+    guard let onRelease else { return }
+    self.onRelease = nil
+    await onRelease()
+  }
 
   /// Runs `body` as one gated operation. A `.deviceDisconnected` from it releases the device,
   /// so later operations fail here instead of waiting on USB.
@@ -67,6 +85,7 @@ actor MTPSession: DeviceSession {
           disconnected = true
           await resolver.invalidateAll()
           await device.close()
+          await released()
         }
         throw error
       }
