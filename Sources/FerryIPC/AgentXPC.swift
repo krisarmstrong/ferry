@@ -22,14 +22,22 @@ public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Senda
     identifier "io.github.krisarmstrong.ferry.provider")
     """
 
+  /// The agent itself, as its clients require it to be signed.
+  public static let agentRequirement = """
+    anchor apple generic and certificate leaf[subject.OU] = "X6JWYP43HG" and \
+    identifier "io.github.krisarmstrong.ferry.agent"
+    """
+
   private let handler: any AgentHandling
   private let codeSigningRequirement: String?
 
-  /// `codeSigningRequirement` is checked on every message; nil admits any peer, which only an
-  /// anonymous listener in tests may use.
-  public init(
-    handler: any AgentHandling, codeSigningRequirement: String? = ferryClientRequirement
-  ) {
+  /// Admits only peers that satisfy `ferryClientRequirement`, checked on every message.
+  public convenience init(handler: any AgentHandling) {
+    self.init(handler: handler, codeSigningRequirement: Self.ferryClientRequirement)
+  }
+
+  /// A nil requirement admits any peer, which only an anonymous listener in tests may use.
+  init(handler: any AgentHandling, codeSigningRequirement: String?) {
     self.handler = handler
     self.codeSigningRequirement = codeSigningRequirement
   }

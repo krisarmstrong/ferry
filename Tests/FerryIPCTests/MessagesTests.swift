@@ -153,10 +153,13 @@ private func reply(to data: Data) async throws -> AgentResponse {
   #expect(try await reply(to: data) == .failure(.io("bad request")))
 }
 
-@Test func clientRequirementCompiles() throws {
+private let requirements =
+  [AgentListenerDelegate.ferryClientRequirement]
+  + [AgentListenerDelegate.agentRequirement]
+
+@Test(arguments: requirements)
+func requirementCompiles(_ text: String) throws {
   var requirement: SecRequirement?
-  let status = SecRequirementCreateWithString(
-    AgentListenerDelegate.ferryClientRequirement as CFString, [], &requirement)
-  #expect(status == errSecSuccess)
+  #expect(SecRequirementCreateWithString(text as CFString, [], &requirement) == errSecSuccess)
   #expect(requirement != nil)
 }

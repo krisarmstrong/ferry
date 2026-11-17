@@ -65,12 +65,15 @@ private struct Harness {
   let started: AsyncStream<Void>
   let release: AsyncStream<Void>.Continuation
 
-  init(requirement: String? = nil, refusals: Int = 0) {
+  /// `signedOnly` uses the production delegate, which admits only Ferry-signed peers.
+  init(signedOnly: Bool = false, refusals: Int = 0) {
     let (started, startedContinuation) = AsyncStream.makeStream(of: Void.self)
     let (releaseStream, release) = AsyncStream.makeStream(of: Void.self)
     let handler = StubHandler(started: startedContinuation, release: releaseStream)
     delegate = RefusingDelegate(
-      inner: AgentListenerDelegate(handler: handler, codeSigningRequirement: requirement),
+      inner: signedOnly
+        ? AgentListenerDelegate(handler: handler)
+        : AgentListenerDelegate(handler: handler, codeSigningRequirement: nil),
       refusals: refusals)
     listener.delegate = delegate
     listener.resume()
@@ -118,7 +121,7 @@ func reconnectsAfterConnectionIsInvalidated() async throws {
 
 @Test(.timeLimit(.minutes(1)))
 func unsignedPeerIsRejected() async throws {
-  let harness = Harness(requirement: AgentListenerDelegate.ferryClientRequirement)
+  let harness = Harness(signedOnly: true)
   defer { harness.finish() }
   await #expect(throws: TransportError.deviceDisconnected) {
     try await harness.client.send(.list(domain: "d", folder: .root))

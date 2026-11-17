@@ -28,7 +28,7 @@ public actor AgentClient: AgentSending {
     target = .machService(machServiceName)
   }
 
-  /// Connects to an anonymous listener in the same process.
+  /// Connects to an anonymous listener in the same process, without checking its signature.
   init(endpoint: NSXPCListenerEndpoint) {
     target = .endpoint(endpoint)
   }
@@ -71,11 +71,16 @@ public actor AgentClient: AgentSending {
 
   private func currentConnection() -> NSXPCConnection {
     if let connection { return connection }
-    let made =
-      switch target {
-      case .machService(let name): NSXPCConnection(machServiceName: name)
-      case .endpoint(let endpoint): NSXPCConnection(listenerEndpoint: endpoint)
-      }
+    let made: NSXPCConnection
+    switch target {
+    case .machService(let name):
+      made = NSXPCConnection(machServiceName: name)
+      // Any same-user process can register this name in the gui domain first, so only a
+      // Ferry-signed agent may answer.
+      made.setCodeSigningRequirement(AgentListenerDelegate.agentRequirement)
+    case .endpoint(let endpoint):
+      made = NSXPCConnection(listenerEndpoint: endpoint)
+    }
     made.remoteObjectInterface = NSXPCInterface(with: AgentXPC.self)
     let id = ObjectIdentifier(made)
     made.invalidationHandler = { [weak self] in
