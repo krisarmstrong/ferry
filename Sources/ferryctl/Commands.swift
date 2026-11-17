@@ -20,26 +20,17 @@ struct Target {
   let storage: StorageID
 }
 
-private struct CommandFailure: Error {
-  let message: String
-}
-
 private func message(for error: TransportError) -> String {
   switch error {
+  case .noDeviceConnected: "No phone is connected."
+  case .deviceNotFound(let id): "No phone with serial \(id.serial) is connected."
+  case .noStorage: "The phone reports no storage."
+  case .storageNotFound(let name): "No storage named \"\(name)\" on the phone."
   case .deviceBusy:
     "Another app is using the phone (Image Capture, Preview, Photos or a sync app). "
       + "Quit it and replug, or see docs/spikes/2026-11-ptpcamerad.md."
   case .deviceLocked: "Unlock your phone and choose \"File transfer\"."
-  case .deviceNotFound(let id): "No phone with serial \(id.serial) is connected."
   case .deviceDisconnected: "The phone was disconnected."
-  case .cancelled: "Cancelled."
-  case .io(let detail): "I/O error: \(detail)"
-  default: itemMessage(for: error)
-  }
-}
-
-private func itemMessage(for error: TransportError) -> String {
-  switch error {
   case .notFound(let path): "\(path) does not exist on the phone."
   case .alreadyExists(let path): "\(path) already exists on the phone. Use --replace to overwrite."
   case .invalidName(let name): "\"\(name)\" is not a valid name."
@@ -52,8 +43,14 @@ private func itemMessage(for error: TransportError) -> String {
     "The phone stored \(actual) bytes instead of \(expected)."
   case .nameChangedByDevice(let requested, let actual):
     "The phone saved \"\(requested)\" as \"\(actual)\"."
-  default: "Unexpected error: \(error)"
+  case .cancelled: "Cancelled."
+  case .io(let detail): "I/O error: \(detail)"
   }
+}
+
+/// Prints tab-separated fields, each with its control characters made visible.
+private func show(_ fields: String...) {
+  print(fields.map(DisplayText.escaped).joined(separator: "\t"))
 }
 
 /// Opens the chosen phone and storage, runs `body`, closes the session, and turns any failure
@@ -65,7 +62,9 @@ private func withTarget(
   do {
     let session = try await open(device)
     do {
-      let id = try await pickStorage(storage?.storage, in: session)
+      let id = try DeviceSelection.pickStorage(
+        description: storage?.storage, from: await session.storages()
+      ).id
       try await body(Target(session: session, writer: SafeWriter(session: session), storage: id))
     } catch {
       await session.close()
@@ -78,41 +77,16 @@ private func withTarget(
 }
 
 private func report(_ error: any Error) -> ExitCode {
-  let text: String
-  switch error {
-  case let error as TransportError: text = message(for: error)
-  case let error as CommandFailure: text = error.message
-  default: text = error.localizedDescription
-  }
-  FileHandle.standardError.write(Data((text + "\n").utf8))
+  let text = (error as? TransportError).map(message(for:)) ?? error.localizedDescription
+  FileHandle.standardError.write(Data((DisplayText.escaped(text) + "\n").utf8))
   return .failure
 }
 
 private func open(_ options: DeviceOptions) async throws -> any DeviceSession {
   let transport = MTPTransport()
-  if let serial = options.device {
-    return try await transport.open(DeviceID(serial: serial))
-  }
-  guard let first = try await transport.connectedDevices().first else {
-    throw CommandFailure(message: "No phone is connected.")
-  }
-  return try await transport.open(first.id)
-}
-
-private func pickStorage(_ description: String?, in session: any DeviceSession) async throws
-  -> StorageID
-{
-  let storages = try await session.storages()
-  guard let description else {
-    guard let first = storages.first else {
-      throw CommandFailure(message: "The phone reports no storage.")
-    }
-    return first.id
-  }
-  guard let match = storages.first(where: { $0.description == description }) else {
-    throw CommandFailure(message: "No storage named \"\(description)\" on the phone.")
-  }
-  return match.id
+  let device = try DeviceSelection.pickDevice(
+    serial: options.device, from: await transport.connectedDevices())
+  return try await transport.open(device.id)
 }
 
 private func path(_ string: String) throws -> RemotePath {
@@ -125,7 +99,7 @@ struct Devices: AsyncParsableCommand {
   func run() async throws {
     do {
       for device in try await MTPTransport().connectedDevices() {
-        print("\(device.id.serial)\t\(device.manufacturer) \(device.model)")
+        show(device.id.serial, "\(device.manufacturer) \(device.model)")
       }
     } catch {
       throw report(error)
@@ -140,7 +114,7 @@ struct Storages: AsyncParsableCommand {
   func run() async throws {
     try await withTarget(device) { target in
       for storage in try await target.session.storages() {
-        print("\(storage.description)\t\(storage.free) free of \(storage.capacity) bytes")
+        show(storage.description, "\(storage.free) free of \(storage.capacity) bytes")
       }
     }
   }
@@ -157,7 +131,7 @@ struct List: AsyncParsableCommand {
     try await withTarget(device, storage) { target in
       for item in try await target.writer.visibleList(path(folder), in: target.storage) {
         let kind = item.kind == .folder ? "d" : "-"
-        print("\(kind)\t\(item.size)\t\(item.path.name ?? "/")")
+        show(kind, "\(item.size)", item.path.name ?? "/")
       }
     }
   }

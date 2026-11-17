@@ -1,5 +1,8 @@
 public enum TransportError: Error, Equatable, Sendable {
+  case noDeviceConnected
   case deviceNotFound(DeviceID)
+  case noStorage
+  case storageNotFound(String)
   case deviceBusy
   case deviceLocked
   case deviceDisconnected

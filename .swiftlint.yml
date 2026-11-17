@@ -8,5 +8,8 @@ identifier_name:
     - id
 
 # swift-format puts the brace of a wrapped signature on its own line.
+cyclomatic_complexity:
+  ignores_case_statements: true
+
 opening_brace:
   ignore_multiline_function_signatures: true
