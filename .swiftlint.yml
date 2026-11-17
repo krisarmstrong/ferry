@@ -6,3 +6,7 @@ identifier_name:
   excluded:
     - io
     - id
+
+# swift-format owns brace placement; it puts the brace of a wrapped signature on its own line.
+disabled_rules:
+  - opening_brace
