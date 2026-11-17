@@ -67,11 +67,19 @@ struct MTPErrorClassificationTests {
     let (error, probes) = classify(
       [.init(code: .general, text: "Get Storage information failed.")], generalMeansLocked: true)
     #expect(error == .deviceLocked)
-    #expect(probes == 0)
+    #expect(probes == 1)
   }
 
   @Test func emptyStackWhileReadingStoragesIsLocked() {
     #expect(classify([], generalMeansLocked: true).0 == .deviceLocked)
+  }
+
+  /// An unplugged phone fails the storage read the same way a locked one does.
+  @Test(arguments: [[], [MTPErrorEntry(code: .general, text: "Get Storage information failed.")]])
+  func storageReadWithDeviceGoneIsDisconnected(entries: [MTPErrorEntry]) {
+    let (error, probes) = classify(entries, generalMeansLocked: true, present: false)
+    #expect(error == .deviceDisconnected)
+    #expect(probes == 1)
   }
 
   @Test func generalMixedWithOtherErrorsIsIO() {

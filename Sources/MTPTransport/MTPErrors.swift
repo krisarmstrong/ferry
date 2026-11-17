@@ -40,10 +40,11 @@ extension TransportError {
   ///
   /// libmtp reports a USB link lost mid-operation as a PTP- or USB-layer error, which a
   /// protocol failure on a healthy link also produces; `deviceStillPresent` tells them apart
-  /// and is only consulted for those codes.
+  /// and is consulted only for those codes and for a possible lock.
   ///
   /// With `generalMeansLocked`, a stack holding only general errors (or none) is a locked
-  /// device: that is how libmtp reports a phone that exposes no storages.
+  /// device if it is still on the bus: that is how libmtp reports a phone that exposes no
+  /// storages, and also one that was just unplugged.
   static func classify(
     _ entries: [MTPErrorEntry], during operation: String, generalMeansLocked: Bool = false,
     deviceStillPresent: () -> Bool
@@ -54,7 +55,9 @@ extension TransportError {
     if codes.contains(where: { $0 == .usbLayer || $0 == .ptpLayer }), !deviceStillPresent() {
       return .deviceDisconnected
     }
-    if generalMeansLocked, codes.allSatisfy({ $0 == .general }) { return .deviceLocked }
+    if generalMeansLocked, codes.allSatisfy({ $0 == .general }) {
+      return deviceStillPresent() ? .deviceLocked : .deviceDisconnected
+    }
     let messages = entries.map(\.text).filter { !$0.isEmpty }
     guard !messages.isEmpty else { return .io("\(operation) failed") }
     return .io("\(operation) failed: \(messages.joined(separator: "; "))")
