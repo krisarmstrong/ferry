@@ -18,7 +18,7 @@ struct RawDeviceRef: @unchecked Sendable {
 /// the handle never leaves it. Methods are synchronous on that queue; callers `await` the hop.
 /// Each operation clears libmtp's error stack first, so a failure drains only its own errors.
 actor MTPDevice {
-  private static let libraryInitialized: Void = LIBMTP_Init()
+  fileprivate static let libraryInitialized: Void = LIBMTP_Init()
   private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "MTPDevice")
 
   private let queue: DispatchSerialQueue
@@ -54,19 +54,18 @@ actor MTPDevice {
 
   /// Opens `raw`. Failure usually means another process (Android File Transfer, a camera
   /// importer) holds the interface, so it is reported as `.deviceBusy`.
-  init(opening raw: RawDeviceRef) throws(TransportError) {
-    _ = Self.libraryInitialized
+  static func open(_ raw: RawDeviceRef) async throws(TransportError) -> MTPDevice {
     let queue = DispatchSerialQueue(label: "io.github.krisarmstrong.ferry.mtp-device")
     // Open and identify on the device's queue too, so no libmtp call for this handle ever
     // runs anywhere else.
-    let opened = queue.sync { () -> (UnsafeMutablePointer<LIBMTP_mtpdevice_t>, DeviceInfo)? in
-      var raw = raw.raw
-      guard let handle = LIBMTP_Open_Raw_Device_Uncached(&raw) else { return nil }
-      return (handle, Self.identify(handle, raw: raw))
-    }
-    guard let opened else { throw .deviceBusy }
+    guard let opened = await DeviceOpener(queue: queue).open(raw) else { throw .deviceBusy }
+    return MTPDevice(queue: queue, opened: opened, raw: raw)
+  }
+
+  private init(queue: DispatchSerialQueue, opened: OpenedHandle, raw: RawDeviceRef) {
     self.queue = queue
-    (handle, info) = opened
+    handle = opened.handle
+    info = opened.info
     busLocation = raw.raw.bus_location
     deviceNumber = raw.raw.devnum
   }
@@ -283,7 +282,7 @@ actor MTPDevice {
     }
   }
 
-  private static func identify(
+  fileprivate static func identify(
     _ handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>, raw: LIBMTP_raw_device_t
   ) -> DeviceInfo {
     let serial = takeString(LIBMTP_Get_Serialnumber(handle))
@@ -319,6 +318,35 @@ extension MTPDevice {
     guard let handle else { return }
     LIBMTP_Release_Device(handle)
     self.handle = nil
+  }
+}
+
+/// A handle just opened, on its way from `DeviceOpener` to the `MTPDevice` that owns it.
+///
+/// `@unchecked`: the handle is used only on the device's queue, before and after the hand-off,
+/// and nothing else keeps it.
+private struct OpenedHandle: @unchecked Sendable {
+  let handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>
+  let info: DeviceInfo
+}
+
+/// Runs the open on a device's queue before the `MTPDevice` that will own the handle exists.
+private actor DeviceOpener {
+  private let queue: DispatchSerialQueue
+
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
+    queue.asUnownedSerialExecutor()
+  }
+
+  init(queue: DispatchSerialQueue) {
+    self.queue = queue
+  }
+
+  func open(_ raw: RawDeviceRef) -> OpenedHandle? {
+    _ = MTPDevice.libraryInitialized
+    var raw = raw.raw
+    guard let handle = LIBMTP_Open_Raw_Device_Uncached(&raw) else { return nil }
+    return OpenedHandle(handle: handle, info: MTPDevice.identify(handle, raw: raw))
   }
 }
 

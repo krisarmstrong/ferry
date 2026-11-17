@@ -9,13 +9,13 @@ import Testing
 @Suite(
   .enabled(if: ProcessInfo.processInfo.environment["FERRY_DEVICE_TESTS"] == "1"), .serialized)
 struct MTPDeviceIntegrationTests {
-  func openFirstDevice() throws -> MTPDevice {
+  func openFirstDevice() async throws -> MTPDevice {
     let raw = try #require(try MTPDevice.detect().first, "no MTP device attached")
-    return try MTPDevice(opening: raw)
+    return try await MTPDevice.open(raw)
   }
 
   @Test func detectsAndOpens() async throws {
-    let device = try openFirstDevice()
+    let device = try await openFirstDevice()
     #expect(!device.info.id.serial.isEmpty)
     _ = await device.capabilities()
   }
@@ -23,14 +23,14 @@ struct MTPDeviceIntegrationTests {
   /// Manual: run with the phone locked.
   @Test(.enabled(if: ProcessInfo.processInfo.environment["FERRY_DEVICE_LOCKED"] == "1"))
   func storagesEmptyMapsToLocked() async throws {
-    let device = try openFirstDevice()
+    let device = try await openFirstDevice()
     await #expect(throws: TransportError.deviceLocked) {
       _ = try await device.storages()
     }
   }
 
   @Test func roundTripSmallFile() async throws {
-    let device = try openFirstDevice()
+    let device = try await openFirstDevice()
     let storage = try #require(try await device.storages().first).raw
     let root = PathResolver.rootParent
 
