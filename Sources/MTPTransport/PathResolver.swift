@@ -61,7 +61,7 @@ actor PathResolver {
   }
 
   /// The entry at `path`, or `nil` for the root.
-  private func entry(at path: RemotePath, storage: UInt32) async throws(TransportError)
+  func entry(at path: RemotePath, storage: UInt32) async throws(TransportError)
     -> MTPEntry?
   {
     guard let parent = path.parent, let name = path.name else { return nil }

@@ -22,7 +22,8 @@ actor MTPDevice {
   private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "MTPDevice")
 
   private let queue: DispatchSerialQueue
-  private let handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>
+  /// `nil` once closed; every operation then throws `.deviceDisconnected`.
+  private var handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>?
   /// Where the device sits on the bus, to tell a lost link from a protocol error.
   private let busLocation: UInt32
   private let deviceNumber: UInt8
@@ -71,10 +72,11 @@ actor MTPDevice {
   }
 
   isolated deinit {
-    LIBMTP_Release_Device(handle)
+    close()
   }
 
   func capabilities() -> DeviceCapabilities {
+    guard let handle else { return [] }
     var capabilities: DeviceCapabilities = []
     if LIBMTP_Check_Capability(handle, LIBMTP_DEVICECAP_MoveObject) != 0 {
       capabilities.insert(.move)
@@ -91,6 +93,7 @@ actor MTPDevice {
   /// The device's storages. A locked Android phone exposes none, so an empty list or a failed
   /// read on a still-connected device is `.deviceLocked`.
   func storages() throws(TransportError) -> [(raw: UInt32, info: StorageInfo)] {
+    let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
     // 1 is success with storage IDs only (placeholder descriptions); only -1 is failure.
     if LIBMTP_Get_Storage(handle, LIBMTP_STORAGE_SORTBY_NOTSORTED) < 0 {
@@ -128,6 +131,7 @@ actor MTPDevice {
 
   /// Children of `parent`; pass `PathResolver.rootParent` for the storage root.
   func list(storage: UInt32, parent: UInt32) throws(TransportError) -> [MTPEntry] {
+    let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
     var node = LIBMTP_Get_Files_And_Folders(handle, storage, parent)
     // NULL means both "empty folder" and "failed"; only the error stack tells them apart.
@@ -146,8 +150,8 @@ actor MTPDevice {
   func download(objectID: UInt32, to file: URL, progress: ProgressHandler)
     throws(TransportError)
   {
+    let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
-    let handle = handle
     let (result, cancelled) = file.withUnsafeFileSystemRepresentation { path in
       guard let path else { return (Int32(-1), false) }
       return Self.transfer(progress: progress) { context in
@@ -162,6 +166,7 @@ actor MTPDevice {
   func upload(
     from file: URL, name: String, parent: UInt32, storage: UInt32, progress: ProgressHandler
   ) throws(TransportError) -> UInt32 {
+    let handle = try openHandle()
     let size = try Self.localSize(of: file)
     LIBMTP_Clear_Errorstack(handle)
     guard let metadata = LIBMTP_new_file_t() else { throw .io("uploading failed: out of memory") }
@@ -175,7 +180,6 @@ actor MTPDevice {
     metadata.pointee.storage_id = storage
     metadata.pointee.filetype = LIBMTP_FILETYPE_UNKNOWN
 
-    let handle = handle
     let (result, cancelled) = file.withUnsafeFileSystemRepresentation { path in
       guard let path else { return (Int32(-1), false) }
       return Self.transfer(progress: progress) { context in
@@ -192,6 +196,7 @@ actor MTPDevice {
     -> UInt32
   {
     // LIBMTP_Create_Folder may rewrite the name in place on 7-bit-only devices, so it gets a copy.
+    let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
     guard let buffer = strdup(name) else { throw .io("creating folder failed: out of memory") }
     defer { free(buffer) }
@@ -201,6 +206,7 @@ actor MTPDevice {
   }
 
   func rename(objectID: UInt32, to name: String) throws(TransportError) {
+    let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
     guard let file = LIBMTP_Get_Filemetadata(handle, objectID) else {
       throw failure(during: "reading metadata")
@@ -214,16 +220,19 @@ actor MTPDevice {
   func move(objectID: UInt32, storage: UInt32, newParent: UInt32) throws(TransportError) {
     // MoveObject names the root as 0, unlike listing and SendObjectInfo.
     let parent = newParent == PathResolver.rootParent ? 0 : newParent
+    let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
     try check(LIBMTP_Move_Object(handle, objectID, storage, parent), during: "moving")
   }
 
   func delete(objectID: UInt32) throws(TransportError) {
+    let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
     try check(LIBMTP_Delete_Object(handle, objectID), during: "deleting")
   }
 
   func metadata(objectID: UInt32) throws(TransportError) -> MTPEntry {
+    let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
     guard let file = LIBMTP_Get_Filemetadata(handle, objectID) else {
       throw failure(during: "reading metadata")
@@ -242,8 +251,15 @@ actor MTPDevice {
     throw cancelled ? .cancelled : error
   }
 
+  private func openHandle() throws(TransportError) -> UnsafeMutablePointer<LIBMTP_mtpdevice_t> {
+    guard let handle else { throw .deviceDisconnected }
+    return handle
+  }
+
   private func failure(during operation: String) -> TransportError {
-    .classify(drainErrorStack(handle), during: operation, deviceStillPresent: isStillAttached)
+    guard let handle else { return .deviceDisconnected }
+    return .classify(
+      drainErrorStack(handle), during: operation, deviceStillPresent: isStillAttached)
   }
 
   /// Whether this device is still on the bus. Runs on the device queue like every other libmtp
@@ -303,6 +319,15 @@ actor MTPDevice {
     } catch {
       throw .io(error.localizedDescription)
     }
+  }
+}
+
+extension MTPDevice {
+  /// Releases the USB interface now, so the device can be opened again at once. Idempotent.
+  func close() {
+    guard let handle else { return }
+    LIBMTP_Release_Device(handle)
+    self.handle = nil
   }
 }
 
