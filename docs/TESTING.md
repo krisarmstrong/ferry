@@ -7,13 +7,13 @@
 The MTP integration suites write to the attached phone, so they are off by default. Use a phone
 you don't mind writing to. Unlock it, choose **File transfer** and quit anything else that might
 grab it (Android File Transfer, Image Capture, Preview, Photos).
-Run one suite at a time: only one session can hold the phone.
+All device suites sit under one serialized `DeviceTests` parent, because only one session can
+hold the phone.
 
 ```bash
-FERRY_DEVICE_TESTS=1 swift test --filter MTPSessionIntegrationTests
-FERRY_DEVICE_TESTS=1 swift test --filter MTPDeviceIntegrationTests
+FERRY_DEVICE_TESTS=1 swift test --filter DeviceTests
 # Adds the 4.1 GB upload. It needs about 4.1 GB free on the phone and takes a while.
-FERRY_DEVICE_TESTS=1 FERRY_LARGE_FILE_TESTS=1 swift test --filter MTPSessionIntegrationTests
+FERRY_DEVICE_TESTS=1 FERRY_LARGE_FILE_TESTS=1 swift test --filter DeviceTests
 # With the phone locked: checks that it reports "locked", not an error.
 FERRY_DEVICE_TESTS=1 FERRY_DEVICE_LOCKED=1 swift test --filter MTPDeviceIntegrationTests
 ```
@@ -25,8 +25,18 @@ one Android 8 or 9 device.
 
 | Device | Android | Integration suites | Large file (>4 GB) | Manual checklist | Date |
 | ------ | ------- | ------------------ | ------------------ | ---------------- | ---- |
+| NetAlly LinkRunner-100G (Android-based; no MoveObject) | AOSP MTP | pass (4/4; locked case not run) | not yet run | partial — see note | 2026-11-17 |
 | Owner's phone | — | not yet run | not yet run | not yet run | — |
 | Android 8 or 9 device | 8 / 9 | not yet run | not yet run | not yet run | — |
+
+**LinkRunner-100G, 2026-11-17.** Claimed with Image Capture's `icdd`/`ptpcamerad` running
+(see `docs/spikes/2026-11-ptpcamerad.md`). Before file transfer was enabled it exposed no
+storage and every command printed the unlock message. Passed with `ferryctl`: `devices`,
+`storages`, `ls /`, `put`, `put` without `--replace` refused, `put --replace`, `get` + byte
+compare, `get` onto an existing file refused, `mkdir`, `mv` (copy+delete fallback — the device
+has no MoveObject), `rename`, `put --replace` onto a folder refused (folder untouched), recursive
+`rm`; no `.ferry-partial-*` left. Not run: unplug mid-transfer, case-variant names, accents/emoji,
+reconnect key stability by hand, large file, "held by another app".
 
 ## Manual checklist
 
