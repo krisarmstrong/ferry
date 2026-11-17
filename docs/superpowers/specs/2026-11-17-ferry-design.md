@@ -29,6 +29,48 @@ use `ferry`.
 7. A small menu-bar item showing connected devices, transfer progress, a
    refresh action, and setup help when the phone isn't detected.
 
+## Target devices (owner decision 2026-11-17)
+
+Ferry is built first for **NetAlly Android-based testers**; generic Android phones are
+supported as a bonus, never at a NetAlly device's expense.
+
+- **v1 targets:** LinkRunner 10G, EtherScope nXG, LinkRunner 100G. The owner says these share
+  one Android 8 board; NetAlly's user guides give identical USB steps for all three but state
+  no Android version.
+- **Later:** AirCheck G3 (different board, different steps).
+- Verified so far: LinkRunner-100G (see `docs/TESTING.md`).
+
+## Setup guide: "Enable file transfer" (owner requirement)
+
+Most "it doesn't work" reports will be a device that is connected but not in file-transfer
+mode: it enumerates over MTP but publishes no storage (seen on the LinkRunner-100G until
+**Transfer files** was chosen). Ferry must say so and show how to fix it.
+
+- **When it appears:** (a) a device is detected but reports no storage
+  (`TransportError.deviceLocked`); (b) nothing is detected for a few seconds after the menu
+  opens; (c) from a permanent "How to connect" item in the menu and Settings. A short
+  one-line reminder ("Choose Transfer files on the device") sits in the empty and transfer
+  views.
+- **Picks the right steps:** when the device is identified, show its model's steps; otherwise
+  show a model picker (NetAlly models first, then "Other Android phone").
+- **NetAlly LinkRunner 10G / EtherScope nXG / LinkRunner 100G** (source: each model's
+  AllyWare 3.x user guide, "Using a USB Type-C to USB Cable"):
+  1. Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac.
+  2. On the unit: **Settings** (bottom of the Home screen) → **Connected devices** → **USB**.
+  3. Tap **Transfer files**.
+  The guides only say "PC or tablet" and never mention a Mac; Ferry's guide fills that gap.
+- **Other Android phones** (generic; to be checked on a real phone before shipping):
+  - Android 8–9: pull down the notification shade → tap **USB charging this device** →
+    **Transfer files**.
+  - Android 10 and newer: notification **Charging this device via USB** → tap → **USB
+    preferences** → **File transfer**. Or Settings → Connected devices → USB.
+  - Unlock the phone first; storage stays hidden while it is locked.
+- **Form:** a SwiftUI sheet with numbered steps, SF Symbols, and per-model screenshots once
+  the owner supplies them (NetAlly screenshots must be the owner's own captures). Strings
+  live in the String Catalog. `ferryctl` points to the same steps in its unlock message.
+- **No vendor impersonation:** NetAlly model names are used factually to identify devices;
+  no NetAlly logos or branding in Ferry.
+
 ## Non-goals (v1)
 
 - ADB mode and Wi-Fi mode — **designed for, not built** (see Transports).
