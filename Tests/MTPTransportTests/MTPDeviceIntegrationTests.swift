@@ -5,8 +5,9 @@ import Testing
 @testable import MTPTransport
 
 /// Runs against a real, unlocked Android device. These write to the device, so they are off
-/// unless `FERRY_DEVICE_TESTS=1`.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["FERRY_DEVICE_TESTS"] == "1"))
+/// unless `FERRY_DEVICE_TESTS=1`. Each test opens the one phone, so they run one at a time.
+@Suite(
+  .enabled(if: ProcessInfo.processInfo.environment["FERRY_DEVICE_TESTS"] == "1"), .serialized)
 struct MTPDeviceIntegrationTests {
   func openFirstDevice() throws -> MTPDevice {
     let raw = try #require(try MTPDevice.detect().first, "no MTP device attached")

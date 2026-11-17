@@ -7,6 +7,7 @@
 The MTP integration suites write to the attached phone, so they are off by default. Use a phone
 you don't mind writing to. Unlock it, choose **File transfer** and quit anything else that might
 grab it (Android File Transfer, Image Capture, Preview, Photos).
+Run one suite at a time: only one session can hold the phone.
 
 ```bash
 FERRY_DEVICE_TESTS=1 swift test --filter MTPSessionIntegrationTests

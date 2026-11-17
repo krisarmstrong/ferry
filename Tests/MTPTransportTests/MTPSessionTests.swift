@@ -55,6 +55,17 @@ struct MTPSessionTests {
     #expect(items == [folder, file])
   }
 
+  /// MTP has no change events, so a listing is the moment to re-read the device.
+  @Test func listSeesChangesMadeOnThePhone() async throws {
+    let device = SessionFixture.makeDevice()
+    let session = MTPSession(device: device)
+    #expect(try await session.list(.root, in: SessionFixture.storage).isEmpty)
+
+    await device.addFile("new.jpg", parent: SessionFixture.root, data: Data())
+    let items = try await session.list(.root, in: SessionFixture.storage)
+    #expect(items.map(\.path) == [try SessionFixture.path("/new.jpg")])
+  }
+
   @Test func itemReportsKindSizeAndModified() async throws {
     let device = SessionFixture.makeDevice()
     let dcim = await device.addFolder("DCIM", parent: SessionFixture.root)

@@ -132,6 +132,8 @@ extension MTPSession {
     -> [RemoteItem]
   {
     let raw = try await raw(storage)
+    // MTP has no change events, so a listing re-reads the device; the cache serves resolution.
+    await resolver.invalidate(folder, storage: raw)
     let entries = try await resolver.entries(in: folder, storage: raw)
     // MTP allows duplicate names; keep the one the resolver would pick, as the path names it.
     var byPath: [RemotePath: MTPEntry] = [:]
