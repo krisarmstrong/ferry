@@ -36,8 +36,10 @@ actor PathResolver {
     let key = Key(storage: storage, folder: folder)
     if let cached = cache[key] { return cached }
 
-    let id = try await folderID(for: folder, storage: storage)
+    // Sampled before resolving ancestors: an ID resolved before an invalidation may name an
+    // object that has since moved, so neither it nor what it lists may be cached.
     let started = generation
+    let id = try await folderID(for: folder, storage: storage)
     let listed = try await lister(storage, id)
     if generation == started {
       cache[key] = listed

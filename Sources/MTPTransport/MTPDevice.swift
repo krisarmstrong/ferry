@@ -2,6 +2,7 @@ import CLibMTP
 import DeviceKit
 import Dispatch
 import Foundation
+import os
 
 /// A detected device, copied out of libmtp's detection array before that array is freed.
 ///
@@ -18,9 +19,13 @@ struct RawDeviceRef: @unchecked Sendable {
 /// Each operation clears libmtp's error stack first, so a failure drains only its own errors.
 actor MTPDevice {
   private static let libraryInitialized: Void = LIBMTP_Init()
+  private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "MTPDevice")
 
   private let queue: DispatchSerialQueue
   private let handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>
+  /// Where the device sits on the bus, to tell a lost link from a protocol error.
+  private let busLocation: UInt32
+  private let deviceNumber: UInt8
   nonisolated let info: DeviceInfo
 
   nonisolated var unownedExecutor: UnownedSerialExecutor {
@@ -61,6 +66,8 @@ actor MTPDevice {
     guard let opened else { throw .deviceBusy }
     self.queue = queue
     (handle, info) = opened
+    busLocation = raw.raw.bus_location
+    deviceNumber = raw.raw.devnum
   }
 
   isolated deinit {
@@ -87,24 +94,36 @@ actor MTPDevice {
     LIBMTP_Clear_Errorstack(handle)
     // 1 is success with storage IDs only (placeholder descriptions); only -1 is failure.
     if LIBMTP_Get_Storage(handle, LIBMTP_STORAGE_SORTBY_NOTSORTED) < 0 {
-      let error = TransportError.drained(from: handle, during: "reading storages")
-      throw error == .deviceDisconnected ? error : .deviceLocked
+      let entries = drainErrorStack(handle)
+      let detail =
+        entries.isEmpty
+        ? "empty error stack" : entries.map { "\($0.code): \($0.text)" }.joined(separator: "; ")
+      Self.log.error("reading storages failed: \(detail, privacy: .public)")
+      throw .classify(
+        entries, during: "reading storages", generalMeansLocked: true,
+        deviceStillPresent: isStillAttached)
     }
     // The storage list belongs to the device handle and is freed by LIBMTP_Release_Device.
-    var result: [(raw: UInt32, info: StorageInfo)] = []
+    var storages: [RawStorage] = []
+    var capacities: [(capacity: UInt64, free: UInt64)] = []
     var node = handle.pointee.storage
     while let storage = node {
-      let description = Self.string(storage.pointee.StorageDescription)
-      let volume = Self.string(storage.pointee.VolumeIdentifier)
-      let info = StorageInfo(
-        id: StorageID(device: info.id, key: "\(description)|\(volume)"),
-        description: description, capacity: storage.pointee.MaxCapacity,
-        free: storage.pointee.FreeSpaceInBytes)
-      result.append((raw: storage.pointee.id, info: info))
+      storages.append(
+        RawStorage(
+          raw: storage.pointee.id,
+          description: storage.pointee.StorageDescription.map { String(cString: $0) },
+          volume: storage.pointee.VolumeIdentifier.map { String(cString: $0) }))
+      capacities.append((storage.pointee.MaxCapacity, storage.pointee.FreeSpaceInBytes))
       node = storage.pointee.next
     }
-    guard !result.isEmpty else { throw .deviceLocked }
-    return result
+    guard !storages.isEmpty else { throw .deviceLocked }
+    let keys = storageKeys(for: storages)
+    return zip(storages, capacities).map { storage, space in
+      let info = StorageInfo(
+        id: StorageID(device: info.id, key: keys[storage.raw] ?? ""),
+        description: storage.description ?? "", capacity: space.capacity, free: space.free)
+      return (raw: storage.raw, info: info)
+    }
   }
 
   /// Children of `parent`; pass `PathResolver.rootParent` for the storage root.
@@ -113,7 +132,7 @@ actor MTPDevice {
     var node = LIBMTP_Get_Files_And_Folders(handle, storage, parent)
     // NULL means both "empty folder" and "failed"; only the error stack tells them apart.
     if node == nil, LIBMTP_Get_Errorstack(handle) != nil {
-      throw .drained(from: handle, during: "listing folder")
+      throw failure(during: "listing folder")
     }
     var entries: [MTPEntry] = []
     while let file = node {
@@ -177,14 +196,14 @@ actor MTPDevice {
     guard let buffer = strdup(name) else { throw .io("creating folder failed: out of memory") }
     defer { free(buffer) }
     let id = LIBMTP_Create_Folder(handle, buffer, parent, storage)
-    guard id != 0 else { throw .drained(from: handle, during: "creating folder") }
+    guard id != 0 else { throw failure(during: "creating folder") }
     return id
   }
 
   func rename(objectID: UInt32, to name: String) throws(TransportError) {
     LIBMTP_Clear_Errorstack(handle)
     guard let file = LIBMTP_Get_Filemetadata(handle, objectID) else {
-      throw .drained(from: handle, during: "reading metadata")
+      throw failure(during: "reading metadata")
     }
     defer { LIBMTP_destroy_file_t(file) }
     let result = name.withCString { LIBMTP_Set_File_Name(handle, file, $0) }
@@ -207,7 +226,7 @@ actor MTPDevice {
   func metadata(objectID: UInt32) throws(TransportError) -> MTPEntry {
     LIBMTP_Clear_Errorstack(handle)
     guard let file = LIBMTP_Get_Filemetadata(handle, objectID) else {
-      throw .drained(from: handle, during: "reading metadata")
+      throw failure(during: "reading metadata")
     }
     defer { LIBMTP_destroy_file_t(file) }
     return MTPEntry(file.pointee)
@@ -219,8 +238,19 @@ actor MTPDevice {
     throws(TransportError)
   {
     guard result != 0 else { return }
-    let error = TransportError.drained(from: handle, during: operation)
+    let error = failure(during: operation)
     throw cancelled ? .cancelled : error
+  }
+
+  private func failure(during operation: String) -> TransportError {
+    .classify(drainErrorStack(handle), during: operation, deviceStillPresent: isStillAttached)
+  }
+
+  /// Whether this device is still on the bus. Runs on the device queue like every other libmtp
+  /// call; a detection that itself fails is taken as "present" so the error stays `.io`.
+  private func isStillAttached() -> Bool {
+    guard let devices = try? Self.detect() else { return true }
+    return devices.contains { $0.raw.bus_location == busLocation && $0.raw.devnum == deviceNumber }
   }
 
   /// Runs a libmtp transfer with `progress` reachable through the callback's context pointer.
@@ -264,10 +294,6 @@ actor MTPDevice {
     defer { free(pointer) }
     let string = String(cString: pointer)
     return string.isEmpty ? nil : string
-  }
-
-  private static func string(_ pointer: UnsafeMutablePointer<CChar>?) -> String {
-    pointer.map { String(cString: $0) } ?? ""
   }
 
   private static func localSize(of file: URL) throws(TransportError) -> UInt64 {

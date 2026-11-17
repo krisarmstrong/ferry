@@ -19,21 +19,28 @@ actor StubLister {
   }
 }
 
-/// Holds its first listing open until released, to race an invalidation against it.
+/// Serves a fixed tree but holds the first listing of `held` open until released, to race an
+/// invalidation against it.
 actor GatedLister {
-  private(set) var calls = 0
+  private let tree: [UInt32: [MTPEntry]]
+  private var held: UInt32?
   private var gate: CheckedContinuation<Void, Never>?
-  private var holdNext = true
+  private(set) var calls: [UInt32] = []
+
+  init(_ tree: [UInt32: [MTPEntry]], holding held: UInt32) {
+    self.tree = tree
+    self.held = held
+  }
 
   var isHolding: Bool { gate != nil }
 
-  func list() async -> [MTPEntry] {
-    calls += 1
-    if holdNext {
-      holdNext = false
+  func list(parent: UInt32) async -> [MTPEntry] {
+    calls.append(parent)
+    if parent == held {
+      held = nil
       await withCheckedContinuation { gate = $0 }
     }
-    return []
+    return tree[parent] ?? []
   }
 
   func release() {
@@ -123,18 +130,37 @@ struct PathResolverTests {
     #expect(await stub.calls == [PathResolver.rootParent, PathResolver.rootParent])
   }
 
-  @Test func listingInFlightAcrossInvalidationIsNotCached() async throws {
-    let lister = GatedLister()
-    let resolver = PathResolver { _, _ in await lister.list() }
-    let first = Task { try await resolver.entries(in: .root, storage: Self.storage) }
+  /// Lists `folder` while the listing of `held` is gated, invalidating everything mid-flight.
+  func resolveAcrossInvalidation(
+    _ folder: RemotePath, tree: [UInt32: [MTPEntry]], holding held: UInt32
+  ) async throws -> (PathResolver, GatedLister) {
+    let lister = GatedLister(tree, holding: held)
+    let resolver = PathResolver { _, parent in await lister.list(parent: parent) }
+    let first = Task { try await resolver.entries(in: folder, storage: Self.storage) }
     while await !lister.isHolding {
       await Task.yield()
     }
     await resolver.invalidateAll()
     await lister.release()
     _ = try await first.value
+    return (resolver, lister)
+  }
+
+  @Test func listingInFlightAcrossInvalidationIsNotCached() async throws {
+    let (resolver, lister) = try await resolveAcrossInvalidation(
+      .root, tree: cameraTree, holding: PathResolver.rootParent)
     _ = try await resolver.entries(in: .root, storage: Self.storage)
-    #expect(await lister.calls == 2)
+    #expect(await lister.calls == [PathResolver.rootParent, PathResolver.rootParent])
+  }
+
+  /// An ancestor listed before an invalidation may name an object that has since moved, so the
+  /// folder listed through it must not be cached either.
+  @Test func ancestorListedAcrossInvalidationDoesNotCacheFolder() async throws {
+    let dcim = try RemotePath("/DCIM")
+    let (resolver, lister) = try await resolveAcrossInvalidation(
+      dcim, tree: cameraTree, holding: PathResolver.rootParent)
+    _ = try await resolver.entries(in: dcim, storage: Self.storage)
+    #expect(await lister.calls == [PathResolver.rootParent, 10, PathResolver.rootParent, 10])
   }
 
   @Test func storagesAreCachedSeparately() async throws {
