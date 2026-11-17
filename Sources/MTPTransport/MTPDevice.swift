@@ -167,7 +167,7 @@ actor MTPDevice {
     from file: URL, name: String, parent: UInt32, storage: UInt32, progress: ProgressHandler
   ) throws(TransportError) -> UInt32 {
     let handle = try openHandle()
-    let size = try Self.localSize(of: file)
+    let size = try LocalFile.regularFileSize(file)
     LIBMTP_Clear_Errorstack(handle)
     guard let metadata = LIBMTP_new_file_t() else { throw .io("uploading failed: out of memory") }
     defer { LIBMTP_destroy_file_t(metadata) }
@@ -310,15 +310,6 @@ actor MTPDevice {
     defer { free(pointer) }
     let string = String(cString: pointer)
     return string.isEmpty ? nil : string
-  }
-
-  private static func localSize(of file: URL) throws(TransportError) -> UInt64 {
-    do {
-      let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
-      return (attributes[.size] as? NSNumber)?.uint64Value ?? 0
-    } catch {
-      throw .io(error.localizedDescription)
-    }
   }
 }
 

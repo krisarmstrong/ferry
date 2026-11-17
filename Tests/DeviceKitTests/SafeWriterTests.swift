@@ -165,6 +165,22 @@ struct SafeWriterTests {
     #expect(await device.contents(of: inside, in: storageID) == Data([9]))
   }
 
+  /// libmtp sends exactly the size it is told, so a link's own size would truncate the upload.
+  @Test func symlinkUploadsTheTargetsFullSize() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let path = try RemotePath("/a.txt")
+    let link = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: link) }
+    let payload = Data(repeating: 7, count: 300)
+    try await withTempFile(payload) { file in
+      try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+      let item = try await writer.write(from: link, to: path, replacing: false)
+      #expect(item.size == 300)
+    }
+    #expect(await device.contents(of: path, in: storageID) == payload)
+  }
+
   @Test func renameFailureFallsBackToDirectUpload() async throws {
     let device = makeDevice()
     let writer = SafeWriter(session: device)

@@ -33,7 +33,7 @@ public struct SafeWriter: Sendable {
     guard let parent = path.parent, let name = path.name else {
       throw .invalidName(path.description)
     }
-    let size = try Self.localSize(of: file)
+    let size = try LocalFile.regularFileSize(file)
 
     // Reject before a byte moves when the storage is known to be too small.
     let storages = try await session.storages()
@@ -176,15 +176,6 @@ public struct SafeWriter: Sendable {
       Self.log.error(
         "could not delete partial \(path.description, privacy: .public): \(String(describing: error), privacy: .public)"
       )
-    }
-  }
-
-  private static func localSize(of file: URL) throws(TransportError) -> UInt64 {
-    do {
-      let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
-      return (attributes[.size] as? NSNumber)?.uint64Value ?? 0
-    } catch {
-      throw .io(error.localizedDescription)
     }
   }
 }
