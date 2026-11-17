@@ -26,10 +26,10 @@ struct MTPSessionDownloadTests {
     return MTPSession(device: device)
   }
 
-  func download(_ session: MTPSession) async throws {
+  func download(_ session: MTPSession, replacing: Bool = false) async throws {
     try await session.download(
       SessionFixture.path("/a.txt"), in: SessionFixture.storage, to: target,
-      progress: SessionFixture.noProgress)
+      replacing: replacing, progress: SessionFixture.noProgress)
   }
 
   func directoryContents() throws -> [String] {
@@ -43,11 +43,35 @@ struct MTPSessionDownloadTests {
     #expect(try directoryContents() == ["a.txt"])
   }
 
-  @Test func completeDownloadReplacesAnExistingFile() async throws {
+  @Test func downloadReplacingOverwrites() async throws {
     defer { cleanUp() }
     try Data("old".utf8).write(to: target)
-    try await download(session())
+    try await download(session(), replacing: true)
     #expect(try Data(contentsOf: target) == Data("hello".utf8))
+    #expect(try directoryContents() == ["a.txt"])
+  }
+
+  @Test func downloadWithoutReplaceRefusesAnExistingFile() async throws {
+    defer { cleanUp() }
+    try Data("old".utf8).write(to: target)
+    await #expect(throws: TransportError.alreadyExists(try SessionFixture.path("/a.txt"))) {
+      try await download(session())
+    }
+    #expect(try Data(contentsOf: target) == Data("old".utf8))
+    #expect(try directoryContents() == ["a.txt"])
+  }
+
+  /// The race a caller's own existence check cannot close: the file appears after the check
+  /// but before the download lands.
+  @Test func downloadWithoutReplaceRefusesFileCreatedMidDownload() async throws {
+    defer { cleanUp() }
+    let session = await session { [target] in
+      await $0.createDuringDownload(at: target, data: Data("theirs".utf8))
+    }
+    await #expect(throws: TransportError.alreadyExists(try SessionFixture.path("/a.txt"))) {
+      try await download(session)
+    }
+    #expect(try Data(contentsOf: target) == Data("theirs".utf8))
     #expect(try directoryContents() == ["a.txt"])
   }
 
@@ -57,7 +81,7 @@ struct MTPSessionDownloadTests {
     if existing { try Data("old".utf8).write(to: target) }
     let session = await session { await $0.limitDownloads(to: 2) }
     await #expect(throws: TransportError.sizeMismatch(expected: 5, actual: 2)) {
-      try await download(session)
+      try await download(session, replacing: true)
     }
     #expect(try directoryContents() == (existing ? ["a.txt"] : []))
     if existing { #expect(try Data(contentsOf: target) == Data("old".utf8)) }
@@ -69,7 +93,7 @@ struct MTPSessionDownloadTests {
     if existing { try Data("old".utf8).write(to: target) }
     let session = await session { await $0.failNextDownload(with: .deviceDisconnected) }
     await #expect(throws: TransportError.deviceDisconnected) {
-      try await download(session)
+      try await download(session, replacing: true)
     }
     #expect(try directoryContents() == (existing ? ["a.txt"] : []))
     if existing { #expect(try Data(contentsOf: target) == Data("old".utf8)) }

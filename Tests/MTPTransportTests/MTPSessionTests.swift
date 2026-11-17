@@ -95,7 +95,7 @@ struct MTPSessionTests {
     defer { try? FileManager.default.removeItem(at: target) }
 
     try await session.download(
-      SessionFixture.path("/a.txt"), in: SessionFixture.storage, to: target,
+      SessionFixture.path("/a.txt"), in: SessionFixture.storage, to: target, replacing: false,
       progress: SessionFixture.noProgress)
     #expect(try Data(contentsOf: target) == Data("hello".utf8))
   }
@@ -118,7 +118,8 @@ struct MTPSessionTests {
     }
     await #expect(throws: TransportError.notFound(missing)) {
       try await session.download(
-        missing, in: SessionFixture.storage, to: target, progress: SessionFixture.noProgress)
+        missing, in: SessionFixture.storage, to: target, replacing: false,
+        progress: SessionFixture.noProgress)
     }
     await #expect(throws: TransportError.notFound(missing)) {
       _ = try await session.rename(missing, to: "b.jpg", in: SessionFixture.storage)

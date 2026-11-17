@@ -70,16 +70,21 @@ struct SafeWriterTests {
     #expect(await device.allPaths(in: storageID) == [try RemotePath("/a.txt")])
   }
 
+  /// A partial registered by anyone on the session, not only by this writer, survives listing:
+  /// the session's own move fallback registers its partials there too.
   @Test func listingDoesNotDeleteInFlightPartial() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
-    let partial = try RemotePath("/.ferry-partial-LIVE")
+    let partial = try RemotePath("/.ferry-partial-MOVE")
     try await device.seed(partial, in: storageID, contents: Data([1]))
-    await writer.registry.register(storageID, partial)
+    await device.partials.registerInFlight(partial, in: storageID)
 
-    let visible = try await writer.visibleList(.root, in: storageID)
-    #expect(visible.isEmpty)
+    #expect(try await SafeWriter(session: device).visibleList(.root, in: storageID).isEmpty)
+    #expect(try await SafeWriter(session: device).visibleList(.root, in: storageID).isEmpty)
     #expect(await device.allPaths(in: storageID) == [partial])
+
+    await device.partials.unregisterInFlight(partial, in: storageID)
+    #expect(try await SafeWriter(session: device).visibleList(.root, in: storageID).isEmpty)
+    #expect(await device.allPaths(in: storageID).isEmpty)
   }
 
   @Test func shortWriteThrowsSizeMismatchAndCleansUp() async throws {

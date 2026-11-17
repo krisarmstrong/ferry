@@ -7,18 +7,27 @@ import os
 /// Storages are addressed by `StorageID.key`; the raw MTP storage ID is a per-connection detail
 /// that never leaves the session. Every mutation invalidates the cached listing of each folder it
 /// touched, whether or not it succeeded, since a failed transfer can still leave an object behind.
+///
+/// Public operations run one at a time through `gate`, so a check and the action it guards are
+/// never split by another operation. They must not call each other: the gate is not reentrant.
+/// Once the device reports it is gone, the session closes it and fails every later call at once.
+/// The move fallback lives in `MTPSession+Move.swift`, so the helpers it shares are internal.
 actor MTPSession: DeviceSession {
-  private static let log = Logger(
+  static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "MTPSession")
 
   nonisolated let info: DeviceInfo
-  private let device: any MTPDeviceOperations
+  nonisolated let partials: PartialRegistry
+  let device: any MTPDeviceOperations
   private let resolver: PathResolver
-  /// Raw storage ID by `StorageID.key`, refreshed by `storages()`.
+  private let gate = OperationGate()
+  /// Raw storage ID by `StorageID.key`, refreshed by `refreshStorages()`.
   private var rawStorages: [String: UInt32] = [:]
+  private var disconnected = false
 
-  init(device: any MTPDeviceOperations) {
+  init(device: any MTPDeviceOperations, partials: PartialRegistry = PartialRegistry()) {
     self.info = device.info
+    self.partials = partials
     self.device = device
     self.resolver = PathResolver { storage, parent throws(TransportError) in
       try await device.list(storage: storage, parent: parent)
@@ -26,10 +35,45 @@ actor MTPSession: DeviceSession {
   }
 
   func capabilities() async -> DeviceCapabilities {
-    await device.capabilities()
+    await gate.run { () async -> DeviceCapabilities in
+      disconnected ? [] : await device.capabilities()
+    }
   }
 
   func storages() async throws(TransportError) -> [StorageInfo] {
+    try await operation { () throws(TransportError) in try await refreshStorages() }
+  }
+
+  func close() async {
+    await gate.run { () async in
+      await resolver.invalidateAll()
+      await device.close()
+    }
+  }
+
+  // MARK: Helpers
+
+  /// Runs `body` as one gated operation. A `.deviceDisconnected` from it releases the device,
+  /// so later operations fail here instead of waiting on USB.
+  func operation<T>(_ body: () async throws(TransportError) -> T)
+    async throws(TransportError) -> T
+  {
+    try await gate.run { () async throws(TransportError) -> T in
+      guard !disconnected else { throw .deviceDisconnected }
+      do throws(TransportError) {
+        return try await body()
+      } catch {
+        if error == .deviceDisconnected {
+          disconnected = true
+          await resolver.invalidateAll()
+          await device.close()
+        }
+        throw error
+      }
+    }
+  }
+
+  private func refreshStorages() async throws(TransportError) -> [StorageInfo] {
     let storages = try await device.storages()
     let keyed = Dictionary(
       storages.map { ($0.info.id.key, $0.raw) }, uniquingKeysWith: { first, _ in first })
@@ -40,41 +84,36 @@ actor MTPSession: DeviceSession {
     return storages.map(\.info)
   }
 
-  func close() async {
-    await resolver.invalidateAll()
-    await device.close()
-  }
-
-  // MARK: Helpers
-
   /// The raw ID of `storage`, re-reading the device's storages once if the key is unknown.
-  private func raw(_ storage: StorageID) async throws(TransportError) -> UInt32 {
+  func raw(_ storage: StorageID) async throws(TransportError) -> UInt32 {
     guard storage.device == info.id else { throw .storageNotFound(storage.key) }
     if let raw = rawStorages[storage.key] { return raw }
-    _ = try await storages()
+    _ = try await refreshStorages()
     guard let raw = rawStorages[storage.key] else { throw .storageNotFound(storage.key) }
     return raw
   }
 
   /// The object at `path`, which must not be the root.
-  private func entry(_ path: RemotePath, storage: UInt32) async throws(TransportError) -> MTPEntry {
+  func entry(_ path: RemotePath, storage: UInt32) async throws(TransportError) -> MTPEntry {
     guard let entry = try await resolver.entry(at: path, storage: storage) else {
       throw .notFound(path)
     }
     return entry
   }
 
-  /// The ID of the folder at `path` and its children. A missing path or a file is `.notFound`.
-  private func folder(_ path: RemotePath, storage: UInt32) async throws(TransportError)
+  /// The ID of the folder at `path` and its children, listed fresh from the device since the
+  /// children are what an existence check reads. A missing path or a file is `.notFound`.
+  func folder(_ path: RemotePath, storage: UInt32) async throws(TransportError)
     -> Folder
   {
+    await resolver.invalidate(path, storage: storage)
     let children = try await resolver.entries(in: path, storage: storage)
     let id = try await resolver.objectID(for: path, storage: storage)
     return Folder(id: id, children: children)
   }
 
   /// Runs `body`, then drops the cached listings of `folders` whether or not it succeeded.
-  private func mutating<T>(
+  func mutating<T>(
     _ folders: [RemotePath], storage: UInt32, _ body: () async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
     let result: Result<T, TransportError>
@@ -93,7 +132,7 @@ actor MTPSession: DeviceSession {
   /// under another name, it is not at `path`, so that is an error rather than a quiet success.
   /// `discardIfRenamed` deletes it first; only a fresh upload may be removed, since anything
   /// else is the user's data. Callers run inside `mutating`, which invalidates the folder.
-  private func stored(_ id: UInt32, at path: RemotePath, discardIfRenamed: Bool = false)
+  func stored(_ id: UInt32, at path: RemotePath, discardIfRenamed: Bool = false)
     async throws(TransportError) -> RemoteItem
   {
     let entry = try await device.metadata(objectID: id)
@@ -107,7 +146,7 @@ actor MTPSession: DeviceSession {
       } catch {
         let reason = String(describing: error)
         Self.log.error(
-          "could not delete renamed upload \(entry.name, privacy: .public): \(reason, privacy: .public)"
+          "could not delete renamed upload \(entry.name, privacy: .private): \(reason, privacy: .private)"
         )
       }
     }
@@ -120,7 +159,7 @@ actor MTPSession: DeviceSession {
       modified: entry.modified)
   }
 
-  private static func split(_ path: RemotePath) throws(TransportError) -> (
+  static func split(_ path: RemotePath) throws(TransportError) -> (
     parent: RemotePath, name: String
   ) {
     guard let parent = path.parent, let name = path.name else {
@@ -129,7 +168,7 @@ actor MTPSession: DeviceSession {
     return (parent, name)
   }
 
-  private struct Folder {
+  struct Folder {
     let id: UInt32
     let children: [MTPEntry]
 
@@ -153,59 +192,97 @@ extension MTPSession {
   func list(_ folder: RemotePath, in storage: StorageID) async throws(TransportError)
     -> [RemoteItem]
   {
-    let raw = try await raw(storage)
-    // MTP has no change events, so a listing re-reads the device; the cache serves resolution.
-    await resolver.invalidate(folder, storage: raw)
-    let entries = try await resolver.entries(in: folder, storage: raw)
-    // MTP allows duplicate names; keep the one the resolver would pick, as the path names it.
-    var byPath: [RemotePath: MTPEntry] = [:]
-    for entry in entries {
-      guard let path = try? folder.appending(entry.name) else {
-        Self.log.error(
-          "skipping object \(entry.objectID) with unusable name \(entry.name, privacy: .public)")
-        continue
+    try await operation { () throws(TransportError) in
+      let raw = try await raw(storage)
+      // MTP has no change events, so a listing re-reads the device; the cache serves resolution.
+      await resolver.invalidate(folder, storage: raw)
+      let entries = try await resolver.entries(in: folder, storage: raw)
+      // MTP allows duplicate names; keep the one the resolver would pick, as the path names it.
+      var byPath: [RemotePath: MTPEntry] = [:]
+      for entry in entries {
+        guard let path = try? folder.appending(entry.name) else {
+          Self.log.error(
+            "skipping object \(entry.objectID) with unusable name \(entry.name, privacy: .private)")
+          continue
+        }
+        if let kept = byPath[path], kept.objectID < entry.objectID { continue }
+        byPath[path] = entry
       }
-      if let kept = byPath[path], kept.objectID < entry.objectID { continue }
-      byPath[path] = entry
+      return byPath.map { Self.item($0.value, at: $0.key) }
+        .sorted { $0.path.description < $1.path.description }
     }
-    return byPath.map { Self.item($0.value, at: $0.key) }
-      .sorted { $0.path.description < $1.path.description }
   }
 
   func item(at path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem
   {
-    let raw = try await raw(storage)
-    guard let entry = try await resolver.entry(at: path, storage: raw) else {
-      return RemoteItem(path: .root, kind: .folder, size: 0, modified: .distantPast)
+    try await operation { () throws(TransportError) in
+      let raw = try await raw(storage)
+      guard let entry = try await resolver.entry(at: path, storage: raw) else {
+        return RemoteItem(path: .root, kind: .folder, size: 0, modified: .distantPast)
+      }
+      return Self.item(entry, at: path)
     }
-    return Self.item(entry, at: path)
   }
 
   /// Downloads into a hidden partial beside `file` and renames it over `file` only once its
   /// size matches the device's, so a failed or short download leaves nothing at `file` and
-  /// leaves a file already there untouched.
+  /// leaves a file already there untouched. Without `replacing`, a file at `file` is
+  /// `.alreadyExists(path)` even if it appeared while the download ran.
   func download(
-    _ path: RemotePath, in storage: StorageID, to file: URL, progress: ProgressHandler
+    _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
+    progress: ProgressHandler
   ) async throws(TransportError) {
-    let entry = try await entry(path, storage: raw(storage))
-    guard !entry.isFolder else { throw .notFound(path) }
-    let partial = file.deletingLastPathComponent()
-      .appendingPathComponent(SafeWriter.partialPrefix + UUID().uuidString)
-    do throws(TransportError) {
-      try await device.download(objectID: entry.objectID, to: partial, progress: progress)
-      let size = try LocalFile.regularFileSize(partial)
-      guard size == entry.size else {
-        throw .sizeMismatch(expected: entry.size, actual: size)
+    try await operation { () throws(TransportError) in
+      let entry = try await entry(path, storage: raw(storage))
+      guard !entry.isFolder else { throw .notFound(path) }
+      let partial = file.deletingLastPathComponent()
+        .appendingPathComponent(SafeWriter.partialPrefix + UUID().uuidString)
+      do throws(TransportError) {
+        try await device.download(objectID: entry.objectID, to: partial, progress: progress)
+        let size = try LocalFile.regularFileSize(partial)
+        guard size == entry.size else {
+          throw .sizeMismatch(expected: entry.size, actual: size)
+        }
+        try Self.place(partial, at: file, replacing: replacing, downloadOf: path)
+      } catch {
+        try? FileManager.default.removeItem(at: partial)
+        throw error
       }
-      // rename(2) replaces atomically, so `file` is either the old copy or the complete one.
-      guard Darwin.rename(partial.path, file.path) == 0 else {
-        throw .io("saving \(file.path) failed: \(String(cString: strerror(errno)))")
-      }
-    } catch {
-      try? FileManager.default.removeItem(at: partial)
-      throw error
     }
+  }
+}
+
+extension MTPSession {
+  /// Moves a finished download from `partial` to `file`. Both renames are atomic, so `file` is
+  /// either what was there before or the complete download.
+  private static func place(
+    _ partial: URL, at file: URL, replacing: Bool, downloadOf path: RemotePath
+  ) throws(TransportError) {
+    if replacing {
+      guard Darwin.rename(partial.path, file.path) == 0 else { throw saveFailed(file, errno) }
+      return
+    }
+    guard renamex_np(partial.path, file.path, UInt32(RENAME_EXCL)) != 0 else { return }
+    let failure = errno
+    switch failure {
+    case EEXIST:
+      throw .alreadyExists(path)
+    case ENOTSUP:
+      // Not every volume supports an exclusive rename; checking first narrows the race.
+      log.warning(
+        "exclusive rename unsupported for \(file.path, privacy: .private); checking first")
+      guard !FileManager.default.fileExists(atPath: file.path) else {
+        throw .alreadyExists(path)
+      }
+      guard Darwin.rename(partial.path, file.path) == 0 else { throw saveFailed(file, errno) }
+    default:
+      throw saveFailed(file, failure)
+    }
+  }
+
+  private static func saveFailed(_ file: URL, _ code: Int32) -> TransportError {
+    .io("saving \(file.path) failed: \(String(cString: strerror(code)))")
   }
 }
 
@@ -215,52 +292,61 @@ extension MTPSession {
   func upload(
     from file: URL, to path: RemotePath, in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
-    let (parent, name) = try Self.split(path)
-    let raw = try await raw(storage)
-    let target = try await folder(parent, storage: raw)
-    try target.requireFree(path)
-    return try await mutating([parent], storage: raw) { () throws(TransportError) in
-      let id = try await device.upload(
-        from: file, name: name, parent: target.id, storage: raw, progress: progress)
-      return try await stored(id, at: path, discardIfRenamed: true)
+    try await operation { () throws(TransportError) in
+      let (parent, name) = try Self.split(path)
+      let raw = try await raw(storage)
+      let target = try await folder(parent, storage: raw)
+      try target.requireFree(path)
+      return try await mutating([parent], storage: raw) { () throws(TransportError) in
+        let id = try await device.upload(
+          from: file, name: name, parent: target.id, storage: raw, progress: progress)
+        return try await stored(id, at: path, discardIfRenamed: true)
+      }
     }
   }
 
   func makeFolder(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem
   {
-    guard path != .root else { throw .alreadyExists(path) }
-    let (parent, name) = try Self.split(path)
-    let raw = try await raw(storage)
-    let target = try await folder(parent, storage: raw)
-    try target.requireFree(path)
-    return try await mutating([parent], storage: raw) { () throws(TransportError) in
-      let id = try await device.createFolder(name: name, parent: target.id, storage: raw)
-      return try await stored(id, at: path)
+    try await operation { () throws(TransportError) in
+      guard path != .root else { throw .alreadyExists(path) }
+      let (parent, name) = try Self.split(path)
+      let raw = try await raw(storage)
+      let target = try await folder(parent, storage: raw)
+      try target.requireFree(path)
+      return try await mutating([parent], storage: raw) { () throws(TransportError) in
+        let id = try await device.createFolder(name: name, parent: target.id, storage: raw)
+        return try await stored(id, at: path)
+      }
     }
   }
 
   func rename(_ path: RemotePath, to newName: String, in storage: StorageID)
     async throws(TransportError) -> RemoteItem
   {
-    let (parent, _) = try Self.split(path)
-    let renamed = try parent.appending(newName)
-    let (_, name) = try Self.split(renamed)
-    let raw = try await raw(storage)
-    let source = try await entry(path, storage: raw)
-    try await folder(parent, storage: raw).requireFree(renamed, except: source.objectID)
-    return try await mutating([parent], storage: raw) { () throws(TransportError) in
-      try await device.rename(objectID: source.objectID, to: name)
-      return try await stored(source.objectID, at: renamed)
+    try await operation { () throws(TransportError) in
+      let (parent, _) = try Self.split(path)
+      let renamed = try parent.appending(newName)
+      let (_, name) = try Self.split(renamed)
+      let raw = try await raw(storage)
+      let siblings = try await folder(parent, storage: raw)
+      let source = try await entry(path, storage: raw)
+      try siblings.requireFree(renamed, except: source.objectID)
+      return try await mutating([parent], storage: raw) { () throws(TransportError) in
+        try await device.rename(objectID: source.objectID, to: name)
+        return try await stored(source.objectID, at: renamed)
+      }
     }
   }
 
   func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError) {
-    guard let parent = path.parent else { throw .notFound(path) }
-    let raw = try await raw(storage)
-    let entry = try await entry(path, storage: raw)
-    try await mutating([parent], storage: raw) { () throws(TransportError) in
-      try await deleteTree(entry, storage: raw)
+    try await operation { () throws(TransportError) in
+      guard let parent = path.parent else { throw .notFound(path) }
+      let raw = try await raw(storage)
+      let entry = try await entry(path, storage: raw)
+      try await mutating([parent], storage: raw) { () throws(TransportError) in
+        try await deleteTree(entry, storage: raw)
+      }
     }
   }
 
@@ -273,95 +359,5 @@ extension MTPSession {
       }
     }
     try await device.delete(objectID: entry.objectID)
-  }
-}
-
-// MARK: Move
-
-extension MTPSession {
-  func move(_ path: RemotePath, toFolder: RemotePath, in storage: StorageID)
-    async throws(TransportError) -> RemoteItem
-  {
-    let (parent, name) = try Self.split(path)
-    let raw = try await raw(storage)
-    let source = try await entry(path, storage: raw)
-    let canMove = await device.capabilities().contains(.move)
-    if !canMove, source.isFolder { throw .unsupported("move") }
-    let destination = try await folder(toFolder, storage: raw)
-    let target = try toFolder.appending(name)
-    try destination.requireFree(target)
-
-    guard canMove else {
-      return try await copyThenDelete(
-        source, from: parent,
-        to: Placement(folder: toFolder, id: destination.id, target: target, name: name),
-        storage: raw)
-    }
-    return try await mutating([parent, toFolder], storage: raw) { () throws(TransportError) in
-      try await device.move(objectID: source.objectID, storage: raw, newParent: destination.id)
-      return try await stored(source.objectID, at: target)
-    }
-  }
-
-  private struct Placement {
-    let folder: RemotePath
-    let id: UInt32
-    let target: RemotePath
-    let name: String
-  }
-
-  /// Move for a device without MoveObject. The copy goes up under a partial name and is renamed
-  /// only once its size checks out, so a failure never leaves a short file under the real name;
-  /// the source is deleted only after that.
-  private func copyThenDelete(
-    _ source: MTPEntry, from parent: RemotePath, to placement: Placement, storage: UInt32
-  ) async throws(TransportError) -> RemoteItem {
-    let local = FileManager.default.temporaryDirectory
-      .appendingPathComponent("ferry-move-\(UUID().uuidString)")
-    defer { try? FileManager.default.removeItem(at: local) }
-    try await device.download(objectID: source.objectID, to: local) { _, _ in true }
-
-    let partialName = SafeWriter.partialPrefix + UUID().uuidString
-    let copy: RemoteItem
-    do {
-      copy = try await mutating([placement.folder], storage: storage) {
-        () throws(TransportError) in
-        let id = try await device.upload(
-          from: local, name: partialName, parent: placement.id, storage: storage
-        ) { _, _ in true }
-        let uploaded = try await device.metadata(objectID: id)
-        guard uploaded.size == source.size else {
-          throw .sizeMismatch(expected: source.size, actual: uploaded.size)
-        }
-        try await device.rename(objectID: id, to: placement.name)
-        return try await stored(id, at: placement.target)
-      }
-    } catch {
-      await discard(partialName, in: placement.folder, storage: storage)
-      throw error
-    }
-
-    try await mutating([parent], storage: storage) { () throws(TransportError) in
-      try await device.delete(objectID: source.objectID)
-    }
-    return copy
-  }
-
-  /// Deletes `name` from `folder` if the device has it. Best effort: a failure is logged, and a
-  /// partial left behind is reaped by the next `SafeWriter.visibleList` of that folder.
-  private func discard(_ name: String, in folder: RemotePath, storage: UInt32) async {
-    do {
-      let path = try folder.appending(name)
-      let entry = try await entry(path, storage: storage)
-      try await mutating([folder], storage: storage) { () throws(TransportError) in
-        try await device.delete(objectID: entry.objectID)
-      }
-    } catch .notFound {
-      return
-    } catch {
-      Self.log.error(
-        "could not delete partial \(name, privacy: .public): \(String(describing: error), privacy: .public)"
-      )
-    }
   }
 }

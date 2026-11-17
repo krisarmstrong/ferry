@@ -76,3 +76,15 @@ func drainErrorStack(_ device: UnsafeMutablePointer<LIBMTP_mtpdevice_t>) -> [MTP
   }
   return entries
 }
+
+/// `entries` if libmtp reported no errors while listing them. A NULL listing means both "empty
+/// folder" and "failed", and a listing cut short returns what it read so far, so only the error
+/// stack tells a whole listing from a broken one.
+func completeListing(
+  _ entries: [MTPEntry], errors: [MTPErrorEntry], deviceStillPresent: () -> Bool
+) throws(TransportError) -> [MTPEntry] {
+  guard errors.isEmpty else {
+    throw .classify(errors, during: "listing folder", deviceStillPresent: deviceStillPresent)
+  }
+  return entries
+}

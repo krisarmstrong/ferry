@@ -4,8 +4,8 @@ import os
 /// Guarantees a partial upload never appears under its real name: bytes land in a hidden
 /// `.ferry-partial-*` object first and are renamed into place once complete.
 ///
-/// Use one `SafeWriter` per session. Copies share one in-flight registry, which is what keeps
-/// `visibleList` from deleting a partial that a concurrent `write` is still uploading.
+/// Every `SafeWriter` over a session shares the session's in-flight registry, which is what
+/// keeps `visibleList` from deleting a partial that a concurrent `write` is still uploading.
 public struct SafeWriter: Sendable {
   public static let partialPrefix = ".ferry-partial-"
 
@@ -17,11 +17,9 @@ public struct SafeWriter: Sendable {
     subsystem: "io.github.krisarmstrong.ferry", category: "SafeWriter")
 
   private let session: any DeviceSession
-  let registry: PartialRegistry
 
   public init(session: any DeviceSession) {
     self.session = session
-    self.registry = PartialRegistry()
   }
 
   /// Upload `file` to `path`. If `replacing`, an existing file at `path`, or one whose name
@@ -50,16 +48,16 @@ public struct SafeWriter: Sendable {
     }
 
     let partial = try parent.appending(Self.partialPrefix + UUID().uuidString)
-    await registry.register(storage, partial)
+    await session.partials.registerInFlight(partial, in: storage)
     do {
       let item = try await commit(
         Source(file: file, size: size), via: partial,
         to: Destination(path: path, name: name, replacing: existing), in: storage,
         progress: progress)
-      await registry.unregister(storage, partial)
+      await session.partials.unregisterInFlight(partial, in: storage)
       return item
     } catch {
-      await registry.unregister(storage, partial)
+      await session.partials.unregisterInFlight(partial, in: storage)
       throw error
     }
   }
@@ -75,7 +73,7 @@ public struct SafeWriter: Sendable {
         visible.append(item)
         continue
       }
-      if await !registry.contains(storage, item.path) {
+      if await !session.partials.contains(item.path, in: storage) {
         await discard(item.path, in: storage)
       }
     }
@@ -191,15 +189,17 @@ public struct SafeWriter: Sendable {
     } catch .notFound {
       return
     } catch {
+      let reason = String(describing: error)
       Self.log.error(
-        "could not delete partial \(path.description, privacy: .public): \(String(describing: error), privacy: .public)"
+        "could not delete partial \(path.description, privacy: .private): \(reason, privacy: .private)"
       )
     }
   }
 }
 
-/// Partials a `write` is still uploading, so a concurrent listing leaves them alone.
-actor PartialRegistry {
+/// Partials still being written, so a concurrent listing leaves them alone. One per session;
+/// see `DeviceSession.partials`.
+public actor PartialRegistry {
   private struct Entry: Hashable {
     let storage: StorageID
     let path: RemotePath
@@ -207,15 +207,17 @@ actor PartialRegistry {
 
   private var inFlight: Set<Entry> = []
 
-  func register(_ storage: StorageID, _ path: RemotePath) {
+  public init() {}
+
+  public func registerInFlight(_ path: RemotePath, in storage: StorageID) {
     inFlight.insert(Entry(storage: storage, path: path))
   }
 
-  func unregister(_ storage: StorageID, _ path: RemotePath) {
+  public func unregisterInFlight(_ path: RemotePath, in storage: StorageID) {
     inFlight.remove(Entry(storage: storage, path: path))
   }
 
-  func contains(_ storage: StorageID, _ path: RemotePath) -> Bool {
+  public func contains(_ path: RemotePath, in storage: StorageID) -> Bool {
     inFlight.contains(Entry(storage: storage, path: path))
   }
 }

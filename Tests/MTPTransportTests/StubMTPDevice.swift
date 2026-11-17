@@ -5,7 +5,8 @@ import Foundation
 
 /// An in-memory MTP device that, like the real thing, knows only object IDs. It refuses to
 /// delete a non-empty folder and records every mutating call, so tests can see what a session
-/// sent and in which order.
+/// sent and in which order. Uploads suspend partway, so a session that lets two operations
+/// interleave shows up as an overlapping device call.
 actor StubMTPDevice: MTPDeviceOperations {
   enum Call: Equatable {
     case upload(name: String, parent: UInt32)
@@ -31,6 +32,17 @@ actor StubMTPDevice: MTPDeviceOperations {
   private(set) var objects: [UInt32: Object] = [:]
   private(set) var calls: [Call] = []
   private(set) var closed = false
+  /// Every device call, mutating or not, including ones that threw.
+  private(set) var callCount = 0
+  /// Whether a call arrived while an upload was still in progress.
+  private(set) var overlapped = false
+  private var uploading = 0
+  /// Set by `unplug()`: every call throws `.deviceDisconnected`, as a lost USB link does.
+  private var unplugged = false
+  /// Runs when an upload starts, with the name it was sent.
+  private var uploadHook: (@Sendable (String) async -> Void)?
+  /// A file that something else creates at a URL while the next download is in progress.
+  private var downloadInterloper: (url: URL, data: Data)?
   private var nextID: UInt32 = 100
   /// Uploads keep at most this many bytes and still report success.
   private var uploadLimit: Int?
@@ -85,6 +97,23 @@ actor StubMTPDevice: MTPDeviceOperations {
     storedNames[requested] = actual
   }
 
+  func unplug() {
+    unplugged = true
+  }
+
+  func resetCallCount() {
+    callCount = 0
+  }
+
+  func onUpload(_ hook: @escaping @Sendable (String) async -> Void) {
+    uploadHook = hook
+  }
+
+  /// The next download, once its bytes are written, finds `data` created at `url`.
+  func createDuringDownload(at url: URL, data: Data) {
+    downloadInterloper = (url, data)
+  }
+
   var uploadCount: Int {
     calls.filter { if case .upload = $0 { true } else { false } }.count
   }
@@ -105,14 +134,19 @@ actor StubMTPDevice: MTPDeviceOperations {
 
   // MARK: MTPDeviceOperations
 
-  func capabilities() -> DeviceCapabilities { deviceCapabilities }
+  func capabilities() -> DeviceCapabilities {
+    record()
+    return deviceCapabilities
+  }
 
   func storages() throws(TransportError) -> [(raw: UInt32, info: StorageInfo)] {
+    record()
     try requireOpen()
     return storageList
   }
 
   func list(storage: UInt32, parent: UInt32) throws(TransportError) -> [MTPEntry] {
+    record()
     try requireOpen()
     return objects.filter { $0.value.parent == parent }.map { Self.entry($0.key, $0.value) }
       .sorted { $0.objectID < $1.objectID }
@@ -128,13 +162,24 @@ actor StubMTPDevice: MTPDeviceOperations {
     if let downloadLimit { data = data.prefix(downloadLimit) }
     if failure != nil { data = data.prefix(data.count / 2) }
     do { try data.write(to: file) } catch { throw .io(error.localizedDescription) }
+    if let interloper = downloadInterloper {
+      downloadInterloper = nil
+      do { try interloper.data.write(to: interloper.url) } catch {
+        throw .io(error.localizedDescription)
+      }
+    }
     if let failure { throw failure }
   }
 
   func upload(
     from file: URL, name: String, parent: UInt32, storage: UInt32, progress: ProgressHandler
-  ) throws(TransportError) -> UInt32 {
+  ) async throws(TransportError) -> UInt32 {
+    record()
     try requireOpen()
+    uploading += 1
+    defer { uploading -= 1 }
+    await uploadHook?(name)
+    await Task.yield()
     calls.append(.upload(name: name, parent: parent))
     var data: Data
     do { data = try Data(contentsOf: file) } catch { throw .io(error.localizedDescription) }
@@ -153,6 +198,7 @@ actor StubMTPDevice: MTPDeviceOperations {
   func createFolder(name: String, parent: UInt32, storage: UInt32) throws(TransportError)
     -> UInt32
   {
+    record()
     try requireOpen()
     calls.append(.createFolder(name: name, parent: parent))
     return addFolder(storedNames[name] ?? name, parent: parent)
@@ -184,6 +230,7 @@ actor StubMTPDevice: MTPDeviceOperations {
   }
 
   func close() {
+    record()
     closed = true
   }
 
@@ -195,11 +242,18 @@ actor StubMTPDevice: MTPDeviceOperations {
     return nextID
   }
 
-  private func requireOpen() throws(TransportError) {
-    if closed { throw .deviceDisconnected }
+  private func record() {
+    callCount += 1
+    if uploading > 0 { overlapped = true }
   }
 
+  private func requireOpen() throws(TransportError) {
+    if closed || unplugged { throw .deviceDisconnected }
+  }
+
+  /// Every object-ID call goes through here, so it is recorded once.
   private func object(_ id: UInt32) throws(TransportError) -> Object {
+    record()
     try requireOpen()
     guard let object = objects[id] else { throw .io("no object \(id)") }
     return object

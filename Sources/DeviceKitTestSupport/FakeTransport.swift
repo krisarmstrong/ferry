@@ -29,6 +29,7 @@ public actor FakeDevice: DeviceSession {
   }
 
   public nonisolated let info: DeviceInfo
+  public nonisolated let partials = PartialRegistry()
   private let storageInfos: [StorageInfo]
   private let deviceCapabilities: DeviceCapabilities
   private var tree: [StorageID: [RemotePath: Node]]
@@ -129,13 +130,20 @@ public actor FakeDevice: DeviceSession {
   }
 
   public func download(
-    _ path: RemotePath, in storage: StorageID, to file: URL, progress: ProgressHandler
+    _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
+    progress: ProgressHandler
   ) async throws(TransportError) {
     let nodes = try nodes(in: storage)
     guard case .file(let data, _) = nodes[path] else { throw .notFound(path) }
     let total = UInt64(data.count)
     guard progress(0, total) else { throw .cancelled }
-    do { try data.write(to: file) } catch { throw .io(error.localizedDescription) }
+    do {
+      try data.write(to: file, options: replacing ? [] : .withoutOverwriting)
+    } catch CocoaError.fileWriteFileExists {
+      throw .alreadyExists(path)
+    } catch {
+      throw .io(error.localizedDescription)
+    }
     guard progress(total, total) else { throw .cancelled }
   }
 

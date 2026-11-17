@@ -10,14 +10,20 @@ public protocol DeviceTransport: Sendable {
 
 public protocol DeviceSession: Sendable {
   var info: DeviceInfo { get }
+  /// Partials being written on this device. Shared by every `SafeWriter` over the session and
+  /// by the session itself, so no listing reaps a partial that is still being written.
+  var partials: PartialRegistry { get }
   func capabilities() async -> DeviceCapabilities
   /// A device that reports no storages is locked, so implementations throw `.deviceLocked`.
   func storages() async throws(TransportError) -> [StorageInfo]
   func list(_ folder: RemotePath, in storage: StorageID) async throws(TransportError)
     -> [RemoteItem]
   func item(at path: RemotePath, in storage: StorageID) async throws(TransportError) -> RemoteItem
+  /// Without `replacing`, a file already at `file` when the download completes is
+  /// `.alreadyExists` and is left untouched.
   func download(
-    _ path: RemotePath, in storage: StorageID, to file: URL, progress: ProgressHandler
+    _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
+    progress: ProgressHandler
   ) async throws(TransportError)
   /// `path` must not already exist.
   func upload(

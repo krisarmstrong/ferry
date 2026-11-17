@@ -22,7 +22,8 @@ actor MTPDevice {
   private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "MTPDevice")
 
   private let queue: DispatchSerialQueue
-  /// `nil` once closed; every operation then throws `.deviceDisconnected`.
+  /// `nil` once closed, or once an operation found the device gone; every operation then
+  /// throws `.deviceDisconnected`.
   private var handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>?
   /// Where the device sits on the bus, to tell a lost link from a protocol error.
   private let busLocation: UInt32
@@ -101,9 +102,10 @@ actor MTPDevice {
         entries.isEmpty
         ? "empty error stack" : entries.map { "\($0.code): \($0.text)" }.joined(separator: "; ")
       Self.log.error("reading storages failed: \(detail, privacy: .public)")
-      throw .classify(
-        entries, during: "reading storages", generalMeansLocked: true,
-        deviceStillPresent: isStillAttached)
+      throw closingIfGone(
+        .classify(
+          entries, during: "reading storages", generalMeansLocked: true,
+          deviceStillPresent: isStillAttached))
     }
     // The storage list belongs to the device handle and is freed by LIBMTP_Release_Device.
     var storages: [RawStorage] = []
@@ -133,17 +135,18 @@ actor MTPDevice {
     let handle = try openHandle()
     LIBMTP_Clear_Errorstack(handle)
     var node = LIBMTP_Get_Files_And_Folders(handle, storage, parent)
-    // NULL means both "empty folder" and "failed"; only the error stack tells them apart.
-    if node == nil, LIBMTP_Get_Errorstack(handle) != nil {
-      throw failure(during: "listing folder")
-    }
     var entries: [MTPEntry] = []
     while let file = node {
       entries.append(MTPEntry(file.pointee))
       node = file.pointee.next
       LIBMTP_destroy_file_t(file)
     }
-    return entries
+    do {
+      return try completeListing(
+        entries, errors: drainErrorStack(handle), deviceStillPresent: isStillAttached)
+    } catch {
+      throw closingIfGone(error)
+    }
   }
 
   func download(objectID: UInt32, to file: URL, progress: ProgressHandler)
@@ -257,8 +260,15 @@ actor MTPDevice {
 
   private func failure(during operation: String) -> TransportError {
     guard let handle else { return .deviceDisconnected }
-    return .classify(
-      drainErrorStack(handle), during: operation, deviceStillPresent: isStillAttached)
+    return closingIfGone(
+      .classify(drainErrorStack(handle), during: operation, deviceStillPresent: isStillAttached))
+  }
+
+  /// Releases the handle once the device is gone, so every later call fails at once in
+  /// `openHandle` instead of timing out on USB.
+  private func closingIfGone(_ error: TransportError) -> TransportError {
+    if error == .deviceDisconnected { close() }
+    return error
   }
 
   /// Whether this device is still on the bus. Runs on the device queue like every other libmtp

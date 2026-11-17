@@ -116,11 +116,28 @@ struct FakeTransportTests {
     let path = try RemotePath("/a.bin")
     try await device.seed(path, in: storageID, contents: Data([9, 8, 7]))
     let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    try await device.download(path, in: storageID, to: dest) { _, _ in true }
+    defer { try? FileManager.default.removeItem(at: dest) }
+    try await device.download(path, in: storageID, to: dest, replacing: false) { _, _ in true }
     #expect(try Data(contentsOf: dest) == Data([9, 8, 7]))
     await #expect(throws: TransportError.cancelled) {
-      try await device.download(path, in: storageID, to: dest) { _, _ in false }
+      try await device.download(path, in: storageID, to: dest, replacing: true) { _, _ in false }
     }
+  }
+
+  @Test func downloadReplacesOnlyWhenAsked() async throws {
+    let device = makeDevice()
+    let path = try RemotePath("/a.bin")
+    try await device.seed(path, in: storageID, contents: Data([9, 8, 7]))
+    let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dest) }
+    try Data([1]).write(to: dest)
+
+    await #expect(throws: TransportError.alreadyExists(path)) {
+      try await device.download(path, in: storageID, to: dest, replacing: false) { _, _ in true }
+    }
+    #expect(try Data(contentsOf: dest) == Data([1]))
+    try await device.download(path, in: storageID, to: dest, replacing: true) { _, _ in true }
+    #expect(try Data(contentsOf: dest) == Data([9, 8, 7]))
   }
 
   @Test func deleteFolderIsRecursiveAndMoveWorks() async throws {

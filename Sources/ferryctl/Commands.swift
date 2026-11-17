@@ -166,8 +166,13 @@ struct Get: AsyncParsableCommand {
       if !replace, FileManager.default.fileExists(atPath: destination.path) {
         throw LocalFileExists(path: destination.path)
       }
-      try await target.session.download(
-        path(remote), in: target.storage, to: destination, progress: { _, _ in true })
+      do {
+        try await target.session.download(
+          path(remote), in: target.storage, to: destination, replacing: replace,
+          progress: { _, _ in true })
+      } catch TransportError.alreadyExists {
+        throw LocalFileExists(path: destination.path)
+      }
     }
   }
 }

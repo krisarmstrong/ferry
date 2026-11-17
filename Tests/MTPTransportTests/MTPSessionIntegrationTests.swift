@@ -69,7 +69,8 @@ extension DeviceTests {
           let copy = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
           defer { try? FileManager.default.removeItem(at: copy) }
-          try await session.download(path, in: storage, to: copy, progress: Self.noProgress)
+          try await session.download(
+            path, in: storage, to: copy, replacing: false, progress: Self.noProgress)
           #expect(try Data(contentsOf: copy) == payload)
 
           let renamed = try await session.rename(path, to: "renamed.bin", in: storage)
