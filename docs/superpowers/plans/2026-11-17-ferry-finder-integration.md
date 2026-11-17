@@ -227,7 +227,7 @@ Rules:
 **Interfaces — Produces:**
 ```swift
 public enum AgentRequest: Codable, Sendable {
-  case devices, recheck(DeviceID), eject(DeviceID), removeAllDomains
+  case status, recheck(DeviceID), eject(DeviceID), removeAllDomains     // .status ⇒ .status(devices:providerEnabled:)
   case item(domain: String, path: RemotePath), list(domain: String, folder: RemotePath)
   case fetch(domain: String, path: RemotePath, to: URL)                       // URL inside the app-group container
   case create(domain: String, path: RemotePath, from: URL?, isFolder: Bool)
@@ -236,7 +236,7 @@ public enum AgentRequest: Codable, Sendable {
   case replaceContents(domain: String, path: RemotePath, from: URL)
   case delete(domain: String, path: RemotePath)
 }
-public enum AgentResponse: Codable, Sendable { case devices([AttachedDevice]), item(RemoteItem), items([RemoteItem]), done, failure(TransportError) }
+public enum AgentResponse: Codable, Sendable { case status(devices: [AttachedDevice], providerEnabled: Bool), item(RemoteItem), items([RemoteItem]), done, failure(TransportError) }
 @objc public protocol AgentXPC { func send(_ request: Data, reply: @escaping @Sendable (Data) -> Void) }   // JSON both ways
 public protocol AgentSending: Sendable { func send(_ request: AgentRequest) async throws(TransportError) -> AgentResponse }
 public actor AgentClient: AgentSending {
@@ -282,6 +282,7 @@ public protocol DomainManaging: Sendable {        // real impl wraps NSFileProvi
   func remove(_ identifier: String) async throws
   func removeAll() async throws
   func signal(_ identifier: String, folder: RemotePath) async
+  func isUserEnabled() async -> Bool              // any Ferry domain's NSFileProviderDomain.userEnabled (Task 0: new domains start disabled)
 }
 public enum DomainNaming { public static func specs(for devices: [AttachedDevice]) -> [DomainSpec] }   // spec's naming rule
 public actor DomainController { public init(hub: DeviceHub, manager: any DomainManaging); public func run() async }  // consumes hub.events
@@ -396,7 +397,10 @@ Notes:
 - [ ] **Step 2:** Run `make app`. Expect a build with zero warnings beyond the accepted two.
   `codesign -d --entitlements -` on the app, agent and appex must show the Task 0 identifiers.
 - [ ] **Step 3:** Smoke test. Launch the app; it registers the agent (an `SMAppService.status`
-  of `.enabled` is logged). With the LinkRunner in file-transfer mode, "LinkRunner-100G"
+  of `.enabled` is logged). The owner enables Ferry under System Settings → General → Login
+  Items & Extensions → File Providers (Task 0: domains start disabled). Confirm the sandboxed
+  extension reaches the agent's Mach service (Task 0 could not; look for a `Sandbox`
+  `mach-lookup` denial if not). With the LinkRunner in file-transfer mode, "LinkRunner-100G"
   appears in Finder's sidebar and `ls`-equivalent browsing in Finder matches `ferryctl ls /`.
 - [ ] **Step 4:** Commit `feat: add app bundle with agent and FileProvider extension`.
 
@@ -423,6 +427,8 @@ public enum GuideSteps {
   public init(client: any AgentSending)
   public private(set) var devices: [AttachedDevice]
   public var guideFamily: DeviceFamily?          // set ⇒ sheet shown
+  public private(set) var providerEnabled: Bool   // false ⇒ "Turn on Ferry in Finder" row with a button opening
+                                                  // x-apple.systempreferences:com.apple.LoginItems-Settings.extension
   public func refresh() async; public func eject(_ id: DeviceID) async; public func removeFerry() async
 }
 ```
@@ -447,6 +453,8 @@ when nothing has been detected for 10 s after the menu opens. Without a known mo
 model picker.
 
 - [ ] **Step 1: Write failing tests:**
+  - `disabledProviderShowsTurnOnRow`: `providerEnabled == false` ⇒ the model exposes the turn-on
+    action, and it is not treated as an error.
   - `guideStepsForNetAllyModels`: all three model spellings, including the LinkRunner's
     reported `LinkRunner-100G`, map to `.netAllyAndroid8Board`, with 3 steps that mention
     "Transfer files".
@@ -468,6 +476,8 @@ model picker.
 - Modify: `docs/TESTING.md` (add a "Finder" checklist and a results row)
 
 - [ ] **Step 1: Run the checklist** with the LinkRunner and record each result:
+  - First run: the menu shows "Turn on Ferry in Finder". The button opens Login Items &
+    Extensions; after enabling Ferry under File Providers, the row disappears.
   - Plug in with file transfer off. The menu shows "Not sharing files" and the guide opens with
     the NetAlly steps.
   - Enable Transfer files. The domain appears within 5 s.
