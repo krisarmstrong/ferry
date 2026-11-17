@@ -69,6 +69,21 @@ struct SafeWriterOverMTPSessionTests {
     #expect(await device.children(of: folder) == ["b.txt"])
   }
 
+  /// The session's rename compares names without case, so replacing one of two case-variants
+  /// would delete it and then fail on the other, losing the old file and the new one.
+  @Test func replacingOneOfTwoCaseVariantsIsRefusedUpFront() async throws {
+    let device = SessionFixture.makeDevice()
+    await device.addFile("foo.txt", parent: SessionFixture.root, data: Data("lower".utf8))
+    await device.addFile("FOO.txt", parent: SessionFixture.root, data: Data("upper".utf8))
+
+    await #expect(throws: TransportError.alreadyExists(try SessionFixture.path("/FOO.txt"))) {
+      _ = try await write(Data("new".utf8), to: "/foo.txt", on: device, replacing: true)
+    }
+    #expect(await device.calls.isEmpty)
+    #expect(await contents(of: "foo.txt", on: device) == Data("lower".utf8))
+    #expect(await contents(of: "FOO.txt", on: device) == Data("upper".utf8))
+  }
+
   @Test func unknownStorageIsRejectedBeforeUpload() async throws {
     let device = SessionFixture.makeDevice()
     let unknown = StorageID(device: SessionFixture.deviceID, key: "SD card|vol9")

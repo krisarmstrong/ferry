@@ -42,8 +42,8 @@ public struct SafeWriter: Sendable {
     if size > free {
       throw .insufficientSpace(needed: size, free: free)
     }
-    // Read once: the item seen here is the one `commit` deletes, so a folder that appears at
-    // `path` later can never be taken for the file being replaced.
+    // Read once, before the upload. `commit` deletes by path, so whatever sits at that path when
+    // the upload ends is deleted: an item swapped in during the upload is not detected.
     let existing = try await existing(path, in: storage)
     if let existing, existing.kind == .folder || !replacing {
       throw .alreadyExists(existing.path)
@@ -161,6 +161,9 @@ public struct SafeWriter: Sendable {
   /// The item `path` collides with, or `nil` if there is none: the exact name, else one that
   /// differs only in case, since Android storage compares names that way. A missing parent is
   /// `nil` too; the upload then reports it.
+  ///
+  /// Two or more colliding items are `.alreadyExists`, naming one that would not be replaced:
+  /// the rename would meet it after the delete, losing both the old file and the new one.
   private func existing(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem?
   {
@@ -172,8 +175,14 @@ public struct SafeWriter: Sendable {
       return nil
     }
     let key = RemotePath.collisionKey(name)
-    return siblings.first { $0.path == path }
-      ?? siblings.first { RemotePath.collisionKey($0.path.name ?? "") == key }
+    let colliding = siblings.filter { RemotePath.collisionKey($0.path.name ?? "") == key }
+    guard let chosen = colliding.first(where: { $0.path == path }) ?? colliding.first else {
+      return nil
+    }
+    if let other = colliding.first(where: { $0.path != chosen.path }) {
+      throw .alreadyExists(other.path)
+    }
+    return chosen
   }
 
   private func discard(_ path: RemotePath, in storage: StorageID) async {

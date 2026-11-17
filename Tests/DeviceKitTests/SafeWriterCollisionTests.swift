@@ -49,8 +49,10 @@ extension SafeWriterTests {
     #expect(await device.contents(of: path, in: storageID) == Data([1, 2]))
   }
 
-  /// A device that does keep both names gets the exact one replaced.
-  @Test func replacingPrefersTheExactName() async throws {
+  /// With two names differing only in case, the rename would collide with whichever is left,
+  /// so the write is refused before anything is uploaded or deleted.
+  @Test(arguments: [false, true])
+  func twoCaseVariantsAreRefusedUpFront(replacing: Bool) async throws {
     let device = makeDevice()
     let writer = SafeWriter(session: device)
     let exact = try RemotePath("/foo.txt")
@@ -58,10 +60,13 @@ extension SafeWriterTests {
     try await device.seed(variant, in: storageID, contents: Data([8]))
     try await device.seed(exact, in: storageID, contents: Data([9]))
     try await withTempFile(Data([1, 2])) { file in
-      _ = try await writer.write(from: file, to: exact, replacing: true)
+      await #expect(throws: TransportError.alreadyExists(variant)) {
+        _ = try await writer.write(from: file, to: exact, replacing: replacing)
+      }
     }
-    #expect(await device.contents(of: exact, in: storageID) == Data([1, 2]))
+    #expect(await device.contents(of: exact, in: storageID) == Data([9]))
     #expect(await device.contents(of: variant, in: storageID) == Data([8]))
+    #expect(await device.allPaths(in: storageID) == [variant, exact])
   }
 
   @Test func folderCaseVariantIsNeverReplaced() async throws {
