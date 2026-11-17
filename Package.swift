@@ -11,8 +11,11 @@ let package = Package(
   targets: [
     .target(name: "DeviceKit"),
     .target(name: "DeviceKitTestSupport", dependencies: ["DeviceKit"]),
+    .systemLibrary(name: "CLibMTP", pkgConfig: "libmtp", providers: [.brew(["libmtp"])]),
+    .target(name: "MTPTransport", dependencies: ["DeviceKit", "CLibMTP"]),
     .testTarget(
       name: "DeviceKitTests", dependencies: ["DeviceKit", "DeviceKitTestSupport"]),
+    .testTarget(name: "MTPTransportTests", dependencies: ["MTPTransport", "DeviceKit"]),
   ],
   swiftLanguageModes: [.v6]
 )
