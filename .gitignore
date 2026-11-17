@@ -3,3 +3,4 @@
 *.xcodeproj
 .superpowers/
 .DS_Store
+!Makefile
