@@ -118,7 +118,7 @@ struct FakeTransportTests {
   @Test func deleteFolderIsRecursiveAndMoveWorks() async throws {
     let device = makeDevice()
     try await device.seed(RemotePath("/d/x/a.txt"), in: storageID, contents: Data([1]))
-    try await device.makeFolder(RemotePath("/e"), in: storageID)
+    _ = try await device.makeFolder(RemotePath("/e"), in: storageID)
     let moved = try await device.move(
       RemotePath("/d/x/a.txt"), toFolder: RemotePath("/e"), in: storageID)
     #expect(moved.path == (try RemotePath("/e/a.txt")))
