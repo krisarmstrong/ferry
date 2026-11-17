@@ -123,6 +123,21 @@ struct SafeWriterTests {
     #expect(await device.allPaths(in: storageID).isEmpty)
   }
 
+  /// An unknown storage must not read as "nothing there", which would skip the space check.
+  @Test func unknownStorageIsRejectedBeforeUpload() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let unknown = StorageID(device: deviceID, key: "SD|vol9")
+    try await withTempFile(Data([1, 2])) { file in
+      await #expect(throws: TransportError.storageNotFound(unknown.key)) {
+        _ = try await writer.write(
+          from: file, to: RemotePath("/a.txt"), in: unknown, replacing: false,
+          progress: { _, _ in true })
+      }
+    }
+    #expect(await device.allPaths(in: storageID).isEmpty)
+  }
+
   @Test func replacingDeletesOldThenRenames() async throws {
     let device = makeDevice()
     let writer = SafeWriter(session: device)

@@ -25,7 +25,7 @@ private func message(for error: TransportError) -> String {
   case .noDeviceConnected: "No phone is connected."
   case .deviceNotFound(let id): "No phone with serial \(id.serial) is connected."
   case .noStorage: "The phone reports no storage."
-  case .storageNotFound(let name): "No storage named \"\(name)\" on the phone."
+  case .storageNotFound(let name): "The phone has no storage \"\(name)\"."
   case .deviceBusy:
     "Another app is using the phone (Image Capture, Preview, Photos or a sync app). "
       + "Quit it and replug, or see docs/spikes/2026-11-ptpcamerad.md."

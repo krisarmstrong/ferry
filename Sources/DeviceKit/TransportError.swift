@@ -2,6 +2,7 @@ public enum TransportError: Error, Equatable, Sendable {
   case noDeviceConnected
   case deviceNotFound(DeviceID)
   case noStorage
+  /// Carries the storage's description when picked by the user, else its `StorageID.key`.
   case storageNotFound(String)
   case deviceBusy
   case deviceLocked

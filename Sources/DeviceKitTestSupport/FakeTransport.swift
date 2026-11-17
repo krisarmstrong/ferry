@@ -222,7 +222,7 @@ public actor FakeDevice: DeviceSession {
 
   private func nodes(in storage: StorageID) throws(TransportError) -> [RemotePath: Node] {
     try requireUnlocked()
-    guard let nodes = tree[storage] else { throw .notFound(.root) }
+    guard let nodes = tree[storage] else { throw .storageNotFound(storage.key) }
     return nodes
   }
 

@@ -49,10 +49,10 @@ actor MTPSession: DeviceSession {
 
   /// The raw ID of `storage`, re-reading the device's storages once if the key is unknown.
   private func raw(_ storage: StorageID) async throws(TransportError) -> UInt32 {
-    guard storage.device == info.id else { throw .notFound(.root) }
+    guard storage.device == info.id else { throw .storageNotFound(storage.key) }
     if let raw = rawStorages[storage.key] { return raw }
     _ = try await storages()
-    guard let raw = rawStorages[storage.key] else { throw .notFound(.root) }
+    guard let raw = rawStorages[storage.key] else { throw .storageNotFound(storage.key) }
     return raw
   }
 

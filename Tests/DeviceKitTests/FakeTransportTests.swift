@@ -24,6 +24,14 @@ struct FakeTransportTests {
     return url
   }
 
+  @Test func unknownStorageIsStorageNotFound() async throws {
+    let device = makeDevice()
+    let unknown = StorageID(device: deviceID, key: "SD|vol9")
+    await #expect(throws: TransportError.storageNotFound(unknown.key)) {
+      _ = try await device.item(at: .root, in: unknown)
+    }
+  }
+
   @Test func seedListAndItem() async throws {
     let device = makeDevice()
     try await device.seed(RemotePath("/DCIM/a.jpg"), in: storageID, contents: Data([1, 2, 3, 4]))

@@ -23,7 +23,7 @@ struct MTPSessionTests {
   @Test func storageIsNotFoundByRawID() async throws {
     let session = MTPSession(device: SessionFixture.makeDevice())
     let byRawID = StorageID(device: SessionFixture.deviceID, key: String(SessionFixture.rawStorage))
-    await #expect(throws: TransportError.notFound(.root)) {
+    await #expect(throws: TransportError.storageNotFound(byRawID.key)) {
       _ = try await session.list(.root, in: byRawID)
     }
   }
@@ -31,7 +31,7 @@ struct MTPSessionTests {
   @Test func storageOfAnotherDeviceIsNotFound() async throws {
     let session = MTPSession(device: SessionFixture.makeDevice())
     let other = StorageID(device: DeviceID(serial: "OTHER"), key: SessionFixture.storage.key)
-    await #expect(throws: TransportError.notFound(.root)) {
+    await #expect(throws: TransportError.storageNotFound(other.key)) {
       _ = try await session.list(.root, in: other)
     }
   }

@@ -35,9 +35,11 @@ public struct SafeWriter: Sendable {
     }
     let size = try LocalFile.regularFileSize(file)
 
-    // Reject before a byte moves when the storage is known to be too small.
-    let storages = try await session.storages()
-    if let free = storages.first(where: { $0.id == storage })?.free, size > free {
+    // Reject before a byte moves when the storage is gone or too small.
+    guard let free = try await session.storages().first(where: { $0.id == storage })?.free else {
+      throw .storageNotFound(storage.key)
+    }
+    if size > free {
       throw .insufficientSpace(needed: size, free: free)
     }
     // Read once: the item seen here is the one `commit` deletes, so a folder that appears at
