@@ -36,6 +36,10 @@ actor StubMTPDevice: MTPDeviceOperations {
   private var uploadLimit: Int?
   /// The next upload stores its object, then throws this.
   private var uploadFailure: TransportError?
+  /// Downloads write at most this many bytes and still report success.
+  private var downloadLimit: Int?
+  /// The next download writes half the object, then throws this.
+  private var downloadFailure: TransportError?
   /// Names the device stores differently from what it was sent, as a FAT card or 7-bit
   /// firmware does.
   private var storedNames: [String: String] = [:]
@@ -67,6 +71,14 @@ actor StubMTPDevice: MTPDeviceOperations {
 
   func failNextUpload(with error: TransportError) {
     uploadFailure = error
+  }
+
+  func limitDownloads(to bytes: Int) {
+    downloadLimit = bytes
+  }
+
+  func failNextDownload(with error: TransportError) {
+    downloadFailure = error
   }
 
   func storeName(_ requested: String, as actual: String) {
@@ -110,7 +122,13 @@ actor StubMTPDevice: MTPDeviceOperations {
     throws(TransportError)
   {
     let object = try object(objectID)
-    do { try object.data.write(to: file) } catch { throw .io(error.localizedDescription) }
+    let failure = downloadFailure
+    downloadFailure = nil
+    var data = object.data
+    if let downloadLimit { data = data.prefix(downloadLimit) }
+    if failure != nil { data = data.prefix(data.count / 2) }
+    do { try data.write(to: file) } catch { throw .io(error.localizedDescription) }
+    if let failure { throw failure }
   }
 
   func upload(

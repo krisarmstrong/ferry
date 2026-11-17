@@ -182,12 +182,30 @@ extension MTPSession {
     return Self.item(entry, at: path)
   }
 
+  /// Downloads into a hidden partial beside `file` and renames it over `file` only once its
+  /// size matches the device's, so a failed or short download leaves nothing at `file` and
+  /// leaves a file already there untouched.
   func download(
     _ path: RemotePath, in storage: StorageID, to file: URL, progress: ProgressHandler
   ) async throws(TransportError) {
     let entry = try await entry(path, storage: raw(storage))
     guard !entry.isFolder else { throw .notFound(path) }
-    try await device.download(objectID: entry.objectID, to: file, progress: progress)
+    let partial = file.deletingLastPathComponent()
+      .appendingPathComponent(SafeWriter.partialPrefix + UUID().uuidString)
+    do throws(TransportError) {
+      try await device.download(objectID: entry.objectID, to: partial, progress: progress)
+      let size = try LocalFile.regularFileSize(partial)
+      guard size == entry.size else {
+        throw .sizeMismatch(expected: entry.size, actual: size)
+      }
+      // rename(2) replaces atomically, so `file` is either the old copy or the complete one.
+      guard Darwin.rename(partial.path, file.path) == 0 else {
+        throw .io("saving \(file.path) failed: \(String(cString: strerror(errno)))")
+      }
+    } catch {
+      try? FileManager.default.removeItem(at: partial)
+      throw error
+    }
   }
 }
 

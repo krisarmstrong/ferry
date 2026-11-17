@@ -56,6 +56,9 @@ with a note.
 ### Copy to and from the phone
 
 - `put` a small file, then `get` it back. The two copies are identical.
+- `get` onto an existing local file fails unless you pass `--replace`, and leaves the file as it
+  was. Unplug halfway through a large `get`: the local file is unchanged (or absent) and no
+  `.ferry-partial-*` file is left beside it.
 - `put` over an existing name fails unless you pass `--replace`.
 - `put Foo.txt` into a folder that has `foo.txt` fails the same way, naming `foo.txt`. With
   `--replace` it replaces `foo.txt`, and only one file is left.

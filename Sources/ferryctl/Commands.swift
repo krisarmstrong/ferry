@@ -137,18 +137,31 @@ struct List: AsyncParsableCommand {
   }
 }
 
+/// `get` would overwrite a file on the Mac without `--replace`.
+struct LocalFileExists: LocalizedError {
+  let path: String
+
+  var errorDescription: String? {
+    "\(path) already exists on this Mac. Use --replace to overwrite."
+  }
+}
+
 struct Get: AsyncParsableCommand {
   static let configuration = CommandConfiguration(abstract: "Copy a file from the phone.")
   @OptionGroup var device: DeviceOptions
   @OptionGroup var storage: StorageOptions
+  @Flag(help: "Replace the local file if it already exists.") var replace = false
   @Argument var remote: String
   @Argument var local: String
 
   func run() async throws {
+    let destination = URL(fileURLWithPath: local)
     try await withTarget(device, storage) { target in
+      if !replace, FileManager.default.fileExists(atPath: destination.path) {
+        throw LocalFileExists(path: destination.path)
+      }
       try await target.session.download(
-        path(remote), in: target.storage, to: URL(fileURLWithPath: local),
-        progress: { _, _ in true })
+        path(remote), in: target.storage, to: destination, progress: { _, _ in true })
     }
   }
 }
