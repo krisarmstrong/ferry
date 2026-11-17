@@ -8,6 +8,7 @@ let package = Package(
     .library(name: "DeviceKit", targets: ["DeviceKit"]),
     .library(name: "DeviceKitTestSupport", targets: ["DeviceKitTestSupport"]),
     .library(name: "FerryAgentCore", targets: ["FerryAgentCore"]),
+    .library(name: "FerryIPC", targets: ["FerryIPC"]),
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
@@ -18,6 +19,7 @@ let package = Package(
     .systemLibrary(name: "CLibMTP", pkgConfig: "libmtp", providers: [.brew(["libmtp"])]),
     .target(name: "MTPTransport", dependencies: ["DeviceKit", "CLibMTP"]),
     .target(name: "FerryAgentCore", dependencies: ["DeviceKit", "MTPTransport"]),
+    .target(name: "FerryIPC", dependencies: ["DeviceKit"]),
     .executableTarget(
       name: "ferryctl",
       dependencies: [
@@ -30,6 +32,7 @@ let package = Package(
     .testTarget(
       name: "FerryAgentCoreTests",
       dependencies: ["FerryAgentCore", "DeviceKit", "DeviceKitTestSupport"]),
+    .testTarget(name: "FerryIPCTests", dependencies: ["FerryIPC", "DeviceKit"]),
   ],
   swiftLanguageModes: [.v6]
 )

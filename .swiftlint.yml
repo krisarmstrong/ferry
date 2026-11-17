@@ -6,6 +6,7 @@ identifier_name:
   excluded:
     - io
     - id
+    - to
 
 # An exhaustive switch over an error enum is one decision per case, not branching logic.
 cyclomatic_complexity:
