@@ -15,6 +15,7 @@ struct RawDeviceRef: @unchecked Sendable {
 ///
 /// libmtp is not thread-safe per device, so the actor's executor is a private serial queue and
 /// the handle never leaves it. Methods are synchronous on that queue; callers `await` the hop.
+/// Each operation clears libmtp's error stack first, so a failure drains only its own errors.
 actor MTPDevice {
   private static let libraryInitialized: Void = LIBMTP_Init()
 
@@ -84,7 +85,8 @@ actor MTPDevice {
   /// read on a still-connected device is `.deviceLocked`.
   func storages() throws(TransportError) -> [(raw: UInt32, info: StorageInfo)] {
     LIBMTP_Clear_Errorstack(handle)
-    if LIBMTP_Get_Storage(handle, LIBMTP_STORAGE_SORTBY_NOTSORTED) != 0 {
+    // 1 is success with storage IDs only (placeholder descriptions); only -1 is failure.
+    if LIBMTP_Get_Storage(handle, LIBMTP_STORAGE_SORTBY_NOTSORTED) < 0 {
       let error = TransportError.drained(from: handle, during: "reading storages")
       throw error == .deviceDisconnected ? error : .deviceLocked
     }
@@ -125,6 +127,7 @@ actor MTPDevice {
   func download(objectID: UInt32, to file: URL, progress: ProgressHandler)
     throws(TransportError)
   {
+    LIBMTP_Clear_Errorstack(handle)
     let handle = handle
     let (result, cancelled) = file.withUnsafeFileSystemRepresentation { path in
       guard let path else { return (Int32(-1), false) }
@@ -141,6 +144,7 @@ actor MTPDevice {
     from file: URL, name: String, parent: UInt32, storage: UInt32, progress: ProgressHandler
   ) throws(TransportError) -> UInt32 {
     let size = try Self.localSize(of: file)
+    LIBMTP_Clear_Errorstack(handle)
     guard let metadata = LIBMTP_new_file_t() else { throw .io("uploading failed: out of memory") }
     defer { LIBMTP_destroy_file_t(metadata) }
     // LIBMTP_destroy_file_t frees `filename`, so it must be libmtp-owned (malloc'd) memory.
@@ -169,6 +173,7 @@ actor MTPDevice {
     -> UInt32
   {
     // LIBMTP_Create_Folder may rewrite the name in place on 7-bit-only devices, so it gets a copy.
+    LIBMTP_Clear_Errorstack(handle)
     guard let buffer = strdup(name) else { throw .io("creating folder failed: out of memory") }
     defer { free(buffer) }
     let id = LIBMTP_Create_Folder(handle, buffer, parent, storage)
@@ -177,6 +182,7 @@ actor MTPDevice {
   }
 
   func rename(objectID: UInt32, to name: String) throws(TransportError) {
+    LIBMTP_Clear_Errorstack(handle)
     guard let file = LIBMTP_Get_Filemetadata(handle, objectID) else {
       throw .drained(from: handle, during: "reading metadata")
     }
@@ -189,14 +195,17 @@ actor MTPDevice {
   func move(objectID: UInt32, storage: UInt32, newParent: UInt32) throws(TransportError) {
     // MoveObject names the root as 0, unlike listing and SendObjectInfo.
     let parent = newParent == PathResolver.rootParent ? 0 : newParent
+    LIBMTP_Clear_Errorstack(handle)
     try check(LIBMTP_Move_Object(handle, objectID, storage, parent), during: "moving")
   }
 
   func delete(objectID: UInt32) throws(TransportError) {
+    LIBMTP_Clear_Errorstack(handle)
     try check(LIBMTP_Delete_Object(handle, objectID), during: "deleting")
   }
 
   func metadata(objectID: UInt32) throws(TransportError) -> MTPEntry {
+    LIBMTP_Clear_Errorstack(handle)
     guard let file = LIBMTP_Get_Filemetadata(handle, objectID) else {
       throw .drained(from: handle, during: "reading metadata")
     }

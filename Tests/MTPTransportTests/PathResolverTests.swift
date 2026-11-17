@@ -19,6 +19,29 @@ actor StubLister {
   }
 }
 
+/// Holds its first listing open until released, to race an invalidation against it.
+actor GatedLister {
+  private(set) var calls = 0
+  private var gate: CheckedContinuation<Void, Never>?
+  private var holdNext = true
+
+  var isHolding: Bool { gate != nil }
+
+  func list() async -> [MTPEntry] {
+    calls += 1
+    if holdNext {
+      holdNext = false
+      await withCheckedContinuation { gate = $0 }
+    }
+    return []
+  }
+
+  func release() {
+    gate?.resume()
+    gate = nil
+  }
+}
+
 struct PathResolverTests {
   static let storage: UInt32 = 0x0001_0001
   static let epoch = Date(timeIntervalSince1970: 0)
@@ -98,6 +121,20 @@ struct PathResolverTests {
     await resolver.invalidateAll()
     _ = try await resolver.entries(in: .root, storage: Self.storage)
     #expect(await stub.calls == [PathResolver.rootParent, PathResolver.rootParent])
+  }
+
+  @Test func listingInFlightAcrossInvalidationIsNotCached() async throws {
+    let lister = GatedLister()
+    let resolver = PathResolver { _, _ in await lister.list() }
+    let first = Task { try await resolver.entries(in: .root, storage: Self.storage) }
+    while await !lister.isHolding {
+      await Task.yield()
+    }
+    await resolver.invalidateAll()
+    await lister.release()
+    _ = try await first.value
+    _ = try await resolver.entries(in: .root, storage: Self.storage)
+    #expect(await lister.calls == 2)
   }
 
   @Test func storagesAreCachedSeparately() async throws {
