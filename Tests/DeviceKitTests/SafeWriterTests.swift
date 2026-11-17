@@ -173,6 +173,38 @@ struct SafeWriterTests {
     #expect(items.count == 1)
     #expect(items.first?.size == 2)
   }
+
+  @Test func renameAlreadyExistsKeepsTheOtherFileAndSurfaces() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let path = try RemotePath("/a.txt")
+    try await device.seed(path, in: storageID, contents: Data([9]))
+    // A false "not found" skips the replace delete, so the rename meets an occupied name.
+    await device.failItem(with: .notFound(path))
+    await device.failRename(with: .alreadyExists(path))
+    try await withTempFile(Data([1, 2])) { file in
+      await #expect(throws: TransportError.alreadyExists(path)) {
+        _ = try await writer.write(from: file, to: path, replacing: true)
+      }
+    }
+    #expect(await device.contents(of: path, in: storageID) == Data([9]))
+    #expect(await device.allPaths(in: storageID) == [path])
+  }
+
+  @Test func existenceCheckErrorOtherThanNotFoundPropagates() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let path = try RemotePath("/a.txt")
+    try await device.seed(path, in: storageID, contents: Data([9]))
+    await device.failItem(with: .deviceBusy)
+    try await withTempFile(Data([1, 2])) { file in
+      await #expect(throws: TransportError.deviceBusy) {
+        _ = try await writer.write(from: file, to: path, replacing: true)
+      }
+    }
+    #expect(await device.contents(of: path, in: storageID) == Data([9]))
+    #expect(await partials(device).isEmpty)
+  }
 }
 
 extension SafeWriter {

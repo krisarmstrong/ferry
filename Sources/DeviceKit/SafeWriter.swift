@@ -40,7 +40,7 @@ public struct SafeWriter: Sendable {
     if let free = storages.first(where: { $0.id == storage })?.free, size > free {
       throw .insufficientSpace(needed: size, free: free)
     }
-    if !replacing, await exists(path, in: storage) {
+    if !replacing, try await exists(path, in: storage) {
       throw .alreadyExists(path)
     }
 
@@ -98,13 +98,13 @@ public struct SafeWriter: Sendable {
     try await upload(file, size: size, to: partial, in: storage, progress: progress)
 
     let path = destination.path
-    if destination.replacing, await exists(path, in: storage) {
-      do {
+    do {
+      if destination.replacing, try await exists(path, in: storage) {
         try await session.delete(path, in: storage)
-      } catch {
-        await discard(partial, in: storage)
-        throw error
       }
+    } catch {
+      await discard(partial, in: storage)
+      throw error
     }
 
     let renamed: RemoteItem
@@ -112,7 +112,14 @@ public struct SafeWriter: Sendable {
       renamed = try await session.rename(partial, to: destination.name, in: storage)
     } catch {
       await discard(partial, in: storage)
-      return try await upload(file, size: size, to: path, in: storage, progress: progress)
+      // Only a device that cannot rename gets the direct-upload fallback; anything else
+      // (the name appeared, the device went away, a cancel) must surface unchanged.
+      switch error {
+      case .unsupported, .io:
+        return try await upload(file, size: size, to: path, in: storage, progress: progress)
+      default:
+        throw error
+      }
     }
     return renamed
   }
@@ -128,6 +135,10 @@ public struct SafeWriter: Sendable {
     do {
       item = try await session.upload(from: file, to: target, in: storage, progress: progress)
     } catch {
+      // `.alreadyExists` means the object at `target` is not ours to delete.
+      if case .alreadyExists = error {
+        throw error
+      }
       await discard(target, in: storage)
       if size > UInt64(UInt32.max), case .io = error {
         throw .fileTooLargeForStorage(size: size)
@@ -141,8 +152,15 @@ public struct SafeWriter: Sendable {
     return item
   }
 
-  private func exists(_ path: RemotePath, in storage: StorageID) async -> Bool {
-    (try? await session.item(at: path, in: storage)) != nil
+  private func exists(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
+    -> Bool
+  {
+    do {
+      _ = try await session.item(at: path, in: storage)
+      return true
+    } catch .notFound {
+      return false
+    }
   }
 
   private func discard(_ path: RemotePath, in storage: StorageID) async {
