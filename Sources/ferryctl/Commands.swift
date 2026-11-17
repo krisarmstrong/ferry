@@ -20,16 +20,22 @@ struct Target {
   let storage: StorageID
 }
 
+/// How to turn on file transfer; NetAlly steps from the AllyWare 3.x user guides.
+private let enableFileTransfer =
+  "NetAlly LinkRunner 10G/100G, EtherScope nXG: connect the left USB-C port, then "
+  + "Settings > Connected devices > USB > Transfer files. Other Android: unlock it, tap the "
+  + "USB notification, choose File transfer."
+
 private func message(for error: TransportError) -> String {
   switch error {
-  case .noDeviceConnected: "No phone is connected."
+  case .noDeviceConnected: "No device is connected. \(enableFileTransfer)"
   case .deviceNotFound(let id): "No phone with serial \(id.serial) is connected."
   case .noStorage: "The phone reports no storage."
   case .storageNotFound(let name): "The phone has no storage \"\(name)\"."
   case .deviceBusy:
     "Another app is using the phone (Image Capture, Preview, Photos or a sync app). "
       + "Quit it and replug, or see docs/spikes/2026-11-ptpcamerad.md."
-  case .deviceLocked: "Unlock your phone and choose \"File transfer\"."
+  case .deviceLocked: "The device is connected but not sharing files. \(enableFileTransfer)"
   case .deviceDisconnected: "The phone was disconnected."
   case .notFound(let path): "\(path) does not exist on the phone."
   case .alreadyExists(let path): "\(path) already exists on the phone. Use --replace to overwrite."

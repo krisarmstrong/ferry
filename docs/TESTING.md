@@ -49,7 +49,8 @@ with a note.
 ### Connect and identify
 
 - `ferryctl devices` lists the phone with its model and serial.
-- With no phone attached, `ferryctl devices` prints "No phone is connected." and exits 1.
+- With no device attached, `ferryctl devices` prints "No device is connected." plus the
+  file-transfer steps, and exits 1.
 - `ferryctl storages` lists internal storage, plus the SD card if there is one.
 
 ### Locked phone

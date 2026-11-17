@@ -14,8 +14,14 @@ make test lint fmt-check
 
 ## ferryctl
 
-A command-line front end that exercises the whole stack against a real phone. Unlock the phone
-and choose "File transfer" first.
+A command-line front end that exercises the whole stack against a real device. Turn on file
+transfer first:
+
+- **NetAlly LinkRunner 10G, EtherScope nXG, LinkRunner 100G:** connect a cable to the USB-C port
+  on the left side, then on the unit go to **Settings > Connected devices > USB** and tap
+  **Transfer files**.
+- **Other Android phones:** unlock the phone, tap the USB notification and choose
+  **File transfer** (Android 10+: **USB preferences > File transfer**).
 
 ```sh
 swift run ferryctl devices
