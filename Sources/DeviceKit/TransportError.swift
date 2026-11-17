@@ -1,4 +1,4 @@
-public enum TransportError: Error, Equatable, Sendable {
+public enum TransportError: Error, Equatable, Sendable, Codable {
   case noDeviceConnected
   case deviceNotFound(DeviceID)
   case noStorage
