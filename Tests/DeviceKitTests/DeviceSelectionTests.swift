@@ -26,6 +26,16 @@ struct DeviceSelectionTests {
     }
   }
 
+  @Test func listingNoDevicesThrowsNoDeviceConnected() {
+    #expect(throws: TransportError.noDeviceConnected) {
+      try DeviceSelection.requireAny([])
+    }
+  }
+
+  @Test func listingDevicesReturnsThemAll() throws {
+    #expect(try DeviceSelection.requireAny([first, second]) == [first, second])
+  }
+
   @Test func unknownSerialThrowsDeviceNotFound() {
     #expect(throws: TransportError.deviceNotFound(DeviceID(serial: "ZZ"))) {
       try DeviceSelection.pickDevice(serial: "ZZ", from: [first])

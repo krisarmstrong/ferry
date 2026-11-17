@@ -1,5 +1,11 @@
 /// Picks the device and storage a command or app acts on from what the transport reported.
 public enum DeviceSelection {
+  /// `devices`, which must not be empty: listing no phones is an error, not an empty answer.
+  public static func requireAny(_ devices: [DeviceInfo]) throws(TransportError) -> [DeviceInfo] {
+    guard !devices.isEmpty else { throw .noDeviceConnected }
+    return devices
+  }
+
   /// The device with `serial`, or the first one when `serial` is nil.
   public static func pickDevice(serial: String?, from devices: [DeviceInfo])
     throws(TransportError) -> DeviceInfo

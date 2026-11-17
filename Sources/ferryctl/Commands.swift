@@ -98,7 +98,7 @@ struct Devices: AsyncParsableCommand {
 
   func run() async throws {
     do {
-      for device in try await MTPTransport().connectedDevices() {
+      for device in try DeviceSelection.requireAny(await MTPTransport().connectedDevices()) {
         show(device.id.serial, "\(device.manufacturer) \(device.model)")
       }
     } catch {
