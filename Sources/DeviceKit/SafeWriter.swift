@@ -24,8 +24,8 @@ public struct SafeWriter: Sendable {
     self.registry = PartialRegistry()
   }
 
-  /// Upload `file` to `path`. If `replacing`, an existing file at `path` is replaced;
-  /// otherwise `.alreadyExists`. A folder at `path` is never replaced.
+  /// Upload `file` to `path`. If `replacing`, an existing file at `path`, or one whose name
+  /// differs only in case, is replaced; otherwise `.alreadyExists`. A folder is never replaced.
   public func write(
     from file: URL, to path: RemotePath, in storage: StorageID, replacing: Bool,
     progress: ProgressHandler
@@ -158,15 +158,22 @@ public struct SafeWriter: Sendable {
     return item
   }
 
-  /// The item at `path`, or `nil` if there is none.
+  /// The item `path` collides with, or `nil` if there is none: the exact name, else one that
+  /// differs only in case, since Android storage compares names that way. A missing parent is
+  /// `nil` too; the upload then reports it.
   private func existing(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem?
   {
+    guard let parent = path.parent, let name = path.name else { return nil }
+    let siblings: [RemoteItem]
     do {
-      return try await session.item(at: path, in: storage)
+      siblings = try await session.list(parent, in: storage)
     } catch .notFound {
       return nil
     }
+    let key = RemotePath.collisionKey(name)
+    return siblings.first { $0.path == path }
+      ?? siblings.first { RemotePath.collisionKey($0.path.name ?? "") == key }
   }
 
   private func discard(_ path: RemotePath, in storage: StorageID) async {

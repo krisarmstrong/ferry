@@ -133,12 +133,16 @@ actor MTPSession: DeviceSession {
     let id: UInt32
     let children: [MTPEntry]
 
-    /// Throws `.alreadyExists(path)` if a child is named like `path`, other than `except`.
+    /// Throws `.alreadyExists` naming the child that `path` collides with, other than `except`.
+    /// Names collide without regard to case, since Android storage compares them that way.
     func requireFree(_ path: RemotePath, except: UInt32? = nil) throws(TransportError) {
-      let taken = children.contains {
-        $0.name.precomposedStringWithCanonicalMapping == path.name && $0.objectID != except
+      guard let parent = path.parent, let name = path.name else { return }
+      let key = RemotePath.collisionKey(name)
+      let taken = children.first {
+        RemotePath.collisionKey($0.name) == key && $0.objectID != except
       }
-      if taken { throw .alreadyExists(path) }
+      guard let taken else { return }
+      throw .alreadyExists((try? parent.appending(taken.name)) ?? path)
     }
   }
 }

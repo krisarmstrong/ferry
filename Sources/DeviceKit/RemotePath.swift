@@ -34,6 +34,13 @@ public struct RemotePath: Hashable, Sendable, Codable, CustomStringConvertible {
 
   public var name: String? { components.last }
 
+  /// The form two names share when Android storage treats them as one name: NFC and without
+  /// case, as FAT and exFAT cards and emulated internal storage compare them.
+  public static func collisionKey(_ name: String) -> String {
+    name.precomposedStringWithCanonicalMapping.folding(options: .caseInsensitive, locale: nil)
+      .precomposedStringWithCanonicalMapping
+  }
+
   public var description: String {
     components.isEmpty ? "/" : "/" + components.joined(separator: "/")
   }

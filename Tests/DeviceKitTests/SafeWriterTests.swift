@@ -164,22 +164,6 @@ struct SafeWriterTests {
     #expect(await partials(device).isEmpty)
   }
 
-  @Test(arguments: [false, true])
-  func folderAtTargetIsNeverReplaced(replacing: Bool) async throws {
-    let device = makeDevice()
-    let writer = SafeWriter(session: device)
-    let folder = try RemotePath("/A")
-    let inside = try RemotePath("/A/b.txt")
-    try await device.seed(inside, in: storageID, contents: Data([9]))
-    try await withTempFile(Data([1, 2])) { file in
-      await #expect(throws: TransportError.alreadyExists(folder)) {
-        _ = try await writer.write(from: file, to: folder, replacing: replacing)
-      }
-    }
-    #expect(await device.allPaths(in: storageID) == [folder, inside])
-    #expect(await device.contents(of: inside, in: storageID) == Data([9]))
-  }
-
   /// libmtp sends exactly the size it is told, so a link's own size would truncate the upload.
   @Test func symlinkUploadsTheTargetsFullSize() async throws {
     let device = makeDevice()
@@ -227,7 +211,7 @@ struct SafeWriterTests {
     let path = try RemotePath("/a.txt")
     try await device.seed(path, in: storageID, contents: Data([9]))
     // A false "not found" skips the replace delete, so the rename meets an occupied name.
-    await device.failItem(with: .notFound(path))
+    await device.failList(with: .notFound(.root))
     await device.failRename(with: .alreadyExists(path))
     try await withTempFile(Data([1, 2])) { file in
       await #expect(throws: TransportError.alreadyExists(path)) {
@@ -243,7 +227,7 @@ struct SafeWriterTests {
     let writer = SafeWriter(session: device)
     let path = try RemotePath("/a.txt")
     try await device.seed(path, in: storageID, contents: Data([9]))
-    await device.failItem(with: .deviceBusy)
+    await device.failList(with: .deviceBusy)
     try await withTempFile(Data([1, 2])) { file in
       await #expect(throws: TransportError.deviceBusy) {
         _ = try await writer.write(from: file, to: path, replacing: true)
@@ -255,7 +239,7 @@ struct SafeWriterTests {
 }
 
 extension SafeWriter {
-  fileprivate func write(from file: URL, to path: RemotePath, replacing: Bool)
+  func write(from file: URL, to path: RemotePath, replacing: Bool)
     async throws(TransportError) -> RemoteItem
   {
     try await write(

@@ -36,7 +36,7 @@ public actor FakeDevice: DeviceSession {
   private var uploadFailure: (afterBytes: UInt64, error: TransportError)?
   private var uploadTruncation: UInt64?
   private var renameFailure: TransportError?
-  private var itemFailure: TransportError?
+  private var listFailure: TransportError?
 
   public init(
     info: DeviceInfo, storages: [StorageInfo],
@@ -81,9 +81,9 @@ public actor FakeDevice: DeviceSession {
     renameFailure = error
   }
 
-  /// The next `item(at:in:)` throws `error`. `nil` clears a pending failure.
-  public func failItem(with error: TransportError?) {
-    itemFailure = error
+  /// The next `list(_:in:)` throws `error`. `nil` clears a pending failure.
+  public func failList(with error: TransportError?) {
+    listFailure = error
   }
 
   public func contents(of path: RemotePath, in storage: StorageID) -> Data? {
@@ -107,6 +107,10 @@ public actor FakeDevice: DeviceSession {
   public func list(_ folder: RemotePath, in storage: StorageID) async throws(TransportError)
     -> [RemoteItem]
   {
+    if let failure = listFailure {
+      listFailure = nil
+      throw failure
+    }
     let nodes = try nodes(in: storage)
     try requireFolder(folder, in: nodes)
     return nodes.filter { $0.key.parent == folder }
@@ -117,10 +121,6 @@ public actor FakeDevice: DeviceSession {
   public func item(at path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem
   {
-    if let failure = itemFailure {
-      itemFailure = nil
-      throw failure
-    }
     let nodes = try nodes(in: storage)
     guard let node = path == .root ? .folder(modified: .distantPast) : nodes[path] else {
       throw .notFound(path)

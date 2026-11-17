@@ -57,6 +57,8 @@ with a note.
 
 - `put` a small file, then `get` it back. The two copies are identical.
 - `put` over an existing name fails unless you pass `--replace`.
+- `put Foo.txt` into a folder that has `foo.txt` fails the same way, naming `foo.txt`. With
+  `--replace` it replaces `foo.txt`, and only one file is left.
 - Unplug the cable halfway through a large `put`. No file appears under the real name, and the
   next `ls` of that folder shows no `.ferry-partial-*` object.
 
