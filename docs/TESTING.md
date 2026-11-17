@@ -25,7 +25,7 @@ one Android 8 or 9 device.
 
 | Device | Android | Integration suites | Large file (>4 GB) | Manual checklist | Date |
 | ------ | ------- | ------------------ | ------------------ | ---------------- | ---- |
-| NetAlly LinkRunner-100G (Android-based; no MoveObject) | AOSP MTP | pass (4/4; locked case not run) | not yet run | partial — see note | 2026-11-17 |
+| NetAlly LinkRunner-100G (Android-based; no MoveObject) | AOSP MTP | pass (4/4; locked case not run) | pass | partial — see note | 2026-11-17 |
 | Owner's phone | — | not yet run | not yet run | not yet run | — |
 | Android 8 or 9 device | 8 / 9 | not yet run | not yet run | not yet run | — |
 
@@ -36,7 +36,10 @@ storage and every command printed the unlock message. Passed with `ferryctl`: `d
 compare, `get` onto an existing file refused, `mkdir`, `mv` (copy+delete fallback — the device
 has no MoveObject), `rename`, `put --replace` onto a folder refused (folder untouched), recursive
 `rm`; no `.ferry-partial-*` left. Not run: unplug mid-transfer, case-variant names, accents/emoji,
-reconnect key stability by hand, large file, "held by another app".
+reconnect key stability by hand, "held by another app".
+Large files: `largeFileOver4GB` passed (4.1 GB in 49 s), and a 4.3 GB random-data `put` (48 s,
+~90 MB/s) then `get` (35 s, ~123 MB/s) round trip matched by SHA-256, leaving nothing behind on
+either side. Internal storage only; no FAT32 SD card to test the >4 GB rejection.
 
 ## Manual checklist
 
