@@ -59,8 +59,17 @@ struct MTPDeviceIntegrationTests {
       try await device.rename(objectID: id, to: "renamed.bin")
       #expect(try await device.metadata(objectID: id).name == "renamed.bin")
     } catch {
-      try? await device.delete(objectID: folder)
+      try? await removeFolder(folder, storage: storage, on: device)
       throw error
+    }
+    try await removeFolder(folder, storage: storage, on: device)
+  }
+
+  /// Deletes `folder` and the files in it, since an MTP device need not delete a non-empty
+  /// folder.
+  func removeFolder(_ folder: UInt32, storage: UInt32, on device: MTPDevice) async throws {
+    for child in try await device.list(storage: storage, parent: folder) {
+      try await device.delete(objectID: child.objectID)
     }
     try await device.delete(objectID: folder)
   }
