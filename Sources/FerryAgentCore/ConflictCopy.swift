@@ -24,22 +24,24 @@ enum ConflictCopy {
   }
 
   /// `report (conflict from Mac).txt`, then `report (conflict from Mac 2).txt` and so on. The
-  /// marker goes before the last extension, so the copy opens in the same app. A name that
-  /// starts with its only dot (`.profile`) has no extension.
-  /// A name longer than a device stores (`maxNameBytes` of UTF-8) loses characters from the end
-  /// of its base, never the marker or the extension.
+  /// marker goes before the extension, so the copy opens in the same app. An extension is a
+  /// short tail (at most 16 bytes, no space) after a dot that does not start the name, so in
+  /// `Notes 2026.11.17 meeting` the marker goes at the end. A name a device cannot store (see
+  /// `RemotePath.fitsOnDevice`) loses characters from the end of its base, never the marker or
+  /// the extension, and the copy's name never starts with a space.
   static func name(for name: String, attempt: Int) -> String {
     let marker = attempt == 1 ? " (conflict from Mac)" : " (conflict from Mac \(attempt))"
-    let dot = name.lastIndex(of: ".").flatMap { $0 == name.startIndex ? nil : $0 }
-    var base = name[..<(dot ?? name.endIndex)]
+    let dot = name.lastIndex(of: ".").flatMap { dot -> String.Index? in
+      let tail = name[dot...]
+      return dot == name.startIndex || tail.utf8.count > 17 || tail.contains(" ") ? nil : dot
+    }
+    var base = name[..<(dot ?? name.endIndex)].drop { $0 == " " }
     let tail = marker + (dot.map { String(name[$0...]) } ?? "")
-    while base.utf8.count + tail.utf8.count > maxNameBytes, !base.isEmpty {
+    while !RemotePath.fitsOnDevice(base + tail), !base.isEmpty {
       base = base.dropLast()
     }
-    return base + tail
+    return base.isEmpty ? String(tail.dropFirst()) : base + tail
   }
-
-  private static let maxNameBytes = 255
 
   private static let maxAttempts = 99
 
