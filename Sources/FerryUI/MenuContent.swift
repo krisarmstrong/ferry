@@ -27,12 +27,7 @@ public struct MenuContent: View {
         }
       }
       if model.agent == .unreachable {
-        Label {
-          Text("Ferry's helper is not responding. Quit Ferry and open it again.", bundle: .module)
-        } icon: {
-          Image(systemName: "exclamationmark.triangle")
-            .foregroundStyle(.yellow)
-        }
+        HelperRow(status: model.helper) { model.openLoginItems() }
       }
       if model.showsTurnOnRow {
         TurnOnRow { model.turnOnInFinder() }
@@ -112,6 +107,43 @@ public struct MenuContent: View {
 
   private func openGuide(for device: AttachedDevice?) {
     model.showGuide(for: device)
+  }
+}
+
+/// The agent did not answer. If macOS will not run it, the fix is in System Settings.
+private struct HelperRow: View {
+  let status: HelperStatus
+  let openSettings: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label {
+        switch status {
+        case .allowed:
+          Text("Ferry's helper is not responding. Quit Ferry and open it again.", bundle: .module)
+        case .requiresApproval:
+          Text("Allow Ferry's helper", bundle: .module)
+            .font(.headline)
+        case .notFound:
+          Text("macOS can't find Ferry's helper", bundle: .module)
+            .font(.headline)
+        }
+      } icon: {
+        Image(systemName: "exclamationmark.triangle")
+          .foregroundStyle(.yellow)
+      }
+      if status != .allowed {
+        Text(
+          "In Login Items & Extensions, turn on Ferry under Allow in the Background.",
+          bundle: .module
+        )
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        Button(action: openSettings) {
+          Text("Open System Settings", bundle: .module)
+        }
+      }
+    }
   }
 }
 

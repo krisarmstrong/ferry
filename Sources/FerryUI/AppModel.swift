@@ -30,6 +30,8 @@ import os
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
   public private(set) var provider = ProviderState.enabled
   public private(set) var agent = AgentState.checking
+  /// What macOS said about the helper the last time the agent did not answer.
+  public private(set) var helper = HelperStatus.allowed
   /// Transfers the agent is running, as of the last status.
   public private(set) var transfers: [ActiveTransfer] = []
   /// The last failed action, shown until the next one succeeds. It can carry device-supplied
@@ -96,6 +98,7 @@ import os
     } catch {
       Self.log.error("status request failed: \(String(describing: error), privacy: .private)")
       agent = .unreachable
+      helper = await services.helperStatus()
     }
   }
 
@@ -205,6 +208,11 @@ import os
     services.open(Self.loginItemsSettings)
   }
 
+  /// Where the user allows Ferry's helper to run in the background.
+  public func openLoginItems() {
+    services.open(Self.loginItemsSettings)
+  }
+
   /// Registers the agent, reads its status, then whether Ferry opens at login. The system calls
   /// run off the main actor (see `SystemServices`), so the app opens without waiting on them.
   public func launch() async {
@@ -281,6 +289,7 @@ import os
   private func apply(_ report: StatusReport) {
     let devices = report.devices
     self.devices = devices
+    helper = .allowed
     provider = report.provider
     transfers = report.transfers
     agent = .running

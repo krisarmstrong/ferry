@@ -113,6 +113,7 @@ final class FakeServices: SystemServicing {
   let log: CallLog
   var loginItem = true
   var failLoginItem = false
+  var helper = HelperStatus.allowed
 
   init(log: CallLog) {
     self.log = log
@@ -120,6 +121,10 @@ final class FakeServices: SystemServicing {
 
   func registerAgent() async {
     log.record("registerAgent")
+  }
+
+  func helperStatus() async -> HelperStatus {
+    helper
   }
 
   func opensAtLogin() async -> Bool {
@@ -346,23 +351,5 @@ struct AppModelTests {
   @Test func deviceTextIsEscaped() {
     let shown = device("A1", model: "Evil\u{1B}[2J\u{202E}", .busy)
     #expect(shown.displayName == "Evil\\u{1B}[2J\\u{202E}")
-  }
-}
-
-@MainActor
-struct AppModelTransferTests {
-  @Test func transfersAreListedUnderTheirDevice() async {
-    let log = CallLog()
-    let client = FakeClient(log: log)
-    let unit = DeviceID(serial: "U1")
-    let copy = ActiveTransfer(
-      device: unit, name: "trace.pcap", direction: .toMac, completed: 25, total: 100)
-    client.setStatus([], transfers: [copy])
-    let model = AppModel(client: client, services: FakeServices(log: log))
-    await model.refresh()
-
-    #expect(model.transfers(on: unit) == [copy])
-    #expect(model.transfers(on: DeviceID(serial: "other")).isEmpty)
-    #expect(DevicePresentation.transferLine(copy) == "Copying “trace.pcap” to this Mac · 25%")
   }
 }

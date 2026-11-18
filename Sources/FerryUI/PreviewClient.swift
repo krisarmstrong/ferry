@@ -48,6 +48,7 @@ extension AppModel {
 @MainActor
 private final class PreviewServices: SystemServicing {
   func registerAgent() async {}
+  func helperStatus() async -> HelperStatus { .allowed }
   func opensAtLogin() async -> Bool { false }
   func setOpensAtLogin(_ enabled: Bool) async {}
   func unregisterAgent() {}

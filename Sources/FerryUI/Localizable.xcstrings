@@ -14,6 +14,16 @@
     "%lld." : {
 
     },
+    "Allow Ferry's helper" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Allow Ferry's helper"
+          }
+        }
+      }
+    },
     "Android 10 or newer" : {
       "extractionState" : "manual"
     },
@@ -180,6 +190,16 @@
     },
     "In Ferry's Settings, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched." : {
       "extractionState" : "manual"
+    },
+    "In Login Items & Extensions, turn on Ferry under Allow in the Background." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "In Login Items & Extensions, turn on Ferry under Allow in the Background."
+          }
+        }
+      }
     },
     "In Login Items & Extensions, turn on Ferry under File Providers." : {
 
@@ -384,6 +404,16 @@
     },
     "Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched. You can then move Ferry to the Trash." : {
 
+    },
+    "macOS can't find Ferry's helper" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "macOS can't find Ferry's helper"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

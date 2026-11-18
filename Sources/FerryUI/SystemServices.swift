@@ -2,12 +2,24 @@ import AppKit
 import ServiceManagement
 import os
 
+/// Whether macOS lets Ferry's helper (the agent) run.
+public enum HelperStatus: Sendable, Equatable {
+  /// Registered and allowed; launchd starts it on demand.
+  case allowed
+  /// Turned off under Allow in the Background in Login Items & Extensions.
+  case requiresApproval
+  /// macOS cannot find the helper in Ferry's bundle.
+  case notFound
+}
+
 /// The system calls `AppModel` makes outside the agent, behind a protocol so tests can check
 /// their order with a fake.
 @MainActor
 public protocol SystemServicing {
   /// Registers the agent, which launchd then starts on demand. Registering again is harmless.
   func registerAgent() async
+  /// What macOS says about the helper now.
+  func helperStatus() async -> HelperStatus
   /// Whether Ferry opens at login.
   func opensAtLogin() async -> Bool
   func setOpensAtLogin(_ enabled: Bool) async throws
@@ -41,6 +53,17 @@ public final class SystemServices: SystemServicing {
         Self.log.error("registering the agent failed: \(error, privacy: .public)")
       }
       Self.log.info("agent status: \(Self.describe(agent.status), privacy: .public)")
+    }.value
+  }
+
+  public func helperStatus() async -> HelperStatus {
+    await Task.detached(priority: .utility) {
+      switch SMAppService.agent(plistName: Self.agentPlist).status {
+      case .requiresApproval: .requiresApproval
+      case .notFound: .notFound
+      // Not registered yet is registered at launch; anything else, the agent's own failure.
+      default: .allowed
+      }
     }.value
   }
 
