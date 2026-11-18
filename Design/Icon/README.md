@@ -10,16 +10,18 @@ water. It says what the app does: carry files across, between a device and the M
 | `layers/background.svg` | Full-bleed 1024 gradient, `#1D3E94` → `#0E8597`. Used by the classic render; the `.icon` bundle sets the same gradient as its fill. |
 | `layers/water.svg` | Water band, white at 16 % opacity. |
 | `layers/hull.svg`, `layers/cargo.svg` | Foreground glyph for 128 px and up. |
-| `layers/hull-small.svg`, `layers/cargo-small.svg` | Larger glyph with a wider gap, for 16 and 32 px. |
+| `layers/hull-small.svg`, `layers/cargo-small.svg` | 32 px glyph, drawn on that size's pixel grid (1 px = 1024/26 units). |
+| `layers/hull-16.svg`, `layers/cargo-16.svg` | 16 px glyph on its pixel grid (1 px = 1024/14 units); no fold, no water. |
 | `Ferry.icon/` | Icon Composer bundle (`icon.json` + `Assets/`). Light and dark fills; glyph layers use Liquid Glass. |
 | `AppIcon.appiconset/` | Classic PNGs, 16–512 pt at 1x and 2x, with `Contents.json`. |
-| `MenuBarGlyph.svg`, `MenuBarGlyph-{16,18,32,36}.png` | Black-and-alpha template glyph. |
+| `MenuBarGlyph.svg`, `MenuBarGlyph-{16,18,32,36}.png` | Black-and-alpha template glyph, drawn on an 18 pt grid (crisp at 18 and 36 px). |
 | `Ferry.png` | 512 px render for the README. |
 | `preview.png` | Review sheet: every size on light and dark, 8x zooms of 16 and 32 px, menu bar glyph. |
 | `actool-render-256.png` | How `actool` renders `Ferry.icon` (the system's glass, not ours). |
 
 The 1024 canvas follows Apple's macOS grid: in the classic render the shape is an 824 px
-continuous-corner square inset 100 px, with a shadow below. In `Ferry.icon` the layers are
+continuous-corner square inset 100 px, with a shadow below. At 16 and 32 px the shape snaps to whole
+pixels (14 px inset 1, 26 px inset 3) so the glyph edges land on the pixel grid. In `Ferry.icon` the layers are
 full-bleed and the system applies the shape, glass and shadow.
 
 ## Render

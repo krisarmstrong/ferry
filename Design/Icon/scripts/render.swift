@@ -36,6 +36,8 @@ let hull = svg("hull")
 let cargo = svg("cargo")
 let smallHull = svg("hull-small")
 let smallCargo = svg("cargo-small")
+let hull16 = svg("hull-16")
+let cargo16 = svg("cargo-16")
 let menuGlyph = NSImage(contentsOf: iconDir.appending(path: "MenuBarGlyph.svg"))!
 
 /// A bitmap with exactly `width` x `height` pixels, drawn at 1 point per pixel.
@@ -82,7 +84,11 @@ func squircle(in rect: CGRect) -> CGPath {
 func classicIcon(_ px: Int) -> NSBitmapImageRep {
   bitmap(px, px) { cg in
     let scale = CGFloat(px) / 1024
-    let tile = CGRect(x: 100 * scale, y: 100 * scale, width: 824 * scale, height: 824 * scale)
+    // Small sizes snap the tile to whole pixels (14 px inset 1 at 16, 26 px inset 3 at 32), and
+    // their glyph layers are drawn on that pixel grid.
+    let inset = px <= 32 ? (100 * scale).rounded(.down) : 100 * scale
+    let side = px <= 32 ? CGFloat(px) - 2 * inset : 824 * scale
+    let tile = CGRect(x: inset, y: inset, width: side, height: side)
     let shape = squircle(in: tile)
     cg.saveGState()
     cg.setShadow(
@@ -95,10 +101,11 @@ func classicIcon(_ px: Int) -> NSBitmapImageRep {
     cg.saveGState()
     cg.addPath(shape)
     cg.clip()
-    let small = px <= 32
     // At 16 px the water edge only smears behind the hull, so it is left out there.
-    let layers = px <= 16 ? [background] : [background, water]
-    for layer in layers + [small ? smallHull : hull, small ? smallCargo : cargo] {
+    let glyph =
+      px <= 16 ? [background, hull16, cargo16]
+      : px <= 32 ? [background, water, smallHull, smallCargo] : [background, water, hull, cargo]
+    for layer in glyph {
       layer.draw(in: tile)
     }
     cg.restoreGState()

@@ -1,3 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <path d="M196 620 H828 Q866 620 852 656 Q800 800 680 800 H344 Q224 800 172 656 Q158 620 196 620 Z" fill="#FFFFFF"/>
+  <!-- Drawn on the 32 px grid: 1 px = 1024/26 units. -->
+  <path d="M157.5 590.8 H866.5 Q820 787.7 669.5 787.7 H354.5 Q204 787.7 157.5 590.8 Z" fill="#FFFFFF"/>
 </svg>

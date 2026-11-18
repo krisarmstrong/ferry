@@ -28,19 +28,21 @@ A standard macOS window, opened from a **Help** item in the menu and in Settings
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ ◉ ◉ ◉            Ferry Help              [🔍 Search        ]  │
+│ o o o            Ferry Help               [ Search        ]  │
 ├───────────────────────┬──────────────────────────────────────┤
-│ ☑ Getting started     │  Connect a NetAlly unit              │
-│ ⎓ Connect a NetAlly…  │  For the LinkRunner 10G, …           │
-│ 📱 Connect another…   │                                      │
-│ 📁 Using Ferry in…    │  1. Connect a USB-C cable to the …   │
-│ ▭ The menu            │  2. On the unit: Settings → …        │
-│ 🔧 Troubleshooting    │  3. Tap Transfer files.              │
-│ ✋ Privacy            │                                      │
-│ 🗑 Uninstall          │  The device appears in Finder once … │
-│ 📅 Coming next        │                     [ How to connect ]│
+│ [checklist] Getting…  │  Connect a NetAlly unit              │
+│ [cable] Connect a N…  │  For the LinkRunner 10G, …           │
+│ [phone] Connect ano…  │                                      │
+│ [folder] Using Ferr…  │  1. Connect a USB-C cable to the …   │
+│ [menubar] The menu    │  2. On the unit: Settings → …        │
+│ [wrench] Troublesho…  │  3. Tap Transfer files.              │
+│ [hand] Privacy        │                                      │
+│ [trash] Uninstall     │  The device appears in Finder once … │
+│ [calendar] Coming n…  │                     [ How to connect ]│
 └───────────────────────┴──────────────────────────────────────┘
 ```
+
+Bracketed names stand for each section's SF Symbol (`symbol` in `help.json`).
 
 - `NavigationSplitView` with a sidebar `List(selection:)` of sections, each a `Label(title,
   systemImage: symbol)`, and a detail `ScrollView` for the selected section. The system draws
