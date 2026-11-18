@@ -1,3 +1,4 @@
+import CoreServices
 import DeviceKit
 import FerryIPC
 import FerryProviderCore
@@ -65,15 +66,42 @@ struct ItemKindTests {
     #expect(await agent.requests.isEmpty)
   }
 
+  /// Only document packages: a folder named like an app, plug-in or other bundle stays a
+  /// folder, so Finder never offers code from a USB device as something to launch.
   @Test(arguments: [
-    ("Notes.rtfd", "com.apple.rtfd"), ("Ferry.app", "com.apple.application-bundle"),
+    ("Notes.rtfd", "com.apple.rtfd"), ("Talk.key", "com.apple.iwork.keynote.key"),
+    ("Ferry.app", "public.folder"), ("x.bundle", "public.folder"),
+    ("x.plugin", "public.folder"), ("x.appex", "public.folder"),
+    ("x.systemextension", "public.folder"), ("x.kext", "public.folder"),
+    ("x.scptd", "public.folder"), ("x.pkg", "public.folder"),
     ("DCIM", "public.folder"), ("report.txt", "public.folder"),
   ])
-  func aDeviceFolderNamedLikeAPackageIsOne(name: String, identifier: String) throws {
+  func aDeviceFolderNamedLikeADocumentPackageIsOne(name: String, identifier: String) throws {
     let item = ProviderItem(
       ProviderEntry(
         id: .random(), parent: .root,
         item: RemoteItem(path: try path("/" + name), kind: .folder, size: 0, modified: epoch)))
     #expect(item.contentType.identifier == identifier)
+  }
+}
+
+/// Contents from a USB device are untrusted downloads: Gatekeeper checks an app or script from
+/// one before it runs.
+struct FetchQuarantineTests {
+  @Test func aFetchedFileIsQuarantined() async throws {
+    let agent = FakeAgent(
+      [try file("/run.command", size: 2)], contents: [try path("/run.command"): Data("hi".utf8)])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+
+    let (url, _) = try await backend.fetch(
+      try await agent.identifier(try path("/run.command")), into: dir)
+
+    let size = getxattr(url.path, "com.apple.quarantine", nil, 0, 0, 0)
+    #expect(size > 0)
+    let properties = try url.resourceValues(forKeys: [.quarantinePropertiesKey])
+      .quarantineProperties
+    #expect(properties?[kLSQuarantineAgentNameKey as String] as? String == "Ferry")
   }
 }

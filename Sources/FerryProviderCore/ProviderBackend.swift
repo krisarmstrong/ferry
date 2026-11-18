@@ -1,3 +1,4 @@
+import CoreServices
 import DeviceKit
 import FerryIPC
 import FileProvider
@@ -57,6 +58,7 @@ public actor ProviderBackend {
       defer { try? handle.close() }
       let response = try await send(.fetch(domain: domain, id: itemID), file: handle)
       guard case .done = response else { throw Self.unexpected(response) }
+      try Self.quarantine(url)
     } catch {
       try? FileManager.default.removeItem(at: url)
       throw error
@@ -266,6 +268,19 @@ public actor ProviderBackend {
     } catch {
       throw ErrorMapping.fileProviderError(error)
     }
+  }
+
+  /// Marks a download from the device as one from an untrusted source, so Gatekeeper checks an
+  /// app or script in it before it runs. Through Foundation's documented quarantine key, which
+  /// writes `com.apple.quarantine`. A file that cannot be marked is not handed over.
+  private static func quarantine(_ url: URL) throws {
+    var url = url
+    var values = URLResourceValues()
+    values.quarantineProperties = [
+      kLSQuarantineAgentNameKey as String: "Ferry",
+      kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String,
+    ]
+    try url.setResourceValues(values)
   }
 
   /// Opens a new file for writing, failing if anything is already at `url`.

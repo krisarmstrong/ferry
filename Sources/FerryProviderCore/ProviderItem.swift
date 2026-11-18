@@ -35,10 +35,12 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   public var contentType: UTType {
     switch entry.item.kind {
     case .folder:
-      // A folder named like a package (`Notes.rtfd`, `Ferry.app`) is one, as on a Mac volume.
+      // A folder named like a document package (`Notes.rtfd`) is one, as on a Mac volume. A
+      // folder named like code (an app, plug-in or any other bundle) stays a folder, so Finder
+      // never offers code from a USB device as something to launch.
       let ext = (filename as NSString).pathExtension
       guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .package),
-        type.isDeclared
+        type.isDeclared, !Self.codeTypes.contains(where: type.conforms(to:))
       else { return .folder }
       return type
     case .file:
@@ -47,6 +49,12 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
       return UTType(filenameExtension: ext, conformingTo: .data) ?? .data
     }
   }
+
+  /// Bundles of code, and anything that runs.
+  private static let codeTypes: [UTType] = [
+    .application, .applicationBundle, .bundle, .executable, .pluginBundle, .framework,
+    .applicationExtension, .script, UTType("com.apple.system-extension"),
+  ].compactMap { $0 }
 
   public var documentSize: NSNumber? {
     entry.item.kind == .file ? NSNumber(value: entry.item.size) : nil
