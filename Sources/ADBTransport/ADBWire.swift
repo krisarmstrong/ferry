@@ -10,6 +10,8 @@ public enum ADBError: Error, Equatable, Sendable {
   /// The peer closed the connection (a device unplugged mid-stream, or the server stopped).
   case connectionClosed
   case protocolViolation(String)
+  /// A transfer's progress handler asked to stop. The sync connection is closed with it.
+  case cancelled
 }
 
 public struct ADBDevice: Sendable, Equatable {
@@ -53,6 +55,19 @@ enum ADBWire {
       throw .protocolViolation("reply is not UTF-8")
     }
     return text
+  }
+
+  /// A little-endian unsigned integer of up to eight bytes, as sync and shell_v2 write them.
+  static func u64(_ bytes: some Collection<UInt8>) -> UInt64 {
+    bytes.enumerated().reduce(0) { $0 | UInt64($1.element) << (8 * UInt64($1.offset)) }
+  }
+
+  static func u32(_ bytes: some Collection<UInt8>) -> UInt32 {
+    UInt32(truncatingIfNeeded: u64(bytes))
+  }
+
+  static func le32(_ value: UInt32) -> Data {
+    Data((0..<4).map { UInt8(truncatingIfNeeded: value >> (8 * UInt32($0))) })
   }
 
   static func length(of digits: Data) throws(ADBError) -> Int {

@@ -57,6 +57,20 @@ public actor ADBStream {
     return data
   }
 
+  /// Whatever the peer sends next (at most `count` bytes), or nil once it has closed cleanly.
+  func readSome(upTo count: Int) async throws(ADBError) -> Data? {
+    let result: Result<Data, ADBError> = await withCheckedContinuation { continuation in
+      connection.receive(minimumIncompleteLength: 1, maximumLength: count) {
+        continuation.resume(returning: Self.received($0, isComplete: $2, error: $3))
+      }
+    }
+    do {
+      return try result.get()
+    } catch .connectionClosed {
+      return nil
+    }
+  }
+
   private static func received(
     _ chunk: Data?, isComplete: Bool, error: NWError?
   ) -> Result<Data, ADBError> {
