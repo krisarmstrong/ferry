@@ -2,6 +2,10 @@ import DeviceKit
 import FerryIPC
 import FileProvider
 import Foundation
+import os
+
+private let packageLog = Logger(
+  subsystem: "io.github.krisarmstrong.ferry", category: "ProviderBackend")
 
 // MARK: Packages
 
@@ -176,6 +180,7 @@ extension ProviderBackend {
     do throws(TransportError) {
       try PackageArchive.extract(from: reader, to: folder, quarantine: quarantine)
     } catch {
+      packageLog.error("extracting a fetched package failed: \(error, privacy: .private)")
       try? FileManager.default.removeItem(at: folder)
       throw ErrorMapping.fileProviderError(error)
     }

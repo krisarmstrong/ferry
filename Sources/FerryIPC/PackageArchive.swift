@@ -1,3 +1,4 @@
+import CoreServices
 import DeviceKit
 import Foundation
 
@@ -199,13 +200,26 @@ public enum PackageArchive {
     }
   }
 
-  /// Sets `quarantine` as `com.apple.quarantine` on `url`, which extraction just made.
+  /// Sets `quarantine` as `com.apple.quarantine` on `url`, which extraction just made. A
+  /// sandboxed process may not write that attribute directly; it then marks the item through
+  /// Foundation's documented quarantine properties, which write the attribute for it.
   private static func mark(_ url: URL, _ quarantine: Data?) throws {
     guard let quarantine else { return }
     let result = quarantine.withUnsafeBytes { bytes in
       setxattr(url.path, "com.apple.quarantine", bytes.baseAddress, bytes.count, 0, XATTR_NOFOLLOW)
     }
-    guard result == 0 else { throw bad("cannot mark \(url.lastPathComponent) as downloaded") }
+    guard result != 0 else { return }
+    var marked = url
+    var values = URLResourceValues()
+    values.quarantineProperties = [
+      kLSQuarantineAgentNameKey as String: "Ferry",
+      kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String,
+    ]
+    do {
+      try marked.setResourceValues(values)
+    } catch {
+      throw bad("cannot mark \(url.lastPathComponent) as downloaded")
+    }
   }
 
   private static func bad(_ reason: String) -> TransportError {
