@@ -47,19 +47,24 @@ struct ADBTrackDevicesTests {
     }
   }
 
-  @Test func survivesServerRestartOnTheSameStream() async throws {
+  @Test func survivesServerRestartsOnTheSameStream() async throws {
     let port = try await closedPort()
     let launches = Box(0)
     let servers = Box<[FakeADBServer]>([])
     let first = try await Self.serve(port: port, "abc device\n", closeAfter: .milliseconds(50))
+    await servers.set([first])
     let host = ADBHost(
       port: port,
       locator: ADBLocator(
         environment: [:], home: "/x", isExecutable: { $0 == "/opt/homebrew/bin/adb" }),
       launcher: { (_) async throws(ADBError) in
-        await launches.set(await launches.value + 1)
+        let launch = await launches.value + 1
+        await launches.set(launch)
         do {
-          await servers.set([try await Self.serve(port: port, "def device\n", closeAfter: nil)])
+          let server = try await Self.serve(
+            port: port, launch == 1 ? "def device\n" : "ghi device\n",
+            closeAfter: launch == 1 ? .milliseconds(50) : nil)
+          await servers.set(await servers.value + [server])
         } catch {
           throw .failed("fake server: \(error)")
         }
@@ -68,15 +73,18 @@ struct ADBTrackDevicesTests {
     var seen: [[String]] = []
     for await list in host.trackDevices() {
       seen.append(list.map(\.serial))
-      if seen.count == 1 { first.stop() }
-      if seen.count == 3 { break }
+      // Stopping the listener while a peer is connected makes the next connect an outage.
+      if list.map(\.serial) == ["abc"] || list.map(\.serial) == ["def"] {
+        await servers.value.last?.stop()
+      }
+      if seen.count == 5 { break }
     }
-    #expect(seen == [["abc"], [], ["def"]])
-    #expect(await launches.value == 1)
+    #expect(seen == [["abc"], [], ["def"], [], ["ghi"]])
+    #expect(await launches.value == 2)
     for server in await servers.value { server.stop() }
   }
 
-  @Test func missingServerReportsNoDevicesAndStartsItOnce() async throws {
+  @Test func persistentOutageReportsNoDevicesOnceAndStartsTheServerOnce() async throws {
     let port = try await closedPort()
     let launches = Box(0)
     let host = ADBHost(
@@ -84,13 +92,59 @@ struct ADBTrackDevicesTests {
       locator: ADBLocator(
         environment: [:], home: "/x", isExecutable: { $0 == "/opt/homebrew/bin/adb" }),
       launcher: { _ in await launches.set(await launches.value + 1) },
-      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(20)))
-    for await list in host.trackDevices() {
-      #expect(list.isEmpty)
+      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)))
+    let lists = Box<[[ADBDevice]]>([])
+    let consumer = Task {
+      for await list in host.trackDevices() { await lists.set(await lists.value + [list]) }
+    }
+    // About thirty failed connects at 10 ms.
+    try await Task.sleep(for: .milliseconds(400))
+    consumer.cancel()
+    await consumer.value
+    #expect(await lists.value == [[]])
+    #expect(await launches.value == 1)
+  }
+
+  @Test func closedConnectionsAreCancelledByTheClient() async throws {
+    let connections = Box(0)
+    let closed = Box(0)
+    let server = try await FakeADBServer.start { peer in
+      await connections.set(await connections.value + 1)
+      _ = try await peer.request()
+      try await peer.okay()
+      try await peer.send("zzzz")
+      _ = try? await peer.stream.read(exactly: 1)
+      await closed.set(await closed.value + 1)
+    }
+    defer { server.stop() }
+    let host = ADBHost(
+      port: server.port, locator: Self.noAdb, launcher: { _ in },
+      backoff: Backoff(initial: .seconds(5), maximum: .seconds(5)))
+    for await _ in host.trackDevices() {
+      try await Task.sleep(for: .milliseconds(300))
       break
     }
-    try await Task.sleep(for: .milliseconds(150))
-    #expect(await launches.value == 1)
+    #expect(await connections.value == 1)
+    #expect(await closed.value == 1)
+  }
+
+  @Test func aSlowConsumerSeesOnlyTheNewestList() async throws {
+    let server = try await FakeADBServer.start { peer in
+      _ = try await peer.request()
+      try await peer.okay()
+      for serial in ["a", "b", "c", "d"] {
+        try await peer.send(String(data: ADBWire.frame("\(serial) device\n"), encoding: .utf8)!)
+      }
+      try await Task.sleep(for: .seconds(2))
+    }
+    defer { server.stop() }
+    let host = ADBHost(port: server.port, locator: Self.noAdb)
+    let stream = host.trackDevices()
+    try await Task.sleep(for: .milliseconds(300))
+    for await list in stream {
+      #expect(list.map(\.serial) == ["d"])
+      break
+    }
   }
 
   @Test func stoppingIterationStopsTheReconnectLoop() async throws {

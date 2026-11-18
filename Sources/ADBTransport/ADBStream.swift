@@ -19,21 +19,27 @@ public actor ADBStream {
     let states = AsyncStream<NWConnection.State> { continuation in
       connection.stateUpdateHandler = { continuation.yield($0) }
     }
-    connection.start(queue: .global())
-    for await state in states {
-      switch state {
-      case .ready:
-        connection.stateUpdateHandler = nil
-        return ADBStream(connection: connection)
-      case .waiting, .failed, .cancelled:
-        // A refused connect parks in `waiting` and retries; the answer is already known.
-        connection.cancel()
-        throw .serverUnavailable
-      default:
-        continue
+    let result: Result<ADBStream, ADBError> = await withTaskCancellationHandler {
+      connection.start(queue: .global())
+      for await state in states {
+        switch state {
+        case .ready:
+          connection.stateUpdateHandler = nil
+          return .success(ADBStream(connection: connection))
+        case .waiting, .failed, .cancelled:
+          // A refused connect parks in `waiting` and retries; the answer is already known.
+          connection.cancel()
+          return .failure(.serverUnavailable)
+        default:
+          continue
+        }
       }
+      connection.cancel()
+      return .failure(.serverUnavailable)
+    } onCancel: {
+      connection.cancel()
     }
-    throw .serverUnavailable
+    return try result.get()
   }
 
   /// Reads exactly `count` bytes, or throws if the peer closes first.
@@ -56,7 +62,9 @@ public actor ADBStream {
   ) -> Result<Data, ADBError> {
     if let error { return .failure(.failed(error.localizedDescription)) }
     if let chunk, !chunk.isEmpty { return .success(chunk) }
-    return isComplete ? .failure(.connectionClosed) : .success(Data())
+    // With minimumIncompleteLength 1 a receive carries data, an error or the end of the stream.
+    return isComplete
+      ? .failure(.connectionClosed) : .failure(.protocolViolation("receive returned nothing"))
   }
 
   public func write(_ data: Data) async throws(ADBError) {
@@ -74,10 +82,6 @@ public actor ADBStream {
   /// Closes the socket without waiting for the actor, so a read blocked on it fails at once.
   nonisolated func cancel() {
     connection.cancel()
-  }
-
-  func send(request: String) async throws(ADBError) {
-    try await write(ADBWire.frame(request))
   }
 
   /// Reads the server's `OKAY`, or turns `FAIL<len><message>` into `.failed(message)`.

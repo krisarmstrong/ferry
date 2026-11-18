@@ -1,7 +1,7 @@
 import Foundation
 
 public enum ADBError: Error, Equatable, Sendable {
-  /// Nothing is listening on the adb server port, or the server dropped the connection.
+  /// Nothing is listening on the adb server port.
   case serverUnavailable
   case adbNotInstalled
   /// The server answered `FAIL` with this message.

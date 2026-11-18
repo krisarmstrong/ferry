@@ -65,7 +65,8 @@ public actor ADBHost {
   /// A new list for every change the server reports, and `[]` once when the server goes away.
   /// It reconnects on its own and finishes only when the consumer stops iterating.
   public nonisolated func trackDevices() -> AsyncStream<[ADBDevice]> {
-    AsyncStream { continuation in
+    // Each list replaces the last, so a slow consumer needs only the newest.
+    AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let task = Task { await self.track(into: continuation) }
       continuation.onTermination = { _ in task.cancel() }
     }
@@ -83,11 +84,13 @@ public actor ADBHost {
   /// Opens a connection routed to `serial` and starts `service` on it; what follows on the
   /// returned stream is the service's own protocol.
   public func connect(_ serial: String, service: String) async throws(ADBError) -> ADBStream {
+    let select = try ADBWire.frame("host:transport:\(serial)")
+    let start = try ADBWire.frame(service)
     let stream = try await ADBStream.open(port: port)
     do throws(ADBError) {
-      try await stream.send(request: "host:transport:\(serial)")
+      try await stream.write(select)
       try await stream.expectOkay()
-      try await stream.send(request: service)
+      try await stream.write(start)
       try await stream.expectOkay()
       return stream
     } catch {
@@ -105,9 +108,10 @@ public actor ADBHost {
   }
 
   private func query(_ request: String) async throws(ADBError) -> String {
+    let framed = try ADBWire.frame(request)
     let stream = try await ADBStream.open(port: port)
     do throws(ADBError) {
-      try await stream.send(request: request)
+      try await stream.write(framed)
       try await stream.expectOkay()
       let reply = try await stream.readFrame()
       await stream.close()
@@ -163,9 +167,11 @@ public actor ADBHost {
     onFrame: () -> Void
   ) async -> Bool {
     await withTaskCancellationHandler {
+      // The server closing, a bad frame or a refused handshake all end up here too.
+      defer { stream.cancel() }
       var reached = false
       do throws(ADBError) {
-        try await stream.send(request: "host:track-devices-l")
+        try await stream.write(ADBWire.frame("host:track-devices-l"))
         try await stream.expectOkay()
         reached = true
         while true {
