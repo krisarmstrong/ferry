@@ -117,6 +117,12 @@ struct AgentDeleteAndConflictTests {
     #expect(reply == .failure(.changedOnDevice(try path("/a.txt"))))
     #expect(
       await setup.device.contents(of: try path("/a.txt"), in: setup.storage) == Data("newer".utf8))
+    // The device's file is recorded, so FileProvider puts back that version.
+    guard
+      case .page(let entries, _) = await setup.send(
+        .workingSet(domain: setup.domain, page: nil))
+    else { throw TransportError.unknownItem }
+    #expect(entries.first { $0.id == file }?.item.size == 5)
   }
 
   @Test func deletingAFileAtItsBaseVersionDeletesIt() async throws {

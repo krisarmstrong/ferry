@@ -33,7 +33,7 @@ struct AgentRecursiveDeleteTests {
     }
 
     func reported(_ string: String) async throws -> Bool {
-      try await harness.controller.route(domain).items.reported(try path(string))
+      try await harness.controller.route(domain).items.knows(try path(string))
     }
 
     func onDevice(_ string: String) async throws -> Bool {
@@ -81,6 +81,24 @@ struct AgentRecursiveDeleteTests {
     }
     // Recorded, so FileProvider learns of it with the folder it puts back.
     #expect(try await setup.reported("/Reports/Sub/new.txt"))
+  }
+
+  /// FileProvider saw the file, but the device changed it since: deleting the folder would
+  /// lose the device's edit.
+  @Test func aFolderHoldingAFileTheDeviceChangedStays() async throws {
+    let setup = try await setup([("/Reports/r1.txt", "one")])
+    defer { setup.harness.finish() }
+    try await setup.show(["/Reports"])
+    try await setup.device.seed(
+      try path("/Reports/r1.txt"), in: setup.storage, contents: Data("edited on the unit".utf8))
+
+    let reply = await setup.send(
+      .delete(domain: setup.domain, id: try await setup.id("/Reports"), base: nil, recursive: true))
+
+    #expect(reply == .failure(.directoryNotEmpty(try path("/Reports"))))
+    #expect(
+      await setup.device.contents(of: try path("/Reports/r1.txt"), in: setup.storage)
+        == Data("edited on the unit".utf8))
   }
 
   /// A folder FileProvider never listed: everything in it is unseen.

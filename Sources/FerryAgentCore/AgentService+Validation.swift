@@ -6,9 +6,10 @@ import Foundation
 
 extension AgentService {
   /// Throws `.directoryNotEmpty(folder)` unless the agent has reported to FileProvider everything
-  /// Finder would show in the device folder `folder`, walked fresh: a recursive delete takes only
-  /// what the user saw go, never what the device added since. Each item not reported is recorded
-  /// now, so FileProvider, which puts the folder back on that error, shows it there. A tree with
+  /// Finder would show in the device folder `folder`, walked fresh, as it is now: a recursive
+  /// delete takes only what the user saw go, never what the device added or changed since. Each
+  /// item not reported as it is is recorded now, so FileProvider, which puts the folder back on
+  /// that error, shows it there. A tree with
   /// an item more than `RemotePath.maxTreeDepth` levels below `folder`, or more than
   /// `deleteWalkLimit` items, is refused the same way, unwalked past that point. The listings
   /// also reap abandoned partials.
@@ -24,7 +25,7 @@ extension AgentService {
         guard walked <= deleteWalkLimit, depth <= RemotePath.maxTreeDepth else {
           throw .directoryNotEmpty(folder)
         }
-        if await !route.items.reported(child.path) { unseen.append(child) }
+        if await !route.items.reportedAsIs(child) { unseen.append(child) }
         if child.kind == .folder { pending.append((child.path, depth + 1)) }
       }
     }
