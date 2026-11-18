@@ -309,7 +309,7 @@ public actor ProviderBackend {
   private static func createExclusively(_ url: URL) throws -> FileHandle {
     let descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
     guard descriptor >= 0 else {
-      throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+      throw ErrorMapping.forFileProvider(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO))
     }
     return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
   }

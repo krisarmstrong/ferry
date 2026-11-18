@@ -35,7 +35,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator {
           observer.value.didEnumerate(result.items)
           observer.value.finishEnumerating(upTo: result.next)
         } catch {
-          observer.value.finishEnumeratingWithError(error)
+          observer.value.finishEnumeratingWithError(ErrorMapping.forFileProvider(error))
         }
       }
     case .folder(let folder):
@@ -44,7 +44,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator {
           observer.value.didEnumerate(try await backend.children(of: folder))
           observer.value.finishEnumerating(upTo: nil)
         } catch {
-          observer.value.finishEnumeratingWithError(error)
+          observer.value.finishEnumeratingWithError(ErrorMapping.forFileProvider(error))
         }
       }
     }
@@ -62,7 +62,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator {
         observer.value.didDeleteItems(withIdentifiers: changes.deleted)
         observer.value.finishEnumeratingChanges(upTo: changes.anchor, moreComing: false)
       } catch {
-        observer.value.finishEnumeratingWithError(error)
+        observer.value.finishEnumeratingWithError(ErrorMapping.forFileProvider(error))
       }
     }
   }

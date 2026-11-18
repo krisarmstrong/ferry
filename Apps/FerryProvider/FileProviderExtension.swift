@@ -192,7 +192,8 @@ private func answer<T: Sendable>(
       let value = try await work()
       result = .success(value)
     } catch {
-      result = .failure(error)
+      // FileProvider accepts only its own and Cocoa's error domains.
+      result = .failure(ErrorMapping.forFileProvider(error))
     }
     progress.completedUnitCount = progress.totalUnitCount
     complete.value(result)
