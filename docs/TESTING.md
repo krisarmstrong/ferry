@@ -107,6 +107,9 @@ with a note.
 | Menu polling stops when the menu closes | pass |
 | No "Move to Trash" (Ferry has no trash); stale pre-fix domain re-added in place | pass |
 | Unplug mid-copy; replug returns the same location | not run (needs the cable pulled by hand) |
-| Eject; Remove Ferry | not run (menu-bar icon not reachable by automation; owner step) |
+| Eject from the menu: Finder location removed, device released (`ferryctl` can open it) | pass |
+| Agent restart (`launchctl kickstart -k`): device re-admitted, location back and browsable | pass |
+| Remove Ferry (Settings, confirm): app quits, agent unregistered, all locations gone, device released | pass |
+| Relaunch after Remove Ferry: agent re-registers, location back, still enabled (no re-enabling) | pass |
 | Phone set to file transfer off ⇒ menu shows "Not sharing files" and the guide | not run live (unit-tested) |
 
