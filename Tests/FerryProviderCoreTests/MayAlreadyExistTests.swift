@@ -63,6 +63,24 @@ struct MayAlreadyExistTests {
     #expect(!match.shouldFetchContent)
   }
 
+  /// A package FileProvider finds on the Mac with nothing of its name on the device is never
+  /// answered with no item, which would delete it from the Mac with everything in it: it stays
+  /// on the Mac, out of sync.
+  @Test(arguments: [false, true])
+  func aPackageWithNoDeviceMatchIsExcludedFromSync(withContents: Bool) async throws {
+    let agent = FakeAgent()
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let contents = withContents ? try localPackage("text", in: dir) : nil
+
+    await #expect(throws: NSFileProviderError(.excludedFromSync)) {
+      _ = try await importing(
+        ItemTemplate(parent: .root, filename: "Notes.rtfd", kind: .package), from: agent,
+        contents: contents)
+    }
+    #expect(await agent.requests == [.list(domain: domain, folder: .root)])
+  }
+
   @Test func aFolderMatchesAFolderOfTheSameNameButNotAFile() async throws {
     let agent = FakeAgent([try folder("/DCIM")])
 

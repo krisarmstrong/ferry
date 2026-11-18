@@ -94,14 +94,16 @@ public actor ProviderBackend {
   /// folder is never a package), a file for a file. A matched file whose size or modification
   /// time (to the second, all MTP keeps) is not the template's is the device's version, so
   /// FileProvider fetches it. With no match and no contents for a file there is nothing to
-  /// create: `nil`.
+  /// create: `nil`. A package with no match is `.excludedFromSync`, never `nil`: FileProvider
+  /// deletes an item answered `nil` from the Mac, a folder with all it holds.
   public func create(
     _ template: ItemTemplate, contents: URL?, mayAlreadyExist: Bool,
     progress: TransferProgressHandler? = nil
   ) async throws -> SyncedItem? {
     if mayAlreadyExist {
       if let match = try await existing(matching: template) { return match }
-      if template.kind == .file || template.kind == .package, contents == nil { return nil }
+      if template.kind == .package { throw NSFileProviderError(.excludedFromSync) }
+      if template.kind == .file, contents == nil { return nil }
     }
     return SyncedItem(
       try await create(template, contents: contents, progress: progress), shouldFetchContent: false)
