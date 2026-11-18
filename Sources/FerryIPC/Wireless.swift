@@ -16,12 +16,30 @@ public struct RememberedDevice: Codable, Sendable, Equatable, Identifiable {
   }
 }
 
+/// An address that answered as a device Ferry already knows, by USB or at another address. A
+/// serial over plain TCP proves nothing, so the agent dropped the connection and waits for the
+/// user to say the address is that device.
+public struct UnconfirmedAddress: Codable, Sendable, Equatable, Hashable {
+  public let address: WirelessEndpoint
+  public let id: DeviceID
+  /// The model of the device it claims to be, as Ferry knows it.
+  public let name: String
+
+  public init(address: WirelessEndpoint, id: DeviceID, name: String) {
+    self.address = address
+    self.id = id
+    self.name = name
+  }
+}
+
 /// How a request to reach a device over the network ended.
 public enum WirelessOutcome: Codable, Sendable, Equatable {
   /// adb lists the device and the agent remembers it.
   case connected
   /// The device was reached and asks the user to allow this Mac. It is remembered once allowed.
   case awaitingAllow(WirelessEndpoint)
+  /// The address answered as a device Ferry already knows: dropped until the user confirms it.
+  case needsConfirmation(WirelessEndpoint)
   /// The device on USB has no Ethernet or Wi-Fi address yet.
   case needsNetwork
   case failed(WirelessFailure)

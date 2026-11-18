@@ -33,12 +33,20 @@ extension ADBWireless: WirelessADBControl {}
 ///   addresses, after `tcpip 5555` unless adbd already listens on a port.
 ///
 /// A device is remembered by its serial (`ro.serialno`), read once adb serves it, with the
-/// addresses it was reached at. One that is still waiting for the user to allow this Mac is held
-/// by address until adb lists it as allowed. Remembered devices are connected again when the
-/// agent starts, when adb's server comes back (it drops network connections when it stops), and
-/// when adb's mDNS lists them under their serial; each address is checked to answer as the
-/// remembered device, and dropped again if it does not. Nothing else is ever connected to:
-/// Ferry never scans a network.
+/// addresses it was reached at and how each was learnt. One that is still waiting for the user to
+/// allow this Mac is held by address until adb lists it as allowed, and checked again then.
+///
+/// adb's key authorisation does not authenticate a device over plain TCP, so any host can claim
+/// a serial. A new address that answers as a device Ferry already knows (on USB, or remembered at
+/// another address) is therefore disconnected at once and offered for the user to confirm; only
+/// a confirmed one joins the device's entry. Addresses read from the unit over USB, and the
+/// first address the user gives for a device Ferry does not know, need no confirmation.
+///
+/// Remembered devices are connected again when the agent starts and when adb's server comes back
+/// (it drops network connections when it stops), at the addresses the user gave or confirmed and
+/// those read over USB only; each must answer as the remembered device, and is dropped if it does
+/// not. An address adb's mDNS lists under a remembered device's serial is offered, never
+/// connected on its own. Nothing else is ever connected to: Ferry never scans a network.
 ///
 /// Whether a device on the network is served while it is also on a cable is not decided here:
 /// any USB route beats a network one (see `CompositeTransport`).
@@ -63,27 +71,47 @@ public actor WirelessADB {
     }
   }
 
-  enum Method: String, Codable {
-    /// Typed by the user.
-    case address
-    /// Paired with a code (Android 11+).
-    case pairing
-    /// Read from the device on USB.
-    case network
+  /// How an address was learnt, which decides whether Ferry reconnects to it on its own.
+  enum Learnt: String, Codable {
+    /// Given by the user for a device Ferry did not know, or confirmed by the user.
+    case user
+    /// Read from the unit over USB.
+    case usb
+    /// The connect service of a device paired with a code, which moves port each session.
+    case paired
+
+    var reconnects: Bool { self != .paired }
+  }
+
+  struct Address: Equatable {
+    let endpoint: WirelessEndpoint
+    var learnt: Learnt
   }
 
   struct Entry: Equatable {
     var name: String
-    var method: Method
-    var addresses: [WirelessEndpoint]
+    var addresses: [Address]
   }
 
   /// An address waiting for the user to allow this Mac on it.
   struct Pending {
-    let method: Method
-    /// The device the address must answer as, when it came from that device.
+    let learnt: Learnt
+    /// The device the address must answer as, when that is known.
     let expected: DeviceID?
+    /// Set when the user confirmed the address for `expected`.
+    let confirmed: Bool
     let addresses: [WirelessEndpoint]
+    /// The devices Ferry knew when the connect was made.
+    let known: Set<DeviceID>
+    /// `forgets` when it was made: a device forgotten since is not adopted.
+    let epoch: UInt64
+  }
+
+  /// What a connect is for: how the address was learnt, and who it must be.
+  struct Purpose {
+    var learnt: Learnt
+    var expected: DeviceID?
+    var confirmed = false
   }
 
   /// How many addresses to keep per device. A paired device moves ports; older ones only cost a
@@ -96,11 +124,26 @@ public actor WirelessADB {
   let gate = OperationGate()
   var entries: [DeviceID: Entry]
   var pending: [WirelessEndpoint: Pending] = [:]
+  /// New addresses for known devices, waiting for the user.
+  var unconfirmedAddresses: [WirelessEndpoint: UnconfirmedAddress] = [:]
+  /// Addresses the user said are not the device they claimed to be, for this run.
+  var ignored: Set<WirelessEndpoint> = []
+  /// Counts forgets; `forgotten` records the count at each device's last forget.
+  var forgets: UInt64 = 0
+  var forgotten: [DeviceID: UInt64] = [:]
+  /// The devices Ferry serves now, by any method.
+  let known: @Sendable () async -> Set<DeviceID>
 
-  public init(adb: any WirelessADBControl, store: URL, timing: Timing = Timing()) {
+  /// `known` lists the devices Ferry serves now (the hub's), so a network host claiming one of
+  /// their serials is not believed without the user.
+  public init(
+    adb: any WirelessADBControl, store: URL, timing: Timing = Timing(),
+    known: @escaping @Sendable () async -> Set<DeviceID> = { [] }
+  ) {
     self.adb = adb
     file = store
     self.timing = timing
+    self.known = known
     entries = WirelessStore.load(store)
   }
 
@@ -113,15 +156,20 @@ public actor WirelessADB {
 
   public func remembered() -> [RememberedDevice] {
     entries.sorted { $0.key.serial < $1.key.serial }.map {
-      RememberedDevice(id: $0.key, name: $0.value.name, addresses: $0.value.addresses)
+      RememberedDevice(
+        id: $0.key, name: $0.value.name, addresses: $0.value.addresses.map(\.endpoint))
     }
+  }
+
+  public func unconfirmed() -> [UnconfirmedAddress] {
+    unconfirmedAddresses.values.sorted { $0.address.argument < $1.address.argument }
   }
 
   // MARK: The user's requests
 
   public func connect(_ endpoint: WirelessEndpoint) async -> WirelessOutcome {
     await gate.run {
-      await attempt(endpoint, method: .address, expected: nil, all: [endpoint])
+      await attempt(endpoint, for: Purpose(learnt: .user), all: [endpoint])
     }
   }
 
@@ -136,7 +184,7 @@ public actor WirelessADB {
             return .failed(.noConnectService)
           }
           return await attempt(
-            service.endpoint, method: .pairing, expected: nil, all: [service.endpoint])
+            service.endpoint, for: Purpose(learnt: .paired), all: [service.endpoint])
         }
       } catch {
         return Self.failure(error)
@@ -161,7 +209,7 @@ public actor WirelessADB {
           await waitForUSB(usb)
         }
         let endpoints = addresses.compactMap { WirelessEndpoint(host: $0, port: port) }
-        return await firstReached(endpoints, method: .network, expected: id)
+        return await firstReached(endpoints, for: Purpose(learnt: .usb, expected: id))
       } catch {
         return Self.failure(error)
       }
@@ -176,14 +224,43 @@ public actor WirelessADB {
     }
   }
 
-  /// Forgets the device and disconnects adb from its addresses.
+  /// The user says `address` is the device it claimed to be: it is connected, must answer as
+  /// that device again, and joins its entry.
+  public func confirm(_ address: WirelessEndpoint) async -> WirelessOutcome {
+    await gate.run { () async -> WirelessOutcome in
+      guard let offer = unconfirmedAddresses.removeValue(forKey: address) else {
+        return .failed(.notRemembered)
+      }
+      return await attempt(
+        address, for: Purpose(learnt: .user, expected: offer.id, confirmed: true),
+        all: [address])
+    }
+  }
+
+  public func ignore(_ address: WirelessEndpoint) async {
+    await gate.run {
+      unconfirmedAddresses[address] = nil
+      ignored.insert(address)
+    }
+  }
+
+  /// Forgets the device and revokes everything under way for it: disconnects adb from its
+  /// addresses and from connections waiting for Allow at them, and drops its offers. A waiting
+  /// connection elsewhere that turns out to be this device is dropped when it resolves.
   public func forget(_ id: DeviceID) async {
     await gate.run {
-      pending = pending.filter { $0.value.expected != id }
-      guard let entry = entries.removeValue(forKey: id) else { return }
+      forgets += 1
+      forgotten[id] = forgets
+      let addresses = Set(entries.removeValue(forKey: id)?.addresses.map(\.endpoint) ?? [])
+      let revoked = pending.filter {
+        $0.value.expected == id || addresses.contains($0.key)
+          || !addresses.isDisjoint(with: $0.value.addresses)
+      }
+      for endpoint in revoked.keys { pending[endpoint] = nil }
+      unconfirmedAddresses = unconfirmedAddresses.filter { $0.value.id != id }
       save()
       log.info("forgot \(id.serial, privacy: .private)")
-      for endpoint in entry.addresses {
+      for endpoint in addresses.union(revoked.keys).sorted(by: { $0.argument < $1.argument }) {
         do throws(ADBError) {
           try await adb.disconnect(endpoint)
         } catch {

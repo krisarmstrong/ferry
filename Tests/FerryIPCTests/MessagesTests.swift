@@ -32,6 +32,8 @@ private func tag(_ request: AgentRequest) -> Int {
   case .connectWireless: 18
   case .enableWireless: 19
   case .forgetWireless: 20
+  case .confirmWireless: 21
+  case .ignoreWireless: 22
   }
 }
 
@@ -59,6 +61,7 @@ private func requests() -> [AgentRequest] {
   let address = WirelessEndpoint(parsing: "192.0.2.31")!
   all += [.connectAddress(address), .pair(address, code: PairingCode("482913")!)]
   all += [.connectWireless(device), .enableWireless(device), .forgetWireless(device)]
+  all += [.confirmWireless(address), .ignoreWireless(address)]
   return all
 }
 
@@ -169,6 +172,7 @@ private func wirelessResponses() throws -> [AgentResponse] {
   let address = try #require(WirelessEndpoint(parsing: "192.0.2.31:5555"))
   var all: [AgentResponse] = []
   all += [.wireless(.connected), .wireless(.awaitingAllow(address)), .wireless(.needsNetwork)]
+  all.append(.wireless(.needsConfirmation(address)))
   for failure: WirelessFailure in [
     .adbUnavailable, .notOverUSB, .notRemembered, .noConnectService, .otherDevice,
     .adb("failed to connect"),
@@ -181,7 +185,8 @@ private func wirelessResponses() throws -> [AgentResponse] {
         devices: [], provider: .enabled,
         remembered: [
           RememberedDevice(id: device, name: "EtherScope nXG", addresses: [address])
-        ])))
+        ],
+        unconfirmed: [UnconfirmedAddress(address: address, id: device, name: "EtherScope nXG")])))
   return all
 }
 
@@ -190,7 +195,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...20))
+  #expect(Set(requests().map(tag)) == Set(0...22))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
@@ -250,7 +255,8 @@ func invalidWirelessRequestsReplyBadRequest(valid: String, invalid: String) asyn
   let code = try #require(PairingCode("482913"))
   for request: AgentRequest in [
     .connectAddress(address), .pair(address, code: code), .connectWireless(device),
-    .enableWireless(device), .forgetWireless(device),
+    .enableWireless(device), .forgetWireless(device), .confirmWireless(address),
+    .ignoreWireless(address),
   ] {
     #expect(ClientRole.app.allows(request))
     #expect(!ClientRole.provider.allows(request))

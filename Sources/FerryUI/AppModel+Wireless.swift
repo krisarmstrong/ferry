@@ -47,6 +47,17 @@ extension AppModel {
     _ = await performWireless(.connectWireless(id))
   }
 
+  /// Use it: the address is the device it claims to be.
+  public func confirm(_ address: WirelessEndpoint) async {
+    _ = await performWireless(.confirmWireless(address))
+  }
+
+  /// Ignore: it is not.
+  public func ignore(_ address: WirelessEndpoint) async {
+    wirelessMessage = nil
+    await perform(.ignoreWireless(address))
+  }
+
   public func forget(_ id: DeviceID) async {
     wirelessMessage = nil
     await perform(.forgetWireless(id))
@@ -81,7 +92,7 @@ extension WirelessOutcome {
   /// Connected, or the rest is up to the user at the device.
   var endsTheForm: Bool {
     switch self {
-    case .connected, .awaitingAllow: true
+    case .connected, .awaitingAllow, .needsConfirmation: true
     case .needsNetwork, .failed: false
     }
   }

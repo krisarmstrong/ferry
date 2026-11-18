@@ -42,6 +42,8 @@ import os
   public private(set) var awaitingAuthorization: [String] = []
   /// Devices the agent reconnects over the network.
   public private(set) var remembered: [RememberedDevice] = []
+  /// New addresses for known devices, waiting for the user to say Use it or Ignore.
+  public private(set) var unconfirmed: [UnconfirmedAddress] = []
   /// What the last network request said, for the form and the menu; `nil` once it connected.
   /// It can carry adb's words, so it is shown verbatim.
   public internal(set) var wirelessMessage: String?
@@ -319,6 +321,7 @@ import os
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered
+    unconfirmed = report.unconfirmed
     agent = .running
     // The agent replaced a domain on its own and the system kept its unsent changes: shown as an
     // eject's are.

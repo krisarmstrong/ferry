@@ -33,7 +33,7 @@ final class FakeClient: AgentSending {
     _ devices: [AttachedDevice], provider: ProviderState = .enabled,
     transfers: [ActiveTransfer] = [], preserved: [URL] = [], adb: ADBStatus? = nil,
     awaitingUSBDebugging: [DeviceID] = [], awaitingAuthorization: [String] = [],
-    remembered: [RememberedDevice] = []
+    remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = []
   ) {
     status.withLock {
       $0 = .status(
@@ -41,7 +41,7 @@ final class FakeClient: AgentSending {
           devices: devices, provider: provider, transfers: transfers,
           awaitingAuthorization: awaitingAuthorization, adbStatus: adb,
           awaitingUSBDebugging: awaitingUSBDebugging, preservedChanges: preserved,
-          remembered: remembered))
+          remembered: remembered, unconfirmed: unconfirmed))
     }
   }
 
@@ -98,6 +98,12 @@ final class FakeClient: AgentSending {
       return wirelessResult.withLock { $0 }
     case .forgetWireless(let id):
       log.record("forgetWireless \(id.serial)")
+      return .done
+    case .confirmWireless(let address):
+      log.record("confirmWireless \(address.argument)")
+      return wirelessResult.withLock { $0 }
+    case .ignoreWireless(let address):
+      log.record("ignoreWireless \(address.argument)")
       return .done
     default:
       return .failure(.unsupported("\(request)"))

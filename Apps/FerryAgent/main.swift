@@ -33,11 +33,14 @@ let adb = ADBTransport()
 let hub = DeviceHub(
   transport: CompositeTransport(mtp: MTPTransport(), adb: adb),
   arrivals: merged(USBWatcher.ticks(), adb.arrivals))
-// Devices on the network: connected when the user asks, remembered, and reconnected.
-let wireless = WirelessADB(adb: ADBWireless(), store: wirelessStore)
-Task { await wireless.run() }
 let manager = FileProviderDomains()
 let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
+// Devices on the network: connected when the user asks, remembered, and reconnected. A host
+// claiming the serial of a device the hub serves is not believed without the user.
+let wireless = WirelessADB(
+  adb: ADBWireless(), store: wirelessStore,
+  known: { Set(await hub.devices().map(\.id)) })
+Task { await wireless.run() }
 Task {
   await manager.conformExisting()
   await domains.run()

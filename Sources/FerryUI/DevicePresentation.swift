@@ -87,6 +87,15 @@ enum DevicePresentation {
       : DisplayText.escaped(device.name)
   }
 
+  /// The menu's question about an address that claims a known device. Both parts came from the
+  /// network or the device, so both are escaped.
+  static func confirmQuestion(_ offer: UnconfirmedAddress) -> String {
+    let address = DisplayText.escaped(offer.address.argument)
+    let name = DisplayText.escaped(offer.name)
+    return String(
+      localized: LocalizedStringResource("Is \(address) your \(name)?", bundle: .module))
+  }
+
   /// What a network request ended with, for the user; `nil` when it connected. adb's own words
   /// are escaped.
   static func message(for outcome: WirelessOutcome) -> String? {
@@ -97,6 +106,11 @@ enum DevicePresentation {
       String(
         localized: LocalizedStringResource(
           "Tap Allow on the device to finish connecting.", bundle: .module))
+    case .needsConfirmation:
+      String(
+        localized: LocalizedStringResource(
+          "Ferry knows this device at another address. Confirm the new one in the menu.",
+          bundle: .module))
     case .needsNetwork:
       String(
         localized: LocalizedStringResource(

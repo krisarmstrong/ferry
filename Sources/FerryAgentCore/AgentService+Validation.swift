@@ -83,7 +83,7 @@ extension AgentService {
     case .create(_, _, _, let isFolder): !isFolder
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .item, .list, .rename,
       .move, .delete, .changes, .workingSet, .connectAddress, .pair, .connectWireless,
-      .enableWireless, .forgetWireless:
+      .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless:
       false
     }
   }

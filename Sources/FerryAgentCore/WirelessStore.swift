@@ -4,7 +4,8 @@ import os
 
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "WirelessADB")
 
-/// The file remembered devices are kept in: serial → name, method and addresses. Addresses are
+/// The file remembered devices are kept in: serial → name, and each address with how it was
+/// learnt. Addresses are
 /// read back through `WirelessEndpoint` validation, so one that is not an address never reaches
 /// adb; an unreadable file is an empty list.
 enum WirelessStore {
@@ -14,8 +15,12 @@ enum WirelessStore {
 
   private struct Device: Codable {
     var name: String
-    var method: WirelessADB.Method
-    var addresses: [String]
+    var addresses: [StoredAddress]
+  }
+
+  private struct StoredAddress: Codable {
+    var address: String
+    var learnt: WirelessADB.Learnt
   }
 
   static func load(_ file: URL) -> [DeviceID: WirelessADB.Entry] {
@@ -34,14 +39,16 @@ enum WirelessStore {
     }
     var entries: [DeviceID: WirelessADB.Entry] = [:]
     for (serial, device) in stored.devices where !serial.isEmpty {
-      let addresses = device.addresses.compactMap {
-        WirelessEndpoint(parsing: $0, defaultPort: nil)
+      let addresses = device.addresses.compactMap { stored in
+        WirelessEndpoint(parsing: stored.address, defaultPort: nil).map {
+          WirelessADB.Address(endpoint: $0, learnt: stored.learnt)
+        }
       }
       if addresses.count != device.addresses.count {
         log.error("dropped stored addresses that are not addresses")
       }
       entries[DeviceID(serial: serial)] = WirelessADB.Entry(
-        name: device.name, method: device.method, addresses: addresses)
+        name: device.name, addresses: addresses)
     }
     return entries
   }
@@ -53,8 +60,10 @@ enum WirelessStore {
           (
             $0.key.serial,
             Device(
-              name: $0.value.name, method: $0.value.method,
-              addresses: $0.value.addresses.map(\.argument))
+              name: $0.value.name,
+              addresses: $0.value.addresses.map {
+                StoredAddress(address: $0.endpoint.argument, learnt: $0.learnt)
+              })
           )
         }))
     do {

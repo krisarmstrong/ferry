@@ -92,7 +92,8 @@ public actor AgentService: AgentHandling {
       return try await workingSet(page, in: domain)
     case (.fetch, nil), (.replaceContents, nil), (.status, _), (.recheck, _), (.recheckADB, _),
       (.refresh, _), (.eject, _), (.removeAllDomains, _), (.connectAddress, _), (.pair, _),
-      (.connectWireless, _), (.enableWireless, _), (.forgetWireless, _):
+      (.connectWireless, _), (.enableWireless, _), (.forgetWireless, _), (.confirmWireless, _),
+      (.ignoreWireless, _):
       throw .io("bad request")
     }
   }
@@ -111,7 +112,8 @@ public actor AgentService: AgentHandling {
           awaitingAuthorization: await hub.awaitingAuthorization(),
           adbStatus: await hub.adbStatus(), awaitingUSBDebugging: await hub.awaitingUSBDebugging(),
           preservedChanges: await domains.preservedByRetirement,
-          remembered: await wireless?.remembered() ?? []))
+          remembered: await wireless?.remembered() ?? [],
+          unconfirmed: await wireless?.unconfirmed() ?? []))
     case .recheck(let id):
       await hub.recheck(id)
       return .done
@@ -125,9 +127,6 @@ public actor AgentService: AgentHandling {
       return .removed(preserved: await domains.eject(id))
     case .removeAllDomains:
       return .removed(preserved: try await domains.removeAll())
-    case .forgetWireless(let id):
-      await wireless?.forget(id)
-      return .done
     default:
       return await performWirelessRequest(request)
     }

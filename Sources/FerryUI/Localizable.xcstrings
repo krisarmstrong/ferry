@@ -215,6 +215,9 @@
     "Ferry is waiting for its helper to answer, for example just after Ferry opens." : {
       "extractionState" : "manual"
     },
+    "Ferry knows this device at another address. Confirm the new one in the menu." : {
+
+    },
     "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check again** once it is installed." : {
       "extractionState" : "manual"
     },
@@ -299,6 +302,9 @@
     "If the menu says **Allow Ferry's helper** or **macOS can't find Ferry's helper**, click **Open System Settings** and turn on Ferry under Allow in the Background." : {
       "extractionState" : "manual"
     },
+    "Ignore" : {
+
+    },
     "In Ferry's Settings, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched." : {
       "extractionState" : "manual"
     },
@@ -320,6 +326,16 @@
     },
     "Install adb for more tools…" : {
       "extractionState" : "manual"
+    },
+    "Is %@ your %@?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Is %1$@ your %2$@?"
+          }
+        }
+      }
     },
     "Menu items" : {
       "extractionState" : "manual"
@@ -589,6 +605,9 @@
       "extractionState" : "manual"
     },
     "Unsent changes were saved to %@" : {
+
+    },
+    "Use it" : {
 
     },
     "Use over Wi-Fi" : {

@@ -91,3 +91,30 @@ struct NetworkRow: View {
     }
   }
 }
+
+/// "Is <address> your <model>?": an address that claims a device Ferry knows, which Ferry will
+/// not use until the user says so.
+struct UnconfirmedRow: View {
+  let offer: UnconfirmedAddress
+  let confirm: () -> Void
+  let ignore: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label {
+        Text(verbatim: DevicePresentation.confirmQuestion(offer))
+          .font(.callout)
+      } icon: {
+        Image(systemName: "questionmark.circle")
+      }
+      HStack {
+        Button(action: confirm) {
+          Text("Use it", bundle: .module)
+        }
+        Button(action: ignore) {
+          Text("Ignore", bundle: .module)
+        }
+      }
+    }
+  }
+}

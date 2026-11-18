@@ -123,4 +123,25 @@ struct AppModelWirelessTests {
       id: DeviceID(serial: "X"), name: "Evil\u{202E}gpj", addresses: [])
     #expect(DevicePresentation.rememberedName(hostile) == "Evil\\u{202E}gpj")
   }
+
+  /// A new address for a device Ferry knows waits for the user: the menu asks, and only Use it
+  /// or Ignore answers.
+  @Test func unconfirmedAddressesAreAskedAboutAndAnswered() async throws {
+    let client = FakeClient(log: log)
+    let address = try #require(WirelessEndpoint(parsing: "192.0.2.99"))
+    let offer = UnconfirmedAddress(address: address, id: Self.etherScope.id, name: "EtherScope nXG")
+    client.setStatus([], unconfirmed: [offer])
+    client.setWireless(.wireless(.needsConfirmation(address)))
+    let model = model(client)
+    #expect(await model.connect(address: "192.0.2.99") == true)
+    #expect(model.unconfirmed == [offer])
+    #expect(DevicePresentation.confirmQuestion(offer) == "Is 192.0.2.99:5555 your EtherScope nXG?")
+    await model.confirm(address)
+    await model.ignore(address)
+    #expect(
+      log.all == [
+        "connectAddress 192.0.2.99:5555", "status", "confirmWireless 192.0.2.99:5555", "status",
+        "ignoreWireless 192.0.2.99:5555", "status",
+      ])
+  }
 }

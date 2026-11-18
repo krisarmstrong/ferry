@@ -166,7 +166,7 @@ actor FakeAgent: AgentSending {
     case .workingSet(_, let page):
       return try workingSetPage(page)
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
-      .pair, .connectWireless, .enableWireless, .forgetWireless:
+      .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless:
       throw .unsupported("\(request)")
     }
   }

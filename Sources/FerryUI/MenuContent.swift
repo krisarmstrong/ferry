@@ -55,6 +55,11 @@ public struct MenuContent: View {
           device: device, connect: { Task { await model.connectAgain(device.id) } },
           forget: { Task { await model.forget(device.id) } })
       }
+      ForEach(model.unconfirmed, id: \.self) { offer in
+        UnconfirmedRow(
+          offer: offer, confirm: { Task { await model.confirm(offer.address) } },
+          ignore: { Task { await model.ignore(offer.address) } })
+      }
       ForEach(model.awaitingAuthorization, id: \.self) { address in
         Text(verbatim: DevicePresentation.waitingLine(for: address))
           .font(.callout)

@@ -8,7 +8,6 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 
 /// Following adb's server, and the connecting every request and reconnect shares.
 extension WirelessADB {
-  // MARK: Following adb
 
   /// Follows adb's server until the calling task is cancelled: remembers devices once they are
   /// allowed, reconnects remembered ones at start and whenever the server comes back, and reads
@@ -32,18 +31,21 @@ extension WirelessADB {
 
   func pollMDNS() async {
     while (try? await Task.sleep(for: timing.mdnsInterval)) != nil {
-      await gate.run { await reconnectFromMDNS() }
+      await gate.run { await offerFromMDNS() }
     }
   }
 
-  /// Remembers each waiting address adb now lists as allowed.
+  /// Adopts each waiting address adb now lists as allowed, checked as it would have been at
+  /// connect time, unless the device it answers as was forgotten since.
   func resolvePending(_ listed: [ADBDevice]) async {
     let allowed = Set(listed.filter { $0.state == .device }.map(\.serial))
     for (endpoint, waiting) in pending where allowed.contains(endpoint.argument) {
       pending[endpoint] = nil
       _ = await adopt(
-        endpoint.argument, at: endpoint, method: waiting.method, expected: waiting.expected,
-        all: waiting.addresses)
+        endpoint.argument, at: endpoint,
+        for: Purpose(
+          learnt: waiting.learnt, expected: waiting.expected, confirmed: waiting.confirmed),
+        all: waiting.addresses, known: waiting.known, since: waiting.epoch)
     }
   }
 
@@ -53,66 +55,78 @@ extension WirelessADB {
     }
   }
 
-  /// Reads adb's mDNS only while a remembered device is missing, and connects only to a connect
-  /// service named for that device's serial.
-  func reconnectFromMDNS() async {
+  /// Reads adb's mDNS only while a remembered device is missing, and offers a connect service
+  /// named for its serial to the user; it is never connected to here.
+  func offerFromMDNS() async {
     guard let listed = try? await adb.devices() else { return }
     let missing = entries.filter { isMissing($0.key, $0.value, from: listed) }
     guard !missing.isEmpty, let services = try? await adb.mdnsServices() else { return }
     for (id, entry) in missing {
-      guard let service = services.first(where: { Self.advertises($0, id) }) else { continue }
-      _ = await attempt(
-        service.endpoint, method: entry.method, expected: id,
-        all: [service.endpoint] + entry.addresses)
+      if let service = services.first(where: { Self.advertises($0, id) }) {
+        offer(service.endpoint, as: id, named: entry.name)
+      }
     }
   }
 
   /// adb lists none of its addresses, and no mDNS connection named for it.
   func isMissing(_ id: DeviceID, _ entry: Entry, from listed: [ADBDevice]) -> Bool {
     let serials = Set(listed.map(\.serial))
-    return entry.addresses.allSatisfy { !serials.contains($0.argument) }
+    return entry.addresses.allSatisfy { !serials.contains($0.endpoint.argument) }
       && !serials.contains { $0.hasPrefix(Self.instancePrefix(id)) }
+  }
+
+  /// Holds an address that claims a known device until the user says whether it is.
+  func offer(_ endpoint: WirelessEndpoint, as id: DeviceID, named name: String) {
+    guard !ignored.contains(endpoint),
+      entries[id]?.addresses.contains(where: { $0.endpoint == endpoint }) != true
+    else { return }
+    unconfirmedAddresses[endpoint] = UnconfirmedAddress(address: endpoint, id: id, name: name)
   }
 
   // MARK: Connecting
 
+  /// Tries the addresses Ferry may reconnect on its own; an address adb's mDNS lists for the
+  /// device is only offered.
   func reconnect(_ id: DeviceID, _ entry: Entry) async -> WirelessOutcome {
-    let outcome = await firstReached(entry.addresses, method: entry.method, expected: id)
-    if case .connected = outcome { return outcome }
-    if case .awaitingAllow = outcome { return outcome }
+    var last = WirelessOutcome.failed(.notRemembered)
+    for address in entry.addresses where address.learnt.reconnects {
+      last = await attempt(
+        address.endpoint, for: Purpose(learnt: address.learnt, expected: id),
+        all: [address.endpoint])
+      if last.reachedTheDevice { return last }
+    }
     guard let services = try? await adb.mdnsServices(),
       let service = services.first(where: { Self.advertises($0, id) })
-    else { return entry.addresses.isEmpty ? .failed(.notRemembered) : outcome }
-    return await attempt(
-      service.endpoint, method: entry.method, expected: id,
-      all: [service.endpoint] + entry.addresses)
+    else { return last }
+    offer(service.endpoint, as: id, named: entry.name)
+    return unconfirmedAddresses[service.endpoint] == nil
+      ? last : .needsConfirmation(service.endpoint)
   }
 
-  /// Tries each address in turn until one connects or waits for Allow.
-  func firstReached(
-    _ endpoints: [WirelessEndpoint], method: Method, expected: DeviceID
-  ) async -> WirelessOutcome {
+  /// Tries each address in turn until one connects, waits for Allow, or waits for the user.
+  func firstReached(_ all: [WirelessEndpoint], for purpose: Purpose) async -> WirelessOutcome {
     var last = WirelessOutcome.failed(.notRemembered)
-    for endpoint in endpoints {
-      last = await attempt(endpoint, method: method, expected: expected, all: endpoints)
-      switch last {
-      case .connected, .awaitingAllow: return last
-      case .needsNetwork, .failed: continue
-      }
+    for endpoint in all {
+      last = await attempt(endpoint, for: purpose, all: all)
+      if last.reachedTheDevice { return last }
     }
     return last
   }
 
-  /// `adb connect` to one address. `expected`, when known, is the device it must answer as.
+  /// `adb connect` to one address. What Ferry knows is read first, so a device the connect
+  /// itself brings up does not count as known.
   func attempt(
-    _ endpoint: WirelessEndpoint, method: Method, expected: DeviceID?, all: [WirelessEndpoint]
+    _ endpoint: WirelessEndpoint, for purpose: Purpose, all: [WirelessEndpoint]
   ) async -> WirelessOutcome {
+    let knownBefore = await known().union(entries.keys)
     do throws(ADBError) {
       switch try await adb.connect(endpoint) {
       case .connected(let serial):
-        return await adopt(serial, at: endpoint, method: method, expected: expected, all: all)
+        return await adopt(serial, at: endpoint, for: purpose, all: all, known: knownBefore)
       case .awaitingAllow:
-        pending[endpoint] = Pending(method: method, expected: expected, addresses: all)
+        pending[endpoint] = Pending(
+          learnt: purpose.learnt, expected: purpose.expected, confirmed: purpose.confirmed,
+          addresses: all, known: knownBefore, epoch: forgets)
         log.info("\(endpoint.argument, privacy: .private) waits for Allow on the device")
         return .awaitingAllow(endpoint)
       case .failed(let detail):
@@ -125,11 +139,12 @@ extension WirelessADB {
     }
   }
 
-  /// Reads who answers at `adbSerial` and remembers it, or disconnects an address that answers
-  /// as another device than `expected`.
+  /// Reads who answers at `adbSerial` and remembers it, unless it answers as another device than
+  /// expected, as a device forgotten since `since`, or as a known device at an address the user
+  /// has not confirmed: then it is disconnected.
   func adopt(
-    _ adbSerial: String, at endpoint: WirelessEndpoint, method: Method, expected: DeviceID?,
-    all: [WirelessEndpoint]
+    _ adbSerial: String, at endpoint: WirelessEndpoint, for purpose: Purpose,
+    all: [WirelessEndpoint], known: Set<DeviceID>, since: UInt64? = nil
   ) async -> WirelessOutcome {
     let info: DeviceInfo?
     do throws(ADBError) {
@@ -139,28 +154,61 @@ extension WirelessADB {
       return .connected
     }
     guard let info else { return .connected }
-    if let expected, info.id != expected {
-      log.error("\(endpoint.argument, privacy: .private) answers as another device; disconnecting")
-      do throws(ADBError) {
-        try await adb.disconnect(endpoint)
-      } catch {
-        log.error("disconnecting failed: \(String(describing: error), privacy: .private)")
-      }
+    if let expected = purpose.expected, info.id != expected {
+      log.error("\(endpoint.argument, privacy: .private) answers as another device")
+      await drop(endpoint)
       return .failed(.otherDevice)
     }
-    var addresses: [WirelessEndpoint] = []
-    for address in [endpoint] + all + (entries[info.id]?.addresses ?? [])
-    where !addresses.contains(address) {
-      addresses.append(address)
+    if let since, let forgottenAt = forgotten[info.id], forgottenAt > since {
+      log.info("\(endpoint.argument, privacy: .private) answers as a forgotten device")
+      await drop(endpoint)
+      return .failed(.notRemembered)
     }
-    let entry = Entry(
-      name: info.model, method: method, addresses: Array(addresses.prefix(Self.addressLimit)))
-    if entries[info.id] != entry {
-      entries[info.id] = entry
-      save()
+    let isNew = entries[info.id]?.addresses.contains { $0.endpoint == endpoint } != true
+    let trusted = purpose.learnt == .usb || purpose.confirmed
+    if isNew, !trusted, known.union(entries.keys).contains(info.id) {
+      log.info("\(endpoint.argument, privacy: .private) claims a known device; asking the user")
+      await drop(endpoint)
+      offer(endpoint, as: info.id, named: entries[info.id]?.name ?? info.model)
+      return .needsConfirmation(endpoint)
     }
+    remember(info, at: endpoint, learnt: purpose.learnt, also: purpose.learnt == .usb ? all : [])
     log.info("\(info.id.serial, privacy: .private) connected over the network")
     return .connected
+  }
+
+  /// Puts `endpoint` first in the device's entry, with `also` (other addresses read over USB)
+  /// after it. An address keeps the stronger of the ways it was learnt.
+  func remember(
+    _ info: DeviceInfo, at endpoint: WirelessEndpoint, learnt: Learnt, also: [WirelessEndpoint]
+  ) {
+    let previous = entries[info.id]?.addresses ?? []
+    var addresses: [Address] = []
+    for candidate in [endpoint] + also + previous.map(\.endpoint)
+    where !addresses.contains(where: { $0.endpoint == candidate }) {
+      let fresh = candidate == endpoint || also.contains(candidate)
+      let kept: Learnt =
+        switch previous.first(where: { $0.endpoint == candidate })?.learnt {
+        case let before? where !fresh || (before.reconnects && !learnt.reconnects): before
+        default: learnt
+        }
+      addresses.append(Address(endpoint: candidate, learnt: kept))
+    }
+    let entry = Entry(
+      name: entries[info.id]?.name ?? info.model,
+      addresses: Array(addresses.prefix(Self.addressLimit)))
+    unconfirmedAddresses[endpoint] = nil
+    guard entries[info.id] != entry else { return }
+    entries[info.id] = entry
+    save()
+  }
+
+  func drop(_ endpoint: WirelessEndpoint) async {
+    do throws(ADBError) {
+      try await adb.disconnect(endpoint)
+    } catch {
+      log.error("disconnecting failed: \(String(describing: error), privacy: .private)")
+    }
   }
 
   /// The adb serial of `id` on USB, if adb serves it there.
@@ -225,5 +273,15 @@ extension WirelessADB {
 
   func save() {
     WirelessStore.save(entries, to: file)
+  }
+}
+
+extension WirelessOutcome {
+  /// The device answered, or the next step is the user's.
+  var reachedTheDevice: Bool {
+    switch self {
+    case .connected, .awaitingAllow, .needsConfirmation: true
+    case .needsNetwork, .failed: false
+    }
   }
 }

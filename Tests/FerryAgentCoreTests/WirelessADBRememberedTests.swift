@@ -65,10 +65,11 @@ struct WirelessADBRememberedTests {
       })
   }
 
-  /// A device paired with a code moves ports: it comes back when adb's mDNS lists it, matched
-  /// by its serial in the instance name, and the identity is checked again.
+  /// A device paired with a code moves ports. adb's mDNS listing it under its serial at a new
+  /// address proves nothing (anyone can advertise a name), so the address is offered for the
+  /// user to confirm, never connected on its own; once confirmed it is connected and checked.
   @Test(.timeLimit(.minutes(1)))
-  func aRememberedDeviceReconnectsWhenMDNSListsIt() async throws {
+  func anAddressMDNSListsForARememberedDeviceIsOfferedNotConnected() async throws {
     let adb = FakeWirelessADB()
     let file = Self.storeFile()
     defer { try? FileManager.default.removeItem(at: file) }
@@ -78,23 +79,30 @@ struct WirelessADBRememberedTests {
     let running = Task { await wireless.run() }
     defer { running.cancel() }
     await adb.publish()
+    let offered = Self.endpoint("192.0.2.169:41001")
     await adb.set {
       $0.mdns = [
         ADBMDNSService(
           name: "adb-\(Self.etherScope.id.serial)-Q1", type: "_adb-tls-connect._tcp",
-          endpoint: Self.endpoint("192.0.2.169:41001")),
+          endpoint: offered),
         ADBMDNSService(
           name: "adb-SOMEONE-ELSE-Q2", type: "_adb-tls-connect._tcp",
           endpoint: Self.endpoint("192.0.2.77:41002")),
       ]
       $0.units["192.0.2.169:41001"] = .init(info: Self.etherScope)
     }
-    #expect(try await eventually { await adb.calls.contains(.connect("192.0.2.169:41001")) })
-    #expect(!(await adb.calls.contains(.connect("192.0.2.77:41002"))))
     #expect(
       try await eventually {
-        await wireless.remembered().first?.addresses.first == Self.endpoint("192.0.2.169:41001")
+        await wireless.unconfirmed()
+          == [UnconfirmedAddress(address: offered, id: Self.etherScope.id, name: "EtherScope nXG")]
       })
+    try await Task.sleep(for: .milliseconds(60))
+    #expect(!(await adb.calls.contains(.connect("192.0.2.169:41001"))))
+    #expect(!(await adb.calls.contains(.connect("192.0.2.77:41002"))))
+    #expect(await wireless.confirm(offered) == .connected)
+    #expect(await adb.calls.contains(.connect("192.0.2.169:41001")))
+    #expect(await wireless.remembered().first?.addresses.first == offered)
+    #expect(await wireless.unconfirmed().isEmpty)
   }
 
   @Test(.timeLimit(.minutes(1)))
@@ -127,8 +135,9 @@ struct WirelessADBRememberedTests {
     let file = Self.storeFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let stored = """
-      {"devices":{"fedcba9876543210":{"name":"EtherScope nXG","method":"address",\
-      "addresses":["-s","192.0.2.31:5555","host;rm:5555"]}}}
+      {"devices":{"fedcba9876543210":{"name":"EtherScope nXG","addresses":[\
+      {"address":"-s","learnt":"user"},{"address":"192.0.2.31:5555","learnt":"user"},\
+      {"address":"host;rm:5555","learnt":"user"}]}}}
       """
     try Data(stored.utf8).write(to: file)
     let adb = FakeWirelessADB()

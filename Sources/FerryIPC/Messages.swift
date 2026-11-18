@@ -147,12 +147,14 @@ public struct StatusReport: Codable, Sendable, Equatable {
   public let preservedChanges: [URL]
   /// Devices the agent reconnects over the network, attached or not.
   public let remembered: [RememberedDevice]
+  /// New addresses for known devices, waiting for the user to confirm them.
+  public let unconfirmed: [UnconfirmedAddress]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
     awaitingAuthorization: [String] = [], adbStatus: ADBStatus? = nil,
     awaitingUSBDebugging: [DeviceID] = [], preservedChanges: [URL] = [],
-    remembered: [RememberedDevice] = []
+    remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = []
   ) {
     self.devices = devices
     self.provider = provider
@@ -162,6 +164,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.awaitingUSBDebugging = awaitingUSBDebugging
     self.preservedChanges = preservedChanges
     self.remembered = remembered
+    self.unconfirmed = unconfirmed
   }
 }
 
@@ -191,6 +194,11 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   case enableWireless(DeviceID)
   /// Disconnects a remembered device from the network and forgets it. Answered with `.done`.
   case forgetWireless(DeviceID)
+  /// The user says an unconfirmed address is the device it claims to be: connected, checked
+  /// again, and remembered. Answered with `.wireless`.
+  case confirmWireless(WirelessEndpoint)
+  /// The user says it is not. Answered with `.done`.
+  case ignoreWireless(WirelessEndpoint)
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
   /// device reach Finder.
   case refresh(DeviceID)
