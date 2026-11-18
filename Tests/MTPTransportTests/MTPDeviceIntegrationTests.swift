@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -52,7 +53,7 @@ extension DeviceTests {
       let folder = try await device.createFolder(name: folderName, parent: root, storage: storage)
       do {
         let payload = Data((0..<16).map { UInt8($0) })
-        let source = FileManager.default.temporaryDirectory
+        let source = TestScratch.root
           .appendingPathComponent(UUID().uuidString)
         try payload.write(to: source)
         defer { try? FileManager.default.removeItem(at: source) }
@@ -65,7 +66,7 @@ extension DeviceTests {
         #expect(listed.map(\.name) == ["probe.bin"])
         #expect(listed.first?.size == 16)
 
-        let copy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let copy = TestScratch.root.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: copy) }
         try await device.download(objectID: id, to: copy) { _, _ in true }
         #expect(try Data(contentsOf: copy) == payload)

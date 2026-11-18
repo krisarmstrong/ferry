@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Synchronization
 import Testing
@@ -114,7 +115,7 @@ private let fetched = Data("fetched".utf8)
 func fileDescriptorCrossesConnection() async throws {
   let harness = Harness()
   defer { harness.finish() }
-  let target = FileManager.default.temporaryDirectory.appending(
+  let target = TestScratch.root.appending(
     path: "ferry-ipc-\(UUID().uuidString)")
   try Data().write(to: target)
   defer { try? FileManager.default.removeItem(at: target) }
@@ -198,7 +199,7 @@ private final class Reports: Sendable {
 func progressReachesTheRequestBeforeItsReply() async throws {
   let harness = Harness()
   defer { harness.finish() }
-  let target = FileManager.default.temporaryDirectory.appending(
+  let target = TestScratch.root.appending(
     path: "ferry-ipc-\(UUID().uuidString)")
   try Data().write(to: target)
   defer { try? FileManager.default.removeItem(at: target) }

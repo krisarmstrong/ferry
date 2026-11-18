@@ -139,7 +139,7 @@ func path(_ string: String) throws -> RemotePath {
 
 /// A new folder for item tables, which a test may share between harnesses to restart the agent.
 func itemStore() -> URL {
-  FileManager.default.temporaryDirectory.appending(
+  TestScratch.root.appending(
     path: "ferry-items-\(UUID().uuidString)", directoryHint: .isDirectory)
 }
 
@@ -168,7 +168,7 @@ struct AgentHarness {
     self.ticks = ticks
     hub = DeviceHub(transport: transport, arrivals: arrivals, clock: clock)
     controller = DomainController(hub: hub, manager: self.manager, itemStore: store)
-    scratch = FileManager.default.temporaryDirectory.appending(
+    scratch = TestScratch.root.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
     service = AgentService(hub: hub, domains: controller)

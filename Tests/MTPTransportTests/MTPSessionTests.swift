@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -91,7 +92,7 @@ struct MTPSessionTests {
     let device = SessionFixture.makeDevice()
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     let session = MTPSession(device: device)
-    let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: target) }
 
     try await session.download(
@@ -108,7 +109,7 @@ struct MTPSessionTests {
     let missing = try SessionFixture.path("/DCIM/missing.jpg")
     let file = try SessionFixture.localFile(Data("x".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
-    let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
 
     await #expect(throws: TransportError.notFound(missing)) {
       _ = try await session.item(at: missing, in: SessionFixture.storage)

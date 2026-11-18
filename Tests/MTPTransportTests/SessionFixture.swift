@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 
 @testable import MTPTransport
@@ -19,7 +20,7 @@ enum SessionFixture {
   }
 
   static func localFile(_ data: Data) throws -> URL {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let url = TestScratch.root.appendingPathComponent(UUID().uuidString)
     try data.write(to: url)
     return url
   }

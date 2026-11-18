@@ -1,4 +1,5 @@
 import AppKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -141,7 +142,7 @@ struct HelpContentTests {
   /// available instead.
   @Test func missingOrBrokenHelpLoadsNothing() throws {
     #expect(HelpContent.load(nil) == nil)
-    let broken = FileManager.default.temporaryDirectory.appending(path: "help-\(UUID()).json")
+    let broken = TestScratch.root.appending(path: "help-\(UUID()).json")
     try Data("{".utf8).write(to: broken)
     defer { try? FileManager.default.removeItem(at: broken) }
     #expect(HelpContent.load(broken) == nil)

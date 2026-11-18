@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import FerryIPC
 import Foundation
 import Testing
@@ -9,7 +10,7 @@ import Testing
 extension AppModelTests {
   /// A folder like the one the system saves unsent changes to, holding a file or empty.
   static func savedFolder(holdingFile: Bool) throws -> URL {
-    let folder = FileManager.default.temporaryDirectory.appending(
+    let folder = TestScratch.root.appending(
       path: "Ferry unsent \(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     if holdingFile {
@@ -67,7 +68,7 @@ extension AppModelTests {
   @Test func ejectShowsNoMessageForAnEmptyOrMissingLocation() async throws {
     let empty = try Self.savedFolder(holdingFile: false)
     defer { try? FileManager.default.removeItem(at: empty) }
-    let missing = FileManager.default.temporaryDirectory.appending(path: "Ferry gone \(UUID())")
+    let missing = TestScratch.root.appending(path: "Ferry gone \(UUID())")
     let client = FakeClient(log: log)
     client.preserve([empty, missing])
     let model = AppModel(client: client, services: FakeServices(log: log))

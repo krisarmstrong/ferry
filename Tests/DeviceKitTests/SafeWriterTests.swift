@@ -23,7 +23,7 @@ struct SafeWriterTests {
   /// Runs `body` with a temp file holding `data`, removing the file afterwards.
   @discardableResult
   func withTempFile<T>(_ data: Data, _ body: (URL) async throws -> T) async throws -> T {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let url = TestScratch.root.appendingPathComponent(UUID().uuidString)
     try data.write(to: url)
     defer { try? FileManager.default.removeItem(at: url) }
     return try await body(url)
@@ -106,7 +106,9 @@ struct SafeWriterTests {
     let device = makeDevice(isFATLike: isFATLike)
     let writer = SafeWriter(session: device)
     let size: UInt64 = 4_294_967_296
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    // Sparse, in the watched test folder: it takes no space, and a fake that read it whole
+    // could not write it out.
+    let url = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: url) }
     #expect(FileManager.default.createFile(atPath: url.path, contents: nil))
     let handle = try FileHandle(forWritingTo: url)
@@ -179,7 +181,7 @@ struct SafeWriterTests {
     let device = makeDevice()
     let writer = SafeWriter(session: device)
     let path = try RemotePath("/a.txt")
-    let link = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let link = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: link) }
     let payload = Data(repeating: 7, count: 300)
     try await withTempFile(payload) { file in

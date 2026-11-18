@@ -36,17 +36,22 @@ let package = Package(
       ]),
     .testTarget(
       name: "DeviceKitTests", dependencies: ["DeviceKit", "DeviceKitTestSupport"]),
-    .testTarget(name: "MTPTransportTests", dependencies: ["MTPTransport", "DeviceKit"]),
+    .testTarget(
+      name: "MTPTransportTests",
+      dependencies: ["MTPTransport", "DeviceKit", "DeviceKitTestSupport"]),
     .testTarget(
       name: "FerryAgentCoreTests",
       dependencies: [
         "FerryAgentCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport",
       ]),
-    .testTarget(name: "FerryIPCTests", dependencies: ["FerryIPC", "DeviceKit"]),
+    .testTarget(
+      name: "FerryIPCTests", dependencies: ["FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),
     .testTarget(
       name: "FerryProviderCoreTests",
-      dependencies: ["FerryProviderCore", "FerryIPC", "DeviceKit"]),
-    .testTarget(name: "FerryUITests", dependencies: ["FerryUI", "FerryIPC", "DeviceKit"]),
+      dependencies: ["FerryProviderCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),
+    .testTarget(
+      name: "FerryUITests",
+      dependencies: ["FerryUI", "FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),
   ],
   swiftLanguageModes: [.v6]
 )

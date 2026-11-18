@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -7,7 +8,7 @@ import Testing
 /// A download must never leave a short file at the destination, nor disturb a file already
 /// there unless it completes.
 struct MTPSessionDownloadTests {
-  let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+  let directory = TestScratch.root.appendingPathComponent(
     UUID().uuidString)
   var target: URL { directory.appendingPathComponent("a.txt") }
 

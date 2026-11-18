@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import FerryIPC
 import Foundation
 import Testing
@@ -19,7 +20,7 @@ private func folder(_ string: String) throws -> RemoteItem {
 
 /// A new, empty store folder for one test.
 private func store() -> URL {
-  FileManager.default.temporaryDirectory.appending(
+  TestScratch.root.appending(
     path: "ferry-items-\(UUID().uuidString)", directoryHint: .isDirectory)
 }
 

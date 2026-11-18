@@ -12,9 +12,10 @@ public enum FileTransfer {
 
   private static let scratchPrefix = "ferry-transfer-"
 
-  /// A new path in the agent's own temporary directory, with nothing there yet.
-  static func scratchURL() -> URL {
-    FileManager.default.temporaryDirectory.appending(path: scratchPrefix + UUID().uuidString)
+  /// A new path in `folder`, by default the agent's own temporary directory, with nothing there
+  /// yet.
+  static func scratchURL(in folder: URL = FileManager.default.temporaryDirectory) -> URL {
+    folder.appending(path: scratchPrefix + UUID().uuidString)
   }
 
   /// Deletes the scratch files, the partial downloads beside them and the copies a move left
@@ -46,12 +47,15 @@ public enum FileTransfer {
     guard info.st_mode & S_IFMT == S_IFREG else { throw .io("not a regular file") }
   }
 
-  /// Copies all of `source`, a regular file, into a new scratch file and returns its URL.
-  @concurrent static func copyIn(_ source: Int32) async throws(TransportError) -> URL {
+  /// Copies all of `source`, a regular file, into a new scratch file in `folder` and returns its
+  /// URL.
+  @concurrent static func copyIn(
+    _ source: Int32, into folder: URL = FileManager.default.temporaryDirectory
+  ) async throws(TransportError) -> URL {
     try requireRegular(source)
     var info = stat()
     guard fstat(source, &info) == 0 else { throw .io("cannot inspect file: \(errorText())") }
-    let url = scratchURL()
+    let url = scratchURL(in: folder)
     try LocalFile.requireSpace(UInt64(clamping: info.st_size), at: url.deletingLastPathComponent())
     let output = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
     guard output >= 0 else { throw .io("cannot create transfer file: \(errorText())") }

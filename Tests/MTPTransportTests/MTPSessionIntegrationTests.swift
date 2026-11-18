@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -48,7 +49,7 @@ extension DeviceTests {
 
     @Test func fullRoundTripThroughSafeWriter() async throws {
       let payload = Data((0..<1_048_576).map { UInt8(truncatingIfNeeded: $0 &* 31) })
-      let source = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+      let source = TestScratch.root.appendingPathComponent(UUID().uuidString)
       try payload.write(to: source)
       defer { try? FileManager.default.removeItem(at: source) }
 
@@ -66,7 +67,7 @@ extension DeviceTests {
           #expect(item.kind == .file)
           #expect(item.size == UInt64(payload.count))
 
-          let copy = FileManager.default.temporaryDirectory
+          let copy = TestScratch.root
             .appendingPathComponent(UUID().uuidString)
           defer { try? FileManager.default.removeItem(at: copy) }
           try await session.download(
@@ -89,7 +90,7 @@ extension DeviceTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["FERRY_LARGE_FILE_TESTS"] == "1"))
     func largeFileOver4GB() async throws {
       let size: UInt64 = 4_100_000_000
-      let source = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+      let source = TestScratch.root.appendingPathComponent(UUID().uuidString)
       #expect(FileManager.default.createFile(atPath: source.path, contents: nil))
       defer { try? FileManager.default.removeItem(at: source) }
       let handle = try FileHandle(forWritingTo: source)

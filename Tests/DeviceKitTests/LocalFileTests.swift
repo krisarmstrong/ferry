@@ -1,9 +1,10 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
 struct LocalFileTests {
-  let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+  let directory = TestScratch.root.appendingPathComponent(
     UUID().uuidString)
 
   init() throws {
@@ -46,7 +47,7 @@ struct LocalFileTests {
     defer { cleanUp() }
     let link = directory.appendingPathComponent("link")
     try FileManager.default.createSymbolicLink(
-      at: link, withDestinationURL: FileManager.default.temporaryDirectory)
+      at: link, withDestinationURL: TestScratch.root)
     #expect(throws: TransportError.self) { try LocalFile.regularFileSize(link) }
   }
 

@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -18,7 +19,7 @@ struct MTPSessionFreshResolutionTests {
     let grown = Data("hello, world, grown on the phone".utf8)
     await device.replaceData(of: id, with: grown)
 
-    let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: target) }
     try await session.download(
       SessionFixture.path("/a.txt"), in: storage, to: target, replacing: true,
@@ -75,7 +76,7 @@ struct MTPSessionFreshResolutionTests {
     let id = await device.addFile("global.o", parent: SessionFixture.root, data: Data(count: 40))
     await device.reportSize(32, for: id)
     let session = MTPSession(device: device)
-    let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: target) }
 
     let result = try await session.download(
@@ -92,7 +93,7 @@ struct MTPSessionFreshResolutionTests {
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     await device.cutShortNextDownloads(1)
     let session = MTPSession(device: device)
-    let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: target) }
 
     let result = try await session.download(
@@ -109,7 +110,7 @@ struct MTPSessionFreshResolutionTests {
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     await device.limitDownloads(to: 2)
     let session = MTPSession(device: device)
-    let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
 
     await #expect(throws: TransportError.downloadSizeMismatch(listed: 5, received: 2)) {
       try await session.download(

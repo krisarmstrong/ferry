@@ -1,3 +1,4 @@
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -30,7 +31,7 @@ struct FerryIdentityTests {
   }
 
   @Test func teamIDIsReadFromTheInfoPlist() throws {
-    let bundleURL = FileManager.default.temporaryDirectory.appending(
+    let bundleURL = TestScratch.root.appending(
       path: "Identity-\(UUID().uuidString).bundle", directoryHint: .isDirectory)
     let contents = bundleURL.appending(path: "Contents", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
@@ -46,7 +47,7 @@ struct FerryIdentityTests {
   /// A build that did not record the team has no identity, so the process stops at launch
   /// rather than naming a service nobody registered.
   @Test func aBundleWithoutTheTeamHasNoIdentity() throws {
-    let bundleURL = FileManager.default.temporaryDirectory.appending(
+    let bundleURL = TestScratch.root.appending(
       path: "Identity-\(UUID().uuidString).bundle", directoryHint: .isDirectory)
     let contents = bundleURL.appending(path: "Contents", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)

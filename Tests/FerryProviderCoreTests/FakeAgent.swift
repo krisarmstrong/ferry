@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import FerryIPC
 import FileProvider
 import Foundation
@@ -353,7 +354,7 @@ extension FakeAgent {
 }
 
 func scratchDirectory() throws -> URL {
-  let dir = FileManager.default.temporaryDirectory.appending(
+  let dir = TestScratch.root.appending(
     path: "FerryProviderCoreTests-\(UUID().uuidString)", directoryHint: .isDirectory)
   try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
   return dir

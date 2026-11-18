@@ -18,7 +18,7 @@ struct FakeTransportTests {
   }
 
   func tempFile(_ data: Data) throws -> URL {
-    let url = FileManager.default.temporaryDirectory
+    let url = TestScratch.root
       .appendingPathComponent(UUID().uuidString)
     try data.write(to: url)
     return url
@@ -115,7 +115,7 @@ struct FakeTransportTests {
     let device = makeDevice()
     let path = try RemotePath("/a.bin")
     try await device.seed(path, in: storageID, contents: Data([9, 8, 7]))
-    let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let dest = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: dest) }
     try await device.download(path, in: storageID, to: dest, replacing: false) { _, _ in true }
     #expect(try Data(contentsOf: dest) == Data([9, 8, 7]))
@@ -128,7 +128,7 @@ struct FakeTransportTests {
     let device = makeDevice()
     let path = try RemotePath("/a.bin")
     try await device.seed(path, in: storageID, contents: Data([9, 8, 7]))
-    let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let dest = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: dest) }
     try Data([1]).write(to: dest)
 
