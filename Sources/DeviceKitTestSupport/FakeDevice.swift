@@ -279,11 +279,16 @@ public actor FakeDevice: DeviceSession {
     return Self.item(destination, node)
   }
 
-  private static func isSame(_ path: RemotePath, orInside ancestor: RemotePath) -> Bool {
+}
+
+// MARK: Helpers
+
+extension FakeDevice {
+  fileprivate static func isSame(_ path: RemotePath, orInside ancestor: RemotePath) -> Bool {
     path.components.starts(with: ancestor.components)
   }
 
-  private static func item(_ path: RemotePath, _ node: Node) -> RemoteItem {
+  fileprivate static func item(_ path: RemotePath, _ node: Node) -> RemoteItem {
     switch node {
     case .file(let data, let modified):
       RemoteItem(path: path, kind: .file, size: UInt64(data.count), modified: modified)
@@ -293,7 +298,7 @@ public actor FakeDevice: DeviceSession {
   }
 
   /// Reads the whole file, or at most `limit` bytes when a limit is given.
-  private static func read(_ file: URL, upTo limit: UInt64?) throws(TransportError) -> Data {
+  fileprivate static func read(_ file: URL, upTo limit: UInt64?) throws(TransportError) -> Data {
     do {
       guard let limit else { return try Data(contentsOf: file) }
       let handle = try FileHandle(forReadingFrom: file)

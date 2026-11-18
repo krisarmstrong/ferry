@@ -93,27 +93,6 @@ actor FakeAgent: AgentSending {
     NSFileProviderItemIdentifier(try id(path))
   }
 
-  func set(failure: TransportError?, thrown: TransportError? = nil) {
-    self.failure = failure
-    self.thrown = thrown
-  }
-
-  func set(progressTotal: UInt64) {
-    self.progressTotal = progressTotal
-  }
-
-  func set(deleteFailure: TransportError) {
-    self.deleteFailure = deleteFailure
-  }
-
-  func set(fetchFailure: TransportError) {
-    self.fetchFailure = fetchFailure
-  }
-
-  func set(changes updated: [ProviderEntry], deleted: [ItemID]) {
-    pendingChanges = (updated, deleted)
-  }
-
   private func changeReply(_ since: Data?) -> AgentResponse {
     switch since {
     case nil:
@@ -125,14 +104,6 @@ actor FakeAgent: AgentSending {
     default:
       .changes(anchor: nextAnchor, updated: [], deleted: [], expired: true)
     }
-  }
-
-  func parkFetchesUntilCancelled() {
-    parkFetches = true
-  }
-
-  func park(until count: Int) {
-    parkCreatesUntil = count
   }
 
   func send(
@@ -169,13 +140,7 @@ actor FakeAgent: AgentSending {
     case .list(_, let folder):
       return .entries(try listing(folder))
     case .fetch(_, let id):
-      let fetched = try path(id)
-      try fetch(fetched, into: file)
-      let listed = try existing(fetched)
-      let received = RemoteItem(
-        path: fetched, kind: .file, size: UInt64(contents[fetched]?.count ?? 0),
-        modified: listed.modified)
-      return .entry(try entry(received, id: id))
+      return .entry(try fetched(id, into: file))
     case .create(_, let parent, let name, let isFolder):
       let created = try await create(
         try path(parent).appending(name), isFolder: isFolder, from: file)
@@ -213,6 +178,19 @@ actor FakeAgent: AgentSending {
     case .status, .recheck, .refresh, .eject, .removeAllDomains:
       throw .unsupported("\(request)")
     }
+  }
+
+  /// Writes the file into `file` and returns it as received.
+  private func fetched(_ id: ItemID, into file: FileHandle?) throws(TransportError)
+    -> ProviderEntry
+  {
+    let path = try path(id)
+    try fetch(path, into: file)
+    let listed = try existing(path)
+    let received = RemoteItem(
+      path: path, kind: .file, size: UInt64(contents[path]?.count ?? 0),
+      modified: listed.modified)
+    return try entry(received, id: id)
   }
 
   private func delete(_ id: ItemID) throws(TransportError) {
@@ -338,6 +316,39 @@ actor FakeAgent: AgentSending {
     parkCreatesUntil = 0
     for continuation in parked { continuation.resume() }
     parked = []
+  }
+}
+
+// MARK: Test controls
+
+extension FakeAgent {
+  func set(failure: TransportError?, thrown: TransportError? = nil) {
+    self.failure = failure
+    self.thrown = thrown
+  }
+
+  func set(progressTotal: UInt64) {
+    self.progressTotal = progressTotal
+  }
+
+  func set(deleteFailure: TransportError) {
+    self.deleteFailure = deleteFailure
+  }
+
+  func set(fetchFailure: TransportError) {
+    self.fetchFailure = fetchFailure
+  }
+
+  func set(changes updated: [ProviderEntry], deleted: [ItemID]) {
+    pendingChanges = (updated, deleted)
+  }
+
+  func parkFetchesUntilCancelled() {
+    parkFetches = true
+  }
+
+  func park(until count: Int) {
+    parkCreatesUntil = count
   }
 }
 
