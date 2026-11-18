@@ -111,16 +111,21 @@ extension FakeAndroid {
     }
   }
 
-  /// `LIST` answers a path that is not a folder with no entries, not an error.
+  /// `LIST` answers a path that is not a folder with no entries, not an error, and lists `.`
+  /// and `..` first, as `readdir` gives them to adbd.
   private func list(_ path: Path) -> Data {
     state.withLock { state in
       guard let folder = state.resolve(path), case .folder = state.nodes[folder] else {
         return Data()
       }
       var reply = Data()
-      for child in state.children(of: folder) {
-        let node = state.nodes[child] ?? .special
-        let name = FakeAndroid.name(child)
+      let dots: [(name: Path, node: Node)] = [
+        (Array(".".utf8), .folder(mtime: 1)), (Array("..".utf8), .folder(mtime: 1)),
+      ]
+      let entries = state.children(of: folder).map {
+        (FakeAndroid.name($0), state.nodes[$0] ?? .special)
+      }
+      for (name, node) in dots + entries {
         reply += Data("DENT".utf8) + Peer.le32(Self.mode(node))
         reply += Peer.le32(UInt32(truncatingIfNeeded: Self.size(node)))
         reply += Peer.le32(UInt32(truncatingIfNeeded: Self.mtime(node)))

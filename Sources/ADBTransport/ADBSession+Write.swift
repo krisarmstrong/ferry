@@ -10,9 +10,8 @@ extension ADBSession {
   public func upload(
     from file: URL, to path: RemotePath, in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
-    try await operation { () throws(TransportError) in
+    try await operation(on: storage) { (root) throws(TransportError) in
       let (parent, _) = try Self.split(path)
-      let root = try await root(for: storage)
       let siblings = try await children(of: parent, under: root, exactSizes: false)
       try Self.requireFree(path, among: siblings.items)
       let location = try await location(of: path, under: root)
@@ -26,6 +25,12 @@ extension ADBSession {
         throw .io("could not open \(file.path): \(error.localizedDescription)")
       }
       defer { try? handle.close() }
+      // The clash check compares names as Ferry does; the device may resolve another name to an
+      // existing file (vfat ignores trailing dots, FAT has short names), and SEND would delete it.
+      let taken = try await adb(Step("upload", path)) { () async throws(ADBError) in
+        try await syncing { (sync) async throws(ADBError) in try await sync.stat(location) }
+      }
+      guard taken == nil else { throw .alreadyExists(path) }
       try await adb(Step("upload", path, target: path)) { () async throws(ADBError) in
         try await syncing { (sync) async throws(ADBError) in
           try await sync.send(
@@ -45,10 +50,9 @@ extension ADBSession {
   public func makeFolder(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem
   {
-    try await operation { () throws(TransportError) in
+    try await operation(on: storage) { (root) throws(TransportError) in
       guard path != .root else { throw .alreadyExists(path) }
       let (parent, _) = try Self.split(path)
-      let root = try await root(for: storage)
       let siblings = try await children(of: parent, under: root, exactSizes: false)
       try Self.requireFree(path, among: siblings.items)
       let location = try await location(of: path, under: root)
@@ -63,10 +67,9 @@ extension ADBSession {
   public func rename(_ path: RemotePath, to newName: String, in storage: StorageID)
     async throws(TransportError) -> RemoteItem
   {
-    try await operation { () throws(TransportError) in
+    try await operation(on: storage) { (root) throws(TransportError) in
       let (parent, name) = try Self.split(path)
       let renamed = try parent.appending(newName)
-      let root = try await root(for: storage)
       let siblings = try await children(of: parent, under: root, exactSizes: false).items
       guard siblings.contains(where: { $0.path == path }) else { throw .notFound(path) }
       let source = try await location(of: path, under: root)
@@ -119,9 +122,8 @@ extension ADBSession {
   public func move(_ path: RemotePath, toFolder: RemotePath, in storage: StorageID)
     async throws(TransportError) -> RemoteItem
   {
-    try await operation { () throws(TransportError) in
+    try await operation(on: storage) { (root) throws(TransportError) in
       let (_, name) = try Self.split(path)
-      let root = try await root(for: storage)
       let source = try await existing(path, under: root).location
       let target = try toFolder.appending(name)
       let destination = try await children(of: toFolder, under: root, exactSizes: false)

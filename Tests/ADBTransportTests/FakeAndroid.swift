@@ -38,6 +38,8 @@ final class FakeAndroid: Sendable {
   struct State {
     var nodes: [Path: Node] = [:]
     var caseInsensitive: [Path] = []
+    /// Roots whose lookups also ignore trailing dots, as Linux vfat does.
+    var trailingDotsIgnored: [Path] = []
     var mounts: [Mount] = []
     var features = "cmd,shell_v2,stat_v2"
     var gone = false
@@ -56,8 +58,9 @@ final class FakeAndroid: Sendable {
   let state = OSAllocatedUnfairLock(initialState: State())
   static let internalRoot = "/storage/emulated/0"
 
-  /// A device with internal shared storage mounted, holding nothing.
-  init(volumes: [String] = []) {
+  /// A device with internal shared storage mounted, holding nothing. With `vfat`, lookups on
+  /// the volumes also ignore trailing dots, as Linux's vfat driver does.
+  init(volumes: [String] = [], vfat: Bool = false) {
     state.withLock { state in
       for folder in ["/storage", "/storage/emulated", Self.internalRoot, "/storage/self"] {
         state.nodes[Self.bytes(folder)] = .folder(mtime: 1_600_000_000)
@@ -72,6 +75,7 @@ final class FakeAndroid: Sendable {
         let root = "/storage/" + volume
         state.nodes[Self.bytes(root)] = .folder(mtime: 1_600_000_000)
         state.caseInsensitive.append(Self.bytes(root))
+        if vfat { state.trailingDotsIgnored.append(Self.bytes(root)) }
         state.mounts.append(
           Mount(
             mountPoint: Self.bytes(root), filesystem: "/dev/fuse", total: 62_522_624,
@@ -233,10 +237,16 @@ extension FakeAndroid.State {
       guard caseInsensitive.contains(where: { FakeAndroid.isSame(exact, orInside: $0) }) else {
         return nil
       }
-      let key = FakeAndroid.folded(Array(component))
+      let undotted = trailingDotsIgnored.contains { FakeAndroid.isSame(exact, orInside: $0) }
+      let fold = { (name: Path) -> Path in
+        var name = FakeAndroid.folded(name)
+        while undotted, name.count > 1, name.last == UInt8(ascii: ".") { name.removeLast() }
+        return name
+      }
+      let key = fold(Array(component))
       guard
         let match = children(of: current.isEmpty ? [UInt8(ascii: "/")] : current).first(where: {
-          FakeAndroid.folded(FakeAndroid.name($0)) == key
+          fold(FakeAndroid.name($0)) == key
         })
       else { return nil }
       current = match

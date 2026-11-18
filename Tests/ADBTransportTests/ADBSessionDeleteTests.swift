@@ -171,6 +171,39 @@ struct ADBSessionDeleteTests {
     #expect(error == wanted)
   }
 
+  /// `rm -r` that removed part of a tree and failed on the rest reports a child's error (toybox
+  /// names the child alone): only a message about the folder itself names a specific cause.
+  @Test(
+    arguments: [
+      "rm: x.txt: Permission denied\nrm: /storage/emulated/0/F: Directory not empty",
+      "rm: x.txt: No such file or directory",
+    ])
+  func aPartlyFailedRecursiveDeleteIsAnIOError(_ message: String) async throws {
+    let device = FakeAndroid()
+    device.addFolder("/F")
+    device.addFile("/F/x.txt", Data("x".utf8))
+    device.addFile("/F/y.txt", Data("y".utf8))
+    device.beforeNextShell("rm") {
+      $0.state.withLock { $0.nodes[FakeAndroid.internalPath("/F/y.txt")] = nil }
+    }
+    device.failNextShell("rm", stderr: message)
+    let folder = try path("/F")
+    await #expect(throws: TransportError.io("delete failed: " + message)) {
+      try await ADBFixture.withSession(device) { try await $0.delete(folder, in: storage) }
+    }
+  }
+
+  /// A message that is not UTF-8 (it names a child whose name is not) keeps its text and its
+  /// cause.
+  @Test func aMessageThatIsNotUTF8IsKept() {
+    let result = ADBShellResult(
+      status: 1, stdout: Data(),
+      stderr: Data([0x72, 0x6D, 0x3A, 0x20, 0xFF]) + Data(": Permission denied\n".utf8))
+    let message = ADBSession.message(of: result)
+    #expect(message.hasPrefix("rm: "))
+    #expect(message.hasSuffix(": Permission denied"))
+  }
+
   @Test func aFailedMkdirOrMvIsMapped() async throws {
     let device = FakeAndroid()
     device.addFile("/a.txt", Data("a".utf8))

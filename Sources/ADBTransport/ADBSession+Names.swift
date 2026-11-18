@@ -95,6 +95,10 @@ extension ADBSession {
   /// The item at `path` and where it is on the device. `path` must be listed in its folder
   /// under exactly that name: storage that ignores case would otherwise act on `A.txt` when asked
   /// for `a.txt`. The listing is fresh, so the spelling used is current.
+  ///
+  /// Only the last name is held to this. Folders on the way resolve as the device resolves
+  /// them, so after another app changes a folder's case `/Foo/x` reaches `/foo/x`, where MTP
+  /// would say not found. On case-insensitive storage that is the same file.
   func existing(_ path: RemotePath, under root: String) async throws(TransportError)
     -> (item: RemoteItem, location: String)
   {

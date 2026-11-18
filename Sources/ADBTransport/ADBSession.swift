@@ -83,6 +83,30 @@ public actor ADBSession: DeviceSession {
     }
   }
 
+  /// One gated operation on `storage`, given its device folder. A storage whose folder has gone
+  /// (a card ejected, storage unmounted) is `.storageNotFound`, never `.notFound` for an item in
+  /// it: FileProvider deletes the local copy of an item reported missing.
+  func operation<T>(on storage: StorageID, _ body: (String) async throws(TransportError) -> T)
+    async throws(TransportError) -> T
+  {
+    try await operation { () throws(TransportError) -> T in
+      let root = try await root(for: storage)
+      do throws(TransportError) {
+        return try await body(root)
+      } catch {
+        guard case .notFound = error else { throw error }
+        let mounted = try await adb(Step("reading", .root)) { () async throws(ADBError) in
+          try await syncing { (sync) async throws(ADBError) in try await sync.stat(root) }
+        }
+        guard mounted?.isDirectory == true else {
+          knownStorages.remove(storage.key)
+          throw .storageNotFound(storage.key)
+        }
+        throw error
+      }
+    }
+  }
+
   private func dropSync() async {
     let open = sync
     sync = nil
@@ -136,9 +160,16 @@ public actor ADBSession: DeviceSession {
   func shell(_ program: String, _ args: [String], _ step: Step) async throws(TransportError) {
     let result = try await run(program, args, step)
     guard result.status != 0 else { return }
-    let message = [result.stderr, result.stdout].map { String(bytes: $0, encoding: .utf8) ?? "" }
+    throw await deviceFailure(Self.message(of: result), step)
+  }
+
+  /// A failed command's output, stderr first. Output that is not UTF-8 (it names a file whose
+  /// name is not) is read as Latin-1, which keeps every byte and the ASCII errno text that ends
+  /// it.
+  static func message(of result: ADBShellResult) -> String {
+    [result.stderr, result.stdout]
+      .map { String(bytes: $0, encoding: .utf8) ?? String(bytes: $0, encoding: .isoLatin1) ?? "" }
       .joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-    throw await deviceFailure(message, step)
   }
 }
 
@@ -206,7 +237,7 @@ extension ADBSession {
     return error
   }
 
-  private func reachable() async -> Bool {
+  func reachable() async -> Bool {
     do {
       _ = try await host.features(serial)
       return true

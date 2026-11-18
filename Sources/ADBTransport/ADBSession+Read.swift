@@ -7,8 +7,7 @@ extension ADBSession {
   public func list(_ folder: RemotePath, in storage: StorageID) async throws(TransportError)
     -> [RemoteItem]
   {
-    try await operation { () throws(TransportError) in
-      let root = try await root(for: storage)
+    try await operation(on: storage) { (root) throws(TransportError) in
       return try await children(of: folder, under: root).items
         .sorted { $0.path.description < $1.path.description }
     }
@@ -17,9 +16,9 @@ extension ADBSession {
   public func item(at path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem
   {
-    try await operation { () throws(TransportError) in
-      let root = try await root(for: storage)
+    try await operation(on: storage) { (root) throws(TransportError) in
       guard path != .root else {
+        guard try await stat(at: root, as: .root)?.kind == .folder else { throw .notFound(.root) }
         return RemoteItem(path: .root, kind: .folder, size: 0, modified: .distantPast)
       }
       return try await existing(path, under: root).item
@@ -69,8 +68,7 @@ extension ADBSession {
     _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
     progress: ProgressHandler
   ) async throws(TransportError) -> Downloaded {
-    try await operation { () throws(TransportError) in
-      let root = try await root(for: storage)
+    try await operation(on: storage) { (root) throws(TransportError) in
       var attempt = 1
       while true {
         let (listed, location) = try await existing(path, under: root)

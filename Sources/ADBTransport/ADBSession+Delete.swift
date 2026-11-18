@@ -8,15 +8,17 @@ extension ADBSession {
   /// only what the caller checked goes (see `DeviceSession.delete`): the tree is listed fresh
   /// first, and anything else in it refuses the delete before anything goes.
   ///
-  /// As with MTP, a checked item is matched by path, kind, size and date, so a file the device
-  /// replaced with one of the same size and date passes, and something added between the check
-  /// and `rm` goes with the folder.
+  /// A checked item is matched by path, kind, size and date, as with MTP, so a file the device
+  /// replaced with one of the same size and date passes. Unlike MTP, which deletes by object ID,
+  /// `rm` acts by path: a file another app replaces between the check and `rm` is deleted, and
+  /// anything added to a checked folder meanwhile (the walk takes one STA2 per file) goes with
+  /// it. Without `expecting` the tree is not walked, so `.folderTooDeep` never arises: `rm -r`
+  /// bounds its own recursion, where MTPSession walks to delete object by object.
   public func delete(_ path: RemotePath, in storage: StorageID, expecting: [RemoteItem]?)
     async throws(TransportError)
   {
-    try await operation { () throws(TransportError) in
+    try await operation(on: storage) { (root) throws(TransportError) in
       guard path != .root else { throw .notFound(path) }
-      let root = try await root(for: storage)
       let (top, location) = try await existing(path, under: root)
       if let expecting {
         let checked = Dictionary(
@@ -30,8 +32,19 @@ extension ADBSession {
         forget(location)
         forget(Self.parentLocation(location))
       }
-      try await shell(
-        "rm", top.kind == .folder ? ["-r", "--", location] : ["--", location], Step("delete", path))
+      let step = Step("delete", path)
+      let result = try await run(
+        "rm", top.kind == .folder ? ["-r", "--", location] : ["--", location], step)
+      guard result.status != 0 else { return }
+      let message = Self.message(of: result)
+      // toybox names a child that failed by its own name, then says nothing of the folder. Only
+      // a message wholly about the folder itself names why it remains; anything else is a tree
+      // partly deleted.
+      let aboutTop = message.hasPrefix("rm: \(location): ") && !message.contains("\n")
+      guard top.kind == .file || aboutTop else {
+        throw await reachable() ? .io("delete failed: \(message)") : .deviceDisconnected
+      }
+      throw await deviceFailure(message, step)
     }
   }
 
