@@ -179,12 +179,30 @@ struct ADBTransportLifecycleTests {
     await hub.kill()
   }
 
-  @Test func parkingADeviceNotHeldDoesNothing() async throws {
+  /// The session may already have ended (its device dropped) when the user's eject arrives:
+  /// the device is parked all the same.
+  @Test func aDeviceWhoseSessionEndedStillParks() async throws {
+    let (hub, _) = try await Self.linkRunnerHub()
+    let transport = Fixture.transport(port: hub.port)
+    _ = try await transport.scan()
+    let session = try await transport.open(Fixture.linkRunner)
+    await session.close()
+    await transport.park(Fixture.linkRunner)
+    var scan = try await transport.scan()
+    #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.devices.isEmpty)
+    scan = try await transport.scan()
+    #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.devices.isEmpty)
+    await hub.kill()
+  }
+
+  /// A device never opened parks by what the last scan knew of it.
+  @Test func aDeviceNeverHeldParksToo() async throws {
     let (hub, _) = try await Self.linkRunnerHub()
     let transport = Fixture.transport(port: hub.port)
     _ = try await transport.scan()
     await transport.park(Fixture.linkRunner)
-    #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
+    let scan = try await transport.scan()
+    #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.devices.isEmpty)
     await hub.kill()
   }
 

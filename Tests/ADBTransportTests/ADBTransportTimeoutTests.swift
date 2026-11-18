@@ -68,3 +68,29 @@ struct ADBTransportTimeoutTests {
     await hub.kill()
   }
 }
+
+/// A device left out because it did not answer is asked again on a schedule of its own: adb
+/// sends no event for a list that has not changed.
+struct ADBTransportRetryTests {
+  typealias Fixture = TransportFixture
+
+  @Test func anUnnamedDeviceAsksForARescanThatBacksOff() async throws {
+    let slow = Fixture.android(serial: "BBBB")
+    slow.state.withLock { $0.hangingPrograms = ["getprop"] }
+    let hub = try await Fixture.hub([.init("BBBB", device: slow)])
+    let transport = Fixture.transport(port: hub.port, answerLimit: .seconds(2))
+    var scan = try await transport.scan()
+    #expect(scan.devices.isEmpty && scan.rescanAfter == ADBTransport.unnamedRetry)
+    scan = try await transport.scan()
+    #expect(scan.rescanAfter == ADBTransport.unnamedRetry * 2)
+    slow.state.withLock { $0.hangingPrograms = [] }
+    scan = try await transport.scan()
+    #expect(scan.devices.map(\.id.serial) == ["BBBB"] && scan.rescanAfter == nil)
+    await hub.kill()
+  }
+
+  @Test func theRescanBackOffIsCapped() {
+    #expect(ADBTransport.unnamedDelay(afterTries: 1) == ADBTransport.unnamedRetry)
+    #expect(ADBTransport.unnamedDelay(afterTries: 40) == ADBTransport.unnamedRetryLimit)
+  }
+}

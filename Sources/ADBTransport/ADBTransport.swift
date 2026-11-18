@@ -67,6 +67,11 @@ public actor ADBTransport: DeviceTransport {
   /// Devices left alone after an eject, until `unpark(_:)` or until adb has not listed them, in
   /// any state, for `settleTime`.
   private var parked: [DeviceID: Parked] = [:]
+  /// What each device was last seen as, so a device parked after its session ended (or never
+  /// opened) is still reported by name and recognised under its adb serials.
+  private var lastKnown: [DeviceID: Held] = [:]
+  /// How many scans in a row each listed adb serial has stayed unnamed.
+  private var unnamedTries: [String: Int] = [:]
   private let now: @Sendable () -> ContinuousClock.Instant
 
   private struct Held {
@@ -96,6 +101,20 @@ public actor ADBTransport: DeviceTransport {
   /// wide margin for a slow link. Devices are read at once, so a scan waits about one limit for
   /// the list and one for names, however many devices are wedged.
   static let defaultAnswerLimit = Duration.seconds(3)
+
+  /// When to scan again for a listed device that could not be named. adb sends no event for a
+  /// list that has not changed, so a slow but healthy device (a Wi-Fi device waking up) would
+  /// otherwise wait for some unrelated change. Two seconds gives it a quick second chance;
+  /// doubling to thirty keeps a wedged device, which costs a scan `answerLimit` each time, from
+  /// keeping the hub scanning.
+  static let unnamedRetry = Duration.seconds(2)
+  static let unnamedRetryLimit = Duration.seconds(30)
+
+  static func unnamedDelay(afterTries tries: Int) -> Duration {
+    var delay = unnamedRetry
+    for _ in 1..<max(tries, 1) where delay < unnamedRetryLimit { delay *= 2 }
+    return min(delay, unnamedRetryLimit)
+  }
 
   init(
     host: ADBHost, locator: ADBLocator, answerLimit: Duration = defaultAnswerLimit,
@@ -138,20 +157,18 @@ public actor ADBTransport: DeviceTransport {
       named = named.filter { serials.contains($0.key) }
       let unnamed = usable.map(\.serial).filter { named[$0] == nil }
       named.merge(try await read(unnamed)) { _, new in new }
-      var found: [DeviceID: Found] = [:]
-      for device in usable {
-        guard let info = named[device.serial] else { continue }
-        var entry = found[info.id] ?? Found(info: info)
-        if device.isWireless {
-          entry.wireless.append(device.serial)
-        } else {
-          entry.usb = device.serial
-          entry.info = info
-        }
-        found[info.id] = entry
-      }
+      let stillUnnamed = usable.map(\.serial).filter { named[$0] == nil }
+      unnamedTries = Dictionary(
+        uniqueKeysWithValues: stillUnnamed.map { ($0, (unnamedTries[$0] ?? 0) + 1) })
+      let retry = unnamedTries.values.max().map { Self.unnamedDelay(afterTries: $0) }
+      let found = assemble(usable)
       routes = found.mapValues { ADBRoutes(usb: $0.usb, wireless: $0.wireless.sorted()) }
-      let rescanAfter = settleParked(found: found, listed: Set(listed.map(\.serial)))
+      for (id, device) in found {
+        lastKnown[id] = Held(
+          info: device.info, serials: Set(device.wireless + [device.usb].compactMap { $0 }))
+      }
+      let settle = settleParked(found: found, listed: Set(listed.map(\.serial)))
+      let rescanAfter = [settle, retry].compactMap { $0 }.min()
       let known = Set(found.keys).union(parked.keys)
       let unauthorized = listed.filter { $0.state == .unauthorized }
         .map(Self.describe)
@@ -162,6 +179,23 @@ public actor ADBTransport: DeviceTransport {
         notSharing: unauthorized, ejected: parked.values.map(\.info).sorted(by: Self.serial),
         rescanAfter: rescanAfter)
     }
+  }
+
+  /// The named devices among `usable`, one per `ro.serialno`, USB first for info and route.
+  private func assemble(_ usable: [ADBDevice]) -> [DeviceID: Found] {
+    var found: [DeviceID: Found] = [:]
+    for device in usable {
+      guard let info = named[device.serial] else { continue }
+      var entry = found[info.id] ?? Found(info: info)
+      if device.isWireless {
+        entry.wireless.append(device.serial)
+      } else {
+        entry.usb = device.serial
+        entry.info = info
+      }
+      found[info.id] = entry
+    }
+    return found
   }
 
   /// One device as a scan assembles it from its adb serials.
@@ -196,10 +230,15 @@ public actor ADBTransport: DeviceTransport {
   }
 
   /// Parks from the hold, not the last scan, which may not list the device at all (offline, or
-  /// the server down) when the user ejects it.
+  /// the server down) when the user ejects it. Without a hold, from what was last seen of it.
   public func park(_ id: DeviceID) async {
-    guard let hold = held[id] else { return }
-    parked[id] = Parked(info: hold.info, serials: hold.serials)
+    // A session that has already ended (its device dropped) leaves no hold; the eject still
+    // stands, by what was last known of the device.
+    let known =
+      held[id] ?? lastKnown[id]
+      ?? Held(
+        info: DeviceInfo(id: id, manufacturer: "Unknown", model: "Android device"), serials: [])
+    parked[id] = Parked(info: known.info, serials: known.serials)
   }
 
   public func unpark(_ id: DeviceID) async {
