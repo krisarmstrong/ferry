@@ -119,6 +119,12 @@ actor ItemTable {
     path == .root || ids[path] != nil
   }
 
+  /// Whether the agent has reported the item at `path` to FileProvider, rather than knowing it
+  /// only as the parent of one it reported.
+  func reported(_ path: RemotePath) -> Bool {
+    path == .root || ids[path].flatMap { records[$0]?.reported } != nil
+  }
+
   /// `nil` when the table does not know `id`: the item was deleted, or never reported.
   func path(for id: ItemID) -> RemotePath? {
     id == .root ? .root : records[id]?.path

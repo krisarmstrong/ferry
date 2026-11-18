@@ -20,7 +20,7 @@
     "A file the device changed since Finder last showed it is not deleted. Finder puts it back with the device's version." : {
       "extractionState" : "manual"
     },
-    "A folder is deleted only with everything Finder shows in it. If the device added files to the folder since Finder last showed it, the folder and those files stay." : {
+    "A folder is deleted only with everything Finder has shown in it. If the device added files to the folder since Finder last showed it, or the folder was never opened, the folder and its files stay, and Finder puts it back with the new files in it. Delete it again to remove them." : {
       "extractionState" : "manual"
     },
     "A package, such as an .rtfd document or an app, can't be copied to the device: compress it into a .zip first. On the device every folder is a plain folder, so a package made there shows as a folder with its files in it. Symbolic links and aliases can't be copied to the device either; Finder shows an error for them." : {

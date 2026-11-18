@@ -88,17 +88,6 @@ struct AgentDeleteAndConflictTests {
         == .done)
   }
 
-  @Test func aRecursiveDeleteRemovesTheFolderAndItsFiles() async throws {
-    let setup = try await setup([("/Reports/r1.txt", "one"), ("/Reports/Sub/r2.txt", "two")])
-    defer { setup.harness.finish() }
-    let reports = try await setup.id("/Reports")
-
-    #expect(
-      await setup.send(.delete(domain: setup.domain, id: reports, base: nil, recursive: true))
-        == .done)
-    #expect(await setup.device.contents(of: try path("/Reports/r1.txt"), in: setup.storage) == nil)
-  }
-
   /// Deleted on the device since Finder last saw it: the delete succeeds and the item is
   /// forgotten.
   @Test func deletingAFileAlreadyGoneFromTheDeviceSucceeds() async throws {

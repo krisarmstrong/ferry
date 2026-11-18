@@ -145,10 +145,12 @@ Rename files and folders, and create new folders, the same way as on any drive.
 The device has no Trash. Finder offers **Delete Immediately** instead of **Move to Trash**,
 and the file is removed from the device at once. It cannot be recovered from the Mac.
 
-Ferry deletes a folder only together with everything Finder shows in it. If the device added
-files to a folder since Finder last showed it, the folder and those files stay, and Finder
-puts the folder back. A file the device changed since Finder last showed it is not deleted
-either: Finder puts it back with the device's version.
+Ferry deletes a folder only together with everything Finder has shown in it. If the device
+added files to a folder since Finder last showed it, or the folder was never opened in Finder,
+the folder and everything in it stay, and Finder puts the folder back with the new files in
+it; delete it again to remove them. A folder nested more than 64 folders deep stays the same
+way. A file the device changed since Finder last showed it is not deleted either: Finder puts
+it back with the device's version.
 
 ### Free up space on the Mac
 

@@ -87,7 +87,7 @@
           "title": "Delete",
           "paragraphs": [
             "The device has no Trash. Finder offers **Delete Immediately**, and the file is removed from the device at once.",
-            "A folder is deleted only with everything Finder shows in it. If the device added files to the folder since Finder last showed it, the folder and those files stay.",
+            "A folder is deleted only with everything Finder has shown in it. If the device added files to the folder since Finder last showed it, or the folder was never opened, the folder and its files stay, and Finder puts it back with the new files in it. Delete it again to remove them.",
             "A file the device changed since Finder last showed it is not deleted. Finder puts it back with the device's version."
           ]
         },

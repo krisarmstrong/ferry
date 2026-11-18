@@ -193,9 +193,10 @@ public actor AgentService: AgentHandling {
 
   /// Deletes the item as the device has it now. A file the device changed since `base` is kept
   /// and its new state recorded, so FileProvider puts it back. A folder is deleted with its
-  /// contents only if `recursive`: without it, one that holds anything Finder would show is
-  /// kept, since Finder may have last seen it empty. An item already gone, from the table or
-  /// from the device, is deleted already: FileProvider expects success.
+  /// contents only if `recursive`, and only if FileProvider has seen all of them (see
+  /// `requireSeen`): without it, one that holds anything Finder would show is kept, since Finder
+  /// may have last seen it empty. An item already gone, from the table or from the device, is
+  /// deleted already: FileProvider expects success.
   private func delete(
     _ id: ItemID, base: ContentVersion?, recursive: Bool, in domain: String
   ) async throws(TransportError) {
@@ -219,7 +220,9 @@ public actor AgentService: AgentHandling {
       case .folder:
         // The listing that checks also reaps partials abandoned in the folder, which Finder
         // never shows.
-        if !recursive, try await !route.writer.visibleList(path, in: route.storage).isEmpty {
+        if recursive {
+          try await Self.requireSeen(path, on: route)
+        } else if try await !route.writer.visibleList(path, in: route.storage).isEmpty {
           throw .directoryNotEmpty(path)
         }
       }

@@ -3,6 +3,11 @@ import Foundation
 public struct RemotePath: Hashable, Sendable, Codable, CustomStringConvertible {
   public static let root = RemotePath(components: [])
 
+  /// How many folders below a tree's top Ferry walks on the device (deleting a folder with its
+  /// contents): a deeper tree is refused rather than walked, so a device that reports a loop
+  /// cannot exhaust the stack or run forever.
+  public static let maxTreeDepth = 64
+
   /// NFC-normalized path components; empty for the root.
   public let components: [String]
 
