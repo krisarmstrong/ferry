@@ -21,24 +21,6 @@ func folder(_ string: String) throws -> RemoteItem {
   RemoteItem(path: try path(string), kind: .folder, size: 0, modified: epoch)
 }
 
-/// What FileProvider hands the extension for a new or changed item.
-final class Template: NSObject, NSFileProviderItem {
-  let itemIdentifier: NSFileProviderItemIdentifier
-  let parentItemIdentifier: NSFileProviderItemIdentifier
-  let filename: String
-  let contentType: UTType
-
-  init(
-    id: String = "new", parent: NSFileProviderItemIdentifier, filename: String,
-    contentType: UTType = .data
-  ) {
-    itemIdentifier = NSFileProviderItemIdentifier(id)
-    parentItemIdentifier = parent
-    self.filename = filename
-    self.contentType = contentType
-  }
-}
-
 /// An agent holding one storage in memory. Like `MTPSession`, a new name collides with a sibling
 /// that shares its `collisionKey`, except the item being renamed. Like the real agent, it gives
 /// each item a random identifier that a rename or move keeps.
@@ -49,6 +31,9 @@ actor FakeAgent: AgentSending {
   ]
   private var paths: [ItemID: RemotePath] = [.root: .root]
   private(set) var contents: [RemotePath: Data] = [:]
+  /// The archive each document package was made or replaced from, by path; a fetch of the
+  /// package answers with it.
+  private(set) var packages: [RemotePath: Data] = [:]
   private(set) var requests: [AgentRequest] = []
   /// Answered to every request instead of performing it.
   var failure: TransportError?
@@ -172,6 +157,8 @@ actor FakeAgent: AgentSending {
     case .delete(_, let id, _, _):
       try delete(id)
       return .done
+    case .createPackage, .replacePackage:
+      return try package(request, from: file)
     case .changes(_, let since):
       return changeReply(since)
     case .workingSet(_, let page):
@@ -181,11 +168,15 @@ actor FakeAgent: AgentSending {
     }
   }
 
-  /// Writes the file into `file` and returns it as received.
+  /// Writes the file, or a package's archive, into `file` and returns it as received.
   private func fetched(_ id: ItemID, into file: FileHandle?) throws(TransportError)
     -> ProviderEntry
   {
     let path = try path(id)
+    if let archive = packages[path] {
+      try? file?.write(contentsOf: archive)
+      return try entry(try existing(path), id: id)
+    }
     try fetch(path, into: file)
     let listed = try existing(path)
     let received = RemoteItem(
@@ -320,6 +311,37 @@ actor FakeAgent: AgentSending {
   }
 }
 
+// MARK: Packages
+
+extension FakeAgent {
+  /// Stores the archive sent with a package request; a fetch of the package answers with it.
+  fileprivate func package(_ request: AgentRequest, from file: FileHandle?)
+    throws(TransportError) -> AgentResponse
+  {
+    switch request {
+    case .createPackage(_, let parent, let name):
+      let path = try path(parent).appending(name)
+      try requireFree(path, except: nil)
+      let item = RemoteItem(path: path, kind: .folder, size: 0, modified: epoch)
+      items[path] = item
+      packages[path] = (try? file?.readToEnd()) ?? Data()
+      let id = ItemID.random()
+      paths[id] = path
+      return .entry(try entry(item, id: id))
+    case .replacePackage(_, let id):
+      let path = try path(id)
+      let old = try existing(path)
+      let item = RemoteItem(
+        path: path, kind: .folder, size: 0, modified: old.modified.addingTimeInterval(60))
+      items[path] = item
+      packages[path] = (try? file?.readToEnd()) ?? Data()
+      return .entry(try entry(item, id: id))
+    default:
+      throw .unsupported("\(request)")
+    }
+  }
+}
+
 // MARK: Test controls
 
 extension FakeAgent {
@@ -351,17 +373,4 @@ extension FakeAgent {
   func park(until count: Int) {
     parkCreatesUntil = count
   }
-}
-
-func scratchDirectory() throws -> URL {
-  let dir = TestScratch.root.appending(
-    path: "FerryProviderCoreTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-  try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-  return dir
-}
-
-func writeContents(_ data: Data, in dir: URL) throws -> URL {
-  let url = dir.appending(path: "upload-\(UUID().uuidString)")
-  try data.write(to: url)
-  return url
 }

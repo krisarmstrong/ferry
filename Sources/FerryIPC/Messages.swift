@@ -153,7 +153,8 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   case removeAllDomains
   case item(domain: String, id: ItemID)
   case list(domain: String, folder: ItemID)
-  /// Downloads the file into the writable file sent with the request.
+  /// Downloads the file into the writable file sent with the request, or a document package as
+  /// a `PackageArchive`. Answered with the item as received.
   case fetch(domain: String, id: ItemID)
   /// Uploads the readable file sent with the request as `name` in `parent`, or makes a folder
   /// (sent with no file). `name` must be one path component.
@@ -168,6 +169,12 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// Deletes the item. A file the device changed since `base` is `.changedOnDevice`; a folder
   /// that holds anything is `.directoryNotEmpty` unless `recursive`.
   case delete(domain: String, id: ItemID, base: ContentVersion?, recursive: Bool)
+  /// Makes the document package `name` in `parent` from the `PackageArchive` sent with the
+  /// request, whole: it appears under its name only once complete.
+  case createPackage(domain: String, parent: ItemID, name: String)
+  /// Replaces the document package with the `PackageArchive` sent with the request, whole: the
+  /// old one is set aside until the new one has its name, and comes back if it cannot.
+  case replacePackage(domain: String, id: ItemID)
   /// The changes to the domain's items since `since`, an anchor from an earlier `.changes`
   /// response; `nil` asks only for the current anchor. Feeds FileProvider's working set.
   case changes(domain: String, since: Data?)

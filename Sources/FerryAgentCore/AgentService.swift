@@ -26,7 +26,7 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 public actor AgentService: AgentHandling {
   private let hub: DeviceHub
   private let domains: DomainController
-  private let transfers = TransferBoard()
+  let transfers = TransferBoard()
 
   public init(hub: DeviceHub, domains: DomainController) {
     self.hub = hub
@@ -51,23 +51,8 @@ public actor AgentService: AgentHandling {
   private func perform(
     _ request: AgentRequest, file: Int32?, progress: @escaping TransferProgressHandler
   ) async throws(TransportError) -> AgentResponse {
+    if let response = try await performAppRequest(request) { return response }
     switch (request, file) {
-    case (.status, _):
-      await hub.firstScan()
-      return .status(
-        StatusReport(
-          devices: await hub.devices(), provider: await domains.providerState(),
-          transfers: await transfers.list()))
-    case (.recheck(let id), _):
-      await hub.recheck(id)
-      return .done
-    case (.refresh(let id), _):
-      try await domains.refresh(id)
-      return .done
-    case (.eject(let id), _):
-      return .removed(preserved: await domains.eject(id))
-    case (.removeAllDomains, _):
-      return .removed(preserved: try await domains.removeAll())
     case (.item(let domain, let id), _):
       return .entry(try await item(id, in: domain))
     case (.list(let domain, let folder), _):
@@ -97,8 +82,39 @@ public actor AgentService: AgentHandling {
         expired: changes.expired)
     case (.workingSet(let domain, let page), _):
       return try await workingSet(page, in: domain)
-    case (.fetch, nil), (.replaceContents, nil):
+    case (.createPackage(let domain, let parent, let name), let file?):
+      return .entry(try await createPackage(from: file, as: name, in: parent, of: domain))
+    case (.replacePackage(let domain, let id), let file?):
+      return .entry(try await replacePackage(id, from: file, in: domain))
+    case (.fetch, nil), (.replaceContents, nil), (.createPackage, nil), (.replacePackage, nil),
+      (.status, _), (.recheck, _), (.refresh, _), (.eject, _), (.removeAllDomains, _):
       throw .io("bad request")
+    }
+  }
+
+  /// Answers the app's requests, which name devices rather than items; `nil` for any other.
+  private func performAppRequest(_ request: AgentRequest) async throws(TransportError)
+    -> AgentResponse?
+  {
+    switch request {
+    case .status:
+      await hub.firstScan()
+      return .status(
+        StatusReport(
+          devices: await hub.devices(), provider: await domains.providerState(),
+          transfers: await transfers.list()))
+    case .recheck(let id):
+      await hub.recheck(id)
+      return .done
+    case .refresh(let id):
+      try await domains.refresh(id)
+      return .done
+    case .eject(let id):
+      return .removed(preserved: await domains.eject(id))
+    case .removeAllDomains:
+      return .removed(preserved: try await domains.removeAll())
+    default:
+      return nil
     }
   }
 
@@ -123,7 +139,15 @@ public actor AgentService: AgentHandling {
   {
     try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: folder)
+      // A package's inside is part of the package, never items of its own.
+      if Packages.isPackageOrInside(path) {
+        await route.items.removedContents(of: path)
+        return []
+      }
       let items = try await route.writer.visibleList(path, in: route.storage)
+      for child in items where child.kind == .folder && Packages.isPackageOrInside(child.path) {
+        await route.items.removedContents(of: child.path)
+      }
       return await route.items.listed(path, children: items)
     }
   }
@@ -219,7 +243,7 @@ public actor AgentService: AgentHandling {
 
   /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
   /// `body` recorded a change, even one followed by a failure.
-  private func gated<T: Sendable>(
+  func gated<T: Sendable>(
     _ domain: String, _ body: (DomainController.Route) async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
     let route = try await domains.route(domain)
@@ -269,6 +293,7 @@ extension AgentService {
     try FileTransfer.requireRegular(target)
     let scratch = FileTransfer.scratchURL()
     defer { FileTransfer.remove(scratch) }
+    if let package = try await packageFetch(id, in: domain, into: target) { return package }
     let entry = try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
       let downloaded = try await transfers.track(

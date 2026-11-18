@@ -76,7 +76,7 @@ public enum ClientRole: Sendable, CaseIterable {
     case .status, .recheck, .refresh, .eject, .removeAllDomains:
       self == .app
     case .item, .list, .fetch, .create, .rename, .move, .replaceContents, .delete, .changes,
-      .workingSet:
+      .workingSet, .createPackage, .replacePackage:
       self == .provider
     }
   }

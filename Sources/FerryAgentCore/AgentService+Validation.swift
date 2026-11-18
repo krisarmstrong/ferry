@@ -30,7 +30,7 @@ extension AgentService {
   /// into.
   static func takesFile(_ request: AgentRequest) -> Bool {
     switch request {
-    case .fetch, .replaceContents: true
+    case .fetch, .replaceContents, .createPackage, .replacePackage: true
     case .create(_, _, _, let isFolder): !isFolder
     case .status, .recheck, .refresh, .eject, .removeAllDomains, .item, .list, .rename, .move,
       .delete, .changes, .workingSet:

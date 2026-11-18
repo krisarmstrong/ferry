@@ -26,6 +26,8 @@ private func tag(_ request: AgentRequest) -> Int {
   case .changes: 12
   case .workingSet: 13
   case .refresh: 14
+  case .createPackage: 15
+  case .replacePackage: 16
   }
 }
 
@@ -48,6 +50,10 @@ private func requests() -> [AgentRequest] {
   all.append(.delete(domain: domain, id: camera, base: version, recursive: true))
   all += [.changes(domain: domain, since: nil), .changes(domain: domain, since: Data([1, 2, 3]))]
   all += [.workingSet(domain: domain, page: nil), .workingSet(domain: domain, page: Data([7]))]
+  all += [
+    .createPackage(domain: domain, parent: camera, name: "Notes.rtfd"),
+    .replacePackage(domain: domain, id: photo),
+  ]
   return all
 }
 
@@ -143,7 +149,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...14))
+  #expect(Set(requests().map(tag)) == Set(0...16))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
