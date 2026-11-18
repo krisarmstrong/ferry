@@ -576,6 +576,17 @@ model picker.
   interface from its interfaces. A device that configures with no interfaces at all publishes
   no interface notification, so the watcher may not tick for it. Check what the LinkRunner
   presents in charge-only mode (owner, live) and, if needed, watch configuration changes.
+- **m10 Unstable domain identifiers (round 5).** A device without a serial is named by its USB
+  location, so its domain (and its items' identities) change when it moves port; a storage
+  whose description and volume label are both uninformative gets a positional key. Give such
+  devices and storages a stable identity, or say in the menu that Ferry cannot tell them apart.
+- **Cancel over the progress channel (round 5).** Round 5 added `AgentClientXPC` and request
+  identifiers for progress; carry a cancel the same way (see I6 above).
+- **Localize provider and agent messages (round 5).** The FileProvider errors Ferry builds
+  ("Symbolic links and aliases can't be copied to the device", the described errors) and the
+  conflict-copy suffix are English only; FerryUI is the only target with a string catalog.
+  The described errors also use Ferry's own error domain, which FileProvider's contract
+  restricts to Cocoa or FileProvider errors.
 
 ## Plan 3 rows (deferred from the final Plan 2 review)
 
@@ -587,3 +598,6 @@ model picker.
   seized, even by enumeration.
 - **Preview fixtures.** Wrap `PreviewClient` and the `#Preview` fixtures in `#if DEBUG` so they
   are not in release builds.
+- **m12 Homebrew libmtp linker warning (round 5, accepted).** Homebrew's libmtp is built for
+  macOS 27, so linking the macOS 26 targets warns. Plan 3's pinned, bundled libmtp build for
+  the deployment target removes it.
