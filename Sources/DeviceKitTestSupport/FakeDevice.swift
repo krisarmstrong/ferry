@@ -299,10 +299,28 @@ extension FakeDevice {
     suspensions[call] = .armed
   }
 
-  /// Returns once `call` is waiting on `suspendNext(_:)`.
+  /// Returns once `call` is waiting on `suspendNext(_:)`, or the calling task is cancelled, as
+  /// a test's time limit does, so a call that never comes fails the test instead of hanging it.
   public func waitUntilSuspended(_ call: SuspendableCall) async {
     if case .waiting = suspensions[call] { return }
-    await withCheckedContinuation { suspensions[call] = .observed($0) }
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        // Cancelled before registering: the handler's release has nothing to resume.
+        if Task.isCancelled {
+          continuation.resume()
+        } else {
+          suspensions[call] = .observed(continuation)
+        }
+      }
+    } onCancel: {
+      Task { await self.stopObserving(call) }
+    }
+  }
+
+  private func stopObserving(_ call: SuspendableCall) {
+    guard case .observed(let observer) = suspensions[call] else { return }
+    suspensions[call] = .armed
+    observer.resume()
   }
 
   public func resume(_ call: SuspendableCall) {

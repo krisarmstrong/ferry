@@ -59,7 +59,8 @@ private actor Sleepers {
   private(set) var count = 0
   private var sleeping: [Sleeper] = []
   private var cancelled: Set<Int> = []
-  private var watchers: [CheckedContinuation<Void, Never>] = []
+  private var watchers: [Int: CheckedContinuation<Void, Never>] = [:]
+  private var nextWatcher = 0
 
   func sleep(until deadline: ManualClock.Instant, now: ManualClock.Instant) async throws {
     count += 1
@@ -80,8 +81,8 @@ private actor Sleepers {
       return
     }
     sleeping.append(sleeper)
-    for watcher in watchers { watcher.resume() }
-    watchers = []
+    for watcher in watchers.values { watcher.resume() }
+    watchers = [:]
   }
 
   func wake(upTo now: ManualClock.Instant) {
@@ -90,9 +91,27 @@ private actor Sleepers {
     for sleeper in due { sleeper.continuation.resume() }
   }
 
+  /// Returns once something sleeps, or the calling task is cancelled, as a test's time limit
+  /// does, so a sleep that never comes fails the test instead of hanging it.
   func waitForSleeper() async {
-    guard sleeping.isEmpty else { return }
-    await withCheckedContinuation { watchers.append($0) }
+    guard sleeping.isEmpty, !Task.isCancelled else { return }
+    nextWatcher += 1
+    let id = nextWatcher
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if Task.isCancelled {
+          continuation.resume()
+        } else {
+          watchers[id] = continuation
+        }
+      }
+    } onCancel: {
+      Task { await self.stopWatching(id) }
+    }
+  }
+
+  private func stopWatching(_ id: Int) {
+    watchers.removeValue(forKey: id)?.resume()
   }
 
   private func cancel(_ id: Int) {
