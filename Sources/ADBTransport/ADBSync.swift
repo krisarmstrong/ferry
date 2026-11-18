@@ -36,7 +36,7 @@ public actor ADBSync {
   /// honest entry or request exceeds 4096.
   private static let nameLimit = 4096
   /// adbd refuses a request longer than this (`path too long`) and ends the session.
-  private static let requestLimit = 1024
+  static let requestLimit = 1024
   /// Same bound as a DATA chunk: adbd's FAIL messages are short text.
   private static let messageLimit = 64 * 1024
   /// A hostile peer could stream entries forever; no real folder on a phone comes near this.
@@ -93,7 +93,7 @@ public actor ADBSync {
     try await perform { () async throws(ADBError) in try await statLocked(path) }
   }
 
-  public func list(_ dir: String) async throws(ADBError) -> [Entry] {
+  public func list(_ dir: String) async throws(ADBError) -> Listing {
     try await perform { () async throws(ADBError) in try await listLocked(dir) }
   }
 
@@ -156,25 +156,33 @@ public actor ADBSync {
 
   public typealias Entry = (name: String, stat: ADBStat)
 
-  private func listLocked(_ dir: String) async throws(ADBError) -> [Entry] {
-    var entries = try await (listV2 ? listWithLis2(dir) : listWithList(dir))
-    guard !listV2, statV2 else { return entries }
+  /// A folder's entries, and how many names were left out because they are not UTF-8: they
+  /// cannot be addressed again, but they are there, so a caller deciding the folder's fate
+  /// (deleting it with what it holds) must know.
+  public struct Listing: Sendable {
+    public var entries: [Entry]
+    public let unreadableNames: Int
+  }
+
+  private func listLocked(_ dir: String) async throws(ADBError) -> Listing {
+    var listing = try await (listV2 ? listWithLis2(dir) : listWithList(dir))
+    guard !listV2, statV2 else { return listing }
     // LIST carries 32-bit sizes, so a regular file over 4 GB reads short; STA2 has the truth.
     let prefix = dir.hasSuffix("/") ? dir : dir + "/"
     var unaddressable = 0
-    for index in entries.indices where entries[index].stat.isRegular {
-      let path = prefix + entries[index].name
+    for index in listing.entries.indices where listing.entries[index].stat.isRegular {
+      let path = prefix + listing.entries[index].name
       // adbd refuses a request this long, so the entry keeps its 32-bit LIST size.
       guard path.utf8.count <= Self.requestLimit else {
         unaddressable += 1
         continue
       }
-      if let exact = try await statLocked(path) { entries[index].stat = exact }
+      if let exact = try await statLocked(path) { listing.entries[index].stat = exact }
     }
     if unaddressable > 0 {
       Self.log.info("listing kept the 32-bit size of \(unaddressable) entries with paths too long")
     }
-    return entries
+    return listing
   }
 
   private func receiveLocked(
@@ -305,7 +313,7 @@ extension ADBSync {
         timeIntervalSince1970: TimeInterval(Int64(bitPattern: ADBWire.u64(bytes[52..<60])))))
   }
 
-  private func listWithLis2(_ dir: String) async throws(ADBError) -> [Entry] {
+  private func listWithLis2(_ dir: String) async throws(ADBError) -> Listing {
     try await request("LIS2", dir)
     var entries: [Entry] = []
     var unnamed = 0
@@ -320,7 +328,7 @@ extension ADBSync {
       case "DONE":
         _ = try await stream.read(exactly: Self.stat2Length + 4)
         Self.logUnnamed(unnamed)
-        return entries
+        return Listing(entries: entries, unreadableNames: unnamed)
       case "FAIL":
         throw try await failure(Int(ADBWire.u32(try await stream.read(exactly: 4))))
       default:
@@ -329,7 +337,7 @@ extension ADBSync {
     }
   }
 
-  private func listWithList(_ dir: String) async throws(ADBError) -> [Entry] {
+  private func listWithList(_ dir: String) async throws(ADBError) -> Listing {
     try await request("LIST", dir)
     var entries: [Entry] = []
     var unnamed = 0
@@ -345,7 +353,7 @@ extension ADBSync {
       case "DONE":
         _ = try await stream.read(exactly: 16)
         Self.logUnnamed(unnamed)
-        return entries
+        return Listing(entries: entries, unreadableNames: unnamed)
       case "FAIL":
         throw try await failure(Int(ADBWire.u32(try await stream.read(exactly: 4))))
       default:

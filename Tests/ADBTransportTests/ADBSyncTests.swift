@@ -87,7 +87,7 @@ struct ADBSyncTests {
           + Peer.listDone(extended: true))
     }
     defer { server.stop() }
-    let entries = try await sync.list("/sdcard")
+    let entries = try await sync.list("/sdcard").entries
     #expect(entries.map(\.name) == ["big.mkv", "Music \u{1F3B5}"])
     #expect(entries[0].stat.size == Self.fiveGB)
     #expect(entries[1].stat.isDirectory)
@@ -110,7 +110,7 @@ struct ADBSyncTests {
       #expect(next.id == "QUIT")
     }
     defer { server.stop() }
-    let entries = try await sync.list("/sdcard/DCIM/")
+    let entries = try await sync.list("/sdcard/DCIM/").entries
     #expect(entries.map(\.name) == ["big.mkv", "sub"])
     #expect(entries[0].stat.size == Self.fiveGB)
     #expect(entries[1].stat.size == 4096)
@@ -123,6 +123,8 @@ struct ADBSyncTests {
       try await peer.raw(Peer.fail("Permission denied"))
     }
     defer { server.stop() }
-    await #expect(throws: ADBError.failed("Permission denied")) { _ = try await sync.list("/x") }
+    await #expect(throws: ADBError.failed("Permission denied")) {
+      _ = try await sync.list("/x").entries
+    }
   }
 }

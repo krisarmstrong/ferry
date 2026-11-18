@@ -1,0 +1,236 @@
+import DeviceKit
+import Foundation
+import os
+
+/// A `DeviceSession` over adb: file transfer and metadata on the sync service, rename, move,
+/// folder creation and delete as toybox commands in the device's shell.
+///
+/// Storage-relative paths live under each storage's device folder (see `ADBStorages`). Public
+/// operations run one at a time through `gate`, so a check and the action it guards are never
+/// split by another operation; they must not call each other, as the gate is not reentrant. One
+/// sync connection is kept open between operations and replaced after any error, since a failed
+/// request ends it. Once the device is gone the session fails every later call at once.
+///
+/// adbd's `SEND` replaces an existing file and creates missing folders, and toybox `mv` moves
+/// onto an existing folder by going inside it: every write is checked against a fresh listing
+/// first, under the gate, and `mv` runs with `-n` and is confirmed afterwards.
+public actor ADBSession: DeviceSession {
+  static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBSession")
+
+  public nonisolated let info: DeviceInfo
+  public nonisolated let partials: PartialRegistry
+  let host: ADBHost
+  /// The adb server's name for the device (`host:port` over Wi-Fi), which need not be
+  /// `info.id.serial` (`ro.serialno`).
+  let serial: String
+  private let features: Set<String>
+  private let gate = OperationGate()
+  private var sync: ADBSync?
+  /// The storage keys the device had when they were last read.
+  private var knownStorages: Set<String> = []
+  private var disconnected = false
+
+  public init(
+    host: ADBHost, serial: String, info: DeviceInfo, features: Set<String>,
+    partials: PartialRegistry = PartialRegistry()
+  ) {
+    self.host = host
+    self.serial = serial
+    self.info = info
+    self.features = features
+    self.partials = partials
+  }
+
+  /// `.copy` stands for the device's own `cp`; there is no partial read over sync.
+  public func capabilities() async -> DeviceCapabilities {
+    await gate.run { () async -> DeviceCapabilities in disconnected ? [] : [.move, .copy] }
+  }
+
+  public func storages() async throws(TransportError) -> [StorageInfo] {
+    try await operation { () throws(TransportError) in
+      let storages = try await refreshStorages()
+      guard !storages.isEmpty else { throw .deviceLocked }
+      return storages
+    }
+  }
+
+  public func close() async {
+    await gate.run { () async in
+      disconnected = true
+      await dropSync()
+    }
+  }
+
+  // MARK: Plumbing
+
+  /// Runs `body` as one gated operation. A `.deviceDisconnected` from it ends the session.
+  func operation<T>(_ body: () async throws(TransportError) -> T)
+    async throws(TransportError) -> T
+  {
+    try await gate.run { () async throws(TransportError) -> T in
+      guard !disconnected else { throw .deviceDisconnected }
+      do throws(TransportError) {
+        return try await body()
+      } catch {
+        if error == .deviceDisconnected {
+          disconnected = true
+          await dropSync()
+        }
+        throw error
+      }
+    }
+  }
+
+  private func dropSync() async {
+    let open = sync
+    sync = nil
+    await open?.quit()
+  }
+
+  private func refreshStorages() async throws(TransportError) -> [StorageInfo] {
+    let storages = try await discoverStorages()
+    knownStorages = Set(storages.map(\.id.key))
+    return storages
+  }
+
+  /// The device folder of `storage`, reading the device's storages once if the key is unknown.
+  func root(for storage: StorageID) async throws(TransportError) -> String {
+    guard storage.device == info.id, let root = ADBStorages.root(forKey: storage.key) else {
+      throw .storageNotFound(storage.key)
+    }
+    if !knownStorages.contains(storage.key) { _ = try await refreshStorages() }
+    guard knownStorages.contains(storage.key) else { throw .storageNotFound(storage.key) }
+    return root
+  }
+
+  static func devicePath(_ path: RemotePath, under root: String) -> String {
+    path == .root ? root : root + path.description
+  }
+
+  /// Runs `body` on the open sync connection, opening one if needed. A request that fails for
+  /// any reason but a refused argument has ended the connection, so it is let go.
+  func syncing<T>(_ body: (ADBSync) async throws(ADBError) -> T) async throws(ADBError) -> T {
+    let open: ADBSync
+    if let sync {
+      open = sync
+    } else {
+      open = ADBSync(stream: try await host.connect(serial, service: "sync:"), features: features)
+      sync = open
+    }
+    do throws(ADBError) {
+      return try await body(open)
+    } catch {
+      if case .invalidArgument = error {} else { sync = nil }
+      throw error
+    }
+  }
+
+  /// Runs a toybox command; a non-zero status is returned, not thrown.
+  func run(_ program: String, _ args: [String], _ step: Step) async throws(TransportError)
+    -> ADBShellResult
+  {
+    try await adb(step) { () async throws(ADBError) in
+      try await host.run(serial: serial, command: ADBShell.command(program, args))
+    }
+  }
+
+  /// Runs a toybox command and turns a non-zero status into the error its message names.
+  func shell(_ program: String, _ args: [String], _ step: Step) async throws(TransportError) {
+    let result = try await run(program, args, step)
+    guard result.status != 0 else { return }
+    let message = [result.stderr, result.stdout].map { String(bytes: $0, encoding: .utf8) ?? "" }
+      .joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    throw await deviceFailure(message, step)
+  }
+}
+
+// MARK: Errors
+
+extension ADBSession {
+  /// What an operation was doing when it failed, for the error it reports: `path` is what it
+  /// acted on, `target` what it was creating.
+  struct Step {
+    let name: String
+    let path: RemotePath
+    let target: RemotePath?
+
+    init(_ name: String, _ path: RemotePath, target: RemotePath? = nil) {
+      self.name = name
+      self.path = path
+      self.target = target
+    }
+  }
+
+  func adb<T>(_ step: Step, _ body: () async throws(ADBError) -> T) async throws(TransportError)
+    -> T
+  {
+    do throws(ADBError) {
+      return try await body()
+    } catch {
+      throw await failure(error, step)
+    }
+  }
+
+  /// How an `ADBError` reaches the caller:
+  ///
+  /// | `ADBError` | `TransportError` |
+  /// |---|---|
+  /// | `deviceGone`, `serverUnavailable`, `adbNotInstalled` | `.deviceDisconnected` |
+  /// | `failed("device offline…")`, `failed("device unauthorized…")` | `.deviceDisconnected` |
+  /// | `cancelled` (the progress handler stopped a transfer) | `.cancelled`, as MTPSession's |
+  /// | `invalidArgument` (a path the sync service cannot carry) | `.invalidName(path)` |
+  /// | `failed(message)`, from the device | by its `strerror` text (`fromDevice`) |
+  /// | `connectionClosed`, `protocolViolation` | `.io` |
+  ///
+  /// Any `.io` is a lost device instead when the server no longer knows the device.
+  func failure(_ error: ADBError, _ step: Step) async -> TransportError {
+    switch error {
+    case .deviceGone, .serverUnavailable, .adbNotInstalled:
+      return .deviceDisconnected
+    case .cancelled:
+      return .cancelled
+    case .invalidArgument:
+      return .invalidName(step.path.description)
+    case .failed(let message)
+    where message.hasPrefix("device offline") || message.hasPrefix("device unauthorized"):
+      return .deviceDisconnected
+    case .failed(let message):
+      return await deviceFailure(message, step)
+    case .connectionClosed, .protocolViolation:
+      return await reachable() ? .io("\(step.name) failed: \(error)") : .deviceDisconnected
+    }
+  }
+
+  /// A message from the device (a sync `FAIL` or a command's output) as a `TransportError`.
+  func deviceFailure(_ message: String, _ step: Step) async -> TransportError {
+    let error = TransportError.fromDevice(message, step)
+    if case .io = error, await !reachable() { return .deviceDisconnected }
+    return error
+  }
+
+  private func reachable() async -> Bool {
+    do {
+      _ = try await host.features(serial)
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
+extension TransportError {
+  /// Classifies a device's message by the `strerror` text toybox and adbd end it with.
+  static func fromDevice(_ message: String, _ step: ADBSession.Step) -> TransportError {
+    if message.contains("No such file or directory") || message.contains("Not a directory") {
+      return .notFound(step.path)
+    }
+    if message.contains("File exists") { return .alreadyExists(step.target ?? step.path) }
+    if message.contains("Is a directory") {
+      return step.target.map(TransportError.alreadyExists) ?? .notFound(step.path)
+    }
+    if message.contains("Directory not empty") { return .directoryNotEmpty(step.path) }
+    // Neither figure is known; the caller fills in what it knows, as with MTP.
+    if message.contains("No space left on device") { return .insufficientSpace(needed: 0, free: 0) }
+    return .io("\(step.name) failed: \(message)")
+  }
+}

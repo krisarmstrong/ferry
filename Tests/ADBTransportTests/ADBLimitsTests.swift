@@ -145,7 +145,7 @@ struct ADBLimitsTests {
     }
     defer { server.stop() }
     try await expectFailureOrViolation(length: length, hungUp: hungUp) {
-      _ = try await sync.list("/x")
+      _ = try await sync.list("/x").entries
     }
   }
 
@@ -228,11 +228,11 @@ struct ADBLimitsTests {
     }
     defer { server.stop() }
     if length <= Self.nameLimit {
-      let entries = try await sync.list("/x")
+      let entries = try await sync.list("/x").entries
       #expect(entries.map(\.name) == [name])
     } else {
       await #expect {
-        _ = try await sync.list("/x")
+        _ = try await sync.list("/x").entries
       } throws: {
         isViolation($0)
       }

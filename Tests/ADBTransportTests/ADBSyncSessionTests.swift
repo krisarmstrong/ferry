@@ -97,7 +97,7 @@ struct ADBSyncSessionTests {
     for _ in 0..<100 where await !hungUp.value { try await Task.sleep(for: .milliseconds(20)) }
     #expect(await hungUp.value)
     await #expect(throws: Self.closed) { _ = try await sync.stat("/y") }
-    await #expect(throws: Self.closed) { _ = try await sync.list("/y") }
+    await #expect(throws: Self.closed) { _ = try await sync.list("/y").entries }
   }
 
   @Test func afterAnUnreadableReplyIdTheConnectionIsClosedAndDead() async throws {
@@ -174,9 +174,9 @@ struct ADBSyncSessionTests {
     let stream = try await host.connect("S", service: "sync:")
     let sync = ADBSync(stream: stream, features: [], entryLimit: limit)
     if extra == 0 {
-      #expect(try await sync.list("/x").count == limit)
+      #expect(try await sync.list("/x").entries.count == limit)
     } else {
-      await #expect { _ = try await sync.list("/x") } throws: { isViolation($0) }
+      await #expect { _ = try await sync.list("/x").entries } throws: { isViolation($0) }
     }
   }
 
@@ -245,7 +245,7 @@ struct ADBSyncSessionTests {
       #expect(next.id == "QUIT")
     }
     defer { server.stop() }
-    let entries = try await sync.list(directory)
+    let entries = try await sync.list(directory).entries
     #expect(entries.map(\.name) == [longName, "short.bin"])
     #expect(entries[0].stat.size == 123)
     #expect(entries[1].stat.size == 5 * 1024 * 1024 * 1024)
