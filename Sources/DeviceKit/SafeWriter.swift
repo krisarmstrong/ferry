@@ -47,8 +47,6 @@ public struct SafeWriter: Sendable {
     return String(tail.dropFirst())
   }
 
-  /// The longest name, in UTF-8 bytes, Android's storage takes.
-
   private static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "SafeWriter")
 
