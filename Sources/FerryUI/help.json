@@ -78,7 +78,7 @@
         "Double-click a file to open it. Ferry copies it to the Mac when you open it.",
         "Drag files or folders between the device and the Mac to copy them. A half-copied file never appears under its real name.",
         "Finder shows how far each copy has got, and the Ferry menu lists copies in progress under their device.",
-        "Packages, such as .rtfd documents, copy as folders. Symbolic links and aliases can't be copied to the device; Finder shows an error for them, and links inside an app or other bundle are left out.",
+        "Packages, such as .rtfd documents, copy, open and save whole. Symbolic links and aliases, and apps and other code bundles, can't be copied to the device; Finder shows an error for them.",
         "To see files added on the device while it is connected, choose **Refresh** in the Ferry menu.",
         "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it."
       ],
@@ -223,6 +223,12 @@
           "paragraphs": [
             "If the menu says **Allow Ferry's helper** or **macOS can't find Ferry's helper**, click **Open System Settings** and turn on Ferry under Allow in the Background.",
             "Otherwise, quit Ferry from the menu and open it again from Applications."
+          ]
+        },
+        {
+          "title": "Apps and code bundles can't be copied to the device",
+          "paragraphs": [
+            "Ferry does not copy apps, plug-ins, frameworks or extensions to a device. Copy the documents you need instead."
           ]
         },
         {

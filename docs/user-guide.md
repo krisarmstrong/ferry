@@ -120,7 +120,8 @@ whole, including ones made on the device. On the device a package is a folder. A
 deeper than 32 folders, with more than 100,000 items or more than 8 GB is refused with "This
 package is too large or too deep to copy between the device and this Mac." Symbolic links and aliases can't be
 copied to the device: Finder shows "Symbolic links and aliases can't be copied to the device"
-for them, and links inside an app or other bundle are left out of its copy.
+for them. Apps and other code bundles (plug-ins, frameworks, extensions) are not copied to the
+device either: Finder shows "Apps and code bundles can't be copied to the device."
 
 ### A file changed on both sides
 
@@ -257,6 +258,11 @@ turn on **Ferry** under **Allow in the Background**.
 
 If the menu says "Ferry's helper is not responding. Quit Ferry and open it again.", quit Ferry
 from the menu and open it again from Applications.
+
+### "Apps and code bundles can't be copied to the device"
+
+Ferry does not copy apps, plug-ins, frameworks or extensions to a device: a test unit has no use
+for them. Copy the documents you need instead.
 
 ### An app or script from the device does not open at once
 

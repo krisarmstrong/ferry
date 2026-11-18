@@ -26,7 +26,7 @@ public actor ProviderBackend {
   let domain: String
   private let client: any AgentSending
 
-  /// How much of a code bundle's tree is copied file by file (see `uploadTree`).
+  /// How much of a document package's tree is sent (see `sendingPackage`).
   let treeBudget: TreeBudget
 
   public init(domain: String, client: any AgentSending, treeBudget: TreeBudget = .standard) {
@@ -70,10 +70,10 @@ public actor ProviderBackend {
     return (try Self.unpack(url, in: dir, quarantine: item.quarantine), item)
   }
 
-  /// Makes a folder (a package too: FileProvider then creates its contents inside it), or
-  /// uploads `contents` as a file. Symbolic links and aliases have nothing MTP can store, so
-  /// they fail with `.cannotSynchronize`, which FileProvider takes as final until the item
-  /// changes on the Mac, with a message saying why.
+  /// Makes a folder, sends a document package whole, or uploads `contents` as a file.
+  /// Symbolic links and aliases have nothing MTP can store, and apps and other code bundles
+  /// have no use on a unit, so they fail with `.cannotSynchronize`, which FileProvider takes as
+  /// final until the item changes on the Mac, with a message saying why.
   public func create(
     _ template: ItemTemplate, contents: URL?, progress: TransferProgressHandler? = nil
   ) async throws -> ProviderItem {
@@ -83,6 +83,8 @@ public actor ProviderBackend {
     switch template.kind {
     case .link:
       throw Self.linkRefused
+    case .code:
+      throw Self.codeRefused
     case .package:
       guard let contents else { throw CocoaError(.featureUnsupported) }
       return ProviderItem(
@@ -90,12 +92,7 @@ public actor ProviderBackend {
           contents,
           as: .createPackage(domain: domain, parent: template.parent, name: template.filename)))
     case .folder:
-      // FileProvider hands over a code bundle as one item, its folder as `contents`; a plain
-      // folder comes with none, its children each created on their own.
-      if let contents { try Self.requireWithinBudget(contents, treeBudget) }
-      let folder = try await entry(request)
-      if let contents { try await uploadTree(contents, into: folder.id) }
-      return ProviderItem(folder)
+      return ProviderItem(try await entry(request))
     case .file:
       break
     }
@@ -166,11 +163,6 @@ public actor ProviderBackend {
     if changed.contains(.contents), let contents, template.kind == .package {
       latest = try await sendingPackage(
         contents, as: .replacePackage(domain: domain, id: itemID))
-    } else if changed.contains(.contents), let contents, template.kind == .folder {
-      // A package edited on the Mac: its folder is the new contents.
-      try Self.requireWithinBudget(contents, treeBudget)
-      try await syncTree(contents, into: itemID)
-      latest = try await entry(.item(domain: domain, id: itemID))
     } else if changed.contains(.contents), let contents {
       let handle = try FileHandle(forReadingFrom: contents)
       defer { try? handle.close() }
@@ -282,6 +274,12 @@ public actor ProviderBackend {
       throw ErrorMapping.fileProviderError(error)
     }
   }
+
+  /// Apps and other code bundles: no use on a unit, and one item to FileProvider where the
+  /// device would hold a folder. `.cannotSynchronize` is final until the item changes.
+  static let codeRefused = NSFileProviderError(
+    .cannotSynchronize,
+    userInfo: [NSLocalizedDescriptionKey: "Apps and code bundles can’t be copied to the device."])
 
   static let linkRefused = NSFileProviderError(
     .cannotSynchronize,

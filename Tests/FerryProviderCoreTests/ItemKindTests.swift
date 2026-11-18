@@ -14,8 +14,11 @@ struct ItemKindTests {
     (UTType.folder, ItemTemplate.Kind.folder),
     (UTType("com.apple.rtfd")!, .package),
     (UTType.package, .package),
-    (UTType.applicationBundle, .folder),
-    (UTType.bundle, .folder),
+    (UTType.applicationBundle, .code),
+    (UTType.bundle, .code),
+    (UTType.pluginBundle, .code),
+    (UTType.framework, .code),
+    (UTType.applicationExtension, .code),
     (UTType.symbolicLink, .link),
     (UTType.aliasFile, .link),
     (UTType.data, .file),
@@ -108,91 +111,31 @@ struct ItemKindTests {
     #expect(try FileManager.default.contentsOfDirectory(atPath: fetchDir.path).count == 1)
   }
 
-  /// A code bundle deeper than the budget is refused, with the description Finder shows.
-  @Test func aBundlePastTheBudgetIsRefused() async throws {
+  /// Apps and other code bundles have no use on a unit, and FileProvider treats them as one
+  /// item where the device would show a folder: they are refused for good, with a message.
+  @Test(arguments: [
+    ("Ferry.app", UTType.applicationBundle), ("Plugin.bundle", UTType.bundle),
+    ("Viewer.plugin", UTType.pluginBundle), ("Share.appex", UTType.applicationExtension),
+  ])
+  func aCodeBundleIsRefusedForGoodWithAMessage(name: String, type: UTType) async throws {
     let agent = FakeAgent()
-    let backend = ProviderBackend(
-      domain: domain, client: agent,
-      treeBudget: TreeBudget(maxDepth: 0, maxEntries: 100, maxBytes: 1 << 20))
+    let backend = ProviderBackend(domain: domain, client: agent)
     let dir = try scratchDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
-    let bundle = try localPackage("rtf", in: dir, named: "Plugin.bundle")
+    let bundle = try localPackage("code", in: dir, named: name)
 
     do {
       _ = try await backend.create(
-        try ItemTemplate(
-          Template(parent: .rootContainer, filename: "Plugin.bundle", contentType: .bundle)),
+        try ItemTemplate(Template(parent: .rootContainer, filename: name, contentType: type)),
         contents: bundle)
       Issue.record("the bundle was copied")
     } catch {
       let error = error as NSError
-      #expect(error.domain == NSCocoaErrorDomain)
-      #expect(error.code == CocoaError.Code.fileReadTooLarge.rawValue)
+      #expect(error.domain == NSFileProviderErrorDomain)
+      #expect(error.code == NSFileProviderError.Code.cannotSynchronize.rawValue)
+      #expect(error.localizedDescription.contains("Apps and code bundles"))
     }
-  }
-
-  /// A code bundle (shown as a folder, see `ProviderItem.contentType`) comes with its folder as
-  /// the contents: everything in it goes to the device, links aside.
-  @Test func aBundlesContentsAreCopiedIntoItsFolder() async throws {
-    let agent = FakeAgent()
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let dir = try scratchDirectory()
-    defer { try? FileManager.default.removeItem(at: dir) }
-    let package = try localPackage("rtf", in: dir, named: "Plugin.bundle")
-    try FileManager.default.createSymbolicLink(
-      at: package.appending(path: "link"), withDestinationURL: package.appending(path: "TXT.rtf"))
-    let template = try ItemTemplate(
-      Template(parent: .rootContainer, filename: "Plugin.bundle", contentType: .bundle))
-
-    _ = try await backend.create(template, contents: package)
-
-    #expect(await agent.contents[try path("/Plugin.bundle/TXT.rtf")] == Data("rtf".utf8))
-    #expect(await agent.contents[try path("/Plugin.bundle/Media/a.png")] == Data("png".utf8))
-    #expect(await agent.items[try path("/Plugin.bundle/link")] == nil)
-  }
-
-  /// Editing a code bundle already on the device: FileProvider sends the package with its folder
-  /// as the new contents. The device folder is brought in line: changed and new files go up,
-  /// files no longer in the package go.
-  @Test func aBundleEditUpdatesTheDeviceFolder() async throws {
-    let agent = FakeAgent(
-      [
-        try folder("/Plugin.bundle"), try file("/Plugin.bundle/TXT.rtf", size: 3),
-        try file("/Plugin.bundle/old.png", size: 3), try file("/Plugin.bundle/same.png", size: 4),
-      ],
-      contents: [
-        try path("/Plugin.bundle/TXT.rtf"): Data("old".utf8),
-        try path("/Plugin.bundle/old.png"): Data("old".utf8),
-        try path("/Plugin.bundle/same.png"): Data("same".utf8),
-      ])
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let dir = try scratchDirectory()
-    defer { try? FileManager.default.removeItem(at: dir) }
-    let package = dir.appending(path: "Plugin.bundle", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(
-      at: package.appending(path: "Media"), withIntermediateDirectories: true)
-    try Data("edited".utf8).write(to: package.appending(path: "TXT.rtf"))
-    try Data("png".utf8).write(to: package.appending(path: "Media/a.png"))
-    let same = package.appending(path: "same.png")
-    try Data("same".utf8).write(to: same)
-    try FileManager.default.setAttributes(
-      [.modificationDate: epoch.addingTimeInterval(-60)], ofItemAtPath: same.path)
-    let id = try await agent.identifier(try path("/Plugin.bundle"))
-
-    let item = try await backend.modify(
-      id, to: ItemTemplate(parent: .root, filename: "Plugin.bundle", kind: .folder),
-      changed: .contents, contents: package)
-
-    #expect(item.itemIdentifier == id)
-    #expect(await agent.contents[try path("/Plugin.bundle/TXT.rtf")] == Data("edited".utf8))
-    #expect(await agent.contents[try path("/Plugin.bundle/Media/a.png")] == Data("png".utf8))
-    #expect(await agent.items[try path("/Plugin.bundle/old.png")] == nil)
-    // Unchanged since the device's copy was made: not sent again.
-    let replaced = await agent.requests.filter {
-      if case .replaceContents = $0 { return true }
-      return false
-    }
-    #expect(replaced.count == 1)
+    #expect(await agent.requests.isEmpty)
   }
 
   @Test(arguments: [UTType.symbolicLink, UTType.aliasFile])

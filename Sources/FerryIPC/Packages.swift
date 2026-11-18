@@ -20,7 +20,13 @@ public enum Packages {
 
   /// Whether `type` is a package that holds a document rather than code.
   public static func isDocumentPackage(_ type: UTType) -> Bool {
-    type.conforms(to: .package) && !codeTypes.contains(where: type.conforms(to:))
+    type.conforms(to: .package) && !isCode(type)
+  }
+
+  /// Whether `type` is an app, a bundle, a plug-in, a framework, an extension or anything else
+  /// that runs.
+  public static func isCode(_ type: UTType) -> Bool {
+    codeTypes.contains(where: type.conforms(to:))
   }
 
   /// Whether `path` is a document package or lies inside one.
