@@ -88,3 +88,25 @@ with a note.
 ### Reconnect
 
 - Unplug and replug. Storage keys and paths are the same as before.
+
+## Finder (Plan 2)
+
+### Results — LinkRunner-100G, Ferry.app (f5ddc04), macOS 27.2, 2026-11-17
+
+| Check | Result |
+|---|---|
+| First run: "Turn on Ferry in Finder" row; enabling under File Providers | pass (owner) |
+| Device appears in Finder (sidebar label "Ferry" — one domain shows the provider name) | pass |
+| Sandboxed extension reaches the agent over XPC | pass |
+| Browse root and `/Download` | pass |
+| Copy 1 GB file to device (~22 s), evict ("Remove"), read back from device (18 s), SHA-256 match | pass |
+| Copy a folder of 50 files to the device | pass (50/50) |
+| New folder, rename, case-only rename (`c.txt` → `C.txt` via rename(2)), move between folders | pass |
+| Delete folders with contents | pass |
+| Menu, Settings, setup guide window | pass (owner) |
+| Menu polling stops when the menu closes | pass |
+| No "Move to Trash" (Ferry has no trash); stale pre-fix domain re-added in place | pass |
+| Unplug mid-copy; replug returns the same location | not run (needs the cable pulled by hand) |
+| Eject; Remove Ferry | not run (menu-bar icon not reachable by automation; owner step) |
+| Phone set to file transfer off ⇒ menu shows "Not sharing files" and the guide | not run live (unit-tested) |
+
