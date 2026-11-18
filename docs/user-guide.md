@@ -115,8 +115,10 @@ their device with a percentage. Ferry writes each file under a hidden temporary 
 renames it only when the copy is complete, so a half-copied file never appears under its real
 name.
 
-Packages, such as `.rtfd` documents, copy as folders, and editing one on the device updates
-its folder there. Symbolic links and aliases can't be
+Packages, such as `.rtfd` documents, are one item, as on the Mac: they copy, open and save
+whole, including ones made on the device. On the device a package is a folder. A package
+deeper than 32 folders, with more than 100,000 items or more than 8 GB is refused with "This
+package is too large or too deep to copy between the device and this Mac." Symbolic links and aliases can't be
 copied to the device: Finder shows "Symbolic links and aliases can't be copied to the device"
 for them, and links inside an app or other bundle are left out of its copy.
 
