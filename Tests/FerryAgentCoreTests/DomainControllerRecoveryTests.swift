@@ -130,14 +130,13 @@ extension DomainControllerTests {
     #expect(devices.map(\.id) == [device.info.id])
   }
 
-  /// An ejected unit that resets on close comes back as a new enumeration: its domain must not
-  /// come back with it.
-  @Test func ejectedDomainIsNotAddedAgainAfterTheDeviceResets() async throws {
+  /// An ejected unit stays listed (the transport keeps reporting it through its resets), but its
+  /// domain does not come back with later scans.
+  @Test func ejectedDomainIsNotAddedAgainByLaterScans() async throws {
     let device = await makeDevice("A")
     let harness = try AgentHarness(devices: [device])
     defer { harness.finish() }
     _ = await harness.manager.waitForCalls(1)
-    await harness.transport.resetOnClose(device.info.id)
     #expect(
       await harness.service.handle(.eject(device.info.id), file: nil) == .removed(preserved: []))
     harness.tick()

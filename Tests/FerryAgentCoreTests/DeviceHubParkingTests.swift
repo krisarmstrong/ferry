@@ -77,20 +77,18 @@ extension DeviceHubTests {
     #expect(await harness.transport.openCount(of: second.info.id) == 1)
   }
 
-  /// Closing an ejected Android unit resets it; the transport sees a new enumeration it does not
-  /// know was ejected. The hub still does not open it, until Try Again.
-  @Test func ejectSticksAcrossTheDevicesOwnResetUntilTryAgain() async {
+  /// Closing an ejected Android unit resets it: gone for a moment, then back. The transport
+  /// keeps reporting it as ejected, and it is not opened until Mount.
+  @Test func ejectSticksAcrossTheDevicesOwnResetUntilMount() async {
     let device = await makeHubDevice("A")
     var harness = HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
-    await harness.transport.resetOnClose(device.info.id)
     await harness.hub.eject(device.info.id)
     #expect(await harness.next() == .changed(AttachedDevice(info: device.info, state: .ejected)))
-    // Gone for a moment (still settling), then back as an enumeration the transport offers.
-    harness.tick()
-    #expect(await harness.barrier()?.isAttached(serial: "BARRIER") == true)
-    harness.tick()
+    for _ in 0..<2 {
+      harness.tick()
+    }
     let second = await makeHubDevice("SECOND")
     await harness.transport.attach(second)
     harness.tick()
@@ -99,6 +97,23 @@ extension DeviceHubTests {
     #expect(await harness.transport.openCount(of: device.info.id) == 1)
 
     await harness.hub.recheck(device.info.id)
+    #expect(await harness.next() == .changed(hubReady(device)))
+  }
+
+  /// The hub follows the transport: once the transport offers an ejected device as usable (it
+  /// counted as unplugged, or turned up where the transport opened it), the hub mounts it rather
+  /// than showing "Ejected" for a device it could hold.
+  @Test func ejectedDeviceTheTransportOffersAgainIsMounted() async {
+    let device = await makeHubDevice("A")
+    var harness = HubHarness(devices: [device])
+    defer { harness.finish() }
+    #expect(await harness.next() == .attached(hubReady(device)))
+    await harness.hub.eject(device.info.id)
+    #expect(await harness.next() == .changed(AttachedDevice(info: device.info, state: .ejected)))
+
+    await harness.transport.forgetEjection(device.info.id)
+    harness.tick()
+
     #expect(await harness.next() == .changed(hubReady(device)))
   }
 
@@ -156,19 +171,18 @@ extension DeviceHubTests {
   /// An ejected device's port is empty: the transport asks for another scan once that would count
   /// as an unplug, and the hub scans then without waiting for a USB event.
   @Test func hubScansAgainWhenTheTransportAsks() async {
-    let harness = HubHarness()
+    var harness = HubHarness()
     defer { harness.finish() }
     await harness.transport.setRescanAfter(.seconds(3))
     harness.tick()
     await harness.clock.waitForSleeper()
-    let scans = await harness.transport.scanCount
     await harness.transport.setRescanAfter(nil)
+    // Plugged in with no USB tick: only the rescan can find it.
+    let device = await makeHubDevice("A")
+    await harness.transport.attach(device)
 
     await harness.clock.advance(by: .seconds(3))
 
-    for _ in 0..<1_000 where await harness.transport.scanCount == scans {
-      try? await Task.sleep(for: .milliseconds(1))
-    }
-    #expect(await harness.transport.scanCount > scans)
+    #expect(await harness.next() == .attached(hubReady(device)))
   }
 }

@@ -48,11 +48,14 @@ public actor DeviceHub {
   private let transport: any DeviceTransport
   let clock: any Clock<Duration>
   private var entries: [DeviceID: Entry] = [:]
-  /// Devices the user ejected. Closing one can reset it into a new enumeration that the
-  /// transport may offer as usable again, so the hub never opens these until the user mounts
-  /// it again (`recheck`) or it is unplugged: no list of a scan names it, which the transport
-  /// ensures only once the device has been gone long enough to count as unplugged.
+  /// Devices the user ejected, never opened while listed. The transport is the authority: it
+  /// reports them in `DeviceScan.ejected`, through the resets their close causes, until they
+  /// count as unplugged; once it offers one as usable instead, the hub drops it from here. The
+  /// hub's own entry covers the moment of the eject, before the transport has been told, and is
+  /// cleared by the user's Mount (`recheck`) or when no list of a scan names the device.
   private var ejected: Set<DeviceID> = []
+  /// Devices whose eject is under way: ejected before the transport has been told.
+  private var ejecting: Set<DeviceID> = []
   /// The scan the transport asked for, without waiting for a USB event.
   var rescan: Task<Void, Never>?
   /// Devices whose storages or open failed, with the wait before the next try. Each close of a
@@ -186,6 +189,8 @@ public actor DeviceHub {
   public func eject(_ id: DeviceID) async {
     guard case .held = entries[id]?.holding else { return }
     ejected.insert(id)
+    ejecting.insert(id)
+    defer { ejecting.remove(id) }
     await transport.park(id)
     guard let entry = entries[id], case .held(let session) = entry.holding else { return }
     store(entry.info, .ejected, .unheld)
@@ -232,6 +237,13 @@ public actor DeviceHub {
     }
     for info in scan.notSharing where isUnheld(info.id) {
       store(info, .notSharingFiles, .unheld)
+    }
+    // The transport decides when an ejected device stops being ejected (unplugged long enough,
+    // or found where it could be opened): the hub follows, except mid-eject.
+    let stillEjected = Set(scan.ejected.map(\.id))
+    for info in scan.devices
+    where !stillEjected.contains(info.id) && !ejecting.contains(info.id) {
+      ejected.remove(info.id)
     }
     for info in scan.ejected where isUnheld(info.id) {
       ejected.insert(info.id)

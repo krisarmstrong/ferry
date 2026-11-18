@@ -5,10 +5,10 @@ import DeviceKit
 public actor FakeTransport: DeviceTransport {
   private var devices: [FakeDevice]
   private var heldElsewhere: Set<DeviceID> = []
+  /// Ejected devices. Like `MTPTransport`, which keeps one by its port through the resets its
+  /// close causes, the fake reports a parked device as ejected until it is unplugged or
+  /// unparked.
   private var parked: Set<DeviceID> = []
-  /// Devices whose close resets them into a new enumeration the transport cannot tie to the
-  /// parked one, as libmtp's release does to an Android device.
-  private var resetting: Set<DeviceID> = []
   /// Attached without file transfer: seen on USB only, as `MTPTransport` sees a device whose
   /// MTP interface is off.
   private var withoutFileTransfer: [DeviceInfo] = []
@@ -41,8 +41,6 @@ public actor FakeTransport: DeviceTransport {
     withoutFileTransfer.append(info)
   }
 
-  /// Devices reset since their close: the scans that have seen them gone.
-  private var resetScans: [DeviceID: Int] = [:]
   private var rescanAfter: Duration?
 
   /// The next scans ask to be repeated after `delay`, as `MTPTransport` does while an ejected
@@ -51,11 +49,11 @@ public actor FakeTransport: DeviceTransport {
     rescanAfter = delay
   }
 
-  /// From now on, closing `id` resets it: once closed, the next scan finds it gone for a moment
-  /// (still reported as ejected, as `MTPTransport` reports a settling port), and the scan after
-  /// that finds a new enumeration it no longer knows was parked.
-  public func resetOnClose(_ id: DeviceID) {
-    resetting.insert(id)
+  /// The transport stops treating `id` as ejected on its own, as `MTPTransport` does once the
+  /// device has been gone long enough to count as unplugged, or when the unit turns up on a port
+  /// it opens.
+  public func forgetEjection(_ id: DeviceID) {
+    parked.remove(id)
   }
 
   public func isParked(_ id: DeviceID) -> Bool {
@@ -102,15 +100,6 @@ public actor FakeTransport: DeviceTransport {
     var ejected: [DeviceInfo] = []
     for device in devices {
       let info = device.info
-      if parked.contains(info.id), resetting.contains(info.id), await !device.isOpen {
-        if resetScans[info.id, default: 0] == 0 {
-          resetScans[info.id] = 1
-          ejected.append(info)
-          continue
-        }
-        parked.remove(info.id)
-        resetScans[info.id] = nil
-      }
       if parked.contains(info.id) {
         ejected.append(info)
       } else if heldElsewhere.contains(info.id) {
