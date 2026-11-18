@@ -42,6 +42,9 @@ import os
   public private(set) var preservedChanges: [URL] = []
   /// Read from the system once launched (see `launch()`); `false` until then.
   public private(set) var opensAtLogin = false
+  /// The login item change being applied, and how many have been requested.
+  private var loginItemChange: Task<Void, Never>?
+  private var loginItemRequests = 0
 
   /// The steps the guide shows; `nil` shows the model picker.
   public var guideFamily: DeviceFamily?
@@ -221,7 +224,26 @@ import os
     opensAtLogin = await services.opensAtLogin()
   }
 
-  public func setOpensAtLogin(_ enabled: Bool) async {
+  /// The Open at login switch: shows `enabled` at once, then applies it after any change still
+  /// being applied, so quick toggles reach macOS in order and the switch never snaps back
+  /// meanwhile. Once the last change is applied, it shows what macOS reports.
+  public func requestOpensAtLogin(_ enabled: Bool) {
+    opensAtLogin = enabled
+    loginItemRequests += 1
+    let request = loginItemRequests
+    let previous = loginItemChange
+    loginItemChange = Task {
+      await previous?.value
+      await applyOpensAtLogin(enabled, request: request)
+    }
+  }
+
+  /// Returns once every requested login item change is applied.
+  func loginItemSettled() async {
+    await loginItemChange?.value
+  }
+
+  private func applyOpensAtLogin(_ enabled: Bool, request: Int) async {
     do {
       try await services.setOpensAtLogin(enabled)
       actionError = nil
@@ -230,7 +252,9 @@ import os
       actionError = String(
         localized: LocalizedStringResource("Could not change Open at login.", bundle: .module))
     }
-    opensAtLogin = await services.opensAtLogin()
+    let reported = await services.opensAtLogin()
+    // A later request shows its own value until it is applied in turn.
+    if request == loginItemRequests { opensAtLogin = reported }
   }
 
   /// Removes Ferry's locations from Finder, unregisters the agent and the login item, and

@@ -16,7 +16,7 @@ public struct SettingsView: View {
       Toggle(
         isOn: Binding(
           get: { model.opensAtLogin },
-          set: { enabled in Task { await model.setOpensAtLogin(enabled) } })
+          set: { enabled in model.requestOpensAtLogin(enabled) })
       ) {
         Text("Open at login", bundle: .module)
       }

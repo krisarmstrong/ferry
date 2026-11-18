@@ -50,3 +50,41 @@ struct AppModelHelperTests {
     #expect(model.helper == .allowed)
   }
 }
+
+/// The Open at login switch shows what the user chose while macOS applies it, and changes are
+/// applied one after another in the order made.
+@MainActor
+struct AppModelLoginItemTests {
+  @Test func theSwitchHoldsThePendingValueAndChangesApplyInOrder() async {
+    let log = CallLog()
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    await model.launch()
+    #expect(model.opensAtLogin)
+
+    model.requestOpensAtLogin(false)
+    #expect(!model.opensAtLogin)
+    model.requestOpensAtLogin(true)
+    #expect(model.opensAtLogin)
+    await model.loginItemSettled()
+
+    #expect(
+      log.all.filter { $0.hasPrefix("opensAtLogin") } == [
+        "opensAtLogin false", "opensAtLogin true",
+      ])
+    #expect(model.opensAtLogin)
+  }
+
+  @Test func aFailedChangeShowsWhatMacOSKept() async {
+    let log = CallLog()
+    let services = FakeServices(log: log)
+    services.failLoginItem = true
+    let model = AppModel(client: FakeClient(log: log), services: services)
+    await model.launch()
+
+    model.requestOpensAtLogin(false)
+    await model.loginItemSettled()
+
+    #expect(model.opensAtLogin)
+    #expect(model.actionError != nil)
+  }
+}
