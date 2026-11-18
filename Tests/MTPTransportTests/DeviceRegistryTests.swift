@@ -66,7 +66,11 @@ struct DeviceRegistryTests {
     /// Address whose device now reports another serial, as after a swap on the same port.
     var swapped: Set<Int> = []
 
+    /// Closing resets the device, so it enumerates again, as libmtp's release does to Android.
+    var resetsOnClose: Bus?
+
     func setBusy(_ addresses: Set<Int>) { busy = addresses }
+    func setResetsOnClose(_ bus: Bus) { resetsOnClose = bus }
     func setSwapped(_ addresses: Set<Int>) { swapped = addresses }
 
     func open(_ raw: Int) async throws(TransportError) -> Handle {
@@ -81,6 +85,7 @@ struct DeviceRegistryTests {
 
     func close(_ handle: Handle) {
       closes[handle.raw, default: 0] += 1
+      resetsOnClose?.reenumerate(handle.raw)
     }
 
     func info(_ handle: Handle) -> DeviceInfo {
@@ -117,13 +122,23 @@ struct DeviceRegistryTests {
         close: { await log.close($0) }))
   }
 
-  @Test func scanOpensEachUnheldDeviceOnceAndClosesIt() async throws {
+  @Test func scanOpensEachUnheldDeviceOnceAndKeepsIt() async throws {
     let bus = Bus([1, 2, 3])
-    let scan = try await makeRegistry(bus).scan()
-
-    #expect(scan == DeviceScan(devices: [1, 2, 3].map(Self.info)))
+    let registry = makeRegistry(bus)
+    for _ in 0..<2 {
+      #expect(try await registry.scan() == DeviceScan(devices: [1, 2, 3].map(Self.info)))
+    }
     #expect(await bus.log.opens == [1: 1, 2: 1, 3: 1])
-    #expect(await bus.log.closes == [1: 1, 2: 1, 3: 1])
+    #expect(await bus.log.closes == [:])
+  }
+
+  @Test func keptDeviceThatLeavesIsClosedByTheNextScan() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    bus.plug([])
+    #expect(try await registry.scan() == DeviceScan(devices: []))
+    #expect(await bus.log.closes == [1: 1])
   }
 
   @Test func scanNeverOpensHeldDevice() async throws {
@@ -135,10 +150,10 @@ struct DeviceRegistryTests {
     for _ in 0..<3 {
       #expect(try await registry.scan() == DeviceScan(devices: [1, 2].map(Self.info)))
     }
-    #expect(await bus.log.opens == [1: 2, 2: 4])
+    #expect(await bus.log.opens == [1: 1, 2: 1])
   }
 
-  @Test func openOpensOnlyTheChosenDevice() async throws {
+  @Test func openHandsOverOnlyTheChosenDevice() async throws {
     let bus = Bus([1, 2, 3])
     let registry = makeRegistry(bus)
     _ = try await registry.scan()
@@ -146,7 +161,7 @@ struct DeviceRegistryTests {
     let opened = try await registry.open(Self.id(2))
 
     #expect(opened.device == Handle(raw: 2))
-    #expect(await bus.log.opens == [1: 1, 2: 2, 3: 1])
+    #expect(await bus.log.opens == [1: 1, 2: 1, 3: 1])
   }
 
   @Test func heldDeviceIsNotOpenedTwice() async throws {
@@ -158,7 +173,7 @@ struct DeviceRegistryTests {
     await #expect(throws: TransportError.deviceBusy) {
       _ = try await registry.open(Self.id(1))
     }
-    #expect(await bus.log.opens == [1: 2])
+    #expect(await bus.log.opens == [1: 1])
   }
 
   @Test func releaseLetsTheDeviceBeOpenedAgain() async throws {
@@ -170,7 +185,7 @@ struct DeviceRegistryTests {
 
     _ = try await registry.scan()
     _ = try await registry.open(Self.id(1))
-    #expect(await bus.log.opens == [1: 4])
+    #expect(await bus.log.opens == [1: 2])
   }
 
   @Test func deviceAnotherProcessHoldsIsBusyByLocation() async throws {
@@ -196,19 +211,6 @@ struct DeviceRegistryTests {
     }
   }
 
-  @Test func otherDeviceAtTheSameLocationIsNotFoundAndClosed() async throws {
-    let bus = Bus([1])
-    let registry = makeRegistry(bus)
-    _ = try await registry.scan()
-    await bus.log.setSwapped([1])
-
-    await #expect(throws: TransportError.deviceNotFound(Self.id(1))) {
-      _ = try await registry.open(Self.id(1))
-    }
-    #expect(await bus.log.closes == [1: 2])
-    #expect(try await registry.scan().devices.map(\.id) == [DeviceID(serial: "X1")])
-  }
-
   @Test func scansAndOpensNeverOverlap() async throws {
     let bus = Bus([1, 2])
     let registry = makeRegistry(bus)
@@ -222,7 +224,24 @@ struct DeviceRegistryTests {
     #expect(await bus.log.peak == 1)
   }
 
-  // MARK: Candidates, parking, re-enumeration
+  @Test func detectionFailureIsThrown() async {
+    let registry = DeviceRegistry<Int, Handle>(
+      label: "test-registry",
+      driver: .init(
+        attached: { () throws(TransportError) in throw .io("usb") },
+        candidacy: { _ in .mtp },
+        resolve: { Int($0.address) },
+        open: { raw, _ in (Handle(raw: raw), Self.info(raw)) },
+        close: { _ in }))
+
+    await #expect(throws: TransportError.io("usb")) {
+      _ = try await registry.scan()
+    }
+  }
+}
+
+extension DeviceRegistryTests {
+  // MARK: Candidates, parking, re-enumeration, hand-over
 
   @Test func deniedDeviceIsNeitherOpenedNorReported() async throws {
     let bus = Bus([])
@@ -231,7 +250,7 @@ struct DeviceRegistryTests {
 
     #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
     #expect(await bus.log.opens == [1: 1])
-    #expect(await bus.log.closes == [1: 1])
+    #expect(await bus.log.closes == [:])
   }
 
   @Test func busyDeviceIsParkedAndNotReopenedUntilRechecked() async throws {
@@ -276,7 +295,7 @@ struct DeviceRegistryTests {
     await #expect(throws: TransportError.deviceNotFound(Self.id(1))) {
       _ = try await registry.open(Self.id(1))
     }
-    #expect(await bus.log.opens == [1: 2])
+    #expect(await bus.log.opens == [1: 1])
 
     bus.reenumerate(1)
     #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
@@ -292,7 +311,7 @@ struct DeviceRegistryTests {
 
     bus.reenumerate(1)
     #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
-    #expect(await bus.log.opens == [1: 3])
+    #expect(await bus.log.opens == [1: 2])
   }
 
   @Test func candidateIsResolvedOncePerEnumeration() async throws {
@@ -302,18 +321,19 @@ struct DeviceRegistryTests {
     #expect(bus.resolves.withLock { $0 } == [1: 1])
   }
 
-  @Test func detectionFailureIsThrown() async {
-    let registry = DeviceRegistry<Int, Handle>(
-      label: "test-registry",
-      driver: .init(
-        attached: { () throws(TransportError) in throw .io("usb") },
-        candidacy: { _ in .mtp },
-        resolve: { Int($0.address) },
-        open: { raw, _ in (Handle(raw: raw), Self.info(raw)) },
-        close: { _ in }))
+  /// libmtp's release resets an Android device, which then enumerates anew: a scan that opened
+  /// and closed it to read its serial would leave `open` nothing to open. The scan's handle is
+  /// kept and handed over instead.
+  @Test func scannedDeviceIsHandedToOpenWithoutAnotherOpen() async throws {
+    let bus = Bus([1])
+    await bus.log.setResetsOnClose(bus)
+    let registry = makeRegistry(bus)
+    #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
 
-    await #expect(throws: TransportError.io("usb")) {
-      _ = try await registry.scan()
-    }
+    let opened = try await registry.open(Self.id(1))
+
+    #expect(opened.device == Handle(raw: 1))
+    #expect(await bus.log.opens == [1: 1])
+    #expect(await bus.log.closes == [:])
   }
 }

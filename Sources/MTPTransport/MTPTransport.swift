@@ -4,7 +4,8 @@ import DeviceKit
 ///
 /// Candidates come from the IOKit registry, never from probing the bus, so an iPhone, a camera or
 /// any device that is not MTP is never opened. MTP reveals a device's serial only once it is
-/// open, so a scan opens each candidate this process does not hold and closes it again. One
+/// open, so a scan opens each candidate this process does not hold and keeps the handle for
+/// `open(_:)`: closing it would reset an Android device, which then enumerates anew. One
 /// `DeviceRegistry` serves the whole process, so a device held by any session is reported without
 /// being touched and is never opened twice. A device that cannot be opened is held by another
 /// process and is reported in `DeviceScan.busy`.

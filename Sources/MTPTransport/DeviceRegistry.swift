@@ -17,10 +17,11 @@ struct BusLocation: Hashable, Sendable {
 /// A held device is never opened or claimed again: a scan reports it from the record. A parked
 /// device (one another app holds, or one the user ejected) is reported from the record too, with
 /// no I/O, until it leaves the registry or `unpark(_:)` is called. Every other candidate is opened
-/// once per scan, to read its serial, and closed again; the scan remembers where it found each
-/// one, so `open(_:)` opens just that enumeration. Scans and opens take turns through `gate`, so
-/// two never race for the same interface; libmtp blocks on USB, so this actor runs on its own
-/// queue.
+/// by the scan, to read its serial, and kept open: `open(_:)` hands that handle over rather than
+/// opening again, because libmtp's release resets an Android device, which then enumerates anew
+/// at another registry entry. A kept handle whose device left is closed by the next scan. Scans
+/// and opens take turns through `gate`, so two never race for the same interface; libmtp blocks
+/// on USB, so this actor runs on its own queue.
 actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
   struct Driver: Sendable {
     /// The USB devices attached now, from the IOKit registry.
@@ -56,8 +57,8 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
   /// Each candidate's raw device, or `nil` for one that is not MTP after all, so an enumeration
   /// is resolved (and an unlisted device probed) once.
   private var resolved: [BusLocation: Raw?] = [:]
-  /// Where the latest scan found each device it could open.
-  private var found: [DeviceID: (location: BusLocation, raw: Raw)] = [:]
+  /// Devices a scan opened and `open(_:)` has not claimed yet.
+  private var opened: [BusLocation: (device: Device, info: DeviceInfo)] = [:]
 
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     queue.asUnownedSerialExecutor()
@@ -74,10 +75,13 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
       let present = Set(attached.map(\.location))
       parked = parked.filter { present.contains($0.key) }
       resolved = resolved.filter { present.contains($0.key) }
+      for (location, gone) in opened where !present.contains(location) {
+        opened[location] = nil
+        await driver.close(gone.device)
+      }
       var devices: [DeviceInfo] = []
       var busy: [DeviceInfo] = []
       var notSharing: [DeviceInfo] = []
-      var found: [DeviceID: (location: BusLocation, raw: Raw)] = [:]
       for record in attached {
         let location = record.location
         switch driver.candidacy(record) {
@@ -100,42 +104,40 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
         case nil:
           break
         }
-        if let info = held[location] {
+        if let info = held[location] ?? opened[location]?.info {
           devices.append(info)
           continue
         }
         guard let raw = resolve(record) else { continue }
         do throws(TransportError) {
           let (device, info) = try await driver.open(raw, location)
-          await driver.close(device)
+          opened[location] = (device, info)
           devices.append(info)
-          found[info.id] = (location, raw)
         } catch {
           let info = Self.describe(record)
           busy.append(info)
           parked[location] = .busy(info)
         }
       }
-      self.found = found
       return DeviceScan(devices: devices, busy: busy, notSharing: notSharing)
     }
   }
 
-  /// Opens `id` where the latest scan found it and records it held until `release(_:)`.
+  /// Hands over the device `id` a scan opened, and records it held until `release(_:)`.
   func open(_ id: DeviceID) async throws(TransportError) -> Opened {
     try await gate.run { () async throws(TransportError) -> Opened in
       if parked.values.contains(where: { $0.info.id == id }) { throw .deviceNotFound(id) }
       if held.values.contains(where: { $0.id == id }) { throw .deviceBusy }
-      guard let (location, raw) = found[id],
-        try driver.attached().contains(where: { $0.location == location })
-      else { throw .deviceNotFound(id) }
-      let (device, info) = try await driver.open(raw, location)
-      guard info.id == id else {
-        await driver.close(device)
+      guard let (location, scanned) = opened.first(where: { $0.value.info.id == id }) else {
         throw .deviceNotFound(id)
       }
-      held[location] = info
-      return (device, location)
+      opened[location] = nil
+      guard try driver.attached().contains(where: { $0.location == location }) else {
+        await driver.close(scanned.device)
+        throw .deviceNotFound(id)
+      }
+      held[location] = scanned.info
+      return (scanned.device, location)
     }
   }
 
