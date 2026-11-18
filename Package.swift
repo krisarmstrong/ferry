@@ -18,7 +18,7 @@ let package = Package(
     .target(name: "DeviceKitTestSupport", dependencies: ["DeviceKit"]),
     .systemLibrary(name: "CLibMTP", pkgConfig: "libmtp", providers: [.brew(["libmtp"])]),
     .target(name: "MTPTransport", dependencies: ["DeviceKit", "CLibMTP"]),
-    .target(name: "FerryAgentCore", dependencies: ["DeviceKit", "MTPTransport"]),
+    .target(name: "FerryAgentCore", dependencies: ["DeviceKit", "FerryIPC", "MTPTransport"]),
     .target(name: "FerryIPC", dependencies: ["DeviceKit"]),
     .executableTarget(
       name: "ferryctl",
@@ -31,7 +31,9 @@ let package = Package(
     .testTarget(name: "MTPTransportTests", dependencies: ["MTPTransport", "DeviceKit"]),
     .testTarget(
       name: "FerryAgentCoreTests",
-      dependencies: ["FerryAgentCore", "DeviceKit", "DeviceKitTestSupport"]),
+      dependencies: [
+        "FerryAgentCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport",
+      ]),
     .testTarget(name: "FerryIPCTests", dependencies: ["FerryIPC", "DeviceKit"]),
   ],
   swiftLanguageModes: [.v6]

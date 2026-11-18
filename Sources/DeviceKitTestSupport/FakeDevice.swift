@@ -7,6 +7,7 @@ public actor FakeDevice: DeviceSession {
   /// A call a test can hold mid-flight.
   public enum SuspendableCall: Sendable {
     case storages
+    case list
     case close
   }
 
@@ -69,6 +70,7 @@ public actor FakeDevice: DeviceSession {
   public func list(_ folder: RemotePath, in storage: StorageID) async throws(TransportError)
     -> [RemoteItem]
   {
+    await pauseIfSuspended(.list)
     if let failure = listFailure {
       listFailure = nil
       throw failure
