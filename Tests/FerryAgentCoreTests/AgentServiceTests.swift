@@ -72,7 +72,7 @@ struct AgentServiceTests {
     #expect(entry.item.path == paths.new)
     #expect(entry.parent == docs)
     #expect(entry.id == (try await setup.id(paths.new)))
-    #expect(await signals(harness) == [.signal(domain, docs)])
+    #expect(await signals(harness) == [.signal(domain)])
 
     // A direct upload would leave the truncated file under its real name; SafeWriter uploads to a
     // partial and deletes it.
@@ -194,13 +194,20 @@ struct AgentServiceTests {
     #expect(await service.handle(.status, file: stray) == bad)
   }
 
-  @Test func mutationsSignalEveryAffectedParent() async throws {
+  @Test func mutationRecordsChangeAndSignals() async throws {
     let paths = try Paths()
     let setup = try await ready()
     let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
     defer { harness.finish() }
     let service = harness.service
-    let (docsID, old) = (try await setup.id(paths.docs), try await setup.id(paths.old))
+    let old = try await setup.id(paths.old)
+    guard
+      case .changes(let anchor, _, _, _) = await service.handle(
+        .changes(domain: domain, since: nil), file: nil)
+    else {
+      Issue.record("expected an anchor")
+      return
+    }
 
     let folder = AgentRequest.create(domain: domain, parent: .root, name: "Moved", isFolder: true)
     guard case .entry(let made) = await service.handle(folder, file: nil) else {
@@ -224,12 +231,23 @@ struct AgentServiceTests {
     #expect(
       await service.handle(.item(domain: domain, id: old), file: nil) == .failure(.unknownItem))
 
-    let root = FakeDomainManager.Call.signal(domain, .root)
-    let docs = FakeDomainManager.Call.signal(domain, docsID)
-    let target = FakeDomainManager.Call.signal(domain, made.id)
-    // Create, rename, move (both parents), delete.
-    #expect(await signals(harness) == [root, docs, docs, target, target])
+    // Create, rename, move, delete: one working-set signal each.
+    #expect(await signals(harness) == Array(repeating: .signal(domain), count: 4))
     #expect(await device.allPaths(in: storageID(device)) == [paths.docs, paths.moved])
+    // The renamed and moved file is reported once, as deleted; the folder as it is now.
+    #expect(
+      await service.handle(.changes(domain: domain, since: anchor), file: nil)
+        == .changes(
+          anchor: try await changesAnchor(service, domain), updated: [made],
+          deleted: [old], expired: false))
+  }
+
+  private func changesAnchor(_ service: AgentService, _ domain: String) async throws -> Data {
+    guard
+      case .changes(let anchor, _, _, _) = await service.handle(
+        .changes(domain: domain, since: nil), file: nil)
+    else { throw TransportError.io("no anchor") }
+    return anchor
   }
 
   @Test func unknownDomainFails() async throws {

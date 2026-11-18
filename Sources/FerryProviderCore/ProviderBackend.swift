@@ -33,7 +33,8 @@ public actor ProviderBackend {
     ProviderItem(try await entry(.item(domain: domain, id: try Self.itemID(id))))
   }
 
-  /// The working set is empty: Ferry does not track items outside the folders Finder lists.
+  /// The working set enumerates no items of its own: it is fed by `changes(since:)`, which
+  /// reports every item the agent has seen change.
   public func children(of id: NSFileProviderItemIdentifier) async throws -> [ProviderItem] {
     if id == .workingSet { return [] }
     let response = try await send(.list(domain: domain, folder: try Self.itemID(id)))
@@ -115,12 +116,35 @@ public actor ProviderBackend {
     return ProviderItem(try await entry(.item(domain: domain, id: itemID)))
   }
 
+  /// The anchor the working set's changes start from now.
+  public func currentAnchor() async throws -> NSFileProviderSyncAnchor {
+    try await changes(from: nil).anchor
+  }
+
+  /// What changed in the domain since `anchor`, for the working set's enumerator. Throws
+  /// `.syncAnchorExpired` when the agent cannot answer from `anchor` (it restarted, or too much
+  /// changed since), so FileProvider enumerates everything again.
+  public func changes(since anchor: NSFileProviderSyncAnchor) async throws -> ProviderChanges {
+    try await changes(from: anchor)
+  }
+
   public func delete(_ id: NSFileProviderItemIdentifier) async throws {
     let response = try await send(.delete(domain: domain, id: try Self.itemID(id)))
     guard case .done = response else { throw Self.unexpected(response) }
   }
 
   // MARK: Requests
+
+  private func changes(from anchor: NSFileProviderSyncAnchor?) async throws -> ProviderChanges {
+    let response = try await send(.changes(domain: domain, since: anchor?.rawValue))
+    guard case .changes(let next, let updated, let deleted, let expired) = response else {
+      throw Self.unexpected(response)
+    }
+    if expired { throw NSFileProviderError(.syncAnchorExpired) }
+    return ProviderChanges(
+      anchor: NSFileProviderSyncAnchor(rawValue: next), updated: updated.map(ProviderItem.init),
+      deleted: deleted.map(NSFileProviderItemIdentifier.init))
+  }
 
   private func entry(_ request: AgentRequest, file: FileHandle? = nil) async throws
     -> ProviderEntry
@@ -180,4 +204,11 @@ public actor ProviderBackend {
     }
     return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
   }
+}
+
+/// Changes to a domain's items, for the working set's enumerator.
+public struct ProviderChanges: Sendable {
+  public let anchor: NSFileProviderSyncAnchor
+  public let updated: [ProviderItem]
+  public let deleted: [NSFileProviderItemIdentifier]
 }

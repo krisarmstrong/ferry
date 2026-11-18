@@ -13,7 +13,7 @@ actor FakeDomainManager: DomainManaging {
     case reconnect(String)
     case remove(String)
     case removeAll
-    case signal(String, ItemID)
+    case signal(String)
   }
 
   private(set) var calls: [Call] = []
@@ -32,8 +32,8 @@ actor FakeDomainManager: DomainManaging {
   func reconnect(_ identifier: String) async throws { record(.reconnect(identifier)) }
   func remove(_ identifier: String) async throws { record(.remove(identifier)) }
   func removeAll() async throws { record(.removeAll) }
-  func signal(_ identifier: String, folder: ItemID) async {
-    record(.signal(identifier, folder))
+  func signal(_ identifier: String) async {
+    record(.signal(identifier))
   }
   func isUserEnabled() async -> Bool { userEnabled }
   func existing() async throws -> [String] { preexisting }

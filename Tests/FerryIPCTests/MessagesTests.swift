@@ -23,6 +23,7 @@ private func tag(_ request: AgentRequest) -> Int {
   case .move: 9
   case .replaceContents: 10
   case .delete: 11
+  case .changes: 12
   }
 }
 
@@ -38,6 +39,7 @@ private func requests() -> [AgentRequest] {
   all.append(.move(domain: domain, id: photo, toFolder: .root))
   all.append(.replaceContents(domain: domain, id: photo))
   all.append(.delete(domain: domain, id: camera))
+  all += [.changes(domain: domain, since: nil), .changes(domain: domain, since: Data([1, 2, 3]))]
   return all
 }
 
@@ -85,6 +87,7 @@ private func tag(_ response: AgentResponse) -> Int {
   case .entries: 2
   case .done: 3
   case .failure: 4
+  case .changes: 5
   }
 }
 
@@ -109,6 +112,8 @@ private func responses() throws -> [AgentResponse] {
   var all: [AgentResponse] = [.status(devices: [ready, locked], providerEnabled: true)]
   all += [.entry(item), .entry(root), .entries([item, root]), .entries([])]
   all += [.done, .failure(.deviceDisconnected)]
+  all.append(.changes(anchor: Data([9]), updated: [item], deleted: [.random()], expired: false))
+  all.append(.changes(anchor: Data(), updated: [], deleted: [], expired: true))
   return all
 }
 
@@ -117,7 +122,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...11))
+  #expect(Set(requests().map(tag)) == Set(0...12))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
@@ -131,7 +136,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyResponseRoundTripsJSON() throws {
-  #expect(Set(try responses().map(tag)) == Set(0...4))
+  #expect(Set(try responses().map(tag)) == Set(0...5))
   for response in try responses() {
     #expect(try roundTrip(response) == response)
   }

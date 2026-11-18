@@ -5,17 +5,30 @@ import UniformTypeIdentifiers
 /// What a new or changed item should look like, copied out of the `NSFileProviderItem`
 /// FileProvider hands the extension.
 ///
-/// FileProvider's callback arguments (`NSFileProviderItem`, `NSFileProviderItemFields`, request
-/// objects) are not `Sendable`, so they must not be captured by the task that does the work. The
-/// extension snapshots them synchronously in the callback, with `ItemTemplate(_:)` and
-/// `ItemChanges(_:)`, and passes only the snapshots, identifiers and URLs to `ProviderBackend`:
+/// `NSFileProviderItem` and FileProvider's request objects are not `Sendable`, so they must not
+/// be captured by the task that does the work. The extension snapshots the item synchronously in
+/// the callback with `ItemTemplate(_:)`, narrows the changed fields with `ItemChanges(_:)`, and
+/// passes only those, identifiers and URLs to `ProviderBackend`. A snapshot that fails completes
+/// the callback with its error at once:
 ///
 /// ```swift
-/// func createItem(basedOn item: NSFileProviderItem, ..., url: URL?, ...) -> Progress {
+/// func createItem(basedOn item: NSFileProviderItem, ..., url: URL?, ...,
+///                 completionHandler: @escaping (...) -> Void) -> Progress {
+///   let template: ItemTemplate
 ///   do {
-///     let template = try ItemTemplate(item)
-///     Task { completion(try await backend.create(template, contents: url), ...) }
-///   } catch { completion(nil, [], false, error) }
+///     template = try ItemTemplate(item)
+///   } catch {
+///     completionHandler(nil, [], false, error)
+///     return Progress()
+///   }
+///   Task {
+///     do {
+///       completionHandler(try await backend.create(template, contents: url), [], false, nil)
+///     } catch {
+///       completionHandler(nil, [], false, error)
+///     }
+///   }
+///   return Progress()
 /// }
 /// ```
 public struct ItemTemplate: Sendable, Equatable {
@@ -40,8 +53,8 @@ public struct ItemTemplate: Sendable, Equatable {
   }
 }
 
-/// The changed fields of an item that reach an MTP device, as a `Sendable` snapshot of
-/// `NSFileProviderItemFields`. Other fields, such as dates and tags, have nowhere to go.
+/// The changed fields of an item that reach an MTP device: `NSFileProviderItemFields` narrowed
+/// to parent, name and contents. Other fields, such as dates and tags, have nowhere to go.
 public struct ItemChanges: OptionSet, Sendable {
   public let rawValue: UInt8
 

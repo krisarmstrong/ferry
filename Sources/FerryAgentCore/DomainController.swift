@@ -13,8 +13,9 @@ public protocol DomainManaging: Sendable {
   func reconnect(_ identifier: String) async throws
   func remove(_ identifier: String) async throws
   func removeAll() async throws
-  /// Tells the system the folder's contents changed.
-  func signal(_ identifier: String, folder: ItemID) async
+  /// Tells the system the domain's working set changed. A replicated FileProvider extension
+  /// ignores signals for any other container; it then asks the agent for `.changes`.
+  func signal(_ identifier: String) async
   /// Whether the user has enabled Ferry's domains. New domains start disabled and only the user
   /// can enable them, so `false` is a normal state.
   func isUserEnabled() async -> Bool
@@ -129,8 +130,8 @@ public actor DomainController {
       storage: storage, session: link.session, writer: link.writer, items: table(for: domain))
   }
 
-  func signal(_ domain: String, folder: ItemID) async {
-    await manager.signal(domain, folder: folder)
+  func signal(_ domain: String) async {
+    await manager.signal(domain)
   }
 
   func isUserEnabled() async -> Bool {

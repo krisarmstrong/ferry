@@ -11,8 +11,11 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// named by an `ItemID` the agent assigned, and resolved through the domain's `ItemTable`; a new
 /// name must be one path component. File contents arrive as an open descriptor, never a path: the
 /// agent copies between that descriptor and a scratch file of its own (see `FileTransfer`), so
-/// it never opens a file a client chose. Uploads go through the domain's one `SafeWriter`. After a
-/// change on the device, the parent folder of every affected item is signalled.
+/// it never opens a file a client chose. Uploads go through the domain's one `SafeWriter`.
+///
+/// Every new, changed or vanished item the agent sees, whether from a request that changed the
+/// device or a listing that found the device changed, is recorded in the domain's change log and
+/// the domain's working set is signalled, so Finder learns of changes made outside it.
 ///
 /// Every operation that resolves an identifier runs through the domain's gate, from the lookup to
 /// the table update after the device changed, so a listing can never see the device and the table
@@ -45,7 +48,8 @@ public actor AgentService: AgentHandling {
     switch request {
     case .fetch, .replaceContents: true
     case .create(_, _, _, let isFolder): !isFolder
-    case .status, .recheck, .eject, .removeAllDomains, .item, .list, .rename, .move, .delete:
+    case .status, .recheck, .eject, .removeAllDomains, .item, .list, .rename, .move, .delete,
+      .changes:
       false
     }
   }
@@ -86,6 +90,11 @@ public actor AgentService: AgentHandling {
     case (.delete(let domain, let id), _):
       try await delete(id, in: domain)
       return .done
+    case (.changes(let domain, let since), _):
+      let changes = try await domains.route(domain).items.changes(since: since)
+      return .changes(
+        anchor: changes.anchor, updated: changes.updated, deleted: changes.deleted,
+        expired: changes.expired)
     case (.fetch, nil), (.replaceContents, nil):
       throw .io("bad request")
     }
@@ -93,25 +102,27 @@ public actor AgentService: AgentHandling {
 
   // MARK: Reading
 
+  /// The item as the device has it now. If the device now has another kind of item at its path,
+  /// the item Finder asked about is gone.
   private func item(_ id: ItemID, in domain: String) async throws(TransportError)
     -> ProviderEntry
   {
-    let route = try await domains.route(domain)
-    return try await route.items.gate.run { () async throws(TransportError) in
+    try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
-      return await route.entry(try await route.session.item(at: path, in: route.storage), id: id)
+      let entry = await route.items.observed(
+        try await route.session.item(at: path, in: route.storage))
+      guard entry.id == id else { throw .unknownItem }
+      return entry
     }
   }
 
   private func list(_ folder: ItemID, in domain: String) async throws(TransportError)
     -> [ProviderEntry]
   {
-    let route = try await domains.route(domain)
-    return try await route.items.gate.run { () async throws(TransportError) in
+    try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: folder)
       let items = try await route.writer.visibleList(path, in: route.storage)
-      let ids = await route.items.listed(path, children: items.map(\.path))
-      return zip(ids, items).map { ProviderEntry(id: $0, parent: folder, item: $1) }
+      return await route.items.listed(path, children: items)
     }
   }
 
@@ -121,10 +132,9 @@ public actor AgentService: AgentHandling {
     async throws(TransportError)
   {
     try FileTransfer.requireRegular(target)
-    let route = try await domains.route(domain)
     let scratch = FileTransfer.scratchURL()
     defer { FileTransfer.remove(scratch) }
-    try await route.items.gate.run { () async throws(TransportError) in
+    try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
       try await route.session.download(
         path, in: route.storage, to: scratch, replacing: true, progress: Self.ignoreProgress)
@@ -139,93 +149,95 @@ public actor AgentService: AgentHandling {
     async throws(TransportError) -> ProviderEntry
   {
     let name = try Self.creatable(name)
-    let route = try await domains.route(domain)
     let scratch = try await FileTransfer.copyIn(source)
     defer { FileTransfer.remove(scratch) }
-    let entry = try await route.items.gate.run { () async throws(TransportError) in
+    return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: parent).appending(name)
-      return await route.entry(
-        try await route.writer.write(
-          from: scratch, to: path, in: route.storage, replacing: false,
-          progress: Self.ignoreProgress))
+      let item = try await route.writer.write(
+        from: scratch, to: path, in: route.storage, replacing: false,
+        progress: Self.ignoreProgress)
+      return await route.items.created(item)
     }
-    await signal(domain, [parent])
-    return entry
   }
 
   private func makeFolder(_ name: String, in parent: ItemID, of domain: String)
     async throws(TransportError) -> ProviderEntry
   {
     let name = try Self.creatable(name)
-    let route = try await domains.route(domain)
-    let entry = try await route.items.gate.run { () async throws(TransportError) in
+    return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: parent).appending(name)
-      return await route.entry(try await route.session.makeFolder(path, in: route.storage))
+      return await route.items.created(try await route.session.makeFolder(path, in: route.storage))
     }
-    await signal(domain, [parent])
-    return entry
   }
 
   /// Copies `source` into a scratch file, then writes that over the file through the writer.
   private func replace(_ id: ItemID, with source: Int32, in domain: String)
     async throws(TransportError) -> ProviderEntry
   {
-    let route = try await domains.route(domain)
     let scratch = try await FileTransfer.copyIn(source)
     defer { FileTransfer.remove(scratch) }
-    let entry = try await route.items.gate.run { () async throws(TransportError) in
+    return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
       let item = try await route.writer.write(
         from: scratch, to: path, in: route.storage, replacing: true,
         progress: Self.ignoreProgress)
-      return await route.entry(item, id: id)
+      return await route.items.changed(item, id: id)
     }
-    await signal(domain, [entry.parent])
-    return entry
   }
 
   private func rename(_ id: ItemID, to name: String, in domain: String)
     async throws(TransportError) -> ProviderEntry
   {
     let validated = try Self.creatable(name)
-    let route = try await domains.route(domain)
-    let entry = try await route.items.gate.run { () async throws(TransportError) in
+    return try await gated(domain) { route throws(TransportError) in
       let path = try await route.changeable(id)
       let item = try await route.session.rename(path, to: validated, in: route.storage)
       await route.items.moved(path, to: item.path)
-      return await route.entry(item, id: id)
+      return await route.items.changed(item, id: id)
     }
-    await signal(domain, [entry.parent])
-    return entry
   }
 
   private func move(_ id: ItemID, to folder: ItemID, in domain: String)
     async throws(TransportError) -> ProviderEntry
   {
-    let route = try await domains.route(domain)
-    let (entry, from) = try await route.items.gate.run {
-      () async throws(TransportError) -> (ProviderEntry, ItemID) in
+    try await gated(domain) { route throws(TransportError) in
       let path = try await route.changeable(id)
       let destination = try await route.path(of: folder)
-      let from = await route.items.id(for: path.parent ?? .root)
       let item = try await route.session.move(path, toFolder: destination, in: route.storage)
       await route.items.moved(path, to: item.path)
-      return (await route.entry(item, id: id), from)
+      return await route.items.changed(item, id: id)
     }
-    await signal(domain, [from, entry.parent])
-    return entry
   }
 
   private func delete(_ id: ItemID, in domain: String) async throws(TransportError) {
-    let route = try await domains.route(domain)
-    let parent = try await route.items.gate.run { () async throws(TransportError) in
+    try await gated(domain) { route throws(TransportError) in
       let path = try await route.changeable(id)
-      let parent = await route.items.id(for: path.parent ?? .root)
       try await route.session.delete(path, in: route.storage)
       await route.items.removed(path)
-      return parent
     }
-    await signal(domain, [parent])
+  }
+
+  /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
+  /// `body` recorded a change, even one followed by a failure.
+  private func gated<T: Sendable>(
+    _ domain: String, _ body: (DomainController.Route) async throws(TransportError) -> T
+  ) async throws(TransportError) -> T {
+    let route = try await domains.route(domain)
+    let (result, changed) = await route.items.gate.run {
+      () async -> (Result<T, TransportError>, Bool) in
+      let before = await route.items.changeCount
+      let result: Result<T, TransportError>
+      do throws(TransportError) {
+        result = .success(try await body(route))
+      } catch {
+        result = .failure(error)
+      }
+      return (result, await route.items.changeCount != before)
+    }
+    if changed {
+      await domains.signal(domain)
+    }
+    return try result.get()
   }
 
   /// A name a client may give an item: one path component, never a partial's. A listing deletes
@@ -236,14 +248,6 @@ public actor AgentService: AgentHandling {
       !SafeWriter.isPartial(validated)
     else { throw .invalidName(name) }
     return validated
-  }
-
-  /// Signals each folder once.
-  private func signal(_ domain: String, _ folders: [ItemID]) async {
-    var signalled: Set<ItemID> = []
-    for folder in folders where signalled.insert(folder).inserted {
-      await domains.signal(domain, folder: folder)
-    }
   }
 
   private static let ignoreProgress: ProgressHandler = { _, _ in true }
@@ -260,18 +264,5 @@ extension DomainController.Route {
   func changeable(_ id: ItemID) async throws(TransportError) -> RemotePath {
     guard id != .root else { throw .unsupported("changing the storage root") }
     return try await path(of: id)
-  }
-
-  /// `item` with its identity. An item that was renamed or moved keeps the `id` it had; the
-  /// table already maps its new path to it.
-  func entry(_ item: RemoteItem, id: ItemID? = nil) async -> ProviderEntry {
-    let resolved: ItemID
-    if let id {
-      resolved = id
-    } else {
-      resolved = await items.id(for: item.path)
-    }
-    return ProviderEntry(
-      id: resolved, parent: await items.id(for: item.path.parent ?? .root), item: item)
   }
 }

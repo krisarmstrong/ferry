@@ -7,6 +7,16 @@ import Testing
 
 private let tableDomain = "SER0000AAAA|Internal|vol0"
 
+private let stamp = Date(timeIntervalSince1970: 1_700_000_000)
+
+private func file(_ string: String, size: UInt64 = 1) throws -> RemoteItem {
+  RemoteItem(path: try path(string), kind: .file, size: size, modified: stamp)
+}
+
+private func folder(_ string: String) throws -> RemoteItem {
+  RemoteItem(path: try path(string), kind: .folder, size: 0, modified: stamp)
+}
+
 /// A new, empty store folder for one test.
 private func store() -> URL {
   FileManager.default.temporaryDirectory.appending(
@@ -74,7 +84,8 @@ struct ItemTableTests {
     let goneChild = await table.id(for: try path("/D/b/x"))
     let elsewhere = await table.id(for: try path("/E/b"))
 
-    let ids = await table.listed(try path("/D"), children: [try path("/D/a"), try path("/D/c")])
+    let ids = await table.listed(try path("/D"), children: [try file("/D/a"), try file("/D/c")])
+      .map(\.id)
 
     try #require(ids.count == 2)
     #expect(ids[0] == kept)
@@ -140,7 +151,7 @@ struct ItemTableTests {
     for name in names {
       ids.append(await table.id(for: try RemotePath.root.appending(name)))
     }
-    ids += await table.listed(.root, children: try names.map { try RemotePath.root.appending($0) })
+    ids += await table.listed(.root, children: try names.map { try file("/" + $0) }).map(\.id)
 
     for id in ids {
       #expect(UUID(uuidString: id.rawValue)?.uuidString == id.rawValue)
@@ -163,5 +174,56 @@ struct ItemTableTests {
     ItemTable.discardAll(in: folder)
 
     #expect(await ItemTable(domain: tableDomain, store: folder).path(for: id) == nil)
+  }
+
+  @Test func kindChangeGetsNewIdentifier() async throws {
+    let table = ItemTable(domain: tableDomain, store: store())
+    let old = try #require(await table.listed(.root, children: [try file("/x")]).first)
+    let inner = await table.id(for: try path("/x/y"))
+
+    let replaced = try #require(await table.listed(.root, children: [try folder("/x")]).first)
+    #expect(replaced.id != old.id)
+    #expect(await table.path(for: old.id) == nil)
+    #expect(await table.path(for: inner) == nil)
+
+    // A file whose contents changed is still the same file.
+    let rewritten = await table.observed(try folder("/x"))
+    #expect(rewritten.id == replaced.id)
+    let kept = try #require(await table.listed(.root, children: [try file("/f", size: 1)]).first)
+    #expect(await table.observed(try file("/f", size: 2)).id == kept.id)
+  }
+
+  @Test func createdNeverTakesAStaleIdentifier() async throws {
+    let table = ItemTable(domain: tableDomain, store: store())
+    let stale = try #require(await table.listed(.root, children: [try file("/x")]).first)
+
+    let made = await table.created(try file("/x"))
+
+    #expect(made.id != stale.id)
+    #expect(await table.path(for: stale.id) == nil)
+    let since = await table.changes(since: nil).anchor
+    _ = await table.created(try folder("/y"))
+    let changes = await table.changes(since: since)
+    #expect(changes.updated.map(\.item.path) == [try path("/y")])
+  }
+
+  @Test func onlyChangesAreSaved() async throws {
+    let folder = store()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let table = ItemTable(domain: tableDomain, store: folder)
+    let children = [try file("/a"), try file("/b")]
+    _ = await table.listed(.root, children: children)
+    let saved = ItemTable.file(for: tableDomain, in: folder)
+    try FileManager.default.removeItem(at: saved)
+
+    // Nothing new: the same listing, a move to where the item is, an unknown removal.
+    _ = await table.listed(.root, children: children)
+    await table.moved(try path("/a"), to: try path("/a"))
+    await table.removed(try path("/zzz"))
+    _ = await table.id(for: try path("/a"))
+    #expect(!FileManager.default.fileExists(atPath: saved.path))
+
+    _ = await table.listed(.root, children: [try file("/a")])
+    #expect(FileManager.default.fileExists(atPath: saved.path))
   }
 }

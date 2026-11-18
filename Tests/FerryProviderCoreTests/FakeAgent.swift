@@ -55,6 +55,11 @@ actor FakeAgent: AgentSending {
   var thrown: TransportError?
   /// Written into the fetch target before failing, as a download cut short would.
   var fetchFailure: TransportError?
+  /// Answered to `.changes`: the changes since `changeAnchor`, which an older anchor finds
+  /// expired.
+  var pendingChanges: (updated: [ProviderEntry], deleted: [ItemID]) = ([], [])
+  let changeAnchor = Data([1])
+  let nextAnchor = Data([2])
   /// Parks creates until this many have arrived, then answers them all.
   var parkCreatesUntil = 0
   private var parked: [CheckedContinuation<Void, Never>] = []
@@ -84,6 +89,23 @@ actor FakeAgent: AgentSending {
 
   func set(fetchFailure: TransportError) {
     self.fetchFailure = fetchFailure
+  }
+
+  func set(changes updated: [ProviderEntry], deleted: [ItemID]) {
+    pendingChanges = (updated, deleted)
+  }
+
+  private func changeReply(_ since: Data?) -> AgentResponse {
+    switch since {
+    case nil:
+      .changes(anchor: changeAnchor, updated: [], deleted: [], expired: false)
+    case changeAnchor:
+      .changes(
+        anchor: nextAnchor, updated: pendingChanges.updated, deleted: pendingChanges.deleted,
+        expired: false)
+    default:
+      .changes(anchor: nextAnchor, updated: [], deleted: [], expired: true)
+    }
   }
 
   func park(until count: Int) {
@@ -147,6 +169,8 @@ actor FakeAgent: AgentSending {
       items[path] = nil
       paths[id] = nil
       return .done
+    case .changes(_, let since):
+      return changeReply(since)
     case .status, .recheck, .eject, .removeAllDomains:
       throw .unsupported("\(request)")
     }

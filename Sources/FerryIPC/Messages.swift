@@ -80,12 +80,19 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// Replaces the file with the readable file sent with the request.
   case replaceContents(domain: String, id: ItemID)
   case delete(domain: String, id: ItemID)
+  /// The changes to the domain's items since `since`, an anchor from an earlier `.changes`
+  /// response; `nil` asks only for the current anchor. Feeds FileProvider's working set.
+  case changes(domain: String, since: Data?)
 }
 
 public enum AgentResponse: Codable, Sendable, Equatable {
   case status(devices: [AttachedDevice], providerEnabled: Bool)
   case entry(ProviderEntry)
   case entries([ProviderEntry])
+  /// Answers `.changes`: each changed item's latest state, the items gone, and the anchor to ask
+  /// from next. `expired` means `since` cannot be answered (it predates the agent process or the
+  /// agent's window), so the lists are empty and the client must enumerate everything again.
+  case changes(anchor: Data, updated: [ProviderEntry], deleted: [ItemID], expired: Bool)
   case done
   case failure(TransportError)
 }
