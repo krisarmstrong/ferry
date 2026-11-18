@@ -13,8 +13,19 @@ extension ADBTransport {
     let model = try await property("ro.product.model", of: serial, on: host)
     return DeviceInfo(
       id: DeviceID(serial: serialNumber),
-      manufacturer: manufacturer.isEmpty ? "Unknown" : manufacturer,
+      manufacturer: isPlatformVendor(manufacturer) ? "" : manufacturer,
       model: model.isEmpty ? "Android device" : model)
+  }
+
+  /// Chip and platform makers that boards built on a reference design report as their
+  /// manufacturer (both NetAlly units say `freescale`), which names the SoC, not the device.
+  static let platformVendors: Set<String> = [
+    "", "unknown", "android", "freescale", "nxp", "qualcomm", "qcom", "mediatek", "mtk",
+    "rockchip", "allwinner", "amlogic", "spreadtrum", "unisoc", "intel", "nvidia",
+  ]
+
+  static func isPlatformVendor(_ manufacturer: String) -> Bool {
+    platformVendors.contains(manufacturer.lowercased())
   }
 
   /// `body`'s result, or a failure once `limit` has passed. `body` is cancelled then, which

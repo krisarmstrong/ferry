@@ -1,3 +1,4 @@
+import ADBTransport
 import FerryAgentCore
 import FerryIPC
 import Foundation
@@ -25,7 +26,11 @@ do {
 
 FileTransfer.sweep()
 
-let hub = DeviceHub(transport: MTPTransport(), arrivals: USBWatcher.ticks())
+// MTP and the user's adb server together: each device is served by the best method it offers.
+let adb = ADBTransport()
+let hub = DeviceHub(
+  transport: CompositeTransport(mtp: MTPTransport(), adb: adb),
+  arrivals: merged(USBWatcher.ticks(), adb.arrivals))
 let manager = FileProviderDomains()
 let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 Task {
@@ -42,3 +47,17 @@ listener.resume()
 log.info("agent started")
 
 dispatchMain()
+
+/// Ticks whenever either stream does. Ticks that arrive faster than they are read coalesce.
+private func merged(_ first: AsyncStream<Void>, _ second: AsyncStream<Void>) -> AsyncStream<Void> {
+  AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+    let relays = [first, second].map { stream in
+      Task {
+        for await _ in stream { continuation.yield() }
+      }
+    }
+    continuation.onTermination = { _ in
+      for relay in relays { relay.cancel() }
+    }
+  }
+}

@@ -22,6 +22,21 @@ extension DeviceRegistryTests {
     #expect(await bus.log.opens == [1: 1])
   }
 
+  /// ADB serves the device, so no session claimed the handle the scan opened. Ejecting it releases
+  /// that handle, so the device is free for other apps, and it stays ejected through the reset.
+  @Test func ejectingAnUnclaimedDeviceReleasesIt() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+
+    await registry.park(Self.id(1))
+    bus.reenumerate(1, at: 12)
+
+    #expect(try await registry.scan() == DeviceScan(devices: [], ejected: [Self.info(1)]))
+    #expect(await bus.log.opens == [1: 1])
+    #expect(await bus.log.closes == [1: 1])
+  }
+
   /// libmtp's release resets an Android device, so an eject is followed by a new enumeration of
   /// it, on the same port and often at another address. It stays ejected.
   @Test(arguments: [false, true])

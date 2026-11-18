@@ -44,6 +44,40 @@ struct ADBTransportScanTests {
     await hub.kill()
   }
 
+  /// The scan says how each device is reached: USB while the cable is in, else the network.
+  @Test func eachDeviceIsReportedWithItsRoute() async throws {
+    let android = Fixture.android(serial: Fixture.linkRunnerSerial)
+    let etherScope = Fixture.android(serial: "fedcba9876543210", model: "EtherScope nXG")
+    let hub = try await Fixture.hub([
+      .init(Fixture.linkRunnerSerial, device: android),
+      .init(Fixture.linkRunnerWiFi, device: android),
+      .init("192.0.2.40:5555", device: etherScope),
+      .init("192.0.2.50:5555", "unauthorized", device: nil),
+      .init("abc", "unauthorized", device: nil),
+    ])
+    let transport = Fixture.transport(port: hub.port)
+    let scan = try await transport.scan()
+    #expect(scan.method(of: Fixture.linkRunner) == .usbADB)
+    #expect(scan.method(of: DeviceID(serial: "fedcba9876543210")) == .wifiADB)
+    #expect(scan.method(of: DeviceID(serial: "192.0.2.50:5555")) == .wifiADB)
+    #expect(scan.method(of: DeviceID(serial: "abc")) == .usbADB)
+    await hub.kill()
+  }
+
+  /// A board on a reference design reports its SoC maker as its manufacturer, which says nothing
+  /// about the device; it is left out rather than shown.
+  @Test(arguments: [("freescale", ""), ("Android", ""), ("", ""), ("Google", "Google")])
+  func aPlatformManufacturerIsLeftOut(_ reported: String, _ shown: String) async throws {
+    let android = Fixture.android(
+      serial: Fixture.linkRunnerSerial, manufacturer: reported, model: "LinkRunner-100G")
+    let hub = try await Fixture.hub([.init(Fixture.linkRunnerSerial, device: android)])
+    let scan = try await Fixture.transport(port: hub.port).scan()
+    #expect(
+      scan.devices
+        == [DeviceInfo(id: Fixture.linkRunner, manufacturer: shown, model: "LinkRunner-100G")])
+    await hub.kill()
+  }
+
   @Test func unauthorizedIsNotSharingByItsAdbSerialAndOfflineIsLeftOut() async throws {
     let hub = try await Fixture.hub([
       .init("abc", "unauthorized", device: nil),
@@ -98,7 +132,7 @@ struct ADBTransportScanTests {
     let closed = try ClosedPort()
     let transport = Fixture.transport(port: closed.port, locator: ADBHostTests.noAdb)
     let scan = try await transport.scan()
-    #expect(scan == DeviceScan(devices: []))
+    #expect(scan == DeviceScan(devices: [], method: .usbADB))
     #expect(await transport.status == .notInstalled)
     withExtendedLifetime(closed) {}
   }
@@ -106,7 +140,7 @@ struct ADBTransportScanTests {
   @Test func installedWithNoServerIsServerDown() async throws {
     let closed = try ClosedPort()
     let transport = Fixture.transport(port: closed.port)
-    #expect(try await transport.scan() == DeviceScan(devices: []))
+    #expect(try await transport.scan() == DeviceScan(devices: [], method: .usbADB))
     #expect(await transport.status == .serverDown)
     withExtendedLifetime(closed) {}
   }

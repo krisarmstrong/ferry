@@ -147,6 +147,8 @@ func itemStore() -> URL {
 /// test's control and a temporary directory for the files a client would send.
 struct AgentHarness {
   let transport: FakeTransport
+  /// ADB, when the harness serves both methods through a `CompositeTransport`.
+  let adb: FakeTransport?
   let manager: FakeDomainManager
   let hub: DeviceHub
   let controller: DomainController
@@ -159,14 +161,18 @@ struct AgentHarness {
 
   init(
     devices: [FakeDevice] = [], existing: [String] = [], store: URL = itemStore(),
-    manager: FakeDomainManager? = nil
+    manager: FakeDomainManager? = nil, adb: FakeTransport? = nil
   ) throws {
     self.store = store
     self.manager = manager ?? FakeDomainManager(existing: existing)
-    transport = FakeTransport(devices: devices)
+    let mtp = FakeTransport(devices: devices)
+    transport = mtp
+    self.adb = adb
     let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
     self.ticks = ticks
-    hub = DeviceHub(transport: transport, arrivals: arrivals, clock: clock)
+    let served: any DeviceTransport =
+      adb.map { CompositeTransport(mtp: mtp, adb: $0) } ?? mtp
+    hub = DeviceHub(transport: served, arrivals: arrivals, clock: clock)
     controller = DomainController(hub: hub, manager: self.manager, itemStore: store)
     scratch = TestScratch.root.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -182,7 +188,7 @@ struct AgentHarness {
 
   /// The identifier the domain's table has for `path`, assigning one if it has none.
   func id(_ path: RemotePath, in domain: String) async throws -> ItemID {
-    try await controller.route(domain).items.id(for: path)
+    try await controller.items(of: domain).id(for: path)
   }
 
   /// Plugs in a ready device of another model and returns every manager call once its domain is

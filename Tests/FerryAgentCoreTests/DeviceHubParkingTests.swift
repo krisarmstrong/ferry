@@ -24,7 +24,9 @@ extension DeviceHubTests {
     await harness.transport.attachWithoutFileTransfer(info)
     harness.tick()
 
-    #expect(await harness.next() == .attached(AttachedDevice(info: info, state: .notSharingFiles)))
+    #expect(
+      await harness.next()
+        == .attached(AttachedDevice(info: info, state: .notSharingFiles, method: .usbFileTransfer)))
     #expect(await harness.clock.sleepCount == 0)
 
     await harness.transport.detach(info.id)
@@ -42,7 +44,9 @@ extension DeviceHubTests {
     await harness.transport.failNextOpen(of: device.info.id, with: .deviceBusy)
     await harness.transport.attach(device)
     harness.tick()
-    #expect(await harness.next() == .attached(AttachedDevice(info: device.info, state: .busy)))
+    #expect(
+      await harness.next()
+        == .attached(AttachedDevice(info: device.info, state: .busy, method: .usbFileTransfer)))
     await harness.transport.park(device.info.id)
 
     await harness.hub.recheck(device.info.id)
@@ -66,7 +70,9 @@ extension DeviceHubTests {
     await harness.clock.advance(by: .seconds(2))
     await first.waitUntilSuspended(.storages)
     await harness.hub.eject(second.info.id)
-    #expect(await harness.next() == .changed(AttachedDevice(info: second.info, state: .ejected)))
+    #expect(
+      await harness.next()
+        == .changed(AttachedDevice(info: second.info, state: .ejected, method: .usbFileTransfer)))
     await first.resume(.storages)
     await harness.clock.waitForSleeper()
     harness.tick()
@@ -85,7 +91,9 @@ extension DeviceHubTests {
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
     await harness.hub.eject(device.info.id)
-    #expect(await harness.next() == .changed(AttachedDevice(info: device.info, state: .ejected)))
+    #expect(
+      await harness.next()
+        == .changed(AttachedDevice(info: device.info, state: .ejected, method: .usbFileTransfer)))
     for _ in 0..<2 {
       harness.tick()
     }
@@ -109,7 +117,9 @@ extension DeviceHubTests {
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
     await harness.hub.eject(device.info.id)
-    #expect(await harness.next() == .changed(AttachedDevice(info: device.info, state: .ejected)))
+    #expect(
+      await harness.next()
+        == .changed(AttachedDevice(info: device.info, state: .ejected, method: .usbFileTransfer)))
 
     await harness.transport.forgetEjection(device.info.id)
     harness.tick()
@@ -142,7 +152,8 @@ extension DeviceHubTests {
     await device.failStorages(with: .io("broken"))
     var harness = HubHarness(devices: [device])
     defer { harness.finish() }
-    let failed = AttachedDevice(info: device.info, state: .failed(.io("broken")))
+    let failed = AttachedDevice(
+      info: device.info, state: .failed(.io("broken")), method: .usbFileTransfer)
     #expect(await harness.next() == .attached(failed))
     await harness.clock.waitForSleeper()
 

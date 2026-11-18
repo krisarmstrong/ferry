@@ -16,10 +16,14 @@ struct DomainControllerTests {
     let second = await makeDevice("SER0000BBBB", model: "LinkRunner 10G")
     let other = await makeDevice("SER0000CCCC", model: "Phone")
     let locked = await makeDevice("SER0000DDDD", model: "Phone")
-    let firstReady = try await AttachedDevice(info: first.info, state: .ready(first.storages()))
-    let secondReady = try await AttachedDevice(info: second.info, state: .ready(second.storages()))
-    let otherReady = try await AttachedDevice(info: other.info, state: .ready(other.storages()))
-    let lockedState = AttachedDevice(info: locked.info, state: .notSharingFiles)
+    let firstReady = try await AttachedDevice(
+      info: first.info, state: .ready(first.storages()), method: .usbFileTransfer)
+    let secondReady = try await AttachedDevice(
+      info: second.info, state: .ready(second.storages()), method: .usbFileTransfer)
+    let otherReady = try await AttachedDevice(
+      info: other.info, state: .ready(other.storages()), method: .usbFileTransfer)
+    let lockedState = AttachedDevice(
+      info: locked.info, state: .notSharingFiles, method: .usbFileTransfer)
 
     let specs = DomainNaming.specs(for: [firstReady, secondReady, otherReady, lockedState])
 

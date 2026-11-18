@@ -11,16 +11,16 @@ struct PreviewClient: AgentSending {
       StorageInfo(
         id: StorageID(device: DeviceID(serial: "LR1"), key: "Internal shared storage|0"),
         description: "Internal shared storage", capacity: 64_000_000_000, free: 41_500_000_000)
-    ]))
+    ]), method: .usbFileTransfer)
   static let notSharing = AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: "ES1"), manufacturer: "NetAlly", model: "EtherScope nXG"),
-    state: .notSharingFiles)
+    state: .notSharingFiles, method: .usbFileTransfer)
   static let busy = AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: "PX1"), manufacturer: "Google", model: "Pixel 8"),
-    state: .busy)
+    state: .busy, method: .usbFileTransfer)
   static let failed = AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: "GX1"), manufacturer: "Samsung", model: "Galaxy S24"),
-    state: .failed(.io("LIBMTP_Get_Storage failed")))
+    state: .failed(.io("LIBMTP_Get_Storage failed")), method: .usbFileTransfer)
 
   let devices: [AttachedDevice]
   let provider: ProviderState

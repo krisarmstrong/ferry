@@ -41,11 +41,11 @@ struct ADBStoragesTests {
       ("emulated", false), ("self", false), ("sdcard1", false), ("1234-ABC", false), ("", false),
     ])
   func volumeFoldersAreNamedByTheirIDs(_ name: String, _ isVolume: Bool) {
-    #expect(ADBStorages.isVolumeName(name) == isVolume)
+    #expect(StorageKey.isVolumeID(name) == isVolume)
   }
 
   @Test func storageKeysAreMethodNeutral() {
-    #expect(ADBStorages.internalKey == "internal")
+    #expect(StorageKey.internal == "internal")
     #expect(ADBStorages.root(forKey: "internal") == "/storage/emulated/0")
     #expect(ADBStorages.root(forKey: "volume:1234-ABCD") == "/storage/1234-ABCD")
     #expect(ADBStorages.root(forKey: "volume:../../data") == nil)

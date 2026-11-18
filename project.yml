@@ -96,6 +96,8 @@ targets:
       - package: Ferry
         product: MTPTransport
       - package: Ferry
+        product: ADBTransport
+      - package: Ferry
         product: DeviceKit
 
   FerryProvider:

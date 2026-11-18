@@ -113,7 +113,7 @@ struct AgentIdentityTests {
     let rename = Task {
       await service.handle(.rename(domain: domain, id: id, to: "new.txt"), file: nil)
     }
-    let gate = try await harness.controller.route(domain).items.gate
+    let gate = try await harness.controller.items(of: domain).gate
     while await gate.waiting == 0 {
       try await Task.sleep(for: .milliseconds(1))
     }

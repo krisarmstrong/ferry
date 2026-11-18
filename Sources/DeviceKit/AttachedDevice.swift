@@ -13,11 +13,14 @@ public enum DeviceState: Sendable, Equatable, Codable {
 public struct AttachedDevice: Sendable, Equatable, Codable, Identifiable {
   public let info: DeviceInfo
   public let state: DeviceState
+  /// How Ferry reaches the device: for a ready one, the method its session uses.
+  public let method: ConnectionMethod
 
   public var id: DeviceID { info.id }
 
-  public init(info: DeviceInfo, state: DeviceState) {
+  public init(info: DeviceInfo, state: DeviceState, method: ConnectionMethod) {
     self.info = info
     self.state = state
+    self.method = method
   }
 }

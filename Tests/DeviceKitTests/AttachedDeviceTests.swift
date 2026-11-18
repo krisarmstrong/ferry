@@ -15,7 +15,7 @@ struct AttachedDeviceTests {
   func stateRoundTripsThroughJSON(_ state: DeviceState) throws {
     let device = AttachedDevice(
       info: DeviceInfo(id: DeviceID(serial: "S1"), manufacturer: "NetAlly", model: "LR-G2"),
-      state: state)
+      state: state, method: .usbFileTransfer)
     let decoded = try JSONDecoder().decode(
       AttachedDevice.self, from: JSONEncoder().encode(device))
     #expect(decoded == device)

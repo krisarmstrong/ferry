@@ -33,7 +33,7 @@ struct AgentRecursiveDeleteTests {
     }
 
     func known(_ string: String) async throws -> Bool {
-      try await harness.controller.route(domain).items.knows(try path(string))
+      try await harness.controller.items(of: domain).knows(try path(string))
     }
 
     func onDevice(_ string: String) async throws -> Bool {
@@ -212,5 +212,6 @@ struct AgentRecursiveDeleteTests {
     _ = try await route.changeable(try await setup.id("/Docs/report.rtfd"))
 
     #expect(await route.items.kind(at: try path("/Docs/report.rtfd")) == .file)
+    await route.release()
   }
 }

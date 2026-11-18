@@ -16,9 +16,15 @@ public actor FakeTransport: DeviceTransport {
   private var probes: [DeviceID: Int] = [:]
   private var openFailures: [DeviceID: TransportError] = [:]
   public private(set) var scanCount = 0
+  /// How the transport reaches its devices, as `DeviceScan.method` reports it.
+  private let method: ConnectionMethod
+  private var methods: [DeviceID: ConnectionMethod] = [:]
 
-  public init(devices: [FakeDevice]) {
+  /// `method` is how the transport reaches its devices: the default stands for MTP, a fake for
+  /// ADB passes `.usbADB`.
+  public init(devices: [FakeDevice], method: ConnectionMethod = .usbFileTransfer) {
     self.devices = devices
+    self.method = method
   }
 
   // MARK: Test controls
@@ -42,6 +48,12 @@ public actor FakeTransport: DeviceTransport {
   }
 
   private var rescanAfter: Duration?
+
+  /// The transport reaches `id` by `method` from now on, as adb does a device whose cable was
+  /// pulled while it stays connected over the network.
+  public func setMethod(_ method: ConnectionMethod, for id: DeviceID) {
+    methods[id] = method
+  }
 
   /// The next scans ask to be repeated after `delay`, as `MTPTransport` does while an ejected
   /// device's port is empty.
@@ -113,7 +125,7 @@ public actor FakeTransport: DeviceTransport {
     }
     return DeviceScan(
       devices: usable, busy: busy, notSharing: notSharing, ejected: ejected,
-      rescanAfter: rescanAfter)
+      rescanAfter: rescanAfter, method: method, methods: methods)
   }
 
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {

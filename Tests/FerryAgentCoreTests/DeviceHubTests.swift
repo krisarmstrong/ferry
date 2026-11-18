@@ -20,7 +20,8 @@ private func hubStorage(of id: DeviceID) -> StorageInfo {
 }
 
 func hubReady(_ device: FakeDevice) -> AttachedDevice {
-  AttachedDevice(info: device.info, state: .ready([hubStorage(of: device.info.id)]))
+  AttachedDevice(
+    info: device.info, state: .ready([hubStorage(of: device.info.id)]), method: .usbFileTransfer)
 }
 
 /// A hub over a fake transport, with USB ticks and time under the test's control.
@@ -82,7 +83,9 @@ struct DeviceHubTests {
     defer { harness.finish() }
 
     #expect(
-      await harness.next() == .attached(AttachedDevice(info: device.info, state: .notSharingFiles)))
+      await harness.next()
+        == .attached(
+          AttachedDevice(info: device.info, state: .notSharingFiles, method: .usbFileTransfer)))
     await harness.clock.waitForSleeper()
     await device.setLocked(false)
     await harness.clock.advance(by: .seconds(2))
@@ -116,7 +119,9 @@ struct DeviceHubTests {
     await harness.transport.attach(device)
     harness.tick()
 
-    #expect(await harness.next() == .attached(AttachedDevice(info: device.info, state: .busy)))
+    #expect(
+      await harness.next()
+        == .attached(AttachedDevice(info: device.info, state: .busy, method: .usbFileTransfer)))
     harness.tick()
     #expect(await harness.next() == .changed(hubReady(device)))
   }
@@ -126,7 +131,7 @@ struct DeviceHubTests {
     let busy = AttachedDevice(
       info: DeviceInfo(
         id: FakeTransport.busyID(for: device.info.id), manufacturer: "Fake", model: "Phone"),
-      state: .busy)
+      state: .busy, method: .usbFileTransfer)
     var harness = HubHarness()
     defer { harness.finish() }
     await harness.transport.attach(device)
@@ -184,7 +189,8 @@ struct DeviceHubTests {
     await device.failNextStorages(with: .io("stall"))
     await harness.hub.recheck(device.info.id)
 
-    let failed = AttachedDevice(info: device.info, state: .failed(.io("stall")))
+    let failed = AttachedDevice(
+      info: device.info, state: .failed(.io("stall")), method: .usbFileTransfer)
     #expect(await harness.next() == .changed(failed))
     #expect(await device.closeCount == 1)
     await #expect(throws: TransportError.io("stall")) {
@@ -261,7 +267,7 @@ struct DeviceHubTests {
 
     await harness.hub.eject(device.info.id)
 
-    let ejected = AttachedDevice(info: device.info, state: .ejected)
+    let ejected = AttachedDevice(info: device.info, state: .ejected, method: .usbFileTransfer)
     #expect(await harness.next() == .changed(ejected))
     #expect(await device.closeCount == 1)
     harness.tick()
@@ -289,7 +295,7 @@ struct DeviceHubTests {
     await device.resume(.storages)
     await recheck
 
-    let ejected = AttachedDevice(info: device.info, state: .ejected)
+    let ejected = AttachedDevice(info: device.info, state: .ejected, method: .usbFileTransfer)
     #expect(await harness.next() == .changed(ejected))
     let barrier = await harness.barrier()
     #expect(barrier?.isAttached(serial: "BARRIER") == true)
@@ -308,12 +314,16 @@ struct DeviceHubTests {
     await harness.transport.attach(locked)
     harness.tick()
     #expect(
-      await harness.next() == .attached(AttachedDevice(info: locked.info, state: .notSharingFiles)))
+      await harness.next()
+        == .attached(
+          AttachedDevice(info: locked.info, state: .notSharingFiles, method: .usbFileTransfer)))
     #expect(await harness.hub.isRechecking)
     await harness.clock.waitForSleeper()
 
     await harness.hub.eject(locked.info.id)
-    #expect(await harness.next() == .changed(AttachedDevice(info: locked.info, state: .ejected)))
+    #expect(
+      await harness.next()
+        == .changed(AttachedDevice(info: locked.info, state: .ejected, method: .usbFileTransfer)))
     #expect(await !harness.hub.isRechecking)
     await harness.clock.advance(by: .seconds(10))
     let barrier = await harness.barrier()

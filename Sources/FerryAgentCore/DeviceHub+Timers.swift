@@ -44,3 +44,41 @@ extension DeviceHub {
     await reconcile()
   }
 }
+
+// MARK: Polling
+
+extension DeviceHub {
+  /// Held devices not sharing files, in serial order.
+  fileprivate var waitingIDs: [DeviceID] {
+    entries.values.compactMap { entry in
+      guard case .held = entry.holding, entry.state == .notSharingFiles else { return nil }
+      return entry.info.id
+    }.sorted { $0.serial < $1.serial }
+  }
+
+  func updatePolling() {
+    let waiting = !waitingIDs.isEmpty
+    if waiting, poller == nil {
+      poller = Task { [weak self, clock] in
+        while !Task.isCancelled {
+          do {
+            try await clock.sleep(for: Self.recheckInterval)
+          } catch {
+            return
+          }
+          guard !Task.isCancelled, let self else { return }
+          await self.recheckWaiting()
+        }
+      }
+    } else if !waiting, let poller {
+      poller.cancel()
+      self.poller = nil
+    }
+  }
+
+  fileprivate func recheckWaiting() async {
+    for id in waitingIDs {
+      await recheckHeld(id)
+    }
+  }
+}

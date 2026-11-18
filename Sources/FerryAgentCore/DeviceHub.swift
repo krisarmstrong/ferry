@@ -19,23 +19,34 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// A device that is attached but not sharing files is re-checked every two seconds. MTP has no
 /// event for "file transfer turned on", so this is the hub's one poll, and it runs only while
 /// such a device is held.
+///
+/// A device reachable more than one way is served by the method the transport reports for it.
+/// When that changes for a held device (ADB authorised, revoked, or the cable pulled while the
+/// network stays), the hub replaces its session in place: the device keeps its entry, and so its
+/// domains and item identities, and the change is reported with the new method. The swap waits
+/// until no request holds a lease on the device (see `lease(_:)`); requests that ask meanwhile
+/// wait for the new session, so two sessions never serve one device at once. An MTP session
+/// that ADB replaces is kept open, idle: releasing it resets an Android device, and the reset
+/// would drop the ADB route that replaced it. It serves again if ADB goes, and is closed when the
+/// device is ejected or leaves.
 public actor DeviceHub {
-  private enum Holding {
+  enum Holding {
     case held(any DeviceSession)
     /// No session open: ejected, held by another app, or failed to open.
     case unheld
   }
 
-  private struct Entry {
+  struct Entry {
     var info: DeviceInfo
     var state: DeviceState
+    var method: ConnectionMethod
     var holding: Holding
     /// Renewed on every store, so a result read across a suspension is dropped once the entry
     /// it was read for has been replaced, ejected or removed.
     var generation: UInt64
   }
 
-  private enum Reading {
+  enum Reading {
     case state(DeviceState)
     case gone
   }
@@ -45,18 +56,18 @@ public actor DeviceHub {
   /// Device changes, in order. Single consumer: iterate it from one task only, since an
   /// `AsyncStream` hands each event to just one of its iterators.
   public nonisolated let events: AsyncStream<HubEvent>
-  private let continuation: AsyncStream<HubEvent>.Continuation
-  private let transport: any DeviceTransport
+  let continuation: AsyncStream<HubEvent>.Continuation
+  let transport: any DeviceTransport
   let clock: any Clock<Duration>
-  private var entries: [DeviceID: Entry] = [:]
+  var entries: [DeviceID: Entry] = [:]
   /// Devices the user ejected, never opened while listed. The transport is the authority: it
   /// reports them in `DeviceScan.ejected`, through the resets their close causes, until they
   /// count as unplugged; once it offers one as usable instead, the hub drops it from here. The
   /// hub's own entry covers the moment of the eject, before the transport has been told, and is
   /// cleared by the user's Mount (`recheck`) or when no list of a scan names the device.
-  private var ejected: Set<DeviceID> = []
+  var ejected: Set<DeviceID> = []
   /// Devices whose eject is under way: ejected before the transport has been told.
-  private var ejecting: Set<DeviceID> = []
+  var ejecting: Set<DeviceID> = []
   /// The scan the transport asked for, without waiting for a USB event.
   var rescan: Task<Void, Never>?
   /// Devices whose storages or open failed, with the wait before the next try. Each close of a
@@ -78,9 +89,20 @@ public actor DeviceHub {
   private var probing: Set<DeviceID> = []
   /// The reconcile most recently asked for; the next one waits for it.
   private var lastReconcile: Task<Void, Never>?
-  private var poller: Task<Void, Never>?
+  var poller: Task<Void, Never>?
 
   var isRechecking: Bool { poller != nil }
+
+  /// MTP sessions kept open, idle, while ADB serves their device.
+  var kept: [DeviceID: any DeviceSession] = [:]
+  /// Leases handed out and not yet released, by device.
+  var leases: [DeviceID: Int] = [:]
+  /// Each swap waiting for its device's leases to be released.
+  var drainWaiters: [DeviceID: CheckedContinuation<Void, Never>] = [:]
+  /// Devices whose session is being replaced.
+  var swapping: Set<DeviceID> = []
+  /// Leases and ejects waiting for a swap to finish, by device.
+  var swapWaiters: [DeviceID: [CheckedContinuation<Void, Never>]] = [:]
 
   /// Set once the first reconcile has finished, whether or not its scan worked.
   private var scanned = false
@@ -126,7 +148,7 @@ public actor DeviceHub {
   }
 
   public func devices() -> [AttachedDevice] {
-    entries.values.map { AttachedDevice(info: $0.info, state: $0.state) }
+    entries.values.map { AttachedDevice(info: $0.info, state: $0.state, method: $0.method) }
       .sorted { $0.id.serial < $1.id.serial }
   }
 
@@ -141,62 +163,33 @@ public actor DeviceHub {
     }
   }
 
-  /// The user's Try Again: re-reads a held device's storages, for instance after file transfer
-  /// was turned on. A device the hub does not hold (busy, failed, not sharing, ejected) is
-  /// offered to the transport again and the bus scanned.
-  public func recheck(_ id: DeviceID) async {
-    guard let entry = entries[id] else { return }
-    guard case .held = entry.holding else {
-      ejected.remove(id)
-      backoff[id] = nil
-      await transport.unpark(id)
-      await reconcile()
-      return
-    }
-    await recheckHeld(id)
-  }
-
   /// Re-reads a held device's storages. The hub's own probes and polls use this, never
   /// `recheck`, so a device ejected while they run is never offered to the transport again.
-  private func recheckHeld(_ id: DeviceID) async {
-    guard let entry = entries[id], case .held(let session) = entry.holding else { return }
+  func recheckHeld(_ id: DeviceID) async {
+    guard !swapping.contains(id), let entry = entries[id], case .held(let session) = entry.holding
+    else { return }
     let reading = await Self.read(session)
-    guard let current = entries[id], current.generation == entry.generation else { return }
+    guard !swapping.contains(id), let current = entries[id],
+      current.generation == entry.generation
+    else { return }
     switch reading {
     case .state(.failed(let error)):
       // Let the session go, so a later scan can open the device afresh.
       await session.close()
       guard let latest = entries[id], latest.generation == current.generation else { return }
-      store(latest.info, .failed(error), .unheld)
+      if await resumeKept(latest.info, generation: latest.generation) { return }
+      store(latest.info, .failed(error), .unheld, method: latest.method)
       backOff(id)
     case .state(let state):
-      store(current.info, state, current.holding)
+      store(current.info, state, current.holding, method: current.method)
     case .gone:
       // Closed while still listed as held, so a replug of the same device ticked meanwhile is
       // not admitted, and reported, ahead of this departure.
       await session.close()
-      guard entries[id]?.generation == current.generation else { return }
-      entries[id] = nil
-      updatePolling()
-      log.info("device \(id.serial, privacy: .private) detached")
-      continuation.yield(.detached(id))
-      // A replug of the same device may already have been ticked while this one was held.
-      Task { [weak self] in await self?.reconcile() }
+      guard let latest = entries[id], latest.generation == current.generation else { return }
+      if await resumeKept(latest.info, generation: latest.generation) { return }
+      drop(id)
     }
-  }
-
-  /// Closes the device's session. It stays listed as `.ejected` until it is unplugged or mounted
-  /// again: the transport is told to leave it alone first, so no scan opens it meanwhile.
-  public func eject(_ id: DeviceID) async {
-    guard case .held = entries[id]?.holding else { return }
-    ejected.insert(id)
-    ejecting.insert(id)
-    defer { ejecting.remove(id) }
-    await transport.park(id)
-    guard let entry = entries[id], case .held(let session) = entry.holding else { return }
-    store(entry.info, .ejected, .unheld)
-    await session.close()
-    log.info("device \(id.serial, privacy: .private) ejected")
   }
 
   // MARK: Reconcile
@@ -213,7 +206,7 @@ public actor DeviceHub {
   }
 
   private func refresh() async {
-    for (id, entry) in entries {
+    for (id, entry) in entries where !swapping.contains(id) {
       if case .held = entry.holding { probe(id) }
     }
     let scan: DeviceScan
@@ -234,10 +227,10 @@ public actor DeviceHub {
       continuation.yield(.detached(id))
     }
     for info in scan.busy where isUnheld(info.id) {
-      store(info, .busy, .unheld)
+      store(info, .busy, .unheld, method: scan.method(of: info.id))
     }
     for info in scan.notSharing where isUnheld(info.id) {
-      store(info, .notSharingFiles, .unheld)
+      store(info, .notSharingFiles, .unheld, method: scan.method(of: info.id))
     }
     // The transport decides when an ejected device stops being ejected (unplugged long enough,
     // or found where it could be opened): the hub follows, except mid-eject.
@@ -248,16 +241,27 @@ public actor DeviceHub {
     }
     for info in scan.ejected where isUnheld(info.id) {
       ejected.insert(info.id)
-      store(info, .ejected, .unheld)
+      store(info, .ejected, .unheld, method: scan.method(of: info.id))
     }
-    for info in scan.devices {
-      await admit(info)
+    await serve(scan)
+  }
+
+  /// Opens each usable device the hub does not hold, and moves each held one whose method the
+  /// scan says has changed.
+  private func serve(_ scan: DeviceScan) async {
+    for info in scan.devices where !swapping.contains(info.id) {
+      let method = scan.method(of: info.id)
+      if let entry = entries[info.id], case .held = entry.holding {
+        if entry.method != method { beginSwap(info.id, to: method) }
+      } else {
+        await admit(info, method: method)
+      }
     }
   }
 
   /// Opens a device the hub does not hold: one it does not list yet, or one that was busy,
   /// failed, not sharing files or ejected and is now offered as usable.
-  private func admit(_ info: DeviceInfo) async {
+  private func admit(_ info: DeviceInfo, method: ConnectionMethod) async {
     let existing = entries[info.id]
     if let existing, case .held = existing.holding { return }
     if ejected.contains(info.id) || backoff[info.id]?.waiting == true { return }
@@ -269,7 +273,7 @@ public actor DeviceHub {
       return
     } catch {
       guard entries[info.id]?.generation == generation else { return }
-      store(info, error == .deviceBusy ? .busy : .failed(error), .unheld)
+      store(info, error == .deviceBusy ? .busy : .failed(error), .unheld, method: method)
       if error != .deviceBusy { backOff(info.id) }
       return
     }
@@ -281,13 +285,13 @@ public actor DeviceHub {
     if case .failed = state {
       await session.close()
       guard entries[info.id]?.generation == generation else { return }
-      store(info, state, .unheld)
+      store(info, state, .unheld, method: method)
       backOff(info.id)
       return
     }
     backoff[info.id] = nil
     log.info("device \(info.id.serial, privacy: .private) opened")
-    store(info, state, .held(session))
+    store(info, state, .held(session), method: method)
   }
 
   /// Reads a held device's storages off this tick, so a long transfer queued on its session
@@ -311,7 +315,7 @@ public actor DeviceHub {
     return true
   }
 
-  private static func read(_ session: any DeviceSession) async -> Reading {
+  static func read(_ session: any DeviceSession) async -> Reading {
     do throws(TransportError) {
       return .state(.ready(try await session.storages()))
     } catch .deviceLocked {
@@ -327,54 +331,21 @@ public actor DeviceHub {
 
   /// Records the entry and emits what changed. Starts or stops the re-check poll in the same
   /// turn, so no observer sees the state without the poll that goes with it.
-  private func store(_ info: DeviceInfo, _ state: DeviceState, _ holding: Holding) {
+  func store(
+    _ info: DeviceInfo, _ state: DeviceState, _ holding: Holding, method: ConnectionMethod
+  ) {
     generations += 1
     let previous = entries[info.id]
-    entries[info.id] = Entry(info: info, state: state, holding: holding, generation: generations)
-    let device = AttachedDevice(info: info, state: state)
-    if previous == nil {
+    entries[info.id] = Entry(
+      info: info, state: state, method: method, holding: holding, generation: generations)
+    let device = AttachedDevice(info: info, state: state, method: method)
+    if let previous {
+      let before = AttachedDevice(
+        info: previous.info, state: previous.state, method: previous.method)
+      if before != device { continuation.yield(.changed(device)) }
+    } else {
       continuation.yield(.attached(device))
-    } else if previous?.state != state {
-      continuation.yield(.changed(device))
     }
     updatePolling()
-  }
-}
-
-// MARK: Polling
-
-extension DeviceHub {
-  /// Held devices not sharing files, in serial order.
-  fileprivate var waitingIDs: [DeviceID] {
-    entries.values.compactMap { entry in
-      guard case .held = entry.holding, entry.state == .notSharingFiles else { return nil }
-      return entry.info.id
-    }.sorted { $0.serial < $1.serial }
-  }
-
-  func updatePolling() {
-    let waiting = !waitingIDs.isEmpty
-    if waiting, poller == nil {
-      poller = Task { [weak self, clock] in
-        while !Task.isCancelled {
-          do {
-            try await clock.sleep(for: Self.recheckInterval)
-          } catch {
-            return
-          }
-          guard !Task.isCancelled, let self else { return }
-          await self.recheckWaiting()
-        }
-      }
-    } else if !waiting, let poller {
-      poller.cancel()
-      self.poller = nil
-    }
-  }
-
-  fileprivate func recheckWaiting() async {
-    for id in waitingIDs {
-      await recheckHeld(id)
-    }
   }
 }

@@ -158,7 +158,7 @@ final class FakeServices: SystemServicing {
 func device(_ serial: String, model: String, _ state: DeviceState) -> AttachedDevice {
   AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: serial), manufacturer: "NetAlly", model: model),
-    state: state)
+    state: state, method: .usbFileTransfer)
 }
 
 @MainActor

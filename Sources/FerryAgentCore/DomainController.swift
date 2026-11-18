@@ -28,7 +28,8 @@ public protocol DomainManaging: Sendable {
 }
 
 /// Keeps one FileProvider domain per storage of each ready device, and maps a domain back to
-/// the session that serves it.
+/// the session that serves it: the hub's current one, leased for the request, so the hub can
+/// change how it reaches the device (MTP or ADB) between requests without touching the domain.
 ///
 /// A domain is added the first time its storage is ready. When the device leaves (unplugged,
 /// locked, not sharing files, failed) its domains are disconnected, never removed, so a replug
@@ -42,14 +43,21 @@ public protocol DomainManaging: Sendable {
 /// disconnect and an agent restart, so Finder's items keep their identity across both; removing
 /// the domain discards it.
 public actor DomainController {
-  /// What a request on a domain runs against.
+  /// What a request on a domain runs against. Holds a lease on the device's session until
+  /// `release()`, which every route must get.
   struct Route: Sendable {
     let storage: StorageID
     let session: any DeviceSession
-    /// The one writer over `session`, so every upload shares one in-flight registry.
+    /// A writer over `session`. Every writer over a session shares its in-flight registry.
     let writer: SafeWriter
     /// The domain's one item table.
     let items: ItemTable
+    fileprivate let lease: SessionLease
+    fileprivate let hub: DeviceHub
+
+    func release() async {
+      await hub.release(lease)
+    }
   }
 
   private struct Domain {
@@ -59,19 +67,12 @@ public actor DomainController {
     var connected: Bool
   }
 
-  private struct Link {
-    let session: any DeviceSession
-    let writer: SafeWriter
-  }
-
-  private let hub: DeviceHub
+  let hub: DeviceHub
   private let manager: any DomainManaging
   private let itemStore: URL
   private var domains: [String: Domain] = [:]
   /// The item table of each domain used since it was added or adopted.
   private var tables: [String: ItemTable] = [:]
-  /// The held session of each device with a connected domain.
-  private var links: [DeviceID: Link] = [:]
   /// The operation most recently queued; the next one waits for it.
   private var tail: Task<Void, Never>?
   /// Devices whose eject is closing their session. Their domains are gone and must not come
@@ -141,14 +142,29 @@ public actor DomainController {
   /// which FileProvider retries: anything it reads as "no such item" would make it delete the
   /// domain's items locally, and a request can arrive before an agent restart's adoption.
   func route(_ domain: String) async throws(TransportError) -> Route {
+    let (storage, items) = try await connected(domain)
+    let lease = try await leaseSession(of: storage.device)
+    return Route(
+      storage: storage, session: lease.session, writer: SafeWriter(session: lease.session),
+      items: items, lease: lease, hub: hub)
+  }
+
+  /// The domain's item table, for a request that does not touch the device. Waits, and fails,
+  /// as `route(_:)` does.
+  func items(of domain: String) async throws(TransportError) -> ItemTable {
+    try await connected(domain).items
+  }
+
+  private func connected(_ domain: String) async throws(TransportError) -> (
+    storage: StorageID, items: ItemTable
+  ) {
     if !adopted {
       await withCheckedContinuation { adoptionWaiters.append($0) }
     }
-    guard let entry = domains[domain], entry.connected, let storage = entry.storage,
-      let link = links[storage.device]
-    else { throw .deviceDisconnected }
-    return Route(
-      storage: storage, session: link.session, writer: link.writer, items: table(for: domain))
+    guard let entry = domains[domain], entry.connected, let storage = entry.storage else {
+      throw .deviceDisconnected
+    }
+    return (storage, table(for: domain))
   }
 
   func signal(_ domain: String) async {
@@ -252,7 +268,7 @@ public actor DomainController {
   private func connect(_ spec: DomainSpec, _ storage: StorageID) async {
     let identifier = spec.identifier
     guard var existing = domains[identifier] else {
-      guard await link(for: storage.device) != nil else { return }
+      guard await isServed(storage.device) else { return }
       domains[identifier] = Domain(spec: spec, storage: storage, connected: true)
       do {
         try await manager.add(spec)
@@ -270,7 +286,7 @@ public actor DomainController {
       domains[identifier] = existing
     }
     if !existing.connected {
-      guard await link(for: storage.device) != nil else { return }
+      guard await isServed(storage.device) else { return }
       domains[identifier]?.connected = true
       do {
         try await manager.reconnect(identifier)
@@ -300,25 +316,7 @@ public actor DomainController {
     }
   }
 
-  /// The device's link, opening one over the hub's session if there is none.
-  private func link(for id: DeviceID) async -> Link? {
-    if let link = links[id] { return link }
-    let session: any DeviceSession
-    do throws(TransportError) {
-      session = try await hub.session(for: id)
-    } catch {
-      log.error(
-        "no session for \(id.serial, privacy: .private): \(String(describing: error), privacy: .private)"
-      )
-      return nil
-    }
-    let link = Link(session: session, writer: SafeWriter(session: session))
-    links[id] = link
-    return link
-  }
-
   private func disconnectDomains(of id: DeviceID) async {
-    links[id] = nil
     let connected = domains.filter { $0.value.connected && $0.value.storage?.device == id }
     for identifier in connected.keys.sorted() {
       await disconnect(identifier)
@@ -328,9 +326,6 @@ public actor DomainController {
   private func disconnect(_ identifier: String) async {
     guard let domain = domains[identifier], domain.connected else { return }
     domains[identifier]?.connected = false
-    if let device = domain.storage?.device, !hasConnectedDomain(device) {
-      links[device] = nil
-    }
     do {
       try await manager.disconnect(identifier)
     } catch {
@@ -339,9 +334,6 @@ public actor DomainController {
     }
   }
 
-  private func hasConnectedDomain(_ device: DeviceID) -> Bool {
-    domains.values.contains { $0.connected && $0.storage?.device == device }
-  }
 }
 
 // MARK: Removing
@@ -349,7 +341,6 @@ public actor DomainController {
 extension DomainController {
   private func removeDomains(of id: DeviceID) async -> [URL] {
     ejecting.insert(id)
-    links[id] = nil
     let identifiers = domains.filter { $0.value.storage?.device == id }.keys.sorted()
     for identifier in identifiers {
       domains[identifier] = nil
@@ -384,7 +375,6 @@ extension DomainController {
   private func removeEveryDomain() async -> Result<[URL], TransportError> {
     retired = true
     domains = [:]
-    links = [:]
     for table in tables.values {
       await table.discard()
     }

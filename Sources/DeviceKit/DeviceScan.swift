@@ -15,15 +15,29 @@ public struct DeviceScan: Sendable, Equatable, Codable {
   /// When to scan again without waiting for a USB event, so an ejected device that left is
   /// noticed once its absence counts as an unplug. `nil` when nothing is waiting.
   public let rescanAfter: Duration?
+  /// How the transport reaches every device it lists, unless `methods` says otherwise.
+  public let method: ConnectionMethod
+  /// Devices the transport reaches another way than `method`.
+  public let methods: [DeviceID: ConnectionMethod]
 
+  /// `method` is how the transport reaches what it lists: MTP is always `.usbFileTransfer`. A
+  /// transport with more than one route names the exceptions in `methods`.
   public init(
     devices: [DeviceInfo], busy: [DeviceInfo] = [], notSharing: [DeviceInfo] = [],
-    ejected: [DeviceInfo] = [], rescanAfter: Duration? = nil
+    ejected: [DeviceInfo] = [], rescanAfter: Duration? = nil,
+    method: ConnectionMethod = .usbFileTransfer, methods: [DeviceID: ConnectionMethod] = [:]
   ) {
     self.devices = devices
     self.busy = busy
     self.notSharing = notSharing
     self.ejected = ejected
     self.rescanAfter = rescanAfter
+    self.method = method
+    self.methods = methods.filter { $0.value != method }
+  }
+
+  /// How the transport reaches `id`.
+  public func method(of id: DeviceID) -> ConnectionMethod {
+    methods[id] ?? method
   }
 }

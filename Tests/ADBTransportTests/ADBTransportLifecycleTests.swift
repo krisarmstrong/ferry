@@ -28,7 +28,7 @@ struct ADBTransportLifecycleTests {
     #expect(try await eventually { await ticks.value >= 1 })
 
     await hub.kill()
-    #expect(try await transport.scan() == DeviceScan(devices: []))
+    #expect(try await transport.scan() == DeviceScan(devices: [], method: .usbADB))
     #expect(await transport.status == .serverDown)
 
     let before = await ticks.value
@@ -96,7 +96,8 @@ struct ADBTransportLifecycleTests {
 
     await hub.kill()
     #expect(
-      try await transport.scan() == DeviceScan(devices: [], ejected: [Fixture.linkRunnerInfo]))
+      try await transport.scan()
+        == DeviceScan(devices: [], ejected: [Fixture.linkRunnerInfo], method: .usbADB))
     clock.advance(by: .seconds(60))
     try await hub.start(port: port)
     hub.set([])
@@ -126,7 +127,7 @@ struct ADBTransportLifecycleTests {
     #expect(scan.rescanAfter == ADBTransport.settleTime)
     clock.advance(by: ADBTransport.settleTime)
     scan = try await transport.scan()
-    #expect(scan == DeviceScan(devices: []))
+    #expect(scan == DeviceScan(devices: [], method: .usbADB))
     hub.set([.init(Fixture.linkRunnerSerial, device: android)])
     #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
     await hub.kill()
@@ -162,7 +163,8 @@ struct ADBTransportLifecycleTests {
     await session.close()
     // Unknown whether it is attached while the server is down, but it stays ejected for the hub.
     #expect(
-      try await transport.scan() == DeviceScan(devices: [], ejected: [Fixture.linkRunnerInfo]))
+      try await transport.scan()
+        == DeviceScan(devices: [], ejected: [Fixture.linkRunnerInfo], method: .usbADB))
     try await hub.start(port: port)
     let scan = try await transport.scan()
     #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.devices.isEmpty)

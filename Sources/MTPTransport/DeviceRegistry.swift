@@ -205,10 +205,22 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
   }
 
   /// Leaves the held device `id` alone once it is released, on whatever enumeration it comes
-  /// back as, until it is unplugged or `unpark(_:)` is called.
-  func park(_ id: DeviceID) {
-    guard let device = held.values.first(where: { $0.info.id == id }) else { return }
-    ejected[device.port] = Ejected(info: device.info, missingSince: nil)
+  /// back as, until it is unplugged or `unpark(_:)` is called. A device a scan opened that no
+  /// session claimed (another transport serves it) is released now, so the eject frees it for
+  /// other apps too.
+  func park(_ id: DeviceID) async {
+    await gate.run {
+      if let device = held.values.first(where: { $0.info.id == id }) {
+        ejected[device.port] = Ejected(info: device.info, missingSince: nil)
+        return
+      }
+      guard let (location, scanned) = opened.first(where: { $0.value.info.id == id }) else {
+        return
+      }
+      opened[location] = nil
+      ejected[scanned.port] = Ejected(info: scanned.info, missingSince: nil)
+      await driver.close(scanned.device)
+    }
   }
 
   /// Lets the next scan open `id` again: a device that was busy or ejected.

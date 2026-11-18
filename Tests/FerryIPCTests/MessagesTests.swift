@@ -125,10 +125,10 @@ private func responses() throws -> [AgentResponse] {
     capacity: 1_000, free: 900)
   let ready = AttachedDevice(
     info: DeviceInfo(id: device, manufacturer: "NetAlly", model: "EtherScope"),
-    state: .ready([storage]))
+    state: .ready([storage]), method: .usbFileTransfer)
   let locked = AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: "B"), manufacturer: "Pixel", model: "8"),
-    state: .failed(.deviceLocked))
+    state: .failed(.deviceLocked), method: .usbFileTransfer)
   var all: [AgentResponse] = [
     .status(StatusReport(devices: [ready, locked], provider: .enabled)),
     .status(StatusReport(devices: [], provider: .noDomains)),

@@ -99,12 +99,20 @@ actor MTPDevice {
           raw: storage.pointee.id,
           description: storage.pointee.StorageDescription.map { String(cString: $0) },
           volume: storage.pointee.VolumeIdentifier.map { String(cString: $0) },
-          fileSystem: storage.pointee.FilesystemType))
+          fileSystem: storage.pointee.FilesystemType, type: storage.pointee.StorageType))
       capacities.append((storage.pointee.MaxCapacity, storage.pointee.FreeSpaceInBytes))
       node = storage.pointee.next
     }
     guard !storages.isEmpty else { throw .deviceLocked }
     let keys = storageKeys(for: storages)
+    for storage in storages {
+      // What the device calls its storages, so the method-neutral keys can be checked against
+      // real devices. A description names the storage, never the user's files.
+      let summary =
+        "storage \(String(format: "%08X", storage.raw)) type \(storage.type) description "
+        + "\(storage.description ?? "nil") volume \(storage.volume ?? "nil") key \(keys[storage.raw] ?? "")"
+      Self.log.info("\(summary, privacy: .public)")
+    }
     return zip(storages, capacities).map { storage, space in
       let info = StorageInfo(
         id: StorageID(device: info.id, key: keys[storage.raw] ?? ""),

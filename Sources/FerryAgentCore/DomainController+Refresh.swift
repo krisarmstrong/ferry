@@ -49,6 +49,7 @@ extension DomainController {
         break
       }
     }
+    await route.release()
     return (await route.items.changeCount != before, failure)
   }
 

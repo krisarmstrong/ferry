@@ -81,7 +81,7 @@ public actor AgentService: AgentHandling {
       try await delete(id, base: base, recursive: recursive, in: domain)
       return .done
     case (.changes(let domain, let since), _):
-      let changes = try await domains.route(domain).items.changes(since: since)
+      let changes = try await domains.items(of: domain).changes(since: since)
       return .changes(
         anchor: changes.anchor, updated: changes.updated, deleted: changes.deleted,
         expired: changes.expired)
@@ -266,6 +266,7 @@ public actor AgentService: AgentHandling {
       }
       return (result, await route.items.changeCount != before)
     }
+    await route.release()
     if changed {
       await domains.signal(domain)
     }

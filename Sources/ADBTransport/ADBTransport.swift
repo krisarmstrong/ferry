@@ -148,7 +148,8 @@ public actor ADBTransport: DeviceTransport {
         throw .cancelled
       } catch {
         serverUnreachable(error)
-        return DeviceScan(devices: [], ejected: parked.values.map(\.info).sorted(by: Self.serial))
+        return DeviceScan(
+          devices: [], ejected: parked.values.map(\.info).sorted(by: Self.serial), method: .usbADB)
       }
       status = .available
       let usable = listed.filter { $0.state == .device }
@@ -171,13 +172,18 @@ public actor ADBTransport: DeviceTransport {
       let rescanAfter = [settle, retry].compactMap { $0 }.min()
       let known = Set(found.keys).union(parked.keys)
       let unauthorized = listed.filter { $0.state == .unauthorized }
-        .map(Self.describe)
-        .filter { !known.contains($0.id) }
-        .sorted { $0.id.serial < $1.id.serial }
+        .filter { !known.contains(Self.describe($0).id) }
+        .sorted { $0.serial < $1.serial }
+      var overNetwork = Set(unauthorized.filter(\.isWireless).map { DeviceID(serial: $0.serial) })
+      for (id, device) in found where device.usb == nil {
+        overNetwork.insert(id)
+      }
       return DeviceScan(
         devices: found.values.map(\.info).filter { parked[$0.id] == nil }.sorted(by: Self.serial),
-        notSharing: unauthorized, ejected: parked.values.map(\.info).sorted(by: Self.serial),
-        rescanAfter: rescanAfter)
+        notSharing: unauthorized.map(Self.describe),
+        ejected: parked.values.map(\.info).sorted(by: Self.serial), rescanAfter: rescanAfter,
+        method: .usbADB,
+        methods: Dictionary(uniqueKeysWithValues: overNetwork.map { ($0, .wifiADB) }))
     }
   }
 
