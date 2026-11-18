@@ -1,12 +1,26 @@
 import Foundation
 
 /// Building the command line the device's `sh` will parse. Every argument is single-quoted, so
-/// a name can never end the command or reach another path. An argument holding a NUL byte is
-/// refused: the device's shell would cut it there and act on a shorter path.
+/// a name can never end the command. Quoting does not stop a name that starts with `-` from
+/// being read as an option: callers pass absolute paths (which start with `/`) or put `--`
+/// first. An argument holding a NUL byte is refused: the device's shell would cut it there and
+/// act on a shorter path.
 public enum ADBShell {
+  /// Escapes scalar by scalar: a `'` followed by a combining mark is one `Character`, so a
+  /// string-level replace would leave its raw quote byte to end the quoting on the device.
   public static func quote(_ argument: String) throws(ADBError) -> String {
     guard !argument.utf8.contains(0) else { throw .invalidArgument(argument) }
-    return "'" + argument.replacing("'", with: "'\\''") + "'"
+    var quoted = String.UnicodeScalarView()
+    quoted.append("'")
+    for scalar in argument.unicodeScalars {
+      if scalar == "'" {
+        quoted.append(contentsOf: "'\\''".unicodeScalars)
+      } else {
+        quoted.append(scalar)
+      }
+    }
+    quoted.append("'")
+    return String(quoted)
   }
 
   /// `program` is a trusted literal such as `rm`; `args` are quoted.
