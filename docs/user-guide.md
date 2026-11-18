@@ -115,7 +115,8 @@ their device with a percentage. Ferry writes each file under a hidden temporary 
 renames it only when the copy is complete, so a half-copied file never appears under its real
 name.
 
-Packages, such as `.rtfd` documents, copy as folders. Symbolic links and aliases can't be
+Packages, such as `.rtfd` documents, copy as folders, and editing one on the device updates
+its folder there. Symbolic links and aliases can't be
 copied to the device: Finder shows "Symbolic links and aliases can't be copied to the device"
 for them, and links inside an app or other bundle are left out of its copy.
 
