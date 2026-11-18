@@ -7,6 +7,8 @@ public enum ADBError: Error, Equatable, Sendable {
   /// The server answered `FAIL` with this message.
   case failed(String)
   case deviceGone(String)
+  /// The peer closed the connection (a device unplugged mid-stream, or the server stopped).
+  case connectionClosed
   case protocolViolation(String)
 }
 

@@ -56,7 +56,7 @@ public actor ADBStream {
   ) -> Result<Data, ADBError> {
     if let error { return .failure(.failed(error.localizedDescription)) }
     if let chunk, !chunk.isEmpty { return .success(chunk) }
-    return isComplete ? .failure(.failed("connection closed")) : .success(Data())
+    return isComplete ? .failure(.connectionClosed) : .success(Data())
   }
 
   public func write(_ data: Data) async throws(ADBError) {

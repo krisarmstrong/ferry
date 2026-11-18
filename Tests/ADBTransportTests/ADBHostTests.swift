@@ -37,6 +37,36 @@ struct ADBHostTests {
     #expect(await received.value == Data("000chost:version".utf8))
   }
 
+  @Test func hardCodedReplyBytesParse() async throws {
+    let server = try await FakeADBServer.start { peer in
+      _ = try await peer.request()
+      try await peer.send("OKAY00040029")
+    }
+    defer { server.stop() }
+    #expect(try await host(server).version() == 0x29)
+  }
+
+  @Test func hardCodedFailBytesParse() async throws {
+    let server = try await FakeADBServer.start { peer in
+      _ = try await peer.request()
+      try await peer.send("FAIL0004nope")
+    }
+    defer { server.stop() }
+    await #expect(throws: ADBError.failed("nope")) { _ = try await host(server).devices() }
+  }
+
+  @Test func framingMatchesTheProtocolSpec() throws {
+    #expect(try ADBWire.frame("host:version") == Data("000chost:version".utf8))
+    #expect(try ADBWire.length(of: Data("00ff".utf8)) == 255)
+    #expect(throws: ADBError.self) { try ADBWire.length(of: Data("00zz".utf8)) }
+  }
+
+  @Test func peerCloseIsConnectionClosed() async throws {
+    let server = try await FakeADBServer.start { peer in _ = try await peer.request() }
+    defer { server.stop() }
+    await #expect(throws: ADBError.connectionClosed) { _ = try await host(server).version() }
+  }
+
   @Test func versionParsesHexReply() async throws {
     let server = try await FakeADBServer.start { peer in
       #expect(try await peer.request() == "host:version")

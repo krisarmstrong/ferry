@@ -62,9 +62,8 @@ public actor ADBHost {
     ADBWire.devices(from: try await query("host:devices-l"))
   }
 
-  /// A new list for every change the server reports. The stream finishes when the server closes
-  /// the connection or answers with an error, and never throws; only a missing server is retried,
-  /// starting it once per outage and then backing off.
+  /// A new list for every change the server reports, and `[]` once when the server goes away.
+  /// It reconnects on its own and finishes only when the consumer stops iterating.
   public nonisolated func trackDevices() -> AsyncStream<[ADBDevice]> {
     AsyncStream { continuation in
       let task = Task { await self.track(into: continuation) }
@@ -119,48 +118,67 @@ public actor ADBHost {
     }
   }
 
+  /// Survives server restarts: when the connection closes or the server is missing, reports
+  /// no devices once, starts the server at most once per outage, and retries with back-off.
+  /// Only the consumer stopping ends it.
   private func track(into continuation: AsyncStream<[ADBDevice]>.Continuation) async {
     var backoff = backoff
+    var reportedGone = false
     var startedThisOutage = false
     while !Task.isCancelled {
+      var connected = false
       do throws(ADBError) {
         let stream = try await ADBStream.open(port: port)
-        await follow(stream, into: continuation)
-        break
-      } catch {
-        if !startedThisOutage {
-          startedThisOutage = true
-          do throws(ADBError) {
-            try await startServer()
-            continue
-          } catch {
-            Self.log.error("adb server not started: \(String(describing: error), privacy: .public)")
-          }
+        connected = await follow(stream, into: continuation) {
+          reportedGone = false
+          startedThisOutage = false
+          backoff.reset()
         }
-        let delay = backoff.next()
-        Self.log.info("adb server unavailable; retrying in \(delay.components.seconds)s")
-        if (try? await Task.sleep(for: delay)) == nil { break }
+      } catch {}
+      if Task.isCancelled { break }
+      if !reportedGone {
+        reportedGone = true
+        continuation.yield([])
       }
+      if !connected && !startedThisOutage {
+        startedThisOutage = true
+        do throws(ADBError) {
+          try await startServer()
+          continue
+        } catch {
+          Self.log.error("adb server not started: \(String(describing: error), privacy: .public)")
+        }
+      }
+      let delay = backoff.next()
+      Self.log.info("adb server unavailable; retrying in \(delay.components.seconds)s")
+      if (try? await Task.sleep(for: delay)) == nil { break }
     }
     continuation.finish()
   }
 
-  /// Emits each frame until the socket closes or the consumer cancels.
+  /// Emits each frame until the socket closes or the consumer cancels. `onFrame` runs before
+  /// each emission; the result says whether the server was reached (the handshake succeeded).
   private func follow(
-    _ stream: ADBStream, into continuation: AsyncStream<[ADBDevice]>.Continuation
-  ) async {
+    _ stream: ADBStream, into continuation: AsyncStream<[ADBDevice]>.Continuation,
+    onFrame: () -> Void
+  ) async -> Bool {
     await withTaskCancellationHandler {
+      var reached = false
       do throws(ADBError) {
         try await stream.send(request: "host:track-devices-l")
         try await stream.expectOkay()
+        reached = true
         while true {
-          continuation.yield(ADBWire.devices(from: try await stream.readFrame()))
+          let devices = ADBWire.devices(from: try await stream.readFrame())
+          onFrame()
+          continuation.yield(devices)
         }
       } catch {
         if !Task.isCancelled {
           Self.log.info("device tracking ended: \(String(describing: error), privacy: .public)")
         }
       }
+      return reached
     } onCancel: {
       stream.cancel()
     }
