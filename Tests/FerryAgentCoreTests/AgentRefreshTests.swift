@@ -89,4 +89,22 @@ struct AgentRefreshTests {
     let since = try await changes(harness, device, since: anchor)
     #expect(since.updated.map(\.item.path) == [try path("/back.txt")])
   }
+
+  /// Refresh lists only what Finder has listed, not every folder a listing showed: otherwise
+  /// each refresh would walk one level deeper, until a reconnect listed the whole device.
+  @Test func refreshNeverListsFoldersFinderHasNotOpened() async throws {
+    let device = await makeDevice("A")
+    try await device.seed(path("/A/B/c.txt"), in: storageID(device), contents: Data("c".utf8))
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    _ = try await list(harness, device)
+    let anchor = try await changes(harness, device, since: nil).anchor
+
+    for _ in 0..<2 {
+      #expect(await harness.service.handle(.refresh(device.info.id), file: nil) == .done)
+    }
+
+    #expect(try await changes(harness, device, since: anchor).updated.isEmpty)
+  }
 }

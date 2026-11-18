@@ -34,14 +34,17 @@ private struct ReportedItem: Codable, Equatable {
 /// the table, so none of them sees the table and the device disagree (see `AgentService`).
 actor ItemTable {
   /// What the table knows about one item. `reported` is `nil` for an item known only as the
-  /// parent of one the agent reported.
-  private struct Record: Codable, Equatable {
+  /// parent of one the agent reported. `listed` marks a folder the agent has listed for a client,
+  /// which a refresh lists again.
+  fileprivate struct Record: Codable, Equatable {
     var path: RemotePath
     var reported: ReportedItem?
+    var listed: Bool
 
-    init(path: RemotePath, item: RemoteItem? = nil) {
+    init(path: RemotePath, item: RemoteItem? = nil, listed: Bool = false) {
       self.path = path
       reported = item.map { ReportedItem(kind: $0.kind, size: $0.size, modified: $0.modified) }
+      self.listed = listed
     }
 
     func describes(_ item: RemoteItem) -> Bool {
@@ -56,8 +59,9 @@ actor ItemTable {
     }
   }
 
-  private struct Stored: Codable {
+  fileprivate struct Stored: Codable {
     var items: [String: Record]
+    var rootListed: Bool
   }
 
   nonisolated let gate = OperationGate()
@@ -65,6 +69,7 @@ actor ItemTable {
   private let file: URL
   private var records: [ItemID: Record] = [:]
   private var ids: [RemotePath: ItemID] = [:]
+  private var rootListed = false
   private var changeLog: ChangeLog
   /// Changed since the last save.
   private var dirty = false
@@ -74,7 +79,8 @@ actor ItemTable {
   init(domain: String, store: URL, changes: ChangeLog = ChangeLog()) {
     file = Self.file(for: domain, in: store)
     changeLog = changes
-    (records, ids) = Self.load(file)
+    let loaded = Self.load(file)
+    (records, ids, rootListed) = (loaded.records, loaded.ids, loaded.rootListed)
   }
 
   /// The number of changes recorded so far.
@@ -116,11 +122,12 @@ actor ItemTable {
     return assign(Record(path: path))
   }
 
-  /// The root and every folder the device reported, parents before their children: what a
-  /// refresh lists again.
+  /// The folders the agent has listed for a client, root included, parents before their
+  /// children: what a refresh lists again. Not every folder a listing showed: listing those too
+  /// would walk one level deeper with each refresh.
   func knownFolders() -> [RemotePath] {
-    let folders = records.values.filter { $0.reported?.kind == .folder }.map(\.path)
-    return [.root]
+    let folders = records.values.filter { $0.listed && $0.reported?.kind == .folder }.map(\.path)
+    return (rootListed ? [.root] : [])
       + folders.sorted {
         ($0.components.count, $0.description) < ($1.components.count, $1.description)
       }
@@ -157,7 +164,7 @@ actor ItemTable {
   /// replaced its contents, after `moved` for the first two). Recorded as a change.
   func changed(_ item: RemoteItem, id: ItemID) -> ProviderEntry {
     defer { save() }
-    records[id] = Record(path: item.path, item: item)
+    records[id] = Record(path: item.path, item: item, listed: records[id]?.listed ?? false)
     ids[item.path] = id
     dirty = true
     let entry = entry(item, id: id)
@@ -195,6 +202,7 @@ actor ItemTable {
   /// order.
   func listed(_ folder: RemotePath, children: [RemoteItem]) -> [ProviderEntry] {
     defer { save() }
+    markListed(folder)
     let shown = Set(children.map(\.path))
     for path in ids.keys where path.parent == folder && !shown.contains(path) {
       forget(subtree(of: path))
@@ -241,7 +249,7 @@ actor ItemTable {
         id = assign(Record(path: item.path, item: item))
       } else {
         id = known
-        records[id] = Record(path: item.path, item: item)
+        records[id] = Record(path: item.path, item: item, listed: record.listed)
         dirty = true
       }
     } else {
@@ -250,6 +258,17 @@ actor ItemTable {
     let entry = entry(item, id: id)
     changeLog.record(.updated(entry))
     return entry
+  }
+
+  private func markListed(_ folder: RemotePath) {
+    if folder == .root {
+      guard !rootListed else { return }
+      rootListed = true
+    } else {
+      guard let id = ids[folder], records[id]?.listed == false else { return }
+      records[id]?.listed = true
+    }
+    dirty = true
   }
 
   private func entry(_ item: RemoteItem, id: ItemID) -> ProviderEntry {
@@ -292,7 +311,8 @@ actor ItemTable {
     guard dirty, !discarded else { return }
     dirty = false
     let stored = Stored(
-      items: Dictionary(uniqueKeysWithValues: records.map { ($0.key.rawValue, $0.value) }))
+      items: Dictionary(uniqueKeysWithValues: records.map { ($0.key.rawValue, $0.value) }),
+      rootListed: rootListed)
     do {
       try FileManager.default.createDirectory(
         at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -302,15 +322,34 @@ actor ItemTable {
     }
   }
 
-  private static func load(_ file: URL) -> ([ItemID: Record], [RemotePath: ItemID]) {
+  private static func remove(_ file: URL) {
+    do {
+      try FileManager.default.removeItem(at: file)
+    } catch CocoaError.fileNoSuchFile {
+      return
+    } catch {
+      log.error("deleting item table failed: \(error, privacy: .private)")
+    }
+  }
+}
+
+extension ItemTable {
+  /// A table as read from its file.
+  fileprivate struct Loaded {
+    var records: [ItemID: Record] = [:]
+    var ids: [RemotePath: ItemID] = [:]
+    var rootListed = false
+  }
+
+  fileprivate static func load(_ file: URL) -> Loaded {
     let data: Data
     do {
       data = try Data(contentsOf: file)
     } catch CocoaError.fileReadNoSuchFile {
-      return ([:], [:])
+      return Loaded()
     } catch {
       log.error("reading item table failed: \(error, privacy: .private)")
-      return ([:], [:])
+      return Loaded()
     }
     do {
       let stored = try JSONDecoder().decode(Stored.self, from: data)
@@ -323,20 +362,10 @@ actor ItemTable {
         records[id] = record
         ids[record.path] = id
       }
-      return (records, ids)
+      return Loaded(records: records, ids: ids, rootListed: stored.rootListed)
     } catch {
       log.error("item table is unreadable, starting empty: \(error, privacy: .private)")
-      return ([:], [:])
-    }
-  }
-
-  private static func remove(_ file: URL) {
-    do {
-      try FileManager.default.removeItem(at: file)
-    } catch CocoaError.fileNoSuchFile {
-      return
-    } catch {
-      log.error("deleting item table failed: \(error, privacy: .private)")
+      return Loaded()
     }
   }
 }
