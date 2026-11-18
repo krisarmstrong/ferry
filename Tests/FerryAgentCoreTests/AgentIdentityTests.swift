@@ -26,10 +26,13 @@ struct AgentIdentityTests {
       .rename(domain: domain, id: unknown, to: "b"),
       .move(
         domain: domain, id: try await harness.id(path("/a.txt"), in: domain), toFolder: unknown),
-      .delete(domain: domain, id: unknown, base: nil, recursive: false),
     ] {
       #expect(await service.handle(request, file: nil) == .failure(.unknownItem), "\(request)")
     }
+    // FileProvider's contract: deleting an item that is already gone succeeds.
+    #expect(
+      await service.handle(
+        .delete(domain: domain, id: unknown, base: nil, recursive: false), file: nil) == .done)
     let (_, handle) = try harness.writable("out", "")
     #expect(
       await service.handle(.fetch(domain: domain, id: unknown), file: handle)

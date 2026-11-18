@@ -216,9 +216,8 @@ import UniformTypeIdentifiers
     try await backend.delete(NSFileProviderItemIdentifier(id))
     #expect(
       await agent.requests == [.delete(domain: domain, id: id, base: nil, recursive: false)])
-    await #expect(throws: NSFileProviderError(.noSuchItem)) {
-      try await backend.delete(NSFileProviderItemIdentifier(id))
-    }
+    // Already gone: FileProvider expects success.
+    try await backend.delete(NSFileProviderItemIdentifier(id))
   }
 
   @Test func disconnectedMapsToServerUnreachable() async throws {

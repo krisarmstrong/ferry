@@ -147,7 +147,7 @@ public actor ProviderBackend {
   /// Deletes the item, as the extension's `deleteItem` asks: `base` is the version FileProvider
   /// last had, and a folder's contents go with it only if `recursive`. A file the device changed
   /// since `base` is refused with `.deletionRejected` carrying the device's item, which
-  /// FileProvider puts back.
+  /// FileProvider puts back. An item already gone is deleted already.
   public func delete(
     _ id: NSFileProviderItemIdentifier, base: ContentVersion? = nil, recursive: Bool = false
   ) async throws {
@@ -155,7 +155,8 @@ public actor ProviderBackend {
     let response = try await reply(
       .delete(domain: domain, id: itemID, base: base, recursive: recursive))
     switch response {
-    case .done:
+    // Already gone counts as deleted, as FileProvider expects.
+    case .done, .failure(.unknownItem), .failure(.notFound):
       return
     case .failure(.changedOnDevice):
       guard let current = try? await item(id) else {

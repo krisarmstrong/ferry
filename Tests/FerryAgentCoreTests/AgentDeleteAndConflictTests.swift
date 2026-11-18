@@ -99,6 +99,20 @@ struct AgentDeleteAndConflictTests {
     #expect(await setup.device.contents(of: try path("/Reports/r1.txt"), in: setup.storage) == nil)
   }
 
+  /// Deleted on the device since Finder last saw it: the delete succeeds and the item is
+  /// forgotten.
+  @Test func deletingAFileAlreadyGoneFromTheDeviceSucceeds() async throws {
+    let setup = try await setup([("/a.txt", "old")])
+    defer { setup.harness.finish() }
+    let file = try await setup.id("/a.txt")
+    try await setup.device.delete(try path("/a.txt"), in: setup.storage)
+
+    #expect(
+      await setup.send(.delete(domain: setup.domain, id: file, base: nil, recursive: false))
+        == .done)
+    #expect(await setup.send(.item(domain: setup.domain, id: file)) == .failure(.unknownItem))
+  }
+
   // MARK: Base versions (I1)
 
   @Test func deletingAFileTheDeviceChangedSinceIsRejected() async throws {

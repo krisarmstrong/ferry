@@ -44,18 +44,6 @@ public actor AgentService: AgentHandling {
     }
   }
 
-  /// Whether a request must come with a file: a readable one to upload, a writable one to fetch
-  /// into.
-  private static func takesFile(_ request: AgentRequest) -> Bool {
-    switch request {
-    case .fetch, .replaceContents: true
-    case .create(_, _, _, let isFolder): !isFolder
-    case .status, .recheck, .refresh, .eject, .removeAllDomains, .item, .list, .rename, .move,
-      .delete, .changes, .workingSet:
-      false
-    }
-  }
-
   /// `file` is present exactly when `takesFile(request)`.
   private func perform(_ request: AgentRequest, file: Int32?) async throws(TransportError)
     -> AgentResponse
@@ -255,13 +243,21 @@ public actor AgentService: AgentHandling {
   /// Deletes the item as the device has it now. A file the device changed since `base` is kept
   /// and its new state recorded, so FileProvider puts it back. A folder is deleted with its
   /// contents only if `recursive`: without it, one that holds anything Finder would show is
-  /// kept, since Finder may have last seen it empty.
+  /// kept, since Finder may have last seen it empty. An item already gone, from the table or
+  /// from the device, is deleted already: FileProvider expects success.
   private func delete(
     _ id: ItemID, base: ContentVersion?, recursive: Bool, in domain: String
   ) async throws(TransportError) {
     try await gated(domain) { route throws(TransportError) in
-      let path = try await route.changeable(id)
-      let current = try await route.session.item(at: path, in: route.storage)
+      guard id != .root else { throw .unsupported("changing the storage root") }
+      guard let path = await route.items.path(for: id) else { return }
+      let current: RemoteItem
+      do throws(TransportError) {
+        current = try await route.session.item(at: path, in: route.storage)
+      } catch .notFound {
+        await route.items.removed(path)
+        return
+      }
       switch current.kind {
       case .file:
         if let base, ContentVersion(current) != base {
@@ -308,6 +304,25 @@ public actor AgentService: AgentHandling {
     return try result.get()
   }
 
+  static let ignoreProgress: ProgressHandler = { _, _ in true }
+  static let workingSetPageSize = 500
+}
+
+// MARK: Validating requests
+
+extension AgentService {
+  /// Whether a request must come with a file: a readable one to upload, a writable one to fetch
+  /// into.
+  private static func takesFile(_ request: AgentRequest) -> Bool {
+    switch request {
+    case .fetch, .replaceContents: true
+    case .create(_, _, _, let isFolder): !isFolder
+    case .status, .recheck, .refresh, .eject, .removeAllDomains, .item, .list, .rename, .move,
+      .delete, .changes, .workingSet:
+      false
+    }
+  }
+
   /// A name a client may give an item: one path component, never a partial's or a backup's. A
   /// listing hides those and deletes abandoned ones, so the agent never creates one under a
   /// client's name.
@@ -317,9 +332,6 @@ public actor AgentService: AgentHandling {
     else { throw .invalidName(name) }
     return validated
   }
-
-  static let ignoreProgress: ProgressHandler = { _, _ in true }
-  static let workingSetPageSize = 500
 }
 
 extension DomainController.Route {
