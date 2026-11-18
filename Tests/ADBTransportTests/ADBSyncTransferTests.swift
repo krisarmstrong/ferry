@@ -76,16 +76,15 @@ struct ADBSyncTransferTests {
     }
     defer { server.stop() }
     let (url, handle) = try scratchFile()
-    let directory = url.deletingLastPathComponent()
     defer { try? FileManager.default.removeItem(at: url) }
     await #expect(throws: ADBError.cancelled) {
       _ = try await sync.receive("/x", to: handle) { _, _ in false }
     }
     for _ in 0..<100 where await !hungUp.value { try await Task.sleep(for: .milliseconds(20)) }
     #expect(await hungUp.value)
-    let partials = try FileManager.default.contentsOfDirectory(atPath: directory.path)
-      .filter { $0.hasSuffix(".ferry-partial") }
-    #expect(partials.isEmpty)
+    // Only the first chunk, the one the handler stopped on, reached the file.
+    try handle.close()
+    #expect(try Data(contentsOf: url) == Data(count: 65_536))
   }
 
   @Test func receiveRefusesAnOversizedChunk() async throws {
@@ -98,8 +97,11 @@ struct ADBSyncTransferTests {
     defer { server.stop() }
     let (url, handle) = try scratchFile()
     defer { try? FileManager.default.removeItem(at: url) }
-    await #expect(throws: ADBError.self) {
+    await #expect {
       _ = try await sync.receive("/x", to: handle) { _, _ in true }
+    } throws: {
+      if case .protocolViolation = $0 as? ADBError { return true }
+      return false
     }
   }
 
