@@ -12,6 +12,8 @@ public enum ADBError: Error, Equatable, Sendable {
   case protocolViolation(String)
   /// A transfer's progress handler asked to stop. The sync connection is closed with it.
   case cancelled
+  /// An argument the device's shell cannot carry intact (it holds a NUL byte).
+  case invalidArgument(String)
 }
 
 public struct ADBDevice: Sendable, Equatable {

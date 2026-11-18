@@ -1,16 +1,19 @@
 import Foundation
 
 /// Building the command line the device's `sh` will parse. Every argument is single-quoted, so
-/// a name can never end the command or reach another path. An argument cannot carry a NUL byte:
-/// the device's shell would cut it there, so callers must refuse such names first.
+/// a name can never end the command or reach another path. An argument holding a NUL byte is
+/// refused: the device's shell would cut it there and act on a shorter path.
 public enum ADBShell {
-  public static func quote(_ argument: String) -> String {
-    "'" + argument.replacing("'", with: "'\\''") + "'"
+  public static func quote(_ argument: String) throws(ADBError) -> String {
+    guard !argument.utf8.contains(0) else { throw .invalidArgument(argument) }
+    return "'" + argument.replacing("'", with: "'\\''") + "'"
   }
 
   /// `program` is a trusted literal such as `rm`; `args` are quoted.
-  public static func command(_ program: String, _ args: [String]) -> String {
-    ([program] + args.map(quote)).joined(separator: " ")
+  public static func command(_ program: String, _ args: [String]) throws(ADBError) -> String {
+    var words = [program]
+    for argument in args { words.append(try quote(argument)) }
+    return words.joined(separator: " ")
   }
 }
 

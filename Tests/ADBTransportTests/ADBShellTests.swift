@@ -8,7 +8,7 @@ struct ADBShellTests {
   private func shellEcho(_ argument: String) async throws -> String {
     let process = Process()
     process.executableURL = URL(filePath: "/bin/sh")
-    process.arguments = ["-c", "printf %s " + ADBShell.quote(argument)]
+    process.arguments = ["-c", "printf %s " + (try ADBShell.quote(argument))]
     let output = Pipe()
     process.standardOutput = output
     // Waiting by callback keeps the cooperative threads free for the other tests.
@@ -34,8 +34,16 @@ struct ADBShellTests {
     #expect(try await shellEcho(argument) == argument)
   }
 
-  @Test func commandQuotesEveryArgumentAndLeavesTheProgram() {
-    #expect(ADBShell.command("rm", ["-f", "a b", "it's"]) == "rm '-f' 'a b' 'it'\\''s'")
-    #expect(ADBShell.command("ls", []) == "ls")
+  @Test func commandQuotesEveryArgumentAndLeavesTheProgram() throws {
+    #expect(try ADBShell.command("rm", ["-f", "a b", "it's"]) == "rm '-f' 'a b' 'it'\\''s'")
+    #expect(try ADBShell.command("ls", []) == "ls")
+  }
+
+  @Test func aNulByteIsRefusedBecauseTheDeviceShellWouldTruncateThere() {
+    let hostile = "/sdcard/a\0/../../etc"
+    #expect(throws: ADBError.invalidArgument(hostile)) { try ADBShell.quote(hostile) }
+    #expect(throws: ADBError.invalidArgument(hostile)) {
+      try ADBShell.command("rm", ["-f", "fine", hostile])
+    }
   }
 }
