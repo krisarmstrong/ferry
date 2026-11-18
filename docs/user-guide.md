@@ -22,17 +22,18 @@ Ferry is free and open source (MIT). It needs macOS 26 or later on an Apple sili
 
 ### Install
 
-1. Download the latest `Ferry.dmg` from the project's GitHub Releases page.
-2. Open the DMG and drag **Ferry** to the **Applications** folder.
-3. Open Ferry from Applications.
+Ferry has no published release yet. Build it from source (see the README), then move
+**Ferry** to the **Applications** folder and open it.
 
 Ferry runs in the menu bar. It has no Dock icon and no main window.
 
 ### First launch
 
 The first time Ferry opens, it starts a small helper that talks to your devices. The helper
-keeps running while Ferry is installed, so devices appear in Finder even when the menu-bar
-item is closed.
+keeps running while Ferry is installed, so devices appear in Finder even after you quit the
+menu-bar item.
+
+Until the helper answers, the menu shows **Checking…**.
 
 ### Turn on Ferry in Finder
 
@@ -56,7 +57,8 @@ same way.
 3. Tap **Transfer files**.
 
 The unit appears in Finder a few seconds later. Until you tap **Transfer files**, the unit is
-connected but shares no storage, and Ferry's menu shows **Not sharing files**.
+connected but shares no storage, and Ferry's menu shows **Not sharing files** and opens
+these steps for you.
 
 AirCheck G3 support is planned; it uses different steps.
 
@@ -96,8 +98,8 @@ Your devices also appear in every app's Open and Save dialogs.
 Click a folder to see what is in it. Double-click a file to open it. Ferry copies the file to
 the Mac when you open it, so a large file can take a moment the first time.
 
-To see files that were added on the device while it was connected, choose **Refresh** in the
-Ferry menu.
+To see files that were added or changed on the device while it was connected, choose
+**Refresh** in the Ferry menu.
 
 ### Copy files
 
@@ -136,20 +138,33 @@ and its state.
 
 | State | Meaning |
 | ----- | ------- |
-| **Ready** | The device is sharing files and is in Finder. |
-| **Not sharing files** | The device is connected but file transfer is off. Click **How to turn on file transfer** for the steps. |
-| **In use by another app** | Another app has the device. See [Troubleshooting](#in-use-by-another-app). |
-| **Checking…** | Ferry is checking the device again, for example after **Try Again**. |
-| **Can't open** | The device reported an error. Click **Try Again**, or unplug it and plug it back in. |
+| **Ready** | The device is sharing files and is in Finder. The menu lists each storage and its free space. |
+| **Not sharing files** | The device is connected but file transfer is off or it is locked, or you ejected it. Click **How to turn on file transfer** for the steps; choose **Refresh** to bring back a device you ejected. |
+| **In use by another app** | Another app has the device. Quit it, then click **Try Again**. See [Troubleshooting](#in-use-by-another-app). |
+| **Can't open** | The device reported an error, shown under its name. Click **Try Again**, or unplug it and plug it back in. |
 
-With no device connected, the menu shows **No device connected** and a **How to connect** link.
+Above the devices, the menu can also show:
+
+- **Checking…**: Ferry is waiting for its helper to answer, for example just after Ferry opens.
+- **Turn on Ferry in Finder**: see [Turn on Ferry in Finder](#turn-on-ferry-in-finder).
+- **No device connected**, with a **How to connect** button. The first time the menu stays
+  open for about 10 seconds with no device, Ferry opens the setup guide.
+
+While the menu is open, Ferry checks for devices every 2 seconds.
 
 Menu items:
 
-- **Refresh** (⌘R): checks for devices again and shows changes made on the device.
+- **Refresh** (⌘R): reads each ready device's folders again, so changes made on the device
+  show in Finder, and brings back a device you ejected.
 - **Eject** (next to a device): removes the device from Finder and releases it, so you can
-  unplug it or use it with another app. Changes that had not reached the device are saved to a
-  folder on the Mac, and the menu offers **Reveal in Finder**.
+  unplug it or use it with another app. The device then shows **Not sharing files** until you
+  choose **Refresh** or plug it in again. Changes that had not reached the device are saved
+  to a folder on the Mac: the menu says **Unsent changes were saved to** that folder and
+  offers **Reveal in Finder**. Deletes and renames that had not reached the device are
+  dropped, so the device keeps those files under their old names.
+- **Try Again** (next to a device that is in use or can't open): asks Ferry to open the
+  device again.
+- **Help** (the question-mark button, ⌘?): opens Ferry Help.
 - **Settings…** (⌘,): opens Settings.
 - **Quit**: closes the menu-bar item. The helper keeps running, so devices stay in Finder.
 
@@ -157,6 +172,7 @@ Settings:
 
 - **Open at login**: starts the Ferry menu-bar item when you log in.
 - **How to connect**: opens the file-transfer steps.
+- **Help**: opens Ferry Help.
 - **Remove Ferry…**: see [Uninstall](#uninstall).
 
 ## Troubleshooting
@@ -175,7 +191,7 @@ Settings:
 
 The device is connected, but file transfer is off or the device is locked. Unlock it and
 choose **Transfer files** (or **File transfer**) on the device. You do not need to replug the
-cable.
+cable. If you ejected the device, choose **Refresh** instead.
 
 ### "In use by another app"
 
@@ -198,13 +214,14 @@ locations are present.
 
 ### The device was unplugged during a copy
 
-Plug it back in and turn on file transfer again. The copy resumes when the device is
-reconnected. Nothing is left on the device under the file's real name until the copy is
+Plug it back in and turn on file transfer again. Finder finishes the copy when the device
+reconnects. Nothing is left on the device under the file's real name until the copy is
 complete.
 
 ### "Ferry's helper is not responding"
 
-Quit Ferry from the menu and open it again from Applications.
+The menu shows "Ferry's helper is not responding. Quit Ferry and open it again." Quit Ferry
+from the menu and open it again from Applications.
 
 ## Privacy
 
