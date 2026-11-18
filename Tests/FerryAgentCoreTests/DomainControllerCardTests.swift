@@ -6,9 +6,9 @@ import Testing
 
 @testable import FerryAgentCore
 
-/// An SD card keeps one Finder location whichever method serves it. Android's MTP server sends
-/// no volume ID, so MTP knows the card only by its description; once ADB has served the device,
-/// the agent remembers which volume that description is.
+/// Android's MTP server sends no volume ID, so MTP knows an SD card only by its description,
+/// which every card of a vendor shares. A card is therefore never matched across methods: it has
+/// a Finder location per method, and another card never takes its location.
 @Suite(.timeLimit(.minutes(1)))
 struct DomainControllerCardTests {
   static let id = DeviceID(serial: "S1")
@@ -73,47 +73,34 @@ struct DomainControllerCardTests {
     return nil
   }
 
-  @Test func aCardKeepsOneLocationAcrossMethods() async throws {
-    let store = itemStore()
+  /// MTP knows the card only by its description, ADB by its volume ID: the card has a location
+  /// per method. Switching method disconnects one and reconnects the other; neither is removed,
+  /// and each keeps its item identities.
+  @Test func aCardHasALocationPerMethod() async throws {
     let mtpDevice = try await mtp()
-    let adbDevice = try await adb()
     let adbTransport = FakeTransport(devices: [], method: .usbADB)
-    let harness = try AgentHarness(devices: [mtpDevice], store: store, adb: adbTransport)
+    let harness = try AgentHarness(devices: [mtpDevice], adb: adbTransport)
+    defer { harness.finish() }
     await until(harness) { $0.count >= 2 }
+    let overMTP = try await cardID(harness, in: Self.oldCardDomain)
 
-    // First time over ADB: the card's description is matched to its volume, and the domain MTP
-    // had under the description is retired for the volume's.
-    await adbTransport.attach(adbDevice)
+    await adbTransport.attach(try await adb())
     harness.tick()
     await served(harness, by: .usbADB)
-    await until(harness) { $0.contains(.remove(Self.oldCardDomain)) }
-    let photo = try await cardID(harness, in: Self.cardDomain)
+    await until(harness) { $0.contains(.disconnect(Self.oldCardDomain)) }
+    let overADB = try await cardID(harness, in: Self.cardDomain)
 
-    // Back on MTP: the card is served under the volume's domain, with the same identities.
     await adbTransport.detach(Self.id)
     harness.tick()
     await served(harness, by: .usbFileTransfer)
-    #expect(try await cardID(harness, in: Self.cardDomain) == photo)
-    let adds = await harness.manager.calls.filter { call in
-      if case .add(let spec) = call { return spec.identifier == Self.oldCardDomain }
+    #expect(try await cardID(harness, in: Self.oldCardDomain) == overMTP)
+    await until(harness) { $0.contains(.disconnect(Self.cardDomain)) }
+    let removes = await harness.manager.calls.filter {
+      if case .remove = $0 { return true }
       return false
     }
-    #expect(adds.count == 1)
-    harness.finish(keepingStore: true)
-
-    // The match outlives the agent: MTP alone serves the card under the volume's domain.
-    let again = try await mtp()
-    let restarted = try AgentHarness(
-      devices: [again], existing: [Self.cardDomain], store: store,
-      adb: FakeTransport(devices: [], method: .usbADB))
-    defer { restarted.finish() }
-    await until(restarted) { $0.contains(.reconnect(Self.cardDomain)) }
-    let calls = await restarted.manager.calls
-    #expect(
-      !calls.contains {
-        if case .add(let spec) = $0 { spec.identifier == Self.oldCardDomain } else { false }
-      })
-    #expect(try await cardID(restarted, in: Self.cardDomain) == photo)
+    #expect(removes.isEmpty)
+    #expect(overADB != nil)
   }
 
   /// When the method changes, FileProvider is told to ask again, so it holds the new method's

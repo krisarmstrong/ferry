@@ -71,10 +71,8 @@ public actor DomainController {
   let manager: any DomainManaging
   let itemStore: URL
   var domains: [String: Domain] = [:]
-  /// Which volume each card MTP knows by description is (see `StorageAliases`).
-  var aliases: StorageAliases
-  /// Each ready device's method and storages when last reconciled, to learn from a change.
-  var lastReady: [DeviceID: (method: ConnectionMethod, storages: [StorageInfo])] = [:]
+  /// Each ready device's method when last reconciled, to notice a change.
+  var lastMethods: [DeviceID: ConnectionMethod] = [:]
   /// Where unsent changes of domains retired on their own went, for the app to show.
   var preservedByRetirement: [URL] = []
   /// The item table of each domain used since it was added or adopted.
@@ -101,7 +99,6 @@ public actor DomainController {
     self.hub = hub
     self.manager = manager
     self.itemStore = itemStore
-    aliases = StorageAliases.load(from: itemStore)
   }
 
   /// The agent's item store, in its own Application Support folder.
@@ -239,10 +236,8 @@ public actor DomainController {
     // so its old session is never kept for the new one.
     switch event {
     case .detached(let id):
-      forgetReading(of: id)
       await disconnectDomains(of: id)
     case .attached(let device), .changed(let device):
-      if case .attached = event { forgetReading(of: device.id) }
       if case .ready = device.state { break }
       await disconnectDomains(of: device.id)
     }
@@ -251,14 +246,11 @@ public actor DomainController {
 
   private func reconcile() async {
     let devices = await hub.devices()
-    let (moved, unmatched) = noteMethods(of: devices)
-    let wanted = DomainNaming.domains(for: devices, aliases: aliases)
+    let moved = noteMethods(of: devices)
+    let wanted = DomainNaming.domains(for: devices)
     let live = Set(wanted.map(\.spec.identifier))
     for (identifier, domain) in domains where domain.connected && !live.contains(identifier) {
       await disconnect(identifier)
-    }
-    for former in unmatched {
-      await retire(former, live: live)
     }
     for domain in wanted where !ejecting.contains(domain.storage.device) {
       for former in domain.formers { await retire(former, live: live) }
@@ -388,8 +380,6 @@ extension DomainController {
     }
     tables = [:]
     ItemTable.discardAll(in: itemStore)
-    StorageAliases.discard(in: itemStore)
-    aliases = StorageAliases()
     do {
       return .success(try await manager.removeAll())
     } catch {

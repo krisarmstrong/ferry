@@ -91,7 +91,8 @@ that mentions file transfer.
 Each device appears in Finder's sidebar under **Locations**. A device with an SD card shows
 two locations: the internal storage, and the card with " – SD card" after the name. If two
 devices of the same model are connected, each name ends with the last four characters of
-its serial number.
+its serial number. The SD card has one location over USB debugging and another over File
+transfer, because File transfer cannot tell one card from another of the same kind.
 
 Your devices also appear in every app's Open and Save dialogs.
 

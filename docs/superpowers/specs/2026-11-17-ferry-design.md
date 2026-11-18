@@ -226,7 +226,12 @@ installed. Switching method mid-session is a session replacement in the hub, not
 **Storages.** ADB exposes the same user storages MTP does, not the whole filesystem: internal
 shared storage (`/storage/emulated/0`) and each removable volume (`/storage/<UUID>`). Storage
 keys become method-neutral (`internal`, `volume:<UUID>`), and MTP storages map onto them; where
-an MTP storage cannot be matched it keeps its MTP key and is served by MTP only.
+an MTP storage cannot be matched it keeps its MTP key and is served by MTP only. Android's MTP
+server sends no volume identifier, so an SD card over MTP keeps its description key, which every
+card of a vendor shares, and is never mapped to an ADB volume (owner ruling 2026-11-18):
+correctness over convenience, since a mapping applied over MTP alone could hand one card's
+location, and its pending writes, to another card of the same size. An SD card therefore has
+one Finder location per method.
 
 **Protocol rules.** File I/O uses the sync service (`STAT`/`LIST`/`RECV`/`SEND`, with
 `stat_v2`/`ls_v2` 64-bit variants when the device advertises them; on Android 8, where

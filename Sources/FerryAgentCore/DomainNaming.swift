@@ -50,12 +50,15 @@ public enum DomainNaming {
   /// added when another listed device has the same model, and ` – SD card` added for every
   /// storage after the device's first.
   public static func specs(for devices: [AttachedDevice]) -> [DomainSpec] {
-    domains(for: devices, aliases: StorageAliases()).map(\.spec)
+    domains(for: devices).map(\.spec)
   }
 
-  /// Each wanted domain with the storage that serves it. A card MTP knows by description is
-  /// named for the volume `aliases` matched it to.
-  static func domains(for devices: [AttachedDevice], aliases: StorageAliases) -> [Wanted] {
+  /// Each wanted domain with the storage that serves it, and the keys it was named by before.
+  ///
+  /// An SD card is never matched across methods: MTP knows it only by its description, which
+  /// every card of a vendor shares, and ADB by its volume ID. It has a location per method, so
+  /// another card can never take a card's location.
+  static func domains(for devices: [AttachedDevice]) -> [Wanted] {
     var models: [String: Int] = [:]
     for device in devices {
       models[device.info.model, default: 0] += 1
@@ -66,15 +69,14 @@ public enum DomainNaming {
       let base =
         models[model, default: 0] > 1 ? "\(model) (\(device.id.serial.suffix(4)))" : model
       return storages.enumerated().map { index, storage in
-        let identity = aliases.identity(of: storage)
         let spec = DomainSpec(
-          identifier: identifier(for: identity),
+          identifier: identifier(for: storage.id),
           displayName: index == 0 ? base : base + " – SD card")
-        var formers = [storage.formerKey].compactMap { $0 } + aliases.mtpKeys(of: identity)
+        var formers = [storage.formerKey].compactMap { $0 }
         if storage.id.key == StorageKey.internal {
           formers.append(androidInternalDescription)
         }
-        let superseded = Set(formers).subtracting([identity.key]).sorted()
+        let superseded = Set(formers).subtracting([storage.id.key]).sorted()
         return Wanted(
           spec: spec, storage: storage.id,
           formers: superseded.map { StorageID(device: device.id, key: $0) })

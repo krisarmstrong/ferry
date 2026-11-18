@@ -2,42 +2,15 @@ import DeviceKit
 
 /// What the controller does when a device's method or storage keys change.
 extension DomainController {
-  /// Records each ready device's method and storages, learns which volume a card MTP knows by
-  /// description is when a device was just seen the other way in the same attachment, and
-  /// returns the devices whose method changed and the volumes whose match moved to another card.
-  func noteMethods(of devices: [AttachedDevice]) -> (moved: [DeviceID], unmatched: [StorageID]) {
+  /// Records each ready device's method and returns the devices whose method changed.
+  func noteMethods(of devices: [AttachedDevice]) -> [DeviceID] {
     var moved: [DeviceID] = []
-    var unmatched: [StorageID] = []
     for device in devices {
-      guard case .ready(let storages) = device.state else { continue }
-      if let last = lastReady[device.id], last.method != device.method {
-        moved.append(device.id)
-        if let replaced = learn(device.id, [last, (method: device.method, storages: storages)]) {
-          unmatched.append(StorageID(device: device.id, key: replaced))
-        }
-      }
-      lastReady[device.id] = (device.method, storages)
+      guard case .ready = device.state else { continue }
+      if let last = lastMethods[device.id], last != device.method { moved.append(device.id) }
+      lastMethods[device.id] = device.method
     }
-    return (moved, unmatched)
-  }
-
-  /// Forgets the device's last reading, when it leaves or is newly attached: a later reading is
-  /// of another attachment, whose cards may not be the ones seen.
-  func forgetReading(of device: DeviceID) {
-    lastReady[device] = nil
-  }
-
-  /// Learns which volume a card MTP knows by description is, from the device seen both ways.
-  /// Returns the volume a replaced match had.
-  private func learn(
-    _ device: DeviceID, _ sides: [(method: ConnectionMethod, storages: [StorageInfo])]
-  ) -> String? {
-    guard let mtp = sides.first(where: { $0.method == .usbFileTransfer }),
-      let adb = sides.first(where: { $0.method != .usbFileTransfer })
-    else { return nil }
-    let learnt = aliases.learn(device, mtp: mtp.storages, adb: adb.storages)
-    if learnt.changed { aliases.save(to: itemStore) }
-    return learnt.replaced
+    return moved
   }
 
   /// Removes the domain a storage of an attached device had under a former key, keeping unsent
