@@ -54,11 +54,11 @@ struct PathResolverTests {
   static let epoch = Date(timeIntervalSince1970: 0)
 
   static func folder(_ id: UInt32, _ name: String) -> MTPEntry {
-    MTPEntry(objectID: id, name: name, isFolder: true, size: 0, modified: epoch)
+    MTPEntry(objectID: id, parent: 0, name: name, isFolder: true, size: 0, modified: epoch)
   }
 
   static func file(_ id: UInt32, _ name: String) -> MTPEntry {
-    MTPEntry(objectID: id, name: name, isFolder: false, size: 1, modified: epoch)
+    MTPEntry(objectID: id, parent: 0, name: name, isFolder: false, size: 1, modified: epoch)
   }
 
   func makeResolver(_ tree: [UInt32: [MTPEntry]]) -> (PathResolver, StubLister) {

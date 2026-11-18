@@ -6,7 +6,8 @@ import os
 ///
 /// Storages are addressed by `StorageID.key`; the raw MTP storage ID is a per-connection detail
 /// that never leaves the session. Every mutation invalidates the cached listing of each folder it
-/// touched, whether or not it succeeded, since a failed transfer can still leave an object behind.
+/// touched, whether or not it succeeded, since a failed transfer can still leave an object behind;
+/// a delete that succeeded only takes its object out of its folder's listing.
 ///
 /// Public operations run one at a time through `gate`, so a check and the action it guards are
 /// never split by another operation. They must not call each other: the gate is not reentrant.
@@ -112,17 +113,42 @@ actor MTPSession: DeviceSession {
     return raw
   }
 
-  /// The object at `path`, which must not be the root, as the device lists it now: its parent
-  /// is listed again first. A cached listing can name an object the device has since changed,
-  /// replaced (a new object ID under the same name) or dropped, and an operation on one item
-  /// must act on what the device has, not on what it had.
+  /// The object at `path`, which must not be the root, as the device has it now. A cached
+  /// listing can name an object the device has since changed, replaced (a new object ID under
+  /// the same name), moved, renamed or dropped, and an operation on one item must act on what
+  /// the device has. So the object a cached listing names is read again by its ID, one device
+  /// call, and used, with its current size and date, if it still has that name, kind and
+  /// folder; anything else, or no cached listing, lists the parent again. An operation on one
+  /// item thus never lists a large folder again just to find it.
   func entry(_ path: RemotePath, storage: UInt32) async throws(TransportError) -> MTPEntry {
     guard let parent = path.parent else { throw .notFound(path) }
+    if let current = try await cachedAndConfirmed(path, storage: storage) { return current }
     await resolver.invalidate(parent, storage: storage)
     guard let entry = try await resolver.entry(at: path, storage: storage) else {
       throw .notFound(path)
     }
     return entry
+  }
+
+  /// The object the cached listing names at `path`, as the device reports it now; `nil` if no
+  /// listing is cached, or the object is gone or is no longer that item. A lost device is still
+  /// an error.
+  private func cachedAndConfirmed(_ path: RemotePath, storage: UInt32)
+    async throws(TransportError) -> MTPEntry?
+  {
+    guard let cached = await resolver.cachedEntry(at: path, storage: storage) else { return nil }
+    let current: MTPEntry
+    do {
+      current = try await device.metadata(objectID: cached.objectID)
+    } catch .deviceDisconnected {
+      throw .deviceDisconnected
+    } catch {
+      return nil
+    }
+    let same =
+      current.name.precomposedStringWithCanonicalMapping == path.name
+      && current.isFolder == cached.isFolder && current.parent == cached.parent
+    return same ? current : nil
   }
 
   /// The ID of the folder at `path` and its children, listed fresh from the device since the
@@ -305,14 +331,21 @@ extension MTPSession {
     }
   }
 
+  /// Once the object is gone, only it leaves the cached listing of its folder, so deleting many
+  /// items from one folder lists it once. A failure drops the whole listing: part of a folder
+  /// may be gone.
   func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError) {
     try await operation { () throws(TransportError) in
       guard let parent = path.parent else { throw .notFound(path) }
       let raw = try await raw(storage)
       let entry = try await entry(path, storage: raw)
-      try await mutating([parent], storage: raw) { () throws(TransportError) in
+      do throws(TransportError) {
         try await deleteTree(entry, storage: raw)
+      } catch {
+        await resolver.invalidate(parent, storage: raw)
+        throw error
       }
+      await resolver.removed(entry.objectID, at: path, storage: raw)
     }
   }
 

@@ -47,6 +47,23 @@ actor PathResolver {
     return listed
   }
 
+  /// The entry at `path` from the cached listing of its parent, or `nil` if that listing is not
+  /// cached or does not name it. The device may have changed it since.
+  func cachedEntry(at path: RemotePath, storage: UInt32) -> MTPEntry? {
+    guard let parent = path.parent, let name = path.name else { return nil }
+    return cache[Key(storage: storage, folder: parent)]?
+      .filter { $0.name.precomposedStringWithCanonicalMapping == name }
+      .min { $0.objectID < $1.objectID }
+  }
+
+  /// Records that the object `id` at `path` is gone: it leaves its parent's cached listing, and
+  /// any listing below it is dropped. The rest of the parent's listing stays cached.
+  func removed(_ id: UInt32, at path: RemotePath, storage: UInt32) {
+    invalidate(path, storage: storage)
+    guard let parent = path.parent else { return }
+    cache[Key(storage: storage, folder: parent)]?.removeAll { $0.objectID == id }
+  }
+
   /// Drops the listing of `folder` and of everything below it.
   func invalidate(_ folder: RemotePath, storage: UInt32) {
     generation += 1

@@ -55,6 +55,8 @@ actor StubMTPDevice: MTPDeviceOperations {
   /// Sizes the device reports for objects instead of their real ones, as stale metadata does.
   private var reportedSizes: [UInt32: UInt64] = [:]
   private(set) var downloadCount = 0
+  /// Folder listings the session asked for.
+  private(set) var listCount = 0
   /// The next download writes half the object, then throws this.
   private var downloadFailure: TransportError?
   /// Names the device stores differently from what it was sent, as a FAT card or 7-bit
@@ -90,6 +92,16 @@ actor StubMTPDevice: MTPDeviceOperations {
   /// Deletes an object as an app on the device would, with no call from the session.
   func removeObject(_ id: UInt32) {
     objects[id] = nil
+  }
+
+  /// Moves an object as an app on the device would, keeping its ID.
+  func moveObject(_ id: UInt32, to parent: UInt32) {
+    objects[id]?.parent = parent
+  }
+
+  /// Renames an object as an app on the device would, keeping its ID.
+  func renameObject(_ id: UInt32, to name: String) {
+    objects[id]?.name = name
   }
 
   func limitUploads(to bytes: Int) {
@@ -172,6 +184,7 @@ actor StubMTPDevice: MTPDeviceOperations {
 
   func list(storage: UInt32, parent: UInt32) throws(TransportError) -> [MTPEntry] {
     record()
+    listCount += 1
     try requireOpen()
     return objects.filter { $0.value.parent == parent }.map { entry($0.key, $0.value) }
       .sorted { $0.objectID < $1.objectID }
@@ -291,7 +304,7 @@ actor StubMTPDevice: MTPDeviceOperations {
 
   private func entry(_ id: UInt32, _ object: Object) -> MTPEntry {
     MTPEntry(
-      objectID: id, name: object.name, isFolder: object.isFolder,
+      objectID: id, parent: object.parent, name: object.name, isFolder: object.isFolder,
       size: reportedSizes[id] ?? UInt64(object.data.count), modified: object.modified)
   }
 }

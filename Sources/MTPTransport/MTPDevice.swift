@@ -377,6 +377,7 @@ extension MTPEntry {
   init(_ file: LIBMTP_file_t) {
     self.init(
       objectID: file.item_id,
+      parent: file.parent_id,
       name: file.filename.map { String(cString: $0) } ?? "",
       isFolder: file.filetype == LIBMTP_FILETYPE_FOLDER,
       size: file.filesize,

@@ -90,7 +90,9 @@ struct MTPSessionGateTests {
 
   @Test func partialListingThrows() {
     let partial = [
-      MTPEntry(objectID: 1, name: "a", isFolder: false, size: 1, modified: StubMTPDevice.epoch)
+      MTPEntry(
+        objectID: 1, parent: 0, name: "a", isFolder: false, size: 1,
+        modified: StubMTPDevice.epoch)
     ]
     let errors = [MTPErrorEntry(code: .ptpLayer, text: "PTP: I/O error")]
 
