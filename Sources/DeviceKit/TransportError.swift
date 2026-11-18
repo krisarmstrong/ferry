@@ -29,6 +29,9 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   case changedOnDevice(RemotePath)
   /// The Mac's own volume has no room for a copy of the file.
   case macDiskFull(needed: UInt64, free: UInt64)
+  /// A folder asked to be deleted with its contents holds items more than
+  /// `RemotePath.maxTreeDepth` levels down.
+  case folderTooDeep(RemotePath)
   case cancelled
   case io(String)
 }

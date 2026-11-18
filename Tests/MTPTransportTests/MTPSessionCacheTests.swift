@@ -59,3 +59,38 @@ struct MTPSessionCacheTests {
     }
   }
 }
+
+/// Deleting a folder empties it child by child, at most `RemotePath.maxTreeDepth` levels down,
+/// so a device that reports a loop cannot recurse without end.
+struct MTPSessionDeleteTreeTests {
+  /// `/d1` holding `d2` … `d<levels>`, the last holding `leaf.txt`, `levels` below `/d1`.
+  private func deepTree(_ levels: Int) async -> StubMTPDevice {
+    let device = SessionFixture.makeDevice()
+    var parent = SessionFixture.root
+    for level in 1...levels {
+      parent = await device.addFolder("d\(level)", parent: parent)
+    }
+    await device.addFile("leaf.txt", parent: parent, data: Data("x".utf8))
+    return device
+  }
+
+  @Test func aTreeAsDeepAsFerryWalksIsDeleted() async throws {
+    let device = await deepTree(RemotePath.maxTreeDepth)
+    let session = MTPSession(device: device)
+
+    try await session.delete(SessionFixture.path("/d1"), in: SessionFixture.storage)
+
+    #expect(await device.objects.isEmpty)
+  }
+
+  @Test func aDeeperTreeIsRefusedWithAClearError() async throws {
+    let device = await deepTree(RemotePath.maxTreeDepth + 1)
+    let session = MTPSession(device: device)
+    let top = try SessionFixture.path("/d1")
+
+    await #expect(throws: TransportError.folderTooDeep(top)) {
+      try await session.delete(top, in: SessionFixture.storage)
+    }
+    #expect(await device.children(of: SessionFixture.root) == ["d1"])
+  }
+}

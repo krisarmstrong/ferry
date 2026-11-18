@@ -17,7 +17,7 @@ struct ErrorMappingTests {
       .nameChangedByDevice(requested: "Résumé.txt", actual: "RESUME.TXT"), .cancelled,
       .io("pipe broke"), .downloadSizeMismatch(listed: 7, received: 3),
       .directoryNotEmpty(try RemotePath("/a")), .changedOnDevice(try RemotePath("/a")),
-      .macDiskFull(needed: 2, free: 1),
+      .macDiskFull(needed: 2, free: 1), .folderTooDeep(try RemotePath("/Deep")),
     ]
   }
 
@@ -93,6 +93,7 @@ struct ErrorMappingTests {
     case .sizeMismatch: .cocoa(.fileWriteUnknown, ["2", "1"])
     case .downloadSizeMismatch: .cocoa(.fileReadCorruptFile, ["7", "3"])
     case .io(let message): .cocoa(.xpcConnectionReplyInvalid, [message])
+    case .folderTooDeep: .cocoa(.featureUnsupported, ["Deep", "64"])
     }
   }
 }

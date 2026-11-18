@@ -57,6 +57,11 @@ public enum ErrorMapping {
       return described(
         .fileReadCorruptFile,
         "The device sent \(received) bytes of a file it lists as \(listed) bytes.")
+    case .folderTooDeep(let path):
+      return described(
+        .featureUnsupported,
+        "“\(path.name ?? path.description)” holds folders nested more than "
+          + "\(RemotePath.maxTreeDepth) deep, which Ferry does not delete.")
     // No Cocoa code describes it: the one the FileProvider headers name for such errors.
     case .io(let message):
       return described(.xpcConnectionReplyInvalid, message)
