@@ -45,6 +45,9 @@ public enum ErrorMapping {
     case .sizeMismatch(let expected, let actual):
       return described(
         "The device stored \(actual) bytes where \(expected) were sent.", code: 4)
+    case .downloadSizeMismatch(let listed, let received):
+      return described(
+        "The device sent \(received) bytes of a file it lists as \(listed) bytes.", code: 6)
     case .io(let message):
       return described(message, code: 5)
     }

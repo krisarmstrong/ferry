@@ -77,6 +77,16 @@ actor StubMTPDevice: MTPDeviceOperations {
     insert(Object(parent: parent, name: name, isFolder: false, data: data, modified: Self.epoch))
   }
 
+  /// Changes a file's contents as an app on the device would, with no call from the session.
+  func replaceData(of id: UInt32, with data: Data) {
+    objects[id]?.data = data
+  }
+
+  /// Deletes an object as an app on the device would, with no call from the session.
+  func removeObject(_ id: UInt32) {
+    objects[id] = nil
+  }
+
   func limitUploads(to bytes: Int) {
     uploadLimit = bytes
   }

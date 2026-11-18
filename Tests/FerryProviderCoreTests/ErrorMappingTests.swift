@@ -13,7 +13,7 @@ struct ErrorMappingTests {
       .unsupported("copy"), .insufficientSpace(needed: 2, free: 1),
       .fileTooLargeForStorage(size: 5), .sizeMismatch(expected: 2, actual: 1),
       .nameChangedByDevice(requested: "Résumé.txt", actual: "RESUME.TXT"), .cancelled,
-      .io("pipe broke"),
+      .io("pipe broke"), .downloadSizeMismatch(listed: 7, received: 3),
     ]
     for sample in samples {
       let mapped = ErrorMapping.fileProviderError(sample) as NSError
@@ -54,6 +54,7 @@ struct ErrorMappingTests {
     case .deviceNotFound(let id): .described([id.serial])
     case .unsupported(let what): .described([what])
     case .sizeMismatch: .described(["2", "1"])
+    case .downloadSizeMismatch: .described(["7", "3"])
     case .io(let message): .described([message])
     }
   }

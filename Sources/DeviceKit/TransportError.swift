@@ -18,6 +18,8 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   case insufficientSpace(needed: UInt64, free: UInt64)
   case fileTooLargeForStorage(size: UInt64)
   case sizeMismatch(expected: UInt64, actual: UInt64)
+  /// A download brought fewer or more bytes than the device listed for the file.
+  case downloadSizeMismatch(listed: UInt64, received: UInt64)
   /// The device stored the object under a name other than the one it was sent (a FAT card's
   /// de-duplication, 7-bit firmware, truncation).
   case nameChangedByDevice(requested: String, actual: String)

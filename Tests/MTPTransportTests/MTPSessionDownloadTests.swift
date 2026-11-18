@@ -80,7 +80,7 @@ struct MTPSessionDownloadTests {
     defer { cleanUp() }
     if existing { try Data("old".utf8).write(to: target) }
     let session = await session { await $0.limitDownloads(to: 2) }
-    await #expect(throws: TransportError.sizeMismatch(expected: 5, actual: 2)) {
+    await #expect(throws: TransportError.downloadSizeMismatch(listed: 5, received: 2)) {
       try await download(session, replacing: true)
     }
     #expect(try directoryContents() == (existing ? ["a.txt"] : []))

@@ -67,6 +67,7 @@ private func tag(_ error: TransportError) -> Int {
   case .nameChangedByDevice: 15
   case .cancelled: 16
   case .io: 17
+  case .downloadSizeMismatch: 18
   }
 }
 
@@ -81,6 +82,7 @@ private func errors() throws -> [TransportError] {
   all += [.insufficientSpace(needed: 10, free: 5), .fileTooLargeForStorage(size: 5_000_000_000)]
   all += [.sizeMismatch(expected: 10, actual: 9), .cancelled, .io("read failed")]
   all.append(.nameChangedByDevice(requested: "Ä.txt", actual: "A.txt"))
+  all.append(.downloadSizeMismatch(listed: 10, received: 9))
   return all
 }
 

@@ -112,8 +112,13 @@ actor MTPSession: DeviceSession {
     return raw
   }
 
-  /// The object at `path`, which must not be the root.
+  /// The object at `path`, which must not be the root, as the device lists it now: its parent
+  /// is listed again first. A cached listing can name an object the device has since changed,
+  /// replaced (a new object ID under the same name) or dropped, and an operation on one item
+  /// must act on what the device has, not on what it had.
   func entry(_ path: RemotePath, storage: UInt32) async throws(TransportError) -> MTPEntry {
+    guard let parent = path.parent else { throw .notFound(path) }
+    await resolver.invalidate(parent, storage: storage)
     guard let entry = try await resolver.entry(at: path, storage: storage) else {
       throw .notFound(path)
     }
@@ -236,11 +241,10 @@ extension MTPSession {
     -> RemoteItem
   {
     try await operation { () throws(TransportError) in
-      let raw = try await raw(storage)
-      guard let entry = try await resolver.entry(at: path, storage: raw) else {
+      guard path != .root else {
         return RemoteItem(path: .root, kind: .folder, size: 0, modified: .distantPast)
       }
-      return Self.item(entry, at: path)
+      return Self.item(try await entry(path, storage: raw(storage)), at: path)
     }
   }
 
@@ -261,7 +265,7 @@ extension MTPSession {
         try await device.download(objectID: entry.objectID, to: partial, progress: progress)
         let size = try LocalFile.regularFileSize(partial)
         guard size == entry.size else {
-          throw .sizeMismatch(expected: entry.size, actual: size)
+          throw .downloadSizeMismatch(listed: entry.size, received: size)
         }
         try Self.place(partial, at: file, replacing: replacing, downloadOf: path)
       } catch {
@@ -349,7 +353,10 @@ extension MTPSession {
       let (_, name) = try Self.split(renamed)
       let raw = try await raw(storage)
       let siblings = try await folder(parent, storage: raw)
-      let source = try await entry(path, storage: raw)
+      // From the listing `folder` just read, so the device is listed once.
+      guard let source = try await resolver.entry(at: path, storage: raw) else {
+        throw .notFound(path)
+      }
       try siblings.requireFree(renamed, except: source.objectID)
       return try await mutating([parent], storage: raw) { () throws(TransportError) in
         try await device.rename(objectID: source.objectID, to: name)

@@ -48,6 +48,8 @@ private func message(for error: TransportError) -> String {
     "The phone's storage cannot hold a file of \(size) bytes."
   case .sizeMismatch(let expected, let actual):
     "The phone stored \(actual) bytes instead of \(expected)."
+  case .downloadSizeMismatch(let listed, let received):
+    "The phone sent \(received) bytes of a file it lists as \(listed) bytes."
   case .nameChangedByDevice(let requested, let actual):
     "The phone saved \"\(requested)\" as \"\(actual)\"."
   case .cancelled: "Cancelled."
