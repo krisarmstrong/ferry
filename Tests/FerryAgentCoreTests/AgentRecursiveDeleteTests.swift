@@ -138,4 +138,24 @@ struct AgentRecursiveDeleteTests {
     #expect(reply == (deletes ? .done : .failure(.directoryNotEmpty(try path("/d1")))))
     #expect(try await setup.onDevice(file) == !deletes)
   }
+
+  /// An item the device adds between the walk and the delete: the delete is refused, and the
+  /// folder is walked again so FileProvider learns of the new item.
+  @Test func anItemAddedDuringTheDeleteIsRecorded() async throws {
+    let setup = try await setup([("/Reports/r1.txt", "one")])
+    defer { setup.harness.finish() }
+    try await setup.show(["/Reports"])
+    let (device, storage) = (setup.device, setup.storage)
+    await device.onNextDelete {
+      try? await device.seed(
+        try path("/Reports/late.txt"), in: storage, contents: Data("late".utf8))
+    }
+
+    let reply = await setup.send(
+      .delete(domain: setup.domain, id: try await setup.id("/Reports"), base: nil, recursive: true))
+
+    #expect(reply == .failure(.directoryNotEmpty(try path("/Reports"))))
+    #expect(try await setup.known("/Reports/late.txt"))
+    #expect(try await setup.onDevice("/Reports/r1.txt"))
+  }
 }

@@ -241,6 +241,10 @@ public actor AgentService: AgentHandling {
         // Changed between the check and the delete: recorded, so FileProvider puts it back.
         _ = await route.items.observed(try await route.session.item(at: path, in: route.storage))
         throw .changedOnDevice(path)
+      } catch .directoryNotEmpty {
+        // Something arrived after the walk: walked again, so what is new is recorded.
+        _ = try await Self.requireSeen(path, on: route)
+        throw .directoryNotEmpty(path)
       }
       await route.items.removed(path)
     }

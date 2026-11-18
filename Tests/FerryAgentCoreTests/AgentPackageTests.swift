@@ -122,4 +122,44 @@ struct AgentPackageTests {
     #expect(reply == .done)
     #expect(await setup.device.allPaths(in: setup.storage).isEmpty)
   }
+
+  /// The package-named folder itself: no rename, move, delete (recursive or not) or create in it.
+  @Test func aPackageFolderItselfIsRefused() async throws {
+    let setup = try await setup([("/Docs/Notes.rtfd/TXT.rtf", "rtf"), ("/Other/x.txt", "x")])
+    defer { setup.harness.finish() }
+    for folder in ["/Docs", "/Docs/Notes.rtfd"] {
+      _ = await setup.send(.list(domain: setup.domain, folder: try await setup.id(folder)))
+    }
+    let (domain, package) = (setup.domain, try await setup.id("/Docs/Notes.rtfd"))
+    let refused = AgentResponse.failure(.readOnly(try path("/Docs/Notes.rtfd")))
+
+    #expect(await setup.send(.rename(domain: domain, id: package, to: "Old.rtfd")) == refused)
+    #expect(await setup.send(.rename(domain: domain, id: package, to: "Plain")) == refused)
+    #expect(
+      await setup.send(.move(domain: domain, id: package, toFolder: try await setup.id("/Other")))
+        == refused)
+    for recursive in [false, true] {
+      #expect(
+        await setup.send(.delete(domain: domain, id: package, base: nil, recursive: recursive))
+          == refused)
+    }
+    #expect(
+      await setup.send(.create(domain: domain, parent: package, name: "Sub", isFolder: true))
+        == refused)
+    #expect(
+      await setup.device.contents(of: try path("/Docs/Notes.rtfd/TXT.rtf"), in: setup.storage)
+        == Data("rtf".utf8))
+  }
+
+  /// A file named like a package is a file: the agent asks the device when its table does not
+  /// know the kind, rather than taking it for a folder.
+  @Test func aFileNamedLikeAPackageCanBeRenamed() async throws {
+    let setup = try await setup([("/Docs/report.rtfd", "a file")])
+    defer { setup.harness.finish() }
+
+    let reply = await setup.send(
+      .rename(domain: setup.domain, id: try await setup.id("/Docs/report.rtfd"), to: "r.txt"))
+
+    #expect(reply.isEntry)
+  }
 }

@@ -15,8 +15,10 @@ extension DomainController.Route {
   func changeable(_ id: ItemID) async throws(TransportError) -> RemotePath {
     guard id != .root else { throw .unsupported("changing the storage root") }
     let path = try await path(of: id)
-    // An item the table knows only as a parent is a folder.
-    let isFolder = await items.kind(at: path) != .file
+    // The table may know the item only by its identifier: the device says what it is.
+    var kind = await items.kind(at: path)
+    if kind == nil { kind = try await session.item(at: path, in: storage).kind }
+    let isFolder = kind == .folder
     if path.isInPackageFolder(isFolder: isFolder) { throw .readOnly(path) }
     return path
   }
