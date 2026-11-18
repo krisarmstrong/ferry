@@ -2,7 +2,7 @@ import AppKit
 import DeviceKit
 import SwiftUI
 
-/// The menu-bar window: each device with its state, then Refresh, Settings and Quit.
+/// The menu-bar window: each device with its state, then Refresh, Help, Settings and Quit.
 ///
 /// While it is open it refreshes every 2 s (see `AppModel.watchWhileMenuOpen()`), and it opens
 /// the setup guide when the model asks for it.
@@ -69,6 +69,19 @@ public struct MenuContent: View {
         }
         .keyboardShortcut("r")
         Spacer()
+        Button {
+          NSApp.activate()
+          openWindow(id: HelpView.windowID)
+        } label: {
+          Label {
+            Text("Help", bundle: .module)
+          } icon: {
+            Image(systemName: "questionmark.circle")
+          }
+          .labelStyle(.iconOnly)
+        }
+        .help(Text("Ferry Help", bundle: .module))
+        .keyboardShortcut("?")
         Button {
           NSApp.activate()
           openSettings()

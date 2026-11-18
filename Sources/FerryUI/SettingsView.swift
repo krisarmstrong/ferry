@@ -1,6 +1,7 @@
+import AppKit
 import SwiftUI
 
-/// Settings: open at login, the setup guide, and removing Ferry.
+/// Settings: open at login, the setup guide, help, and removing Ferry.
 public struct SettingsView: View {
   @Environment(\.openWindow) private var openWindow
   @State private var confirmingRemoval = false
@@ -27,6 +28,16 @@ public struct SettingsView: View {
         }
       } label: {
         Text("File transfer", bundle: .module)
+      }
+      LabeledContent {
+        Button {
+          NSApp.activate()
+          openWindow(id: HelpView.windowID)
+        } label: {
+          Text("Ferry Help", bundle: .module)
+        }
+      } label: {
+        Text("Help", bundle: .module)
       }
       Section {
         Button(role: .destructive) {

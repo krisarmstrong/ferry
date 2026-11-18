@@ -1,6 +1,6 @@
 # In-app help
 
-`help.json` holds Ferry's help in a compact form for a SwiftUI Help window. It mirrors
+`Sources/FerryUI/help.json` holds Ferry's help in a compact form for a SwiftUI Help window. It mirrors
 `docs/user-guide.md`; when one changes, change the other.
 
 ## Schema

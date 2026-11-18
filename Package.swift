@@ -27,7 +27,7 @@ let package = Package(
     .target(name: "FerryProviderCore", dependencies: ["DeviceKit", "FerryIPC"]),
     .target(
       name: "FerryUI", dependencies: ["DeviceKit", "FerryIPC"],
-      resources: [.process("Localizable.xcstrings")]),
+      resources: [.process("Localizable.xcstrings"), .process("help.json")]),
     .executableTarget(
       name: "ferryctl",
       dependencies: [

@@ -150,7 +150,12 @@ import os
   /// Opens the guide with the device's steps, or the model picker if Ferry does not know its
   /// model or no device is given.
   public func showGuide(for device: AttachedDevice?) {
-    guideFamily = device.flatMap { GuideSteps.family(forModel: $0.info.model) }
+    showGuide(family: device.flatMap { GuideSteps.family(forModel: $0.info.model) })
+  }
+
+  /// Opens the guide with the family's steps, or the model picker for `nil`.
+  public func showGuide(family: DeviceFamily?) {
+    guideFamily = family
     isGuidePresented = true
     guideOpenPending = true
   }

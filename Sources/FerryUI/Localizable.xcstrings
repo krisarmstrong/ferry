@@ -14,6 +14,18 @@
     "%lld." : {
 
     },
+    "ADB connection, Wi-Fi connection, and **Send to device** in Finder's Control-click menu." : {
+      "extractionState" : "manual"
+    },
+    "Android 10 or newer" : {
+      "extractionState" : "manual"
+    },
+    "Android 8 or 9" : {
+      "extractionState" : "manual"
+    },
+    "Another app has the device. Quit that app, then click **Try Again**." : {
+      "extractionState" : "manual"
+    },
     "Another app is using the device. Quit Image Capture or Android File Transfer." : {
 
     },
@@ -23,8 +35,14 @@
     "Cancelled." : {
 
     },
+    "Check that Ferry is on under File Providers in Login Items & Extensions." : {
+      "extractionState" : "manual"
+    },
     "Checking…" : {
 
+    },
+    "Choose **Refresh** in the Ferry menu." : {
+      "extractionState" : "manual"
     },
     "Choose Transfer files on the device." : {
 
@@ -35,8 +53,29 @@
     "Choose your device to see its steps." : {
 
     },
+    "Click **Open System Settings**." : {
+      "extractionState" : "manual"
+    },
+    "Click the Ferry icon in the menu bar." : {
+      "extractionState" : "manual"
+    },
+    "Closes the menu. The helper keeps running, so devices stay in Finder." : {
+      "extractionState" : "manual"
+    },
+    "Coming next" : {
+      "extractionState" : "manual"
+    },
+    "Connect a NetAlly unit" : {
+      "extractionState" : "manual"
+    },
     "Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac." : {
 
+    },
+    "Connect another Android phone" : {
+      "extractionState" : "manual"
+    },
+    "Control-click a file you opened and choose **Remove Download**. The file stays on the device." : {
+      "extractionState" : "manual"
     },
     "Could not change Open at login." : {
 
@@ -44,11 +83,26 @@
     "Could not remove Ferry. Make sure Ferry is running, then try again." : {
 
     },
+    "Delete" : {
+      "extractionState" : "manual"
+    },
     "Device" : {
 
     },
     "Done" : {
 
+    },
+    "Double-click a file to open it. Ferry copies it to the Mac when you open it." : {
+      "extractionState" : "manual"
+    },
+    "Drag Ferry from Applications to the Trash." : {
+      "extractionState" : "manual"
+    },
+    "Drag files or folders between the device and the Mac to copy them. A half-copied file never appears under its real name." : {
+      "extractionState" : "manual"
+    },
+    "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs. An SD card is a second location." : {
+      "extractionState" : "manual"
     },
     "Eject" : {
 
@@ -56,11 +110,44 @@
     "Error: %@" : {
 
     },
+    "Ferry Help" : {
+
+    },
+    "Ferry does not use the network. No telemetry, no analytics, no account. Nothing leaves your Mac." : {
+      "extractionState" : "manual"
+    },
+    "Ferry is waiting for its helper to answer, for example just after Ferry opens." : {
+      "extractionState" : "manual"
+    },
+    "Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper is not responding" : {
+      "extractionState" : "manual"
+    },
     "Ferry's helper is not responding. Quit Ferry and open it again." : {
 
     },
     "File transfer" : {
 
+    },
+    "File transfer is off or the device is locked, or you ejected it. Choose **Refresh** to bring back a device you ejected." : {
+      "extractionState" : "manual"
+    },
+    "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it." : {
+      "extractionState" : "manual"
+    },
+    "For the LinkRunner 10G, EtherScope nXG and LinkRunner 100G." : {
+      "extractionState" : "manual"
+    },
+    "Free up space on the Mac" : {
+      "extractionState" : "manual"
+    },
+    "Getting started" : {
+      "extractionState" : "manual"
+    },
+    "Help" : {
+      "extractionState" : "manual"
     },
     "How to connect" : {
 
@@ -68,11 +155,17 @@
     "How to turn on file transfer" : {
 
     },
+    "In Ferry's Settings, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched." : {
+      "extractionState" : "manual"
+    },
     "In Login Items & Extensions, turn on Ferry under File Providers." : {
 
     },
     "In use by another app" : {
 
+    },
+    "Menu items" : {
+      "extractionState" : "manual"
     },
     "NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG" : {
 
@@ -92,11 +185,23 @@
     "Open at login" : {
 
     },
+    "Open at login, How to connect, Help and Remove Ferry." : {
+      "extractionState" : "manual"
+    },
+    "Opens this window." : {
+      "extractionState" : "manual"
+    },
     "Other Android phone (Android 10 or newer)" : {
 
     },
     "Other Android phone (Android 8 or 9)" : {
 
+    },
+    "Plug the device back in and turn on file transfer. Finder finishes the copy when the device reconnects. A half-copied file never appears under its real name." : {
+      "extractionState" : "manual"
+    },
+    "Privacy" : {
+      "extractionState" : "manual"
     },
     "Pull down the notification shade and tap **Charging this device via USB**." : {
 
@@ -107,8 +212,14 @@
     "Quit" : {
 
     },
+    "Quit Ferry from the menu and open it again from Applications." : {
+      "extractionState" : "manual"
+    },
     "Quit Image Capture or Android File Transfer, then try again." : {
 
+    },
+    "Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then click **Try Again**." : {
+      "extractionState" : "manual"
     },
     "Ready" : {
 
@@ -125,11 +236,17 @@
     "Remove Ferry…" : {
 
     },
+    "Removes the device from Finder and releases it. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names." : {
+      "extractionState" : "manual"
+    },
     "Reveal in Finder" : {
 
     },
     "Settings…" : {
 
+    },
+    "Shows changes made on the device in Finder, and brings back a device you ejected. While the menu is open, Ferry also checks for devices every 2 seconds." : {
+      "extractionState" : "manual"
     },
     "Tap **Transfer files**." : {
 
@@ -137,14 +254,26 @@
     "The device appears in Finder once it shares files." : {
 
     },
+    "The device does not show up" : {
+      "extractionState" : "manual"
+    },
     "The device does not support this: %@." : {
 
+    },
+    "The device has no Trash. Finder offers **Delete Immediately**, and the file is removed from the device at once." : {
+      "extractionState" : "manual"
     },
     "The device is not sharing files." : {
 
     },
+    "The device is sharing files and is in Finder." : {
+      "extractionState" : "manual"
+    },
     "The device reported an error." : {
 
+    },
+    "The device reported an error. Click **Try Again**, or unplug it and plug it back in." : {
+      "extractionState" : "manual"
     },
     "The device reports no storage." : {
 
@@ -152,8 +281,26 @@
     "The device was disconnected." : {
 
     },
+    "The first time Ferry opens, it starts a small helper that talks to your devices. The helper keeps running after you quit the menu, so devices stay in Finder." : {
+      "extractionState" : "manual"
+    },
+    "The menu" : {
+      "extractionState" : "manual"
+    },
+    "The sidebar says \"Ferry\"" : {
+      "extractionState" : "manual"
+    },
+    "To see files added on the device while it is connected, choose **Refresh** in the Ferry menu." : {
+      "extractionState" : "manual"
+    },
+    "Troubleshooting" : {
+      "extractionState" : "manual"
+    },
     "Try Again" : {
 
+    },
+    "Try another cable. Some carry power only." : {
+      "extractionState" : "manual"
     },
     "Turn On File Transfer" : {
 
@@ -161,17 +308,44 @@
     "Turn on Ferry in Finder" : {
 
     },
+    "Turn on file transfer on the device." : {
+      "extractionState" : "manual"
+    },
     "Under **USB preferences**, choose **File transfer**. Or open **Settings** → **Connected devices** → **USB**." : {
 
+    },
+    "Uninstall" : {
+      "extractionState" : "manual"
     },
     "Unknown device" : {
 
     },
+    "Unlock the device and choose Transfer files on it. You do not need to replug the cable." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device." : {
+      "extractionState" : "manual"
+    },
     "Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked." : {
 
     },
+    "Unlock the phone first. Its storage stays hidden while it is locked." : {
+      "extractionState" : "manual"
+    },
+    "Unplugged during a copy" : {
+      "extractionState" : "manual"
+    },
     "Unsent changes were saved to %@" : {
 
+    },
+    "Using Ferry in Finder" : {
+      "extractionState" : "manual"
+    },
+    "With one device location, macOS labels it with the app's name. This is normal." : {
+      "extractionState" : "manual"
+    },
+    "You only do this once." : {
+      "extractionState" : "manual"
     },
     "Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched. You can then move Ferry to the Trash." : {
 

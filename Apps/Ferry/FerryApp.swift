@@ -2,8 +2,8 @@ import FerryIPC
 import FerryUI
 import SwiftUI
 
-/// The menu-bar app: registers the agent, shows its devices, and hosts the setup guide and
-/// Settings.
+/// The menu-bar app: registers the agent, shows its devices, and hosts the setup guide, Help
+/// and Settings.
 @main
 struct FerryApp: App {
   @State private var model: AppModel
@@ -34,6 +34,13 @@ struct FerryApp: App {
     .windowResizability(.contentSize)
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
+
+    // Unlike the setup guide, the help window keeps state restoration, so it can reopen on
+    // the section the reader last chose.
+    Window(HelpView.windowTitle, id: HelpView.windowID) {
+      HelpView(model: model)
+    }
+    .defaultLaunchBehavior(.suppressed)
 
     Settings {
       SettingsView(model: model)

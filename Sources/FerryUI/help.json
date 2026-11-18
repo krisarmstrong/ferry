@@ -8,7 +8,7 @@
       "symbol": "checklist",
       "paragraphs": [
         "Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon.",
-        "The first time Ferry opens, it starts a small helper that talks to your devices. Devices stay in Finder even when the menu is closed."
+        "The first time Ferry opens, it starts a small helper that talks to your devices. The helper keeps running after you quit the menu, so devices stay in Finder."
       ],
       "groups": [
         {
@@ -35,7 +35,10 @@
         "Tap **Transfer files**."
       ],
       "note": "The device appears in Finder once it shares files.",
-      "link": { "title": "How to connect", "target": "guide:netAllyAndroid8Board" }
+      "link": {
+        "title": "How to connect",
+        "target": "guide:netAllyAndroid8Board"
+      }
     },
     {
       "id": "connect-android",
@@ -62,7 +65,10 @@
           ]
         }
       ],
-      "link": { "title": "How to connect", "target": "guide" }
+      "link": {
+        "title": "How to connect",
+        "target": "guide"
+      }
     },
     {
       "id": "finder",
@@ -72,6 +78,7 @@
         "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs. An SD card is a second location.",
         "Double-click a file to open it. Ferry copies it to the Mac when you open it.",
         "Drag files or folders between the device and the Mac to copy them. A half-copied file never appears under its real name.",
+        "To see files added on the device while it is connected, choose **Refresh** in the Ferry menu.",
         "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it."
       ],
       "groups": [
@@ -94,19 +101,51 @@
       "title": "The menu",
       "symbol": "menubar.rectangle",
       "definitions": [
-        { "term": "Ready", "detail": "The device is sharing files and is in Finder." },
-        { "term": "Not sharing files", "detail": "File transfer is off on the device." },
-        { "term": "In use by another app", "detail": "Another app has the device." },
-        { "term": "Checking…", "detail": "Ferry is checking the device again." },
-        { "term": "Can't open", "detail": "The device reported an error. Click Try Again." }
+        {
+          "term": "Ready",
+          "detail": "The device is sharing files and is in Finder."
+        },
+        {
+          "term": "Not sharing files",
+          "detail": "File transfer is off or the device is locked, or you ejected it. Choose **Refresh** to bring back a device you ejected."
+        },
+        {
+          "term": "In use by another app",
+          "detail": "Another app has the device. Quit that app, then click **Try Again**."
+        },
+        {
+          "term": "Can't open",
+          "detail": "The device reported an error. Click **Try Again**, or unplug it and plug it back in."
+        },
+        {
+          "term": "Checking…",
+          "detail": "Ferry is waiting for its helper to answer, for example just after Ferry opens."
+        }
       ],
       "groups": [
         {
           "title": "Menu items",
           "definitions": [
-            { "term": "Refresh", "detail": "Checks for devices and shows changes made on the device." },
-            { "term": "Eject", "detail": "Removes the device from Finder and releases it." },
-            { "term": "Settings…", "detail": "Open at login, How to connect, Remove Ferry." }
+            {
+              "term": "Refresh",
+              "detail": "Shows changes made on the device in Finder, and brings back a device you ejected. While the menu is open, Ferry also checks for devices every 2 seconds."
+            },
+            {
+              "term": "Eject",
+              "detail": "Removes the device from Finder and releases it. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names."
+            },
+            {
+              "term": "Help",
+              "detail": "Opens this window."
+            },
+            {
+              "term": "Settings…",
+              "detail": "Open at login, How to connect, Help and Remove Ferry."
+            },
+            {
+              "term": "Quit",
+              "detail": "Closes the menu. The helper keeps running, so devices stay in Finder."
+            }
           ]
         }
       ]
@@ -129,9 +168,12 @@
         {
           "title": "Not sharing files",
           "paragraphs": [
-            "Choose Transfer files on the device. You do not need to replug the cable."
+            "Unlock the device and choose Transfer files on it. You do not need to replug the cable."
           ],
-          "link": { "title": "How to turn on file transfer", "target": "guide" }
+          "link": {
+            "title": "How to turn on file transfer",
+            "target": "guide"
+          }
         },
         {
           "title": "In use by another app",
@@ -148,7 +190,13 @@
         {
           "title": "Unplugged during a copy",
           "paragraphs": [
-            "Plug the device back in and turn on file transfer. The copy resumes when the device is reconnected."
+            "Plug the device back in and turn on file transfer. Finder finishes the copy when the device reconnects. A half-copied file never appears under its real name."
+          ]
+        },
+        {
+          "title": "Ferry's helper is not responding",
+          "paragraphs": [
+            "Quit Ferry from the menu and open it again from Applications."
           ]
         }
       ]

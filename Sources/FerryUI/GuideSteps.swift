@@ -1,7 +1,8 @@
 import Foundation
 
-/// The groups of devices that share one set of file-transfer steps.
-public enum DeviceFamily: Sendable, CaseIterable, Hashable {
+/// The groups of devices that share one set of file-transfer steps. The raw value names the
+/// family in help links (`guide:<rawValue>`).
+public enum DeviceFamily: String, Sendable, CaseIterable, Hashable {
   /// LinkRunner 10G, LinkRunner 100G and EtherScope nXG, which share one Android 8 board.
   /// AirCheck G3 runs on a different board with different steps, and gets its own case later.
   case netAllyAndroid8Board

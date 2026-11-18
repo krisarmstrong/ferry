@@ -26,18 +26,7 @@ public struct SetupGuide: View {
         Text("Device", bundle: .module)
       }
       if let family = model.guideFamily {
-        VStack(alignment: .leading, spacing: 10) {
-          let steps = Array(GuideSteps.steps(for: family).enumerated())
-          ForEach(steps, id: \.offset) { index, step in
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-              Text("\(index + 1).", bundle: .module)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-              Text(AttributedString(localized: step))
-                .fixedSize(horizontal: false, vertical: true)
-            }
-          }
-        }
+        NumberedSteps(steps: GuideSteps.steps(for: family))
       } else {
         Text("Choose your device to see its steps.", bundle: .module)
           .foregroundStyle(.secondary)
@@ -58,6 +47,26 @@ public struct SetupGuide: View {
     .padding(20)
     .frame(width: 460)
     .onDisappear { model.isGuidePresented = false }
+  }
+}
+
+/// Steps as a numbered list, the number in secondary monospaced digits. The setup guide and
+/// the help window share it.
+struct NumberedSteps: View {
+  let steps: [LocalizedStringResource]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+          Text("\(index + 1).", bundle: .module)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+          Text(AttributedString(localized: step))
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+    }
   }
 }
 
