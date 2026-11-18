@@ -60,12 +60,14 @@ extension MTPSession {
       for child in try await device.list(storage: storage, parent: entry.objectID) {
         let childPath = try? path.appending(child.name)
         let hidden = SafeWriter.isPartial(child.name) || SafeWriter.isBackup(child.name)
+        // An unusable name has no path to check what it holds against, hidden or not.
+        guard childPath != nil || checked == nil else { throw .directoryNotEmpty(top) }
         if let checked, !hidden {
           guard let childPath, let seen = checked[childPath],
             Self.item(child, at: childPath).matches(seen)
           else { throw .directoryNotEmpty(top) }
         }
-        // An unusable name has no path of its own; its folder's stands in for the checks below.
+        // Unchecked, an unusable name's folder stands in for its path: only the depth is read.
         objects += try await tree(of: child, at: childPath ?? path, depth: depth + 1, walk)
       }
     }

@@ -312,4 +312,25 @@ struct MTPSessionCheckedDeleteTests {
     try await session.delete(path("/F"), in: storage)
     #expect(await device.objects.isEmpty)
   }
+
+  /// A hidden folder whose name Ferry cannot use is refused like any unusable name: what it holds
+  /// would otherwise be checked against its parent's items, and an `a.txt` inside it would pass
+  /// as the `a.txt` Finder saw beside it.
+  @Test func aHiddenFolderWithAnUnusableNameIsRefusedByACheckedDelete() async throws {
+    let device = SessionFixture.makeDevice()
+    let folder = await device.addFolder("F", parent: SessionFixture.root)
+    await device.addFile("a.txt", parent: folder, data: Data("a".utf8))
+    let hidden = await device.addFolder(SafeWriter.partialPrefix + "x/y", parent: folder)
+    await device.addFile("a.txt", parent: hidden, data: Data("a".utf8))
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    let checked = [
+      try await session.item(at: path("/F"), in: storage),
+      try await session.item(at: path("/F/a.txt"), in: storage),
+    ]
+
+    await #expect(throws: TransportError.directoryNotEmpty(try path("/F"))) {
+      try await session.delete(path("/F"), in: storage, expecting: checked)
+    }
+    #expect(await device.objects.count == 4)
+  }
 }
