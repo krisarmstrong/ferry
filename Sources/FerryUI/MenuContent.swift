@@ -17,6 +17,14 @@ public struct MenuContent: View {
 
   public var body: some View {
     VStack(alignment: .leading, spacing: 10) {
+      if model.isChecking {
+        Label {
+          Text("Checking…", bundle: .module)
+        } icon: {
+          ProgressView()
+            .controlSize(.small)
+        }
+      }
       if model.agent == .unreachable {
         Label {
           Text("Ferry's helper is not responding. Quit Ferry and open it again.", bundle: .module)

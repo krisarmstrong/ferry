@@ -68,6 +68,9 @@ import os
     opensAtLogin = services.opensAtLogin
   }
 
+  /// No answer from the agent yet, so whether a device is attached is not known.
+  public var isChecking: Bool { agent == .checking }
+
   /// File transfer is off in Finder: not an error, but the user must turn Ferry on.
   public var showsTurnOnRow: Bool {
     agent == .running && !providerEnabled
@@ -105,21 +108,24 @@ import os
   /// Refreshes now and every 2 s until the calling task is cancelled, which happens when the
   /// menu closes.
   public func watchWhileMenuOpen() async {
-    var openFor = Duration.zero
+    // How long the menu has been open since the agent first answered.
+    var answeredFor: Duration?
     while !Task.isCancelled {
       await refresh()
-      considerEmptyGuide(openFor: openFor)
+      if agent == .running, answeredFor == nil { answeredFor = .zero }
+      if let answeredFor { considerEmptyGuide(openFor: answeredFor) }
       do {
         try await sleep(Self.pollInterval)
       } catch {
         return
       }
-      openFor += Self.pollInterval
+      answeredFor? += Self.pollInterval
     }
   }
 
   /// Opens the guide, with the model picker, once per app run when the agent is running but
-  /// has seen no device for 10 s of the menu being open.
+  /// has seen no device for 10 s of the menu being open, counted from the agent's first
+  /// answer.
   func considerEmptyGuide(openFor: Duration) {
     guard agent == .running, devices.isEmpty, openFor >= Self.emptyGuideDelay,
       !emptyGuideShown

@@ -67,6 +67,27 @@ private final class FakeClient: AgentSending {
   }
 }
 
+/// Fails the first `failures` status requests, as a client whose agent is still starting does,
+/// then answers with no devices.
+private final class StartingClient: AgentSending {
+  private let remaining: Mutex<Int>
+
+  init(failures: Int) {
+    remaining = Mutex(failures)
+  }
+
+  func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
+    -> AgentResponse
+  {
+    let failing = remaining.withLock { count in
+      defer { count -= 1 }
+      return count > 0
+    }
+    if failing { throw .deviceDisconnected }
+    return .status(devices: [], providerEnabled: true)
+  }
+}
+
 /// Refuses every request, as a client whose agent is not running does.
 private struct UnreachableClient: AgentSending {
   func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
@@ -212,6 +233,31 @@ struct AppModelTests {
     await model.watchWhileMenuOpen()
     #expect(log.all == Array(repeating: "status", count: 6))
     #expect(model.isGuidePresented)
+  }
+
+  /// The 10 s before the guide opens count from the agent's first answer, not from the menu
+  /// opening: until then Ferry does not know whether a device is attached.
+  @Test func emptyGuideWaitsTenSecondsAfterTheFirstStatus() async {
+    let polls = Mutex(0)
+    let model = AppModel(
+      client: StartingClient(failures: 5), services: FakeServices(log: log),
+      sleep: { _ in
+        let count = polls.withLock { count in
+          count += 1
+          return count
+        }
+        if count == 9 { throw CancellationError() }
+      })
+    await model.watchWhileMenuOpen()
+    #expect(model.agent == .running)
+    #expect(!model.isGuidePresented)
+  }
+
+  @Test func menuChecksUntilTheFirstStatus() async {
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    #expect(model.isChecking)
+    await model.refresh()
+    #expect(!model.isChecking)
   }
 
   @Test func removeFerryCallsRemoveAllThenUnregister() async {

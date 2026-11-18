@@ -64,6 +64,12 @@ public actor DeviceHub {
 
   var isRechecking: Bool { poller != nil }
 
+  /// Set once the first reconcile has finished, whether or not its scan worked.
+  private var scanned = false
+  private var scanWaiters: [CheckedContinuation<Void, Never>] = []
+  /// Requests waiting for the hub's first scan.
+  var requestsAwaitingFirstScan: Int { scanWaiters.count }
+
   /// `arrivals` ticks on any USB attach or detach; the hub also reconciles once at start.
   public init(
     transport: any DeviceTransport, arrivals: AsyncStream<Void>,
@@ -74,6 +80,7 @@ public actor DeviceHub {
     self.clock = clock
     Task { [weak self] in
       await self?.reconcile()
+      await self?.markScanned()
       for await _ in arrivals {
         guard let self else { return }
         await self.reconcile()
@@ -83,6 +90,21 @@ public actor DeviceHub {
 
   deinit {
     continuation.finish()
+  }
+
+  /// Returns once the hub has scanned the bus for the first time. Until then `devices()` would
+  /// leave out a device that is plugged in.
+  public func firstScan() async {
+    guard !scanned else { return }
+    await withCheckedContinuation { scanWaiters.append($0) }
+  }
+
+  private func markScanned() {
+    scanned = true
+    for waiter in scanWaiters {
+      waiter.resume()
+    }
+    scanWaiters = []
   }
 
   public func devices() -> [AttachedDevice] {

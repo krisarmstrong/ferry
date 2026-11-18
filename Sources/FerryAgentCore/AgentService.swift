@@ -60,6 +60,7 @@ public actor AgentService: AgentHandling {
   {
     switch (request, file) {
     case (.status, _):
+      await hub.firstScan()
       return .status(devices: await hub.devices(), providerEnabled: await domains.isUserEnabled())
     case (.recheck(let id), _):
       await hub.recheck(id)

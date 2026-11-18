@@ -105,4 +105,28 @@ extension DomainControllerTests {
     #expect(await harness.manager.waitForCalls(2) == [.remove(old), added])
     #expect(!FileManager.default.fileExists(atPath: oldTable.path))
   }
+
+  /// Right after the agent starts, its status must wait for the first scan: an empty list then
+  /// would show "No device connected" for a device that is plugged in.
+  @Test func statusWaitsForTheFirstScan() async throws {
+    let device = await makeDevice("A")
+    await device.suspendNext(.storages)
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    await device.waitUntilSuspended(.storages)
+
+    let status = Task { [service = harness.service] in
+      await service.handle(.status, file: nil)
+    }
+    for _ in 0..<1_000 where await harness.hub.requestsAwaitingFirstScan == 0 {
+      try await Task.sleep(for: .milliseconds(1))
+    }
+    await device.resume(.storages)
+
+    guard case .status(let devices, _) = await status.value else {
+      Issue.record("expected a status")
+      return
+    }
+    #expect(devices.map(\.id) == [device.info.id])
+  }
 }
