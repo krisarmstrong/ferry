@@ -75,7 +75,9 @@ final class FakeADBHub: Sendable {
 
   private static func listing(_ entries: [Entry]) -> String {
     entries.map { entry in
-      [entry.serial, entry.state, entry.model.map { "model:\($0)" }].compactMap { $0 }
+      // adb gives a USB device its USB path; a network one has none.
+      let usb = entry.serial.contains(":") ? nil : "usb:1-1"
+      return [entry.serial, entry.state, usb, entry.model.map { "model:\($0)" }].compactMap { $0 }
         .joined(separator: " ") + "\n"
     }.joined()
   }

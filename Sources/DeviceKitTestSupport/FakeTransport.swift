@@ -50,6 +50,32 @@ public actor FakeTransport: DeviceTransport {
   private var rescanAfter: Duration?
 
   private var awaiting: [String] = []
+  private var overUSB: Set<DeviceID> = []
+  private var withdrawn: Set<DeviceID> = []
+  private var scanFailure: TransportError?
+  private var busyKeepsSerial = false
+
+  /// A USB route presents `id` in a state the fake does not list (offline), as adb reports.
+  public func presentOverUSB(_ id: DeviceID) {
+    overUSB.insert(id)
+  }
+
+  /// The device leaves the scan while its open session keeps working, as an ADB device does
+  /// when USB debugging is revoked: adb lists it unauthorised, the sync connection stays.
+  public func withdraw(_ id: DeviceID) {
+    withdrawn.insert(id)
+  }
+
+  /// Every scan throws `error` until called with `nil`.
+  public func failScans(with error: TransportError?) {
+    scanFailure = error
+  }
+
+  /// A device held by another app is reported under its own serial, as `MTPTransport` does when
+  /// the registry has the USB serial, instead of under `busyID(for:)`.
+  public func setBusyKeepsSerial(_ keeps: Bool) {
+    busyKeepsSerial = keeps
+  }
 
   /// A network device at `address` waits for the user to allow this Mac, as adb lists one
   /// `unauthorized` under its `host:port`.
@@ -114,18 +140,21 @@ public actor FakeTransport: DeviceTransport {
 
   public func scan() async throws(TransportError) -> DeviceScan {
     scanCount += 1
+    if let scanFailure { throw scanFailure }
     var usable: [DeviceInfo] = []
     var busy: [DeviceInfo] = []
     let notSharing = withoutFileTransfer
     var ejected: [DeviceInfo] = []
-    for device in devices {
+    for device in devices where !withdrawn.contains(device.info.id) {
       let info = device.info
       if parked.contains(info.id) {
         ejected.append(info)
       } else if heldElsewhere.contains(info.id) {
         busy.append(
-          DeviceInfo(
-            id: Self.busyID(for: info.id), manufacturer: info.manufacturer, model: info.model))
+          busyKeepsSerial
+            ? info
+            : DeviceInfo(
+              id: Self.busyID(for: info.id), manufacturer: info.manufacturer, model: info.model))
       } else {
         if await !device.isOpen { probes[info.id, default: 0] += 1 }
         usable.append(info)
@@ -133,7 +162,8 @@ public actor FakeTransport: DeviceTransport {
     }
     return DeviceScan(
       devices: usable, busy: busy, notSharing: notSharing, ejected: ejected,
-      rescanAfter: rescanAfter, method: method, methods: methods, awaitingAuthorization: awaiting)
+      rescanAfter: rescanAfter, method: method, methods: methods, awaitingAuthorization: awaiting,
+      presentOverUSB: overUSB)
   }
 
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {

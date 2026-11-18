@@ -49,6 +49,20 @@ extension AppModelTests {
     #expect(model.actionError != nil)
   }
 
+  /// The agent replaced a domain on its own (a storage's new key) and the system kept its unsent
+  /// changes: the menu says where, as it does after an eject.
+  @Test func statusShowsWhereARetiredDomainsChangesWereSaved() async throws {
+    let saved = try Self.savedFolder(holdingFile: true)
+    defer { try? FileManager.default.removeItem(at: saved) }
+    let client = FakeClient(log: log)
+    client.setStatus([], preserved: [saved])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+
+    await model.refresh()
+
+    #expect(model.preservedChanges == [saved])
+  }
+
   @Test func ejectShowsWhereUnsentChangesWereSaved() async throws {
     let saved = try Self.savedFolder(holdingFile: true)
     defer { try? FileManager.default.removeItem(at: saved) }

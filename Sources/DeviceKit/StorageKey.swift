@@ -7,8 +7,12 @@ public enum StorageKey {
   public static let `internal` = "internal"
   private static let volumePrefix = "volume:"
 
-  /// A removable volume, `/storage/<id>` over ADB.
-  public static func volume(_ id: String) -> String { volumePrefix + id }
+  /// A removable volume, `/storage/<id>` over ADB. The ID takes Android's case for its mount
+  /// folder (upper case for FAT's `XXXX-XXXX`, lower case for a UUID), so an ID MTP reports in
+  /// the other case gets the same key.
+  public static func volume(_ id: String) -> String {
+    volumePrefix + (UUID(uuidString: id) != nil ? id.lowercased() : id.uppercased())
+  }
 
   /// The volume ID a `volume(_:)` key names, or `nil` for any other key.
   public static func volumeID(of key: String) -> String? {

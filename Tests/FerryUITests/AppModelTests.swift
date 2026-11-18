@@ -30,10 +30,12 @@ final class FakeClient: AgentSending {
 
   func setStatus(
     _ devices: [AttachedDevice], provider: ProviderState = .enabled,
-    transfers: [ActiveTransfer] = []
+    transfers: [ActiveTransfer] = [], preserved: [URL] = []
   ) {
     status.withLock {
-      $0 = .status(StatusReport(devices: devices, provider: provider, transfers: transfers))
+      $0 = .status(
+        StatusReport(
+          devices: devices, provider: provider, transfers: transfers, preservedChanges: preserved))
     }
   }
 

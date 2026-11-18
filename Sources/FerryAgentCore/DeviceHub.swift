@@ -95,6 +95,8 @@ public actor DeviceHub {
 
   /// Network devices waiting for the user to allow this Mac, from the most recent scan.
   var awaiting: [String] = []
+  /// Devices whose next swap attempt is held off: their new session was not ready.
+  var swapHolds: [DeviceID: Backoff] = [:]
   /// MTP sessions kept open, idle, while ADB serves their device.
   var kept: [DeviceID: any DeviceSession] = [:]
   /// Leases handed out and not yet released, by device.
@@ -249,22 +251,9 @@ public actor DeviceHub {
     await serve(scan)
   }
 
-  /// Opens each usable device the hub does not hold, and moves each held one whose method the
-  /// scan says has changed.
-  private func serve(_ scan: DeviceScan) async {
-    for info in scan.devices where !swapping.contains(info.id) {
-      let method = scan.method(of: info.id)
-      if let entry = entries[info.id], case .held = entry.holding {
-        if entry.method != method { beginSwap(info.id, to: method) }
-      } else {
-        await admit(info, method: method)
-      }
-    }
-  }
-
   /// Opens a device the hub does not hold: one it does not list yet, or one that was busy,
   /// failed, not sharing files or ejected and is now offered as usable.
-  private func admit(_ info: DeviceInfo, method: ConnectionMethod) async {
+  func admit(_ info: DeviceInfo, method: ConnectionMethod) async {
     let existing = entries[info.id]
     if let existing, case .held = existing.holding { return }
     if ejected.contains(info.id) || backoff[info.id]?.waiting == true { return }

@@ -172,13 +172,21 @@ struct ADBHostTests {
         ADBDevice(
           serial: "192.168.1.20:5555", state: .device, isWireless: true, model: "Pixel_4a",
           product: "sunfish"),
-        ADBDevice(serial: "emulator-5554", state: .offline, isWireless: false),
+        ADBDevice(serial: "emulator-5554", state: .offline, isWireless: true),
       ])
   }
 
   @Test func unfamiliarStateIsKept() {
-    let devices = ADBWire.devices(from: "abc recovery transport_id:1\n")
+    let devices = ADBWire.devices(from: "abc recovery usb:1-1 transport_id:1\n")
     #expect(devices == [ADBDevice(serial: "abc", state: .other("recovery"), isWireless: false)])
+  }
+
+  /// adb marks a USB device with `usb:`; anything without it (network, mDNS, an emulator) is not
+  /// on a cable and must not outrank one.
+  @Test func onlyAnEntryWithAUSBPathIsOnUSB() {
+    let devices = ADBWire.devices(
+      from: "abc device usb:1-1 transport_id:1\nemulator-5554 device transport_id:2\n")
+    #expect(devices.map(\.isWireless) == [false, true])
   }
 
   @Test func mdnsSerialIsWireless() {

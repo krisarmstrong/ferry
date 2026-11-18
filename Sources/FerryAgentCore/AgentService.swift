@@ -104,7 +104,8 @@ public actor AgentService: AgentHandling {
         StatusReport(
           devices: await hub.devices(), provider: await domains.providerState(),
           transfers: await transfers.list(),
-          awaitingAuthorization: await hub.awaitingAuthorization()))
+          awaitingAuthorization: await hub.awaitingAuthorization(),
+          preservedChanges: await domains.preservedByRetirement))
     case .recheck(let id):
       await hub.recheck(id)
       return .done
@@ -224,7 +225,7 @@ public actor AgentService: AgentHandling {
       case .file:
         // Compared as FileProvider holds it: at the size a download delivered, if the device
         // still lists the file with the stale size it had then.
-        if let base, ContentVersion(await route.items.observed(current).item) != base {
+        if let base, !ContentVersion(await route.items.observed(current).item).matches(base) {
           throw .changedOnDevice(path)
         }
       case .folder:
@@ -359,7 +360,7 @@ extension AgentService {
         let current = try await route.session.item(at: path, in: route.storage)
         // As FileProvider holds it: at the size a download delivered (see `delete`).
         let entry = await route.items.observed(current)
-        if entry.item.kind == .file, ContentVersion(entry.item) != base {
+        if entry.item.kind == .file, !ContentVersion(entry.item).matches(base) {
           return try await ConflictCopy.keepDevice(entry, onConflict, mac: scratch, on: route)
         }
         checked = current

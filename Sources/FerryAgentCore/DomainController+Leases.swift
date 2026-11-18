@@ -1,10 +1,19 @@
 import DeviceKit
+import FerryIPC
 import os
 
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "DomainController")
 
 /// The hub's sessions, as the controller uses them.
 extension DomainController {
+  func signal(_ domain: String) async {
+    await manager.signal(domain)
+  }
+
+  func providerState() async -> ProviderState {
+    await manager.providerState()
+  }
+
   /// The domain's item table, for a request that does not touch the device. Waits, and fails,
   /// as `route(_:)` does.
   func items(of domain: String) async throws(TransportError) -> ItemTable {

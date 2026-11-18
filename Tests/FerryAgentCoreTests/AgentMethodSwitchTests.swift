@@ -14,15 +14,17 @@ private struct Switching {
   let domain: String
   let storage: StorageID
 
-  init() async throws {
+  /// Served over MTP, or, given `over`, by ADB alone over that route (MTP not attached).
+  init(over route: ConnectionMethod? = nil) async throws {
     mtpDevice = viaMTP("S1")
     adbDevice = viaADB("S1")
     storage = neutralStorage("S1").id
     for device in [mtpDevice, adbDevice] {
       try await device.seed(try path("/Docs/a.txt"), in: storage, contents: Data("a".utf8))
     }
-    harness = try AgentHarness(
-      devices: [mtpDevice], adb: FakeTransport(devices: [], method: .usbADB))
+    let adb = FakeTransport(devices: route == nil ? [] : [adbDevice], method: .usbADB)
+    if let route { await adb.setMethod(route, for: adbDevice.info.id) }
+    harness = try AgentHarness(devices: route == nil ? [mtpDevice] : [], adb: adb)
     domain = DomainNaming.identifier(for: storage)
     _ = await harness.manager.waitForCalls(1)
   }
@@ -131,65 +133,131 @@ struct AgentMethodSwitchTests {
     #expect(!calls.contains { if case .remove = $0 { true } else { false } })
   }
 
-  /// Review Focus 1: a copy running when ADB turns up finishes on MTP, and the swap follows it.
-  @Test func aCopyInFlightFinishesOnTheOldSession() async throws {
+  /// Review Focus 1: ADB turns up while a copy runs over MTP. The swap waits for the copy: ADB
+  /// is not opened until it has finished on MTP, and the file is whole on the device that took
+  /// it.
+  @Test func aCopyInFlightFinishesBeforeADBIsOpened() async throws {
     let setup = try await Switching()
     defer { setup.harness.finish() }
     let docs = try await setup.harness.id(try path("/Docs"), in: setup.domain)
-    let (adb, adbDevice, harness) = (setup.adb, setup.adbDevice, setup.harness)
+    let (adb, adbDevice, hub) = (setup.adb, setup.adbDevice, setup.harness.hub)
+    let opensDuringCopy = Counter()
+    let tick = setup.harness.tick
     await setup.mtpDevice.onNextUpload {
       await adb.attach(adbDevice)
-      harness.tick()
-      while await !harness.hub.isSwapping(adbDevice.info.id), !Task.isCancelled {
-        await Task.yield()
-      }
+      tick()
+      // The swap has begun and is waiting for this copy's lease.
+      while await hub.waitingForRequests == 0, !Task.isCancelled { await Task.yield() }
+      await opensDuringCopy.set(await adb.openCount(of: adbDevice.info.id))
     }
 
-    let reply = await harness.service.handle(
+    let reply = await setup.harness.service.handle(
       .create(domain: setup.domain, parent: docs, name: "b.txt", isFolder: false),
-      file: try harness.readable("b.txt", "bee"))
+      file: try setup.harness.readable("b.txt", "bee"))
 
     #expect(reply.isEntry)
+    #expect(await opensDuringCopy.value == 0)
     #expect(
       await setup.mtpDevice.contents(of: try path("/Docs/b.txt"), in: setup.storage)
         == Data("bee".utf8))
+    #expect(
+      await !setup.mtpDevice.allPaths(in: setup.storage).contains {
+        SafeWriter.isPartial($0.name ?? "")
+      })
     await setup.waitForMethod(.usbADB)
   }
 
-  /// Review Focus 1: the cable is pulled mid-copy while the network carries on. The copy fails
-  /// as a disconnection, nothing appears under its name, and the device carries on over ADB.
-  @Test func aCopyCutOffBySwitchingLeavesNothingVisible() async throws {
+  /// Review Focus 1: the cable goes in while a copy runs over the network. ADB holds one session
+  /// per device, so the swap closes it, but only once the copy has finished; the file is whole on
+  /// the device that took it, with no partial left.
+  @Test func aNetworkCopyFinishesBeforeUSBTakesOver() async throws {
+    let setup = try await Switching(over: .wifiADB)
+    defer { setup.harness.finish() }
+    let docs = try await setup.harness.id(try path("/Docs"), in: setup.domain)
+    let (mtp, mtpDevice, adbDevice, hub) = (
+      setup.harness.transport, setup.mtpDevice, setup.adbDevice, setup.harness.hub
+    )
+    let closesDuringCopy = Counter()
+    let tick = setup.harness.tick
+    await adbDevice.onNextUpload {
+      await mtp.attach(mtpDevice)
+      tick()
+      while await hub.waitingForRequests == 0, !Task.isCancelled { await Task.yield() }
+      await closesDuringCopy.set(await adbDevice.closeCount)
+    }
+
+    let reply = await setup.harness.service.handle(
+      .create(domain: setup.domain, parent: docs, name: "b.txt", isFolder: false),
+      file: try setup.harness.readable("b.txt", "bee"))
+
+    #expect(reply.isEntry)
+    #expect(await closesDuringCopy.value == 0)
+    #expect(
+      await adbDevice.contents(of: try path("/Docs/b.txt"), in: setup.storage) == Data("bee".utf8))
+    #expect(
+      await !adbDevice.allPaths(in: setup.storage).contains { SafeWriter.isPartial($0.name ?? "") })
+    await setup.waitForMethod(.usbFileTransfer)
+    #expect(await adbDevice.closeCount == 1)
+  }
+
+  /// Review Focus 1: USB debugging is revoked while a copy runs over ADB, and MTP is there. The
+  /// ADB session is closed only after the copy finished on it.
+  @Test func anADBCopyFinishesBeforeMTPTakesOver() async throws {
+    let setup = try await Switching(over: .usbADB)
+    defer { setup.harness.finish() }
+    await setup.harness.transport.attach(setup.mtpDevice)
+    setup.harness.tick()
+    _ = await setup.harness.barrier(after: 1)
+    #expect(await setup.currentMethod == .usbADB)
+    let docs = try await setup.harness.id(try path("/Docs"), in: setup.domain)
+    let (adb, adbDevice, hub) = (setup.adb, setup.adbDevice, setup.harness.hub)
+    let closesDuringCopy = Counter()
+    let tick = setup.harness.tick
+    await adbDevice.onNextUpload {
+      await adb.withdraw(adbDevice.info.id)
+      tick()
+      while await hub.waitingForRequests == 0, !Task.isCancelled { await Task.yield() }
+      await closesDuringCopy.set(await adbDevice.closeCount)
+    }
+
+    let reply = await setup.harness.service.handle(
+      .create(domain: setup.domain, parent: docs, name: "b.txt", isFolder: false),
+      file: try setup.harness.readable("b.txt", "bee"))
+
+    #expect(reply.isEntry)
+    #expect(await closesDuringCopy.value == 0)
+    #expect(
+      await adbDevice.contents(of: try path("/Docs/b.txt"), in: setup.storage) == Data("bee".utf8))
+    await setup.waitForMethod(.usbFileTransfer)
+    #expect(await adbDevice.closeCount == 1)
+  }
+
+  /// Review Focus 1: the cable is pulled mid-copy. The copy fails as a disconnection, and the
+  /// device that ran it has nothing under the name and no partial.
+  @Test func aCopyCutOffLeavesNothingOnTheDeviceThatRanIt() async throws {
     let setup = try await Switching()
     defer { setup.harness.finish() }
     let docs = try await setup.harness.id(try path("/Docs"), in: setup.domain)
-    let (mtp, mtpDevice, adb, adbDevice, harness) = (
-      setup.harness.transport, setup.mtpDevice, setup.adb, setup.adbDevice, setup.harness
-    )
+    let (mtp, mtpDevice) = (setup.harness.transport, setup.mtpDevice)
     await mtpDevice.onNextUpload {
       await mtp.detach(mtpDevice.info.id)
-      await adb.setMethod(.wifiADB, for: adbDevice.info.id)
-      await adb.attach(adbDevice)
     }
 
-    let reply = await harness.service.handle(
+    let reply = await setup.harness.service.handle(
       .create(domain: setup.domain, parent: docs, name: "b.txt", isFolder: false),
-      file: try harness.readable("b.txt", "bee"))
-    #expect(reply == .failure(.deviceDisconnected))
+      file: try setup.harness.readable("b.txt", "bee"))
 
-    harness.tick()
-    await setup.waitForMethod(.wifiADB)
-    // The device left over MTP and came back over the network: its domain reconnects.
-    var listing = await setup.list(docs)
-    while listing == .failure(.deviceDisconnected), !Task.isCancelled {
-      await Task.yield()
-      listing = await setup.list(docs)
-    }
-    guard case .entries(let entries) = listing else {
-      Issue.record("expected entries, got \(listing)")
-      return
-    }
-    #expect(entries.compactMap(\.item.path.name) == ["a.txt"])
+    #expect(reply == .failure(.deviceDisconnected))
+    let left = await mtpDevice.allPaths(in: setup.storage).compactMap(\.name)
+    #expect(!left.contains("b.txt"))
+    #expect(!left.contains(where: SafeWriter.isPartial))
   }
+}
+
+/// A value a test's hook records for the test to check afterwards.
+actor Counter {
+  private(set) var value = -1
+  func set(_ value: Int) { self.value = value }
 }
 
 extension AgentResponse {

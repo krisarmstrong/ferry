@@ -17,6 +17,8 @@ extension DeviceHub {
   /// replacing the device's session, waits for the new one.
   public func lease(_ id: DeviceID) async throws(TransportError) -> SessionLease {
     await swapFinished(id)
+    // Once an eject has begun, the session is the eject's to close.
+    if ejecting.contains(id) { throw .deviceNotFound(id) }
     let session = try session(for: id)
     leases[id, default: 0] += 1
     return SessionLease(device: id, session: session)
@@ -42,7 +44,7 @@ extension DeviceHub {
   public func awaitingAuthorization() -> [String] { awaiting }
 
   /// Swaps and ejects waiting for a device's requests to finish.
-  var ejectsAwaitingRequests: Int { drainWaiters.values.map(\.count).reduce(0, +) }
+  var waitingForRequests: Int { drainWaiters.values.map(\.count).reduce(0, +) }
 
   /// Returns once no lease on `id` is out.
   func requestsFinished(_ id: DeviceID) async {
@@ -59,33 +61,109 @@ extension DeviceHub {
   }
 }
 
-// MARK: Swapping
+// MARK: Serving
 
 extension DeviceHub {
-  /// Replaces the session of the held device `id` with one over `method`, off the reconcile
-  /// chain, so a long transfer that holds a lease does not hold up other devices.
-  func beginSwap(_ id: DeviceID, to method: ConnectionMethod) {
+  /// Opens each usable device the hub does not hold, and moves each held one whose method the
+  /// scan says has changed.
+  ///
+  /// A held device is never moved from USB to the network in place: a cable pull is learnt from
+  /// the session reporting the device gone, which detaches it before the network serves it. A
+  /// held device a USB route presents but cannot serve (busy, not sharing, or present only to
+  /// adb, offline) is let go: the network must not serve it.
+  func serve(_ scan: DeviceScan) async {
+    for info in scan.devices where !swapping.contains(info.id) && !ejecting.contains(info.id) {
+      let method = scan.method(of: info.id)
+      if let entry = entries[info.id], case .held = entry.holding {
+        guard entry.method != method, method != .wifiADB, swapHolds[info.id]?.waiting != true
+        else { continue }
+        beginSwap(info.id, to: .method(method))
+      } else {
+        await admit(info, method: method)
+      }
+    }
+    let usable = Set(scan.devices.map(\.id))
+    func listing(_ info: DeviceInfo, _ state: DeviceState) -> (DeviceID, SwapTarget.Listing?) {
+      (info.id, SwapTarget.Listing(info: info, state: state, method: scan.method(of: info.id)))
+    }
+    let unservable =
+      scan.busy.map { listing($0, .busy) } + scan.notSharing.map { listing($0, .notSharingFiles) }
+      + scan.presentOverUSB.map { ($0, SwapTarget.Listing?.none) }
+    for (id, listed) in unservable
+    where !usable.contains(id) && !swapping.contains(id) && !ejecting.contains(id) {
+      guard let entry = entries[id], case .held = entry.holding else { continue }
+      if listed == nil, entry.method != .wifiADB { continue }
+      beginSwap(id, to: .released(listed))
+    }
+  }
+}
+
+// MARK: Swapping
+
+/// What a swap leaves a held device on.
+enum SwapTarget: Equatable {
+  /// A session over this method.
+  case method(ConnectionMethod)
+  /// No session: a USB route presents the device but cannot serve it (busy, not sharing), so the
+  /// network must stop serving it; it is listed as that route lists it. With no listing, the
+  /// device is dropped: the USB route lists it nowhere (adb offline).
+  case released(Listing?)
+
+  struct Listing: Equatable {
+    let info: DeviceInfo
+    let state: DeviceState
+    let method: ConnectionMethod
+  }
+}
+
+extension DeviceHub {
+  /// Replaces the session of the held device `id`, off the reconcile chain, so a long transfer
+  /// that holds a lease does not hold up other devices.
+  func beginSwap(_ id: DeviceID, to target: SwapTarget) {
     guard swapping.insert(id).inserted else { return }
-    log.info(
-      "device \(id.serial, privacy: .private) moving to \(method.rawValue, privacy: .public)")
+    log.info("device \(id.serial, privacy: .private) moving to \(target.name, privacy: .public)")
     Task { [weak self] in
-      await self?.swap(id, to: method)
+      await self?.swap(id, to: target)
     }
   }
 
-  private func swap(_ id: DeviceID, to method: ConnectionMethod) async {
+  private func swap(_ id: DeviceID, to target: SwapTarget) async {
     defer { endSwap(id) }
     await requestsFinished(id)
     // Nothing else touches the entry while it swaps: probes, ejects and scans of it wait.
-    guard let entry = entries[id], case .held(let old) = entry.holding, entry.method != method
-    else { return }
+    guard let entry = entries[id], case .held(let old) = entry.holding else { return }
+    switch target {
+    case .released(let listing):
+      await old.close()
+      await kept.removeValue(forKey: id)?.close()
+      if let listing {
+        store(listing.info, listing.state, .unheld, method: listing.method)
+      } else {
+        drop(id)
+      }
+    case .method(let method):
+      guard entry.method != method else { return }
+      if await move(entry, from: old, to: method) {
+        swapHolds[id] = nil
+      } else {
+        holdSwaps(id)
+      }
+    }
+  }
+
+  /// Moves the device to a session over `method`. Returns whether it moved; if not, it is back
+  /// on the MTP session it kept, or dropped.
+  private func move(_ entry: Entry, from old: any DeviceSession, to method: ConnectionMethod)
+    async -> Bool
+  {
+    let id = entry.info.id
     if entry.method == .usbFileTransfer {
       kept[id] = old
     } else {
       await old.close()
     }
     if method == .usbFileTransfer, await resumeKept(entry.info, generation: entry.generation) {
-      return
+      return true
     }
     let session: any DeviceSession
     do throws(TransportError) {
@@ -95,9 +173,9 @@ extension DeviceHub {
       log.info(
         "\(serial, privacy: .private) not opened over \(via, privacy: .public): \(reason, privacy: .private)"
       )
-      if await resumeKept(entry.info, generation: entry.generation) { return }
+      if await resumeKept(entry.info, generation: entry.generation) { return false }
       drop(id)
-      return
+      return false
     }
     let reading = await Self.read(session)
     // Leaving a working MTP session for one that cannot read its storages would take the
@@ -111,11 +189,36 @@ extension DeviceHub {
     switch reading {
     case .state(let state) where usable:
       store(entry.info, state, .held(session), method: await session.method)
+      return true
     case .state, .gone:
       await session.close()
-      if await resumeKept(entry.info, generation: entry.generation) { return }
+      if await resumeKept(entry.info, generation: entry.generation) { return false }
       drop(id)
+      return false
     }
+  }
+
+  /// Holds off the next swap attempt of a device whose new session was not ready: 2 s, doubling
+  /// to 60 s, then scans again.
+  func holdSwaps(_ id: DeviceID) {
+    let delay = swapHolds[id].map { min($0.delay * 2, Self.maxRetryDelay) } ?? Self.firstRetryDelay
+    generations += 1
+    let token = generations
+    swapHolds[id] = Backoff(delay: delay, waiting: true, token: token)
+    Task { [weak self, clock] in
+      do {
+        try await clock.sleep(for: delay)
+      } catch {
+        return
+      }
+      await self?.retrySwap(id, token: token)
+    }
+  }
+
+  private func retrySwap(_ id: DeviceID, token: UInt64) async {
+    guard let hold = swapHolds[id], hold.waiting, hold.token == token else { return }
+    swapHolds[id]?.waiting = false
+    await reconcile()
   }
 
   func endSwap(_ id: DeviceID) {
@@ -160,6 +263,15 @@ extension DeviceHub {
     log.info("device \(id.serial, privacy: .private) detached")
     continuation.yield(.detached(id))
     Task { [weak self] in await self?.reconcile() }
+  }
+}
+
+extension SwapTarget {
+  fileprivate var name: String {
+    switch self {
+    case .method(let method): method.rawValue
+    case .released(let listing): listing.map { "unserved (\($0.state))" } ?? "unserved"
+    }
   }
 }
 

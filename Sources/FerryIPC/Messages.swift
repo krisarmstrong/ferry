@@ -70,6 +70,16 @@ public struct ContentVersion: Codable, Sendable, Hashable {
     modifiedBits = item.modified.timeIntervalSince1970.bitPattern
   }
 
+  /// Whether `other` is this version: the same size, dated in the same second. MTP and ADB both
+  /// date files to the second, so a version one issued matches the other's.
+  public func matches(_ other: ContentVersion) -> Bool {
+    size == other.size && second == other.second
+  }
+
+  private var second: Double {
+    Double(bitPattern: modifiedBits).rounded(.down)
+  }
+
   /// Reads `encoded`; anything else, such as FileProvider's before-first-sync marker, is `nil`.
   public init?(encoded: Data) {
     guard encoded.count == 16 else { return nil }
@@ -127,15 +137,19 @@ public struct StatusReport: Codable, Sendable, Equatable {
   public let transfers: [ActiveTransfer]
   /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
   public let awaitingAuthorization: [String]
+  /// Where the system saved unsent changes of domains the agent retired on its own (a storage's
+  /// domain replaced under its method-neutral key), as `.removed` reports for an eject.
+  public let preservedChanges: [URL]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
-    awaitingAuthorization: [String] = []
+    awaitingAuthorization: [String] = [], preservedChanges: [URL] = []
   ) {
     self.devices = devices
     self.provider = provider
     self.transfers = transfers
     self.awaitingAuthorization = awaitingAuthorization
+    self.preservedChanges = preservedChanges
   }
 }
 

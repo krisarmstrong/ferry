@@ -92,7 +92,8 @@ enum ADBWire {
         properties[field[..<colon]] = field[field.index(after: colon)...]
       }
       return ADBDevice(
-        serial: serial, state: state(String(fields[1])), isWireless: isWireless(serial),
+        serial: serial, state: state(String(fields[1])),
+        isWireless: properties["usb"] == nil || isWireless(serial),
         model: properties["model"].map(String.init),
         product: properties["product"].map(String.init))
     }
@@ -107,8 +108,9 @@ enum ADBWire {
     }
   }
 
-  /// Wireless serials are `host:port` (adb connect) or an mDNS name (`adb-<id>._adb-tls-connect…`).
-  static func isWireless(_ serial: String) -> Bool {
+  /// Only a device on a cable has a `usb:` path. A serial that is `host:port` (adb connect) or an
+  /// mDNS name (`adb-<id>._adb-tls-connect…`) is on the network whatever else the line says.
+  private static func isWireless(_ serial: String) -> Bool {
     serial.contains(":") || serial.contains("._adb-tls-connect.")
   }
 }

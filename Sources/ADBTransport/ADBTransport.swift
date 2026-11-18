@@ -164,7 +164,10 @@ public actor ADBTransport: DeviceTransport {
       unnamedTries = Dictionary(
         uniqueKeysWithValues: stillUnnamed.map { ($0, (unnamedTries[$0] ?? 0) + 1) })
       let retry = unnamedTries.values.max().map { Self.unnamedDelay(afterTries: $0) }
-      let found = assemble(usable)
+      // Every serial adb lists on a cable, in any state. A network route never serves one: a
+      // serial alone does not prove a network device is the unit on the cable.
+      let onUSB = Set(listed.filter { !$0.isWireless }.map { DeviceID(serial: $0.serial) })
+      let found = assemble(usable).filter { $0.value.usb != nil || !onUSB.contains($0.key) }
       routes = found.mapValues { ADBRoutes(usb: $0.usb, wireless: $0.wireless.sorted()) }
       for (id, device) in found {
         lastKnown[id] = Held(
@@ -183,7 +186,8 @@ public actor ADBTransport: DeviceTransport {
         ejected: parked.values.map(\.info).sorted(by: Self.serial), rescanAfter: rescanAfter,
         method: .usbADB,
         methods: Dictionary(uniqueKeysWithValues: overNetwork.map { ($0, .wifiADB) }),
-        awaitingAuthorization: unauthorized.filter(\.isWireless).map(\.serial))
+        awaitingAuthorization: unauthorized.filter(\.isWireless).map(\.serial),
+        presentOverUSB: onUSB.union(found.filter { $0.value.usb != nil }.keys))
     }
   }
 
@@ -232,6 +236,7 @@ public actor ADBTransport: DeviceTransport {
     }
     return ADBSession(
       host: host, serial: serial, info: info, features: features,
+      method: routes.usb == nil ? .wifiADB : .usbADB,
       onRelease: { [weak self] in await self?.release(id) })
   }
 

@@ -19,7 +19,7 @@ public actor ADBSession: DeviceSession {
 
   public nonisolated let info: DeviceInfo
   public nonisolated let partials: PartialRegistry
-  /// Over the network when `serial` is a `host:port`, over USB otherwise.
+  /// The route `serial` is: USB, or the network.
   public nonisolated let method: ConnectionMethod
   let host: ADBHost
   /// The adb server's name for the device (`host:port` over Wi-Fi), which need not be
@@ -38,12 +38,12 @@ public actor ADBSession: DeviceSession {
 
   public init(
     host: ADBHost, serial: String, info: DeviceInfo, features: Set<String>,
-    partials: PartialRegistry = PartialRegistry(),
+    method: ConnectionMethod, partials: PartialRegistry = PartialRegistry(),
     onRelease: @escaping @Sendable () async -> Void = {}
   ) {
     self.host = host
     self.serial = serial
-    method = ADBWire.isWireless(serial) ? .wifiADB : .usbADB
+    self.method = method
     self.info = info
     self.features = features
     self.partials = partials

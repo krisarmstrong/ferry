@@ -78,6 +78,23 @@ struct ADBTransportScanTests {
     await hub.kill()
   }
 
+  /// The unit is on the cable, unauthorised or offline, and a network device answers with its
+  /// serial: the network does not serve it. The USB entry stands, and its serial is reported as
+  /// present over USB.
+  @Test(arguments: ["unauthorized", "offline"])
+  func aUSBEntryInAnyStateBlocksTheNetwork(_ state: String) async throws {
+    let android = Fixture.android(serial: Fixture.linkRunnerSerial)
+    let hub = try await Fixture.hub([
+      .init(Fixture.linkRunnerSerial, state, device: nil),
+      .init(Fixture.linkRunnerWiFi, device: android),
+    ])
+    let scan = try await Fixture.transport(port: hub.port).scan()
+    #expect(scan.devices.isEmpty)
+    #expect(scan.presentOverUSB == [Fixture.linkRunner])
+    #expect(scan.notSharing.map(\.id) == (state == "unauthorized" ? [Fixture.linkRunner] : []))
+    await hub.kill()
+  }
+
   @Test func unauthorizedIsNotSharingByItsAdbSerialAndOfflineIsLeftOut() async throws {
     let hub = try await Fixture.hub([
       .init("abc", "unauthorized", device: nil),
@@ -90,19 +107,6 @@ struct ADBTransportScanTests {
     #expect(scan.devices.isEmpty)
     #expect(scan.notSharing.map(\.id.serial) == ["abc"])
     #expect(scan.awaitingAuthorization == ["192.0.2.31:5555"])
-    await hub.kill()
-  }
-
-  @Test func anUnauthorizedRouteOfAUsableDeviceIsNotListedTwice() async throws {
-    let android = Fixture.android(serial: Fixture.linkRunnerSerial)
-    let hub = try await Fixture.hub([
-      .init(Fixture.linkRunnerSerial, "unauthorized", device: nil),
-      .init(Fixture.linkRunnerWiFi, device: android),
-    ])
-    let transport = Fixture.transport(port: hub.port)
-    let scan = try await transport.scan()
-    #expect(scan.devices == [Fixture.linkRunnerInfo])
-    #expect(scan.notSharing.isEmpty)
     await hub.kill()
   }
 

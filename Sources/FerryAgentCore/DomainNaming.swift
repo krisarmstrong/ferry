@@ -18,9 +18,16 @@ public struct DomainSpec: Sendable, Hashable {
 public enum DomainNaming {
   struct Wanted {
     let spec: DomainSpec
+    /// The storage as the session serving it names it.
     let storage: StorageID
-    let former: StorageID?
+    /// Keys the storage's domain was named by before, whose domains it supersedes.
+    let formers: [StorageID]
   }
+
+  /// What MTP calls Android's primary storage, in English: the key ADB's `internal` had when
+  /// MTP keyed storages by description. A device served over ADB from the start has no MTP
+  /// reading to say so, so its old domain is found by this.
+  static let androidInternalDescription = "Internal shared storage|"
 
   /// The domain identifier of a storage: SHA-256, in lowercase hex, of `"<serial>|<key>"`.
   /// Stable across reconnects, and free of the serial, which FileProvider would otherwise write
@@ -43,12 +50,12 @@ public enum DomainNaming {
   /// added when another listed device has the same model, and ` – SD card` added for every
   /// storage after the device's first.
   public static func specs(for devices: [AttachedDevice]) -> [DomainSpec] {
-    domains(for: devices).map(\.spec)
+    domains(for: devices, aliases: StorageAliases()).map(\.spec)
   }
 
-  /// Each wanted domain with its storage, and the storage as MTP keyed it before keys were
-  /// method-neutral, when that differs.
-  static func domains(for devices: [AttachedDevice]) -> [Wanted] {
+  /// Each wanted domain with the storage that serves it. A card MTP knows by description is
+  /// named for the volume `aliases` matched it to.
+  static func domains(for devices: [AttachedDevice], aliases: StorageAliases) -> [Wanted] {
     var models: [String: Int] = [:]
     for device in devices {
       models[device.info.model, default: 0] += 1
@@ -59,11 +66,18 @@ public enum DomainNaming {
       let base =
         models[model, default: 0] > 1 ? "\(model) (\(device.id.serial.suffix(4)))" : model
       return storages.enumerated().map { index, storage in
+        let identity = aliases.identity(of: storage.id)
         let spec = DomainSpec(
-          identifier: identifier(for: storage.id),
+          identifier: identifier(for: identity),
           displayName: index == 0 ? base : base + " – SD card")
-        let former = storage.formerKey.map { StorageID(device: device.id, key: $0) }
-        return Wanted(spec: spec, storage: storage.id, former: former)
+        var formers = [storage.formerKey].compactMap { $0 } + aliases.mtpKeys(of: identity)
+        if storage.id.key == StorageKey.internal {
+          formers.append(androidInternalDescription)
+        }
+        let superseded = Set(formers).subtracting([identity.key]).sorted()
+        return Wanted(
+          spec: spec, storage: storage.id,
+          formers: superseded.map { StorageID(device: device.id, key: $0) })
       }
     }
   }

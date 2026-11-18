@@ -106,7 +106,7 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
       }
       var found = Found(ejected: ejected.filter { !occupied.contains($0.key) }.map(\.value.info))
       for record in candidates {
-        await report(record, into: &found)
+        await report(record, among: candidates, into: &found)
       }
       // One device can be ejected on more than one port (see `report`): list it once.
       var listed: Set<DeviceID> = []
@@ -129,7 +129,9 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
   }
 
   /// Sorts one attached device into `found`, opening it only if it is a new candidate.
-  private func report(_ record: USBDeviceRecord, into found: inout Found) async {
+  private func report(
+    _ record: USBDeviceRecord, among candidates: [USBDeviceRecord], into found: inout Found
+  ) async {
     let location = record.location
     // Ejected first, before any I/O: it stays held until its session finishes closing, and any
     // enumeration on its port is it, whatever product ID it comes back with.
@@ -141,7 +143,7 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     case .ignored:
       return
     case .notSharing:
-      found.notSharing.append(Self.describe(record))
+      found.notSharing.append(Self.describe(record, among: candidates))
       return
     case .mtp:
       break
@@ -173,7 +175,7 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
       opened[location] = Scanned(device: device, info: info, port: record.locationID)
       found.devices.append(info)
     } catch {
-      let info = Self.describe(record)
+      let info = Self.describe(record, among: candidates)
       found.busy.append(info)
       busy[location] = info
     }
@@ -275,13 +277,18 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
 
   /// Names a device from its registry properties, for one Ferry cannot open. It is identified by
   /// its USB serial, which Android sets to the serial MTP and ADB report once open, so the device
-  /// is one device whichever way it is seen. One without a serial is identified by where it is,
-  /// which is unique while it stays plugged in.
-  static func describe(_ record: USBDeviceRecord) -> DeviceInfo {
+  /// is one device whichever way it is seen. One without a serial, or whose serial another
+  /// attached candidate shares (a vendor's default), is identified by where it is, which is
+  /// unique while it stays plugged in.
+  static func describe(_ record: USBDeviceRecord, among candidates: [USBDeviceRecord])
+    -> DeviceInfo
+  {
     let location = record.location
     let serial = record.serial.flatMap { $0.isEmpty ? nil : $0 }
+    let shared = candidates.filter { $0.serial == serial }.count > 1
+    let name = shared ? nil : serial
     return DeviceInfo(
-      id: DeviceID(serial: serial ?? "usb-\(location.bus)-\(location.address)"),
+      id: DeviceID(serial: name ?? "usb-\(location.bus)-\(location.address)"),
       manufacturer: record.vendorName ?? "Unknown", model: record.productName ?? "USB device")
   }
 }

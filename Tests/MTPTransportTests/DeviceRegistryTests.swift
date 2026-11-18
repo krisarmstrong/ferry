@@ -120,7 +120,21 @@ struct DeviceRegistryTests {
       registryID: 9, locationID: 1 << 24 | 3 << 16, address: 3, vendorID: 0x18D1,
       productID: 0x4EE7, interfaces: [], vendorName: "NetAlly", productName: "LinkRunner-100G",
       serial: serial)
-    #expect(DeviceRegistry<Int, Int>.describe(record).id == DeviceID(serial: expected))
+    #expect(
+      DeviceRegistry<Int, Int>.describe(record, among: [record]).id == DeviceID(serial: expected))
+  }
+
+  /// Two boards that share a USB serial (a vendor default) are told apart by location.
+  @Test func aSharedUSBSerialFallsBackToTheLocation() {
+    let records = [3, 4].map { address in
+      USBDeviceRecord(
+        registryID: UInt64(address), locationID: 1 << 24 | UInt32(address) << 16,
+        address: UInt8(address), vendorID: 0x18D1, productID: 0x4EE7, interfaces: [],
+        serial: "0123456789ABCDEF")
+    }
+    #expect(
+      records.map { DeviceRegistry<Int, Int>.describe($0, among: records).id.serial }
+        == ["usb-1-3", "usb-1-4"])
   }
 
   static func id(_ raw: Int) -> DeviceID { DeviceID(serial: "S\(raw)") }

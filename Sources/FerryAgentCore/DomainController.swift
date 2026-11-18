@@ -60,7 +60,7 @@ public actor DomainController {
     }
   }
 
-  private struct Domain {
+  struct Domain {
     /// `nil` for a domain found at start, until its device is ready and names it.
     var spec: DomainSpec?
     var storage: StorageID?
@@ -68,9 +68,15 @@ public actor DomainController {
   }
 
   let hub: DeviceHub
-  private let manager: any DomainManaging
-  private let itemStore: URL
-  private var domains: [String: Domain] = [:]
+  let manager: any DomainManaging
+  let itemStore: URL
+  var domains: [String: Domain] = [:]
+  /// Which volume each card MTP knows by description is (see `StorageAliases`).
+  var aliases: StorageAliases
+  /// Each ready device's method and storages when last reconciled, to learn from a change.
+  var lastReady: [DeviceID: (method: ConnectionMethod, storages: [StorageInfo])] = [:]
+  /// Where unsent changes of domains retired on their own went, for the app to show.
+  var preservedByRetirement: [URL] = []
   /// The item table of each domain used since it was added or adopted.
   private var tables: [String: ItemTable] = [:]
   /// The operation most recently queued; the next one waits for it.
@@ -95,6 +101,7 @@ public actor DomainController {
     self.hub = hub
     self.manager = manager
     self.itemStore = itemStore
+    aliases = StorageAliases.load(from: itemStore)
   }
 
   /// The agent's item store, in its own Application Support folder.
@@ -161,17 +168,9 @@ public actor DomainController {
     return (storage, table(for: domain))
   }
 
-  func signal(_ domain: String) async {
-    await manager.signal(domain)
-  }
-
   /// The connected domains of `device`, in identifier order.
   func connectedDomains(of device: DeviceID) -> [String] {
     domains.filter { $0.value.connected && $0.value.storage?.device == device }.keys.sorted()
-  }
-
-  func providerState() async -> ProviderState {
-    await manager.providerState()
   }
 
   /// The domain's table, loaded on first use. Nothing awaits between the lookup and the insert,
@@ -185,7 +184,7 @@ public actor DomainController {
 
   /// Deletes the domain's table, loaded or not, so a domain added again starts with new
   /// identifiers.
-  private func discardTable(of domain: String) async {
+  func discardTable(of domain: String) async {
     if let table = tables.removeValue(forKey: domain) {
       await table.discard()
     } else {
@@ -249,14 +248,19 @@ public actor DomainController {
   }
 
   private func reconcile() async {
-    let wanted = DomainNaming.domains(for: await hub.devices())
+    let devices = await hub.devices()
+    let moved = noteMethods(of: devices)
+    let wanted = DomainNaming.domains(for: devices, aliases: aliases)
     let live = Set(wanted.map(\.spec.identifier))
     for (identifier, domain) in domains where domain.connected && !live.contains(identifier) {
       await disconnect(identifier)
     }
     for domain in wanted where !ejecting.contains(domain.storage.device) {
-      if let former = domain.former { await retire(former) }
+      for former in domain.formers { await retire(former) }
       await connect(domain.spec, domain.storage)
+    }
+    for device in moved {
+      await resync(device)
     }
   }
 
@@ -279,6 +283,10 @@ public actor DomainController {
       existing.storage = storage
       existing.spec = spec
       domains[identifier] = existing
+    } else if existing.storage != storage {
+      // Another method serves the storage, under its own name for it (an SD card MTP knows by
+      // description): requests go to that name from now on.
+      domains[identifier]?.storage = storage
     }
     if !existing.connected {
       guard await isServed(storage.device) else { return }
@@ -334,16 +342,6 @@ public actor DomainController {
 // MARK: Removing
 
 extension DomainController {
-  /// Removes a ready storage's domain under its former key, unsent changes kept as Remove Ferry
-  /// does, unless a live storage claims it.
-  private func retire(_ former: StorageID) async {
-    let identifier = DomainNaming.identifier(for: former)
-    guard let domain = domains[identifier], [nil, former].contains(domain.storage) else { return }
-    domains[identifier] = nil
-    await discardTable(of: identifier)
-    _ = await remove(identifier)
-  }
-
   private func removeDomains(of id: DeviceID) async -> [URL] {
     ejecting.insert(id)
     let identifiers = domains.filter { $0.value.storage?.device == id }.keys.sorted()
@@ -359,7 +357,7 @@ extension DomainController {
   }
 
   /// Removes one domain, keeping its unsent changes; a failure is logged.
-  private func remove(_ identifier: String) async -> URL? {
+  func remove(_ identifier: String) async -> URL? {
     do {
       let preserved = try await manager.remove(identifier)
       if let preserved {
@@ -385,6 +383,8 @@ extension DomainController {
     }
     tables = [:]
     ItemTable.discardAll(in: itemStore)
+    StorageAliases.discard(in: itemStore)
+    aliases = StorageAliases()
     do {
       return .success(try await manager.removeAll())
     } catch {

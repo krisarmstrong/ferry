@@ -44,6 +44,15 @@ struct ADBStoragesTests {
     #expect(StorageKey.isVolumeID(name) == isVolume)
   }
 
+  /// Android names a FAT volume's folder in upper case and a UUID one in lower case; a volume ID
+  /// from MTP in the other case gets the same key.
+  @Test func volumeKeysTakeAndroidsCase() {
+    #expect(StorageKey.volume("1234-abcd") == "volume:1234-ABCD")
+    #expect(
+      StorageKey.volume("8F3C3A5E-7B0D-4E8B-9A6E-0C1D2E3F4A5B")
+        == "volume:8f3c3a5e-7b0d-4e8b-9a6e-0c1d2e3f4a5b")
+  }
+
   @Test func storageKeysAreMethodNeutral() {
     #expect(StorageKey.internal == "internal")
     #expect(ADBStorages.root(forKey: "internal") == "/storage/emulated/0")

@@ -11,9 +11,10 @@ struct ADBTrackDevicesTests {
     let server = try await FakeADBServer.start { peer in
       #expect(try await peer.request() == "host:track-devices-l")
       try await peer.okay()
-      try await peer.send("0017abc device model:Pixel\n0000")
+      try await peer.send("001fabc device usb:1-1 model:Pixel\n0000")
       try await peer.send(
-        String(data: ADBWire.frame("abc unauthorized\n1.2.3.4:5555 device\n"), encoding: .utf8)!)
+        String(
+          data: ADBWire.frame("abc unauthorized usb:1-1\n1.2.3.4:5555 device\n"), encoding: .utf8)!)
     }
     defer { server.stop() }
     var lists: [[ADBDevice]] = []

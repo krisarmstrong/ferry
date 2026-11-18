@@ -317,6 +317,12 @@ import os
     provider = report.provider
     transfers = report.transfers
     agent = .running
+    // The agent replaced a domain on its own and the system kept its unsent changes: shown as an
+    // eject's are.
+    for location in report.preservedChanges.filter(Self.holdsSomething)
+    where !preservedChanges.contains(location) {
+      preservedChanges.append(location)
+    }
     let states = devices.map { DevicePresentation.kind(of: $0.state) }.joined(separator: ",")
     Self.log.info(
       "devices: [\(states, privacy: .public)] provider: \(report.provider.rawValue, privacy: .public)"

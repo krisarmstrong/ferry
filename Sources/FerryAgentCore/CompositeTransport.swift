@@ -7,21 +7,21 @@ import os
 /// reports), so a device either one lists is one `DeviceID`, listed once, served by its preferred
 /// route (see `ConnectionMethod.isPreferred(over:)`): ADB over USB, then MTP, then ADB over the
 /// network. A serial alone does not prove a network device is the unit on the cable, so a
-/// network route serves a device only while no USB route presents its serial. A
+/// network route serves a device only while no USB route of either kind presents its serial in
+/// any state (usable, busy, not sharing, ejected, unauthorised, offline). A transport whose scan
+/// fails is taken as unchanged since its last successful scan, never as having found nothing. A
 /// device keeps the name MTP gave it once MTP has seen it, so its Finder location is not renamed
 /// when the method changes; one only ADB has seen keeps ADB's name.
 ///
 /// A device ADB lists as unauthorised is left to MTP when MTP can serve it, and otherwise listed
-/// as not sharing, reached over ADB. A device either transport reports ejected is ejected: MTP
-/// can park only a device it holds, so it may still offer one that ADB served when it was
-/// ejected. Parking and unparking reach both.
+/// as not sharing, reached over ADB. A device either transport reports ejected is ejected, so one
+/// transport's park holds it even if the other still offers it. Parking and unparking reach both.
 ///
 /// A device both list as busy or not sharing is listed once, as MTP names it. MTP names such a
 /// device by its USB serial when the registry has one, so it merges with ADB's identity; one
 /// without falls back to its USB location and cannot be matched.
 ///
-/// A transport whose scan fails is left out of that scan; only when both fail does the scan
-/// fail.
+/// Only when both transports' scans fail does the scan fail.
 public actor CompositeTransport: DeviceTransport {
   private static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "CompositeTransport")
@@ -39,6 +39,10 @@ public actor CompositeTransport: DeviceTransport {
   private var mtpNames: [DeviceID: DeviceInfo] = [:]
   /// Devices MTP offered as usable in the most recent scan.
   private var overMTP: Set<DeviceID> = []
+  /// Each transport's most recent successful scan. A failed scan says nothing about what is
+  /// attached, so the last view stands until a scan succeeds.
+  private var lastMTP: DeviceScan?
+  private var lastADB: DeviceScan?
 
   public init(mtp: any DeviceTransport, adb: any DeviceTransport) {
     self.mtp = mtp
@@ -55,25 +59,29 @@ public actor CompositeTransport: DeviceTransport {
     case (.failure(let error), .failure):
       throw error
     case (.success(let scan), .failure):
-      (viaMTP, viaADB) = (scan, DeviceScan(devices: []))
+      (viaMTP, viaADB) = (scan, Self.unchanged(lastADB))
     case (.failure, .success(let scan)):
-      (viaMTP, viaADB) = (DeviceScan(devices: []), scan)
+      (viaMTP, viaADB) = (Self.unchanged(lastMTP), scan)
     case (.success(let mtpScan), .success(let adbScan)):
       (viaMTP, viaADB) = (mtpScan, adbScan)
     }
+    if case .success(let scan) = results.mtp { lastMTP = scan }
+    if case .success(let scan) = results.adb { lastADB = scan }
     return merge(mtp: viaMTP, adb: viaADB)
   }
 
+  /// A transport's last view, standing in for a scan that failed: the same devices, with no
+  /// rescan of its own asked for.
+  private static func unchanged(_ last: DeviceScan?) -> DeviceScan {
+    guard let last else { return DeviceScan(devices: []) }
+    return DeviceScan(
+      devices: last.devices, busy: last.busy, notSharing: last.notSharing, ejected: last.ejected,
+      method: last.method, methods: last.methods,
+      awaitingAuthorization: last.awaitingAuthorization, presentOverUSB: last.presentOverUSB)
+  }
+
   private func merge(mtp viaMTP: DeviceScan, adb viaADB: DeviceScan) -> DeviceScan {
-    for info in viaMTP.devices + viaMTP.ejected {
-      mtpNames[info.id] = info
-    }
-    // A device MTP cannot open is named from its USB descriptors: second best, kept only until
-    // MTP opens it.
-    for info in viaMTP.busy + viaMTP.notSharing where mtpNames[info.id] == nil {
-      mtpNames[info.id] = info
-    }
-    overMTP = Set(viaMTP.devices.map(\.id))
+    rememberNames(viaMTP)
     var methods: [DeviceID: ConnectionMethod] = [:]
     var ejected: [DeviceInfo] = []
     for (scan, info) in viaMTP.ejected.map({ (viaMTP, $0) }) + viaADB.ejected.map({ (viaADB, $0) })
@@ -82,11 +90,13 @@ public actor CompositeTransport: DeviceTransport {
       methods[info.id] = scan.method(of: info.id)
     }
     let ejectedIDs = Set(ejected.map(\.id))
+    let onUSB = Self.onUSB(mtp: viaMTP, adb: viaADB)
     var servers: [DeviceID: Side] = [:]
     var chosen: [DeviceID: DeviceInfo] = [:]
     for (side, scan) in [(Side.adb, viaADB), (.mtp, viaMTP)] {
       for info in scan.devices where !ejectedIDs.contains(info.id) {
         let method = scan.method(of: info.id)
+        if method == .wifiADB, onUSB.contains(info.id) { continue }
         if let best = methods[info.id], chosen[info.id] != nil, !method.isPreferred(over: best) {
           continue
         }
@@ -113,7 +123,29 @@ public actor CompositeTransport: DeviceTransport {
       devices: devices.sorted { $0.id.serial < $1.id.serial }, busy: leftOut["busy"] ?? [],
       notSharing: leftOut["notSharing"] ?? [], ejected: ejected, rescanAfter: rescanAfter,
       method: .usbFileTransfer, methods: methods,
-      awaitingAuthorization: viaMTP.awaitingAuthorization + viaADB.awaitingAuthorization)
+      awaitingAuthorization: viaMTP.awaitingAuthorization + viaADB.awaitingAuthorization,
+      presentOverUSB: onUSB)
+  }
+
+  private func rememberNames(_ viaMTP: DeviceScan) {
+    for info in viaMTP.devices + viaMTP.ejected {
+      mtpNames[info.id] = info
+    }
+    // A device MTP cannot open is named from its USB descriptors: second best, kept only until
+    // MTP opens it.
+    for info in viaMTP.busy + viaMTP.notSharing where mtpNames[info.id] == nil {
+      mtpNames[info.id] = info
+    }
+    overMTP = Set(viaMTP.devices.map(\.id))
+  }
+
+  /// Every device a USB route presents, in any state: a network route never serves these.
+  private static func onUSB(mtp viaMTP: DeviceScan, adb viaADB: DeviceScan) -> Set<DeviceID> {
+    let mtpListed = viaMTP.devices + viaMTP.busy + viaMTP.notSharing + viaMTP.ejected
+    let adbOnUSB = (viaADB.devices + viaADB.notSharing).map(\.id)
+      .filter { viaADB.method(of: $0) == .usbADB }
+    return Set(mtpListed.map(\.id)).union(adbOnUSB).union(viaADB.presentOverUSB)
+      .union(viaMTP.presentOverUSB)
   }
 
   private func named(_ info: DeviceInfo) -> DeviceInfo {

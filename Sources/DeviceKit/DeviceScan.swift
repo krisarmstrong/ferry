@@ -22,6 +22,10 @@ public struct DeviceScan: Sendable, Equatable, Codable {
   /// Network devices (`host:port`) waiting for the user to allow this Mac on them. They name no
   /// unit until they are allowed, so they are not devices yet.
   public let awaitingAuthorization: [String]
+  /// Devices a USB route presents in any state, usable or not (unauthorised, offline). A
+  /// network route never serves one of these: a serial alone does not prove a network device is
+  /// the unit on the cable.
+  public let presentOverUSB: Set<DeviceID>
 
   /// `method` is how the transport reaches what it lists: MTP is always `.usbFileTransfer`. A
   /// transport with more than one route names the exceptions in `methods`.
@@ -29,7 +33,7 @@ public struct DeviceScan: Sendable, Equatable, Codable {
     devices: [DeviceInfo], busy: [DeviceInfo] = [], notSharing: [DeviceInfo] = [],
     ejected: [DeviceInfo] = [], rescanAfter: Duration? = nil,
     method: ConnectionMethod = .usbFileTransfer, methods: [DeviceID: ConnectionMethod] = [:],
-    awaitingAuthorization: [String] = []
+    awaitingAuthorization: [String] = [], presentOverUSB: Set<DeviceID> = []
   ) {
     self.devices = devices
     self.busy = busy
@@ -39,6 +43,7 @@ public struct DeviceScan: Sendable, Equatable, Codable {
     self.method = method
     self.methods = methods.filter { $0.value != method }
     self.awaitingAuthorization = awaitingAuthorization
+    self.presentOverUSB = presentOverUSB
   }
 
   /// How the transport reaches `id`.

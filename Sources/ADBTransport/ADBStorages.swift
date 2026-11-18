@@ -75,7 +75,7 @@ extension ADBSession {
       guard result.status == 0,
         let space = ADBStorages.space(fromDF: String(bytes: result.stdout, encoding: .utf8) ?? "")
       else {
-        Self.log.info("leaving out storage \(candidate.key, privacy: .public): df failed")
+        Self.log.info("leaving out storage \(candidate.key, privacy: .private): df failed")
         continue
       }
       storages.append(

@@ -215,4 +215,65 @@ struct CompositeTransportTests {
     #expect(scan.notSharing.isEmpty && scan.devices.isEmpty)
     #expect(scan.awaitingAuthorization == ["192.0.2.31:5555"])
   }
+
+  // MARK: USB presence in any state blocks the network (C1)
+
+  /// A cabled unit MTP cannot serve (file transfer off, held by another app, ejected) still keeps
+  /// a network device with its serial from serving it.
+  @Test(arguments: ["notSharing", "busy", "ejected"])
+  func aUSBDeviceMTPCannotServeIsNotServedOverTheNetwork(_ state: String) async throws {
+    let mtp = FakeTransport(devices: [mtpDevice])
+    switch state {
+    case "notSharing":
+      await mtp.detach(id)
+      await mtp.attachWithoutFileTransfer(mtpDevice.info)
+    case "busy":
+      await mtp.setHeldByAnotherApp(id, true)
+      await mtp.setBusyKeepsSerial(true)
+    default:
+      _ = try await mtp.open(id)
+      await mtp.park(id)
+    }
+    let adb = FakeTransport(devices: [adbDevice], method: .usbADB)
+    await adb.setMethod(.wifiADB, for: id)
+    let composite = CompositeTransport(mtp: mtp, adb: adb)
+
+    let scan = try await composite.scan()
+    #expect(scan.devices.isEmpty)
+    #expect((scan.busy + scan.notSharing + scan.ejected).map(\.id) == [id])
+    await #expect(throws: TransportError.deviceNotFound(id)) {
+      _ = try await composite.open(id)
+    }
+    #expect(await adb.openCount(of: id) == 0)
+  }
+
+  /// adb itself sees the unit on USB (unauthorised, offline): the network does not serve it.
+  @Test func aUSBRouteADBReportsBlocksTheNetwork() async throws {
+    let adb = FakeTransport(devices: [adbDevice], method: .usbADB)
+    await adb.setMethod(.wifiADB, for: id)
+    await adb.presentOverUSB(id)
+    let scan = try await CompositeTransport(mtp: FakeTransport(devices: []), adb: adb).scan()
+    #expect(scan.devices.isEmpty)
+  }
+
+  // MARK: A failed scan is not an empty one (I1)
+
+  /// One failed MTP scan leaves MTP's last view standing, so a cabled unit is not handed to the
+  /// network; a successful scan that no longer lists it does.
+  @Test func aFailedMTPScanKeepsItsLastView() async throws {
+    let mtp = FakeTransport(devices: [mtpDevice])
+    let adb = FakeTransport(devices: [adbDevice], method: .usbADB)
+    await adb.setMethod(.wifiADB, for: id)
+    let composite = CompositeTransport(mtp: mtp, adb: adb)
+    #expect(try await composite.scan().method(of: id) == .usbFileTransfer)
+
+    await mtp.failScans(with: .io("registry"))
+    let failed = try await composite.scan()
+    #expect(failed.devices == [mtpDevice.info])
+    #expect(failed.method(of: id) == .usbFileTransfer)
+
+    await mtp.failScans(with: nil)
+    await mtp.detach(id)
+    #expect(try await composite.scan().method(of: id) == .wifiADB)
+  }
 }
