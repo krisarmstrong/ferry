@@ -284,20 +284,44 @@ struct AppModelTests {
     #expect(model.actionError != nil)
   }
 
-  static let preserved = URL(
-    filePath: "/Users/me/Library/Unsent Ferry Changes", directoryHint: .isDirectory)
+  /// A folder like the one the system saves unsent changes to, holding a file or empty.
+  static func savedFolder(holdingFile: Bool) throws -> URL {
+    let folder = FileManager.default.temporaryDirectory.appending(
+      path: "Ferry unsent \(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    if holdingFile {
+      try Data("x".utf8).write(to: folder.appending(path: "report.txt"))
+    }
+    return folder
+  }
 
-  @Test func ejectShowsWhereUnsentChangesWereSaved() async {
+  @Test func ejectShowsWhereUnsentChangesWereSaved() async throws {
+    let saved = try Self.savedFolder(holdingFile: true)
+    defer { try? FileManager.default.removeItem(at: saved) }
     let client = FakeClient(log: log)
-    client.preserve([Self.preserved])
+    client.preserve([saved])
     let model = AppModel(client: client, services: FakeServices(log: log))
 
     await model.eject(DeviceID(serial: "A1"))
 
-    #expect(model.preservedChanges == [Self.preserved])
+    #expect(model.preservedChanges == [saved])
     #expect(model.actionError == nil)
     model.revealPreservedChanges()
-    #expect(log.all.last == "reveal \(Self.preserved.path)")
+    #expect(log.all.last == "reveal \(saved.path)")
+  }
+
+  /// The system can name a location it left empty, or none at all: nothing to show then.
+  @Test func ejectShowsNoMessageForAnEmptyOrMissingLocation() async throws {
+    let empty = try Self.savedFolder(holdingFile: false)
+    defer { try? FileManager.default.removeItem(at: empty) }
+    let missing = FileManager.default.temporaryDirectory.appending(path: "Ferry gone \(UUID())")
+    let client = FakeClient(log: log)
+    client.preserve([empty, missing])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+
+    await model.eject(DeviceID(serial: "A1"))
+
+    #expect(model.preservedChanges.isEmpty)
   }
 
   @Test func ejectWithNothingUnsentShowsNoMessage() async {
@@ -307,17 +331,18 @@ struct AppModelTests {
   }
 
   /// Ferry quits right after Remove Ferry, so a menu message would never be seen: the saved
-  /// changes are shown in Finder instead.
-  @Test func removeFerryRevealsSavedChangesBeforeQuitting() async {
+  /// changes are shown in Finder instead, if there are any.
+  @Test(arguments: [true, false])
+  func removeFerryRevealsSavedChangesBeforeQuitting(holdingFile: Bool) async throws {
+    let saved = try Self.savedFolder(holdingFile: holdingFile)
+    defer { try? FileManager.default.removeItem(at: saved) }
     let client = FakeClient(log: log)
-    client.preserve([Self.preserved])
+    client.preserve([saved])
     let model = AppModel(client: client, services: FakeServices(log: log))
     await model.removeFerry()
+    let reveal = holdingFile ? ["reveal \(saved.path)"] : []
     #expect(
-      log.all == [
-        "removeAllDomains", "unregisterAgent", "reveal \(Self.preserved.path)",
-        "opensAtLogin false", "quit",
-      ])
+      log.all == ["removeAllDomains", "unregisterAgent"] + reveal + ["opensAtLogin false", "quit"])
   }
 
   /// Refresh lists the ready devices' folders again on the agent, so changes made on a device

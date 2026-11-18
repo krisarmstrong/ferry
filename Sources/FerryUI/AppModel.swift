@@ -168,6 +168,18 @@ import os
     await perform(.eject(id))
   }
 
+  /// Whether a location the system saved unsent changes to has anything in it: it can name a
+  /// folder it left empty, or one already gone.
+  static func holdsSomething(_ location: URL) -> Bool {
+    var isFolder: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: location.path, isDirectory: &isFolder) else {
+      return false
+    }
+    guard isFolder.boolValue else { return true }
+    let contents = try? FileManager.default.contentsOfDirectory(atPath: location.path)
+    return !(contents ?? []).isEmpty
+  }
+
   public func revealPreservedChanges() {
     services.reveal(preservedChanges)
   }
@@ -205,7 +217,7 @@ import os
         throw TransportError.io("agent kept its locations")
       }
       try await services.unregisterAgent()
-      preserved = saved
+      preserved = saved.filter(Self.holdsSomething)
     } catch {
       Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .private)")
       actionError = String(
@@ -234,7 +246,7 @@ import os
         actionError = nil
       case .removed(let preserved):
         actionError = nil
-        preservedChanges = preserved
+        preservedChanges = preserved.filter(Self.holdsSomething)
       case .failure(let error):
         actionError = DevicePresentation.message(for: error)
       default:
