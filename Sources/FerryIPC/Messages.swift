@@ -123,10 +123,15 @@ public enum ProviderState: String, Codable, Sendable {
 public struct StatusReport: Codable, Sendable, Equatable {
   public let devices: [AttachedDevice]
   public let provider: ProviderState
+  /// Transfers running now, oldest first.
+  public let transfers: [ActiveTransfer]
 
-  public init(devices: [AttachedDevice], provider: ProviderState) {
+  public init(
+    devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = []
+  ) {
     self.devices = devices
     self.provider = provider
+    self.transfers = transfers
   }
 }
 

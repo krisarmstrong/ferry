@@ -47,8 +47,10 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
   ) -> Progress {
     let backend = backend
     let directory = temporaryDirectory()
+    let (progress, update) = FileProgress.make(.downloading)
     return answer(
-      { try await backend.fetch(itemIdentifier, into: directory) },
+      progress: progress,
+      { try await backend.fetch(itemIdentifier, into: directory, progress: update) },
       then: { result in
         switch result {
         case .success(let (url, item)): completionHandler(url, item, nil)
@@ -72,8 +74,10 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
       return Progress()
     }
     let backend = backend
+    let (progress, update) = FileProgress.make(.uploading)
     return answer(
-      { try await backend.create(template, contents: url) },
+      progress: progress,
+      { try await backend.create(template, contents: url, progress: update) },
       then: { result in
         switch result {
         case .success(let item): completionHandler(item, [], false, nil)
@@ -104,11 +108,13 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
       return Progress()
     }
     let backend = backend
+    let (progress, update) = FileProgress.make(.uploading)
     return answer(
+      progress: progress,
       {
         try await backend.modify(
           identifier, to: template, changed: changes, contents: newContents, base: base,
-          onConflict: onConflict)
+          onConflict: onConflict, progress: update)
       },
       then: { result in
         switch result {
@@ -164,12 +170,13 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
 
 /// Runs `work` in a task and hands its result to `complete` exactly once: the task is its only
 /// caller. Cancelling the returned progress cancels the task, and `ProviderBackend` then returns
-/// promptly with `.userCancelled`.
+/// promptly with `.userCancelled`. A transfer passes the byte-counting `progress` its work
+/// feeds; anything else gets one unit, done when the work is.
 private func answer<T: Sendable>(
+  progress: Progress = Progress(totalUnitCount: 1),
   _ work: @escaping @Sendable () async throws -> T,
   then complete: @escaping (Result<T, any Error>) -> Void
 ) -> Progress {
-  let progress = Progress(totalUnitCount: 1)
   let complete = Handoff(complete)
   let task = Task {
     let result: Result<T, any Error>

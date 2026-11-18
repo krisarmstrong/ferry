@@ -26,10 +26,14 @@ private struct StubHandler: AgentHandling {
   let started: AsyncStream<Void>.Continuation
   let release: AsyncStream<Void>
 
-  func handle(_ request: AgentRequest, file: FileHandle?) async -> AgentResponse {
+  func handle(
+    _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler
+  ) async -> AgentResponse {
     switch request {
     case .fetch:
       guard let file else { return .failure(.io("no file")) }
+      progress(3, UInt64(fetched.count))
+      progress(UInt64(fetched.count), UInt64(fetched.count))
       do {
         try file.write(contentsOf: fetched)
         return .done
@@ -177,4 +181,39 @@ func unsignedPeerIsRejected() async throws {
   await #expect(throws: TransportError.deviceDisconnected) {
     try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
   }
+}
+
+/// Records the progress a request reports.
+private final class Reports: Sendable {
+  private let values = Mutex<[[UInt64]]>([])
+  var all: [[UInt64]] { values.withLock { $0 } }
+  func record(_ completed: UInt64, _ total: UInt64) {
+    values.withLock { $0.append([completed, total]) }
+  }
+}
+
+/// The agent's progress comes back over the client's own exported object, to the request that
+/// asked for it, all of it before the reply.
+@Test(.timeLimit(.minutes(1)))
+func progressReachesTheRequestBeforeItsReply() async throws {
+  let harness = Harness()
+  defer { harness.finish() }
+  let target = FileManager.default.temporaryDirectory.appending(
+    path: "ferry-ipc-\(UUID().uuidString)")
+  try Data().write(to: target)
+  defer { try? FileManager.default.removeItem(at: target) }
+  let handle = try FileHandle(forWritingTo: target)
+  defer { try? handle.close() }
+  let reports = Reports()
+
+  let response = try await harness.client.send(
+    .fetch(domain: "d", id: listedID), file: handle, progress: reports.record)
+
+  #expect(response == .done)
+  #expect(reports.all == [[3, 7], [7, 7]])
+  // Another request's handler hears nothing of it.
+  let quiet = Reports()
+  _ = try await harness.client.send(
+    .list(domain: "d", folder: .root), file: nil, progress: quiet.record)
+  #expect(quiet.all.isEmpty)
 }

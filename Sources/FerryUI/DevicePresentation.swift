@@ -1,4 +1,5 @@
 import DeviceKit
+import FerryIPC
 import Foundation
 
 extension AttachedDevice {
@@ -28,6 +29,23 @@ enum DevicePresentation {
     let free = storage.free.formatted(.byteCount(style: .file))
     let name = DisplayText.escaped(storage.description)
     return String(localized: LocalizedStringResource("\(name) · \(free) free", bundle: .module))
+  }
+
+  /// A running transfer: the item's name, escaped since the device or the user chose it, where
+  /// it is going and how far it has got.
+  static func transferLine(_ transfer: ActiveTransfer) -> String {
+    let name = DisplayText.escaped(transfer.name)
+    let percent = transfer.percent
+    return switch transfer.direction {
+    case .toDevice:
+      String(
+        localized: LocalizedStringResource(
+          "Copying “\(name)” to the device · \(percent)%", bundle: .module))
+    case .toMac:
+      String(
+        localized: LocalizedStringResource(
+          "Copying “\(name)” to this Mac · \(percent)%", bundle: .module))
+    }
   }
 
   /// A short explanation of an agent error. Device-supplied detail is escaped, and the result

@@ -25,7 +25,9 @@ struct PreviewClient: AgentSending {
   let devices: [AttachedDevice]
   let provider: ProviderState
 
-  func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError)
     -> AgentResponse
   {
     switch request {

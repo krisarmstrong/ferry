@@ -163,7 +163,9 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 private struct UnreachableHandler: AgentHandling {
-  func handle(_ request: AgentRequest, file: FileHandle?) async -> AgentResponse {
+  func handle(
+    _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler
+  ) async -> AgentResponse {
     Issue.record("handler called with \(request)")
     return .done
   }
@@ -172,7 +174,7 @@ private struct UnreachableHandler: AgentHandling {
 private func reply(to data: Data) async throws -> AgentResponse {
   let service = AgentService(handler: UnreachableHandler())
   let (replies, continuation) = AsyncStream.makeStream(of: Data.self)
-  service.send(data, file: nil) { continuation.yield($0) }
+  service.send(data, id: "test", file: nil) { continuation.yield($0) }
   var iterator = replies.makeAsyncIterator()
   let data = try #require(await iterator.next())
   return try JSONDecoder().decode(AgentResponse.self, from: data)

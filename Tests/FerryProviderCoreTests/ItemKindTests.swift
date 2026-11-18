@@ -4,6 +4,7 @@ import FerryIPC
 import FerryProviderCore
 import FileProvider
 import Foundation
+import Synchronization
 import Testing
 import UniformTypeIdentifiers
 
@@ -103,5 +104,30 @@ struct FetchQuarantineTests {
     let properties = try url.resourceValues(forKeys: [.quarantinePropertiesKey])
       .quarantineProperties
     #expect(properties?[kLSQuarantineAgentNameKey as String] as? String == "Ferry")
+  }
+}
+
+/// Finder's progress for a copy counts the bytes the agent reports.
+struct FileProgressTests {
+  @Test func aFetchMovesItsProgressInBytes() async throws {
+    let agent = FakeAgent([try file("/big.bin", size: 8)])
+    await agent.set(progressTotal: 8)
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let (progress, update) = FileProgress.make(.downloading)
+    let seen = Mutex<[Int64]>([])
+
+    _ = try await backend.fetch(
+      try await agent.identifier(try path("/big.bin")), into: dir,
+      progress: { completed, total in
+        update(completed, total)
+        seen.withLock { $0.append(progress.completedUnitCount) }
+      })
+
+    #expect(seen.withLock { $0 } == [4, 8])
+    #expect(progress.totalUnitCount == 8)
+    #expect(progress.kind == .file)
+    #expect(progress.fileOperationKind == .downloading)
   }
 }

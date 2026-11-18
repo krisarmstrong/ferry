@@ -28,8 +28,13 @@ final class FakeClient: AgentSending {
     self.log = log
   }
 
-  func setStatus(_ devices: [AttachedDevice], provider: ProviderState = .enabled) {
-    status.withLock { $0 = .status(StatusReport(devices: devices, provider: provider)) }
+  func setStatus(
+    _ devices: [AttachedDevice], provider: ProviderState = .enabled,
+    transfers: [ActiveTransfer] = []
+  ) {
+    status.withLock {
+      $0 = .status(StatusReport(devices: devices, provider: provider, transfers: transfers))
+    }
   }
 
   func failRemoveAll() {
@@ -42,7 +47,9 @@ final class FakeClient: AgentSending {
     ejectResult.withLock { $0 = .removed(preserved: preserved) }
   }
 
-  func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError)
     -> AgentResponse
   {
     switch request {
@@ -76,7 +83,9 @@ final class StartingClient: AgentSending {
     remaining = Mutex(failures)
   }
 
-  func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError)
     -> AgentResponse
   {
     let failing = remaining.withLock { count in
@@ -90,7 +99,9 @@ final class StartingClient: AgentSending {
 
 /// Refuses every request, as a client whose agent is not running does.
 struct UnreachableClient: AgentSending {
-  func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError)
     -> AgentResponse
   {
     throw .deviceDisconnected
@@ -335,5 +346,23 @@ struct AppModelTests {
   @Test func deviceTextIsEscaped() {
     let shown = device("A1", model: "Evil\u{1B}[2J\u{202E}", .busy)
     #expect(shown.displayName == "Evil\\u{1B}[2J\\u{202E}")
+  }
+}
+
+@MainActor
+struct AppModelTransferTests {
+  @Test func transfersAreListedUnderTheirDevice() async {
+    let log = CallLog()
+    let client = FakeClient(log: log)
+    let unit = DeviceID(serial: "U1")
+    let copy = ActiveTransfer(
+      device: unit, name: "trace.pcap", direction: .toMac, completed: 25, total: 100)
+    client.setStatus([], transfers: [copy])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.refresh()
+
+    #expect(model.transfers(on: unit) == [copy])
+    #expect(model.transfers(on: DeviceID(serial: "other")).isEmpty)
+    #expect(DevicePresentation.transferLine(copy) == "Copying “trace.pcap” to this Mac · 25%")
   }
 }

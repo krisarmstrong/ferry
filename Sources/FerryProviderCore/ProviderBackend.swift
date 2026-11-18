@@ -47,16 +47,17 @@ public actor ProviderBackend {
   /// device in between, FileProvider holds newer contents under an older version and fetches it
   /// again, rather than older contents under a newer version, which it would keep. Anything but
   /// `.done` removes the file, which may hold a truncated prefix.
-  public func fetch(_ id: NSFileProviderItemIdentifier, into dir: URL) async throws
-    -> (URL, ProviderItem)
-  {
+  public func fetch(
+    _ id: NSFileProviderItemIdentifier, into dir: URL, progress: TransferProgressHandler? = nil
+  ) async throws -> (URL, ProviderItem) {
     let itemID = try Self.itemID(id)
     let item = try await entry(.item(domain: domain, id: itemID))
     let url = dir.appending(path: UUID().uuidString, directoryHint: .notDirectory)
     let handle = try Self.createExclusively(url)
     do {
       defer { try? handle.close() }
-      let response = try await send(.fetch(domain: domain, id: itemID), file: handle)
+      let response = try await send(
+        .fetch(domain: domain, id: itemID), file: handle, progress: progress)
       guard case .done = response else { throw Self.unexpected(response) }
       try Self.quarantine(url)
     } catch {
@@ -70,7 +71,9 @@ public actor ProviderBackend {
   /// uploads `contents` as a file. Symbolic links and aliases have nothing MTP can store, so
   /// they fail with `.cannotSynchronize`, which FileProvider takes as final until the item
   /// changes on the Mac, with a message saying why.
-  public func create(_ template: ItemTemplate, contents: URL?) async throws -> ProviderItem {
+  public func create(
+    _ template: ItemTemplate, contents: URL?, progress: TransferProgressHandler? = nil
+  ) async throws -> ProviderItem {
     let request = AgentRequest.create(
       domain: domain, parent: template.parent, name: template.filename,
       isFolder: template.kind == .folder)
@@ -85,7 +88,7 @@ public actor ProviderBackend {
     guard let contents else { throw CocoaError(.featureUnsupported) }
     let handle = try FileHandle(forReadingFrom: contents)
     defer { try? handle.close() }
-    return ProviderItem(try await entry(request, file: handle))
+    return ProviderItem(try await entry(request, file: handle, progress: progress))
   }
 
   /// Applies the changed fields in order: parent (move), then filename (rename), then contents.
@@ -96,7 +99,8 @@ public actor ProviderBackend {
   /// different identifier would tell FileProvider to merge the item into another.
   public func modify(
     _ id: NSFileProviderItemIdentifier, to template: ItemTemplate, changed: ItemChanges,
-    contents: URL?, base: ContentVersion? = nil, onConflict: ConflictPolicy = .keepBoth
+    contents: URL?, base: ContentVersion? = nil, onConflict: ConflictPolicy = .keepBoth,
+    progress: TransferProgressHandler? = nil
   ) async throws -> ProviderItem {
     let itemID = try Self.itemID(id)
     var latest: ProviderEntry?
@@ -123,7 +127,7 @@ public actor ProviderBackend {
       defer { try? handle.close() }
       latest = try await entry(
         .replaceContents(domain: domain, id: itemID, base: base, onConflict: onConflict),
-        file: handle)
+        file: handle, progress: progress)
     }
     if let latest { return ProviderItem(latest) }
     return ProviderItem(try await entry(.item(domain: domain, id: itemID)))
@@ -192,20 +196,20 @@ public actor ProviderBackend {
       deleted: deleted.map(NSFileProviderItemIdentifier.init))
   }
 
-  private func entry(_ request: AgentRequest, file: FileHandle? = nil) async throws
-    -> ProviderEntry
-  {
-    let response = try await send(request, file: file)
+  private func entry(
+    _ request: AgentRequest, file: FileHandle? = nil, progress: TransferProgressHandler? = nil
+  ) async throws -> ProviderEntry {
+    let response = try await send(request, file: file, progress: progress)
     guard case .entry(let entry) = response else { throw Self.unexpected(response) }
     return entry
   }
 
   /// Sends `request`, turning a thrown error and a `.failure` reply alike into a FileProvider
   /// error.
-  private func send(_ request: AgentRequest, file: FileHandle? = nil) async throws
-    -> AgentResponse
-  {
-    let response = try await reply(request, file: file)
+  private func send(
+    _ request: AgentRequest, file: FileHandle? = nil, progress: TransferProgressHandler? = nil
+  ) async throws -> AgentResponse {
+    let response = try await reply(request, file: file, progress: progress)
     if case .failure(let error) = response {
       log.info(
         "\(String(describing: request), privacy: .private) refused: \(error, privacy: .private)")
@@ -216,12 +220,12 @@ public actor ProviderBackend {
 
   /// Sends `request` and returns the agent's reply as it is, `.failure` included. Only a thrown
   /// error becomes a FileProvider error.
-  private func reply(_ request: AgentRequest, file: FileHandle? = nil) async throws
-    -> AgentResponse
-  {
+  private func reply(
+    _ request: AgentRequest, file: FileHandle? = nil, progress: TransferProgressHandler? = nil
+  ) async throws -> AgentResponse {
     if Task.isCancelled { throw CocoaError(.userCancelled) }
     do {
-      return try await client.send(request, file: file)
+      return try await client.send(request, file: file, progress: progress)
     } catch {
       log.log(
         level: error.logType,

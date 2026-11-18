@@ -53,6 +53,8 @@ actor FakeAgent: AgentSending {
   var failure: TransportError?
   /// Thrown by `send` itself, as `AgentClient` does when the connection is lost.
   var thrown: TransportError?
+  /// Reported, half then all of it, as a fetch's progress.
+  var progressTotal: UInt64?
   /// Answered to the next `.delete` instead of performing it.
   var deleteFailure: TransportError?
   /// Written into the fetch target before failing, as a download cut short would.
@@ -96,6 +98,10 @@ actor FakeAgent: AgentSending {
     self.thrown = thrown
   }
 
+  func set(progressTotal: UInt64) {
+    self.progressTotal = progressTotal
+  }
+
   func set(deleteFailure: TransportError) {
     self.deleteFailure = deleteFailure
   }
@@ -129,7 +135,9 @@ actor FakeAgent: AgentSending {
     parkCreatesUntil = count
   }
 
-  func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError)
     -> AgentResponse
   {
     requests.append(request)
@@ -140,6 +148,10 @@ actor FakeAgent: AgentSending {
       fetchStartedContinuation.yield()
       try? await Task.sleep(for: .seconds(3600))
       throw .cancelled
+    }
+    if case .fetch = request, let total = progressTotal {
+      progress?(total / 2, total)
+      progress?(total, total)
     }
     do {
       return try await perform(request, file: file)

@@ -6,14 +6,27 @@ import os
 /// `AgentResponse`, so the wire format is ordinary `Codable` rather than `NSSecureCoding`. A
 /// request that moves file contents also carries an open file, which XPC passes as a descriptor.
 @objc public protocol AgentXPC {
-  func send(_ request: Data, file: FileHandle?, reply: @escaping @Sendable (Data) -> Void)
+  /// `id` names the request in the progress the agent reports on the client's exported
+  /// `AgentClientXPC`.
+  func send(
+    _ request: Data, id: String, file: FileHandle?, reply: @escaping @Sendable (Data) -> Void)
 }
 
 /// Serves agent requests from the app and the FileProvider extension.
 public protocol AgentHandling: Sendable {
   /// `file` is the descriptor sent with the request, if any: readable for `create` and
-  /// `replaceContents`, writable for `fetch`.
-  func handle(_ request: AgentRequest, file: FileHandle?) async -> AgentResponse
+  /// `replaceContents`, writable for `fetch`. A transfer reports its bytes to `progress`, which
+  /// forwards them to the client; it never blocks.
+  func handle(
+    _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler
+  ) async -> AgentResponse
+}
+
+extension AgentHandling {
+  /// Handles a request whose progress nobody follows.
+  public func handle(_ request: AgentRequest, file: FileHandle?) async -> AgentResponse {
+    await handle(request, file: file, progress: { _, _ in })
+  }
 }
 
 /// Accepts connections on the agent's listener and routes their requests to a handler.
@@ -41,6 +54,7 @@ public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Senda
     }
     connection.exportedInterface = NSXPCInterface(with: AgentXPC.self)
     connection.exportedObject = AgentService(handler: handler)
+    connection.remoteObjectInterface = NSXPCInterface(with: AgentClientXPC.self)
     connection.resume()
     return true
   }
@@ -57,7 +71,13 @@ final class AgentService: NSObject, AgentXPC, Sendable {
     self.handler = handler
   }
 
-  func send(_ request: Data, file: FileHandle?, reply: @escaping @Sendable (Data) -> Void) {
+  func send(
+    _ request: Data, id: String, file: FileHandle?, reply: @escaping @Sendable (Data) -> Void
+  ) {
+    // The connection the message came on, read now: it is only known while the call runs. Its
+    // proxy is fetched per request, so this object keeps no reference to its own connection.
+    let connection = NSXPCConnection.current()
+    let client = connection?.remoteObjectProxyWithErrorHandler { _ in } as? any AgentClientXPC
     let decoded: AgentRequest
     do {
       decoded = try JSONDecoder().decode(AgentRequest.self, from: request)
@@ -66,8 +86,29 @@ final class AgentService: NSObject, AgentXPC, Sendable {
       reply(Self.encode(.failure(.io("bad request"))))
       return
     }
+    let reported = Reported()
     Task {
-      reply(Self.encode(await handler.handle(decoded, file: file)))
+      let response = await handler.handle(decoded, file: file) { completed, total in
+        // A report that cannot be delivered is dropped: it never fails the transfer.
+        reported.mark()
+        client?.progress(id, completed: completed, total: total)
+      }
+      if reported.any, let connection {
+        await Self.flush(id, on: connection)
+      }
+      reply(Self.encode(response))
+    }
+  }
+
+  /// Waits until the client has every report sent before now, or its connection fails.
+  private static func flush(_ id: String, on connection: NSXPCConnection) async {
+    _ = await awaitReply { reply, failed in
+      guard let client = connection.remoteObjectProxyWithErrorHandler(failed) as? any AgentClientXPC
+      else {
+        failed(CancellationError())
+        return
+      }
+      client.flush(id) { reply(Data()) }
     }
   }
 

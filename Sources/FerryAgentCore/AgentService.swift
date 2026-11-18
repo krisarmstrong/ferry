@@ -26,16 +26,19 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 public actor AgentService: AgentHandling {
   private let hub: DeviceHub
   private let domains: DomainController
+  private let transfers = TransferBoard()
 
   public init(hub: DeviceHub, domains: DomainController) {
     self.hub = hub
     self.domains = domains
   }
 
-  public func handle(_ request: AgentRequest, file: FileHandle?) async -> AgentResponse {
+  public func handle(
+    _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler
+  ) async -> AgentResponse {
     do throws(TransportError) {
       guard Self.takesFile(request) == (file != nil) else { throw .io("bad request") }
-      return try await perform(request, file: file?.fileDescriptor)
+      return try await perform(request, file: file?.fileDescriptor, progress: progress)
     } catch {
       log.log(
         level: error.logType,
@@ -45,14 +48,16 @@ public actor AgentService: AgentHandling {
   }
 
   /// `file` is present exactly when `takesFile(request)`.
-  private func perform(_ request: AgentRequest, file: Int32?) async throws(TransportError)
-    -> AgentResponse
-  {
+  private func perform(
+    _ request: AgentRequest, file: Int32?, progress: @escaping TransferProgressHandler
+  ) async throws(TransportError) -> AgentResponse {
     switch (request, file) {
     case (.status, _):
       await hub.firstScan()
       return .status(
-        StatusReport(devices: await hub.devices(), provider: await domains.providerState()))
+        StatusReport(
+          devices: await hub.devices(), provider: await domains.providerState(),
+          transfers: await transfers.list()))
     case (.recheck(let id), _):
       await hub.recheck(id)
       return .done
@@ -68,15 +73,17 @@ public actor AgentService: AgentHandling {
     case (.list(let domain, let folder), _):
       return .entries(try await list(folder, in: domain))
     case (.fetch(let domain, let id), let file?):
-      try await fetch(id, in: domain, into: file)
+      try await fetch(id, in: domain, into: file, progress: progress)
       return .done
     case (.create(let domain, let parent, let name, _), let file?):
-      return .entry(try await upload(file, as: name, in: parent, of: domain))
+      return .entry(try await upload(file, as: name, in: parent, of: domain, progress: progress))
     case (.create(let domain, let parent, let name, _), nil):
       return .entry(try await makeFolder(name, in: parent, of: domain))
     case (.replaceContents(let domain, let id, let base, let onConflict), let file?):
       return .entry(
-        try await replace(id, with: file, base: base, onConflict: onConflict, in: domain))
+        try await replace(
+          Replacement(id: id, base: base, onConflict: onConflict), with: file, in: domain,
+          progress: progress))
     case (.rename(let domain, let id, let name), _):
       return .entry(try await rename(id, to: name, in: domain))
     case (.move(let domain, let id, let folder), _):
@@ -122,22 +129,6 @@ public actor AgentService: AgentHandling {
     }
   }
 
-  /// Downloads into a scratch file, then copies it into `target`. Replacing, because the scratch
-  /// path is new and nothing else may be there.
-  private func fetch(_ id: ItemID, in domain: String, into target: Int32)
-    async throws(TransportError)
-  {
-    try FileTransfer.requireRegular(target)
-    let scratch = FileTransfer.scratchURL()
-    defer { FileTransfer.remove(scratch) }
-    try await gated(domain) { route throws(TransportError) in
-      let path = try await route.path(of: id)
-      try await route.session.download(
-        path, in: route.storage, to: scratch, replacing: true, progress: Self.ignoreProgress)
-    }
-    try await FileTransfer.copyOut(scratch, to: target)
-  }
-
   /// One page of the working set. The page token is the last identifier served, as UTF-8.
   private func workingSet(_ page: Data?, in domain: String) async throws(TransportError)
     -> AgentResponse
@@ -156,22 +147,6 @@ public actor AgentService: AgentHandling {
 
   // MARK: Changing
 
-  /// Copies `source` into a scratch file, then uploads that through the domain's writer.
-  private func upload(_ source: Int32, as name: String, in parent: ItemID, of domain: String)
-    async throws(TransportError) -> ProviderEntry
-  {
-    let name = try Self.creatable(name)
-    let scratch = try await FileTransfer.copyIn(source)
-    defer { FileTransfer.remove(scratch) }
-    return try await gated(domain) { route throws(TransportError) in
-      let path = try await route.path(of: parent).appending(name)
-      let item = try await route.writer.write(
-        from: scratch, to: path, in: route.storage, replacing: false,
-        progress: Self.ignoreProgress)
-      return await route.items.created(item)
-    }
-  }
-
   private func makeFolder(_ name: String, in parent: ItemID, of domain: String)
     async throws(TransportError) -> ProviderEntry
   {
@@ -179,41 +154,6 @@ public actor AgentService: AgentHandling {
     return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: parent).appending(name)
       return await route.items.created(try await route.session.makeFolder(path, in: route.storage))
-    }
-  }
-
-  /// Copies `source` into a scratch file, then writes that over the file through the writer.
-  ///
-  /// If the device's file is no longer at `base` (an app on the device, or the user at the
-  /// unit, changed it since the Mac read it), the device's file is kept: with `.keepBoth` the
-  /// Mac's contents go up beside it as a conflict copy and the device's item is returned, so
-  /// FileProvider fetches the device's contents; with `.fail` nothing is written.
-  private func replace(
-    _ id: ItemID, with source: Int32, base: ContentVersion?, onConflict: ConflictPolicy,
-    in domain: String
-  ) async throws(TransportError) -> ProviderEntry {
-    let scratch = try await FileTransfer.copyIn(source)
-    defer { FileTransfer.remove(scratch) }
-    return try await gated(domain) { route throws(TransportError) in
-      let path = try await route.path(of: id)
-      if let base {
-        let current = try await route.session.item(at: path, in: route.storage)
-        if current.kind == .file, ContentVersion(current) != base {
-          let entry = await route.items.observed(current)
-          switch onConflict {
-          case .fail:
-            throw .changedOnDevice(path)
-          case .keepBoth:
-            _ = await route.items.created(
-              try await ConflictCopy.upload(scratch, beside: path, route))
-            return entry
-          }
-        }
-      }
-      let item = try await route.writer.write(
-        from: scratch, to: path, in: route.storage, replacing: true,
-        progress: Self.ignoreProgress)
-      return await route.items.changed(item, id: id)
     }
   }
 
@@ -309,9 +249,109 @@ public actor AgentService: AgentHandling {
   static let workingSetPageSize = 500
 }
 
+// MARK: Transfers
+
+/// What a content replacement is based on.
+private struct Replacement {
+  let id: ItemID
+  let base: ContentVersion?
+  let onConflict: ConflictPolicy
+}
+
+extension AgentService {
+  /// Downloads into a scratch file, then copies it into `target`. Replacing, because the scratch
+  /// path is new and nothing else may be there.
+  fileprivate func fetch(
+    _ id: ItemID, in domain: String, into target: Int32,
+    progress: @escaping TransferProgressHandler
+  ) async throws(TransportError) {
+    try FileTransfer.requireRegular(target)
+    let scratch = FileTransfer.scratchURL()
+    defer { FileTransfer.remove(scratch) }
+    try await gated(domain) { route throws(TransportError) in
+      let path = try await route.path(of: id)
+      try await transfers.track(
+        Self.transfer(path, .toMac, on: route), report: progress
+      ) { handler throws(TransportError) in
+        try await route.session.download(
+          path, in: route.storage, to: scratch, replacing: true, progress: handler)
+      }
+    }
+    try await FileTransfer.copyOut(scratch, to: target)
+  }
+
+  /// Copies `source` into a scratch file, then uploads that through the domain's writer.
+  fileprivate func upload(
+    _ source: Int32, as name: String, in parent: ItemID, of domain: String,
+    progress: @escaping TransferProgressHandler
+  ) async throws(TransportError) -> ProviderEntry {
+    let name = try Self.creatable(name)
+    let scratch = try await FileTransfer.copyIn(source)
+    defer { FileTransfer.remove(scratch) }
+    return try await gated(domain) { route throws(TransportError) in
+      let path = try await route.path(of: parent).appending(name)
+      let item = try await transfers.track(
+        Self.transfer(path, .toDevice, on: route), report: progress
+      ) { handler throws(TransportError) in
+        try await route.writer.write(
+          from: scratch, to: path, in: route.storage, replacing: false, progress: handler)
+      }
+      return await route.items.created(item)
+    }
+  }
+
+  /// Copies `source` into a scratch file, then writes that over the file through the writer.
+  ///
+  /// If the device's file is no longer at `base` (an app on the device, or the user at the
+  /// unit, changed it since the Mac read it), the device's file is kept: with `.keepBoth` the
+  /// Mac's contents go up beside it as a conflict copy and the device's item is returned, so
+  /// FileProvider fetches the device's contents; with `.fail` nothing is written.
+  fileprivate func replace(
+    _ replacement: Replacement, with source: Int32, in domain: String,
+    progress: @escaping TransferProgressHandler
+  ) async throws(TransportError) -> ProviderEntry {
+    let (id, base, onConflict) = (replacement.id, replacement.base, replacement.onConflict)
+    let scratch = try await FileTransfer.copyIn(source)
+    defer { FileTransfer.remove(scratch) }
+    return try await gated(domain) { route throws(TransportError) in
+      let path = try await route.path(of: id)
+      if let base {
+        let current = try await route.session.item(at: path, in: route.storage)
+        if current.kind == .file, ContentVersion(current) != base {
+          let entry = await route.items.observed(current)
+          switch onConflict {
+          case .fail:
+            throw .changedOnDevice(path)
+          case .keepBoth:
+            _ = await route.items.created(
+              try await ConflictCopy.upload(scratch, beside: path, route))
+            return entry
+          }
+        }
+      }
+      let item = try await transfers.track(
+        Self.transfer(path, .toDevice, on: route), report: progress
+      ) { handler throws(TransportError) in
+        try await route.writer.write(
+          from: scratch, to: path, in: route.storage, replacing: true, progress: handler)
+      }
+      return await route.items.changed(item, id: id)
+    }
+  }
+}
+
 // MARK: Validating requests
 
 extension AgentService {
+  /// A transfer of the item at `path` starting on `route`'s device, its size not known yet.
+  fileprivate static func transfer(
+    _ path: RemotePath, _ direction: ActiveTransfer.Direction, on route: DomainController.Route
+  ) -> ActiveTransfer {
+    ActiveTransfer(
+      device: route.storage.device, name: path.name ?? "", direction: direction, completed: 0,
+      total: 0)
+  }
+
   /// Whether a request must come with a file: a readable one to upload, a writable one to fetch
   /// into.
   private static func takesFile(_ request: AgentRequest) -> Bool {

@@ -30,6 +30,8 @@ import os
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
   public private(set) var provider = ProviderState.enabled
   public private(set) var agent = AgentState.checking
+  /// Transfers the agent is running, as of the last status.
+  public private(set) var transfers: [ActiveTransfer] = []
   /// The last failed action, shown until the next one succeeds. It can carry device-supplied
   /// detail, so it is shown verbatim, never parsed as Markdown.
   public private(set) var actionError: String?
@@ -66,6 +68,11 @@ import os
     self.client = client
     self.services = services
     self.sleep = sleep
+  }
+
+  /// The transfers running on `device`.
+  public func transfers(on device: DeviceID) -> [ActiveTransfer] {
+    transfers.filter { $0.device == device }
   }
 
   /// No answer from the agent yet, so whether a device is attached is not known.
@@ -275,6 +282,7 @@ import os
     let devices = report.devices
     self.devices = devices
     provider = report.provider
+    transfers = report.transfers
     agent = .running
     let states = devices.map { DevicePresentation.kind(of: $0.state) }.joined(separator: ",")
     Self.log.info(

@@ -1,5 +1,6 @@
 import AppKit
 import DeviceKit
+import FerryIPC
 import SwiftUI
 
 /// The menu-bar window: each device with its state, then Refresh, Help, Settings and Quit.
@@ -41,7 +42,7 @@ public struct MenuContent: View {
       }
       ForEach(model.devices) { device in
         DeviceRow(
-          device: device,
+          device: device, transfers: model.transfers(on: device.id),
           eject: { Task { await model.eject(device.id) } },
           recheck: { Task { await model.recheck(device.id) } },
           mount: { Task { await model.mount(device.id) } },
@@ -187,6 +188,7 @@ private struct NoDeviceRow: View {
 /// Per-device tools and a connection-method label can join the header and the action row.
 private struct DeviceRow: View {
   let device: AttachedDevice
+  let transfers: [ActiveTransfer]
   let eject: () -> Void
   let recheck: () -> Void
   let mount: () -> Void
@@ -241,6 +243,11 @@ private struct DeviceRow: View {
       ForEach(storages, id: \.id) { storage in
         Text(verbatim: DevicePresentation.storageLine(storage))
           .foregroundStyle(.secondary)
+      }
+      ForEach(transfers.indices, id: \.self) { index in
+        Text(verbatim: DevicePresentation.transferLine(transfers[index]))
+          .lineLimit(1)
+          .truncationMode(.middle)
       }
     case .notSharingFiles:
       Text("Choose Transfer files on the device.", bundle: .module)

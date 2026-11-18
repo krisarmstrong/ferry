@@ -71,6 +71,26 @@
     "Control-click a file you opened and choose **Remove Download**. The file stays on the device." : {
       "extractionState" : "manual"
     },
+    "Copying “%@” to the device · %lld%%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Copying “%1$@” to the device · %2$lld%%"
+          }
+        }
+      }
+    },
+    "Copying “%@” to this Mac · %lld%%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Copying “%1$@” to this Mac · %2$lld%%"
+          }
+        }
+      }
+    },
     "Could not change Open at login." : {
 
     },
