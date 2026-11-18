@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 
 @testable import ADBTransport
 
@@ -9,18 +10,62 @@ actor Box<Value: Sendable> {
   func set(_ new: Value) { value = new }
 }
 
-/// A port nothing listens on: a listener's port, after it is closed.
-/// It is outside the ephemeral range, so no other test's listener can be handed it meanwhile.
-func closedPort() async throws -> UInt16 {
-  for _ in 0..<20 {
-    let port = UInt16.random(in: 20_000..<30_000)
-    if let server = try? await FakeADBServer.start(port: port, script: { _ in }) {
-      server.stop()
-      try await Task.sleep(for: .milliseconds(50))
-      return port
+/// A loopback port that refuses connections for as long as this object lives.
+///
+/// A socket that is bound but not listening cannot do this: macOS drops the SYN and a connect
+/// hangs for about eight seconds instead of being refused. So the port is picked, not held:
+/// it is outside the kernel's ephemeral range (49152 and up), so neither another test's
+/// `FakeADBServer` (which asks for any port) nor an outgoing connection is ever given it; a
+/// process-wide registry hands each caller a different one, so no two tests share it; and a
+/// bind with no address reuse must succeed, which proves nothing else on the machine holds it.
+/// The registry entry is released on `deinit`.
+final class ClosedPort: Sendable {
+  private static let taken = OSAllocatedUnfairLock(initialState: Set<UInt16>())
+  let port: UInt16
+
+  init() throws {
+    for _ in 0..<1000 {
+      let candidate = UInt16.random(in: 20_000..<30_000)
+      guard Self.taken.withLock({ $0.insert(candidate).inserted }) else { continue }
+      if Self.isFree(candidate) {
+        port = candidate
+        return
+      }
+      Self.taken.withLock { _ = $0.remove(candidate) }
+    }
+    throw POSIXError(.EADDRINUSE)
+  }
+
+  deinit { _ = Self.taken.withLock { $0.remove(port) } }
+
+  /// True if a fresh socket can bind the port: nothing is listening or holding it.
+  private static func isFree(_ port: UInt16) -> Bool {
+    let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+    guard descriptor >= 0 else { return false }
+    defer { close(descriptor) }
+    var address = sockaddr_in()
+    address.sin_family = sa_family_t(AF_INET)
+    address.sin_addr = in_addr(s_addr: UInt32(INADDR_LOOPBACK).bigEndian)
+    address.sin_port = port.bigEndian
+    return withUnsafePointer(to: &address) {
+      $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+        bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+      }
     }
   }
-  throw CancellationError()
+}
+
+/// Polls until `condition` holds, up to `timeout`: waiting on what a test needs rather than
+/// sleeping a guess at how long a loaded machine takes.
+func eventually(
+  timeout: Duration = .seconds(10), _ condition: () async -> Bool
+) async throws -> Bool {
+  let deadline = ContinuousClock.now + timeout
+  while ContinuousClock.now < deadline {
+    if await condition() { return true }
+    try await Task.sleep(for: .milliseconds(10))
+  }
+  return await condition()
 }
 
 struct ADBHostTests {
@@ -187,10 +232,11 @@ struct ADBHostTests {
   }
 
   @Test func refusedConnectionIsServerUnavailable() async throws {
-    let port = try await closedPort()
+    let closed = try ClosedPort()
     await #expect(throws: ADBError.serverUnavailable) {
-      _ = try await ADBHost(port: port, locator: Self.noAdb).version()
+      _ = try await ADBHost(port: closed.port, locator: Self.noAdb).version()
     }
+    withExtendedLifetime(closed) {}
   }
 
   @Test func startServerWithoutAdbIsNotInstalled() async {

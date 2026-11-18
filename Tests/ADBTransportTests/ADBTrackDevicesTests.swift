@@ -36,7 +36,7 @@ struct ADBTrackDevicesTests {
       ])
   }
 
-  static func serve(port: UInt16, _ listing: String, closeAfter: Duration?) async throws
+  static func serve(port: UInt16?, _ listing: String, closeAfter: Duration?) async throws
     -> FakeADBServer
   {
     try await FakeADBServer.start(port: port) { peer in
@@ -48,10 +48,11 @@ struct ADBTrackDevicesTests {
   }
 
   @Test func survivesServerRestartsOnTheSameStream() async throws {
-    let port = try await closedPort()
     let launches = Box(0)
     let servers = Box<[FakeADBServer]>([])
-    let first = try await Self.serve(port: port, "abc device\n", closeAfter: .milliseconds(200))
+    // The first server takes an OS-assigned port; restarts rebind exactly that port.
+    let first = try await Self.serve(port: nil, "abc device\n", closeAfter: .milliseconds(200))
+    let port = first.port
     await servers.set([first])
     let host = ADBHost(
       port: port,
@@ -75,7 +76,7 @@ struct ADBTrackDevicesTests {
       seen.append(list.map(\.serial))
       // Stopping the listener while a peer is connected makes the next connect an outage.
       if list.map(\.serial) == ["abc"] || list.map(\.serial) == ["def"] {
-        await servers.value.last?.stop()
+        await servers.value.last?.stopAndWait()
       }
       if seen.count == 5 { break }
     }
@@ -85,10 +86,10 @@ struct ADBTrackDevicesTests {
   }
 
   @Test func persistentOutageReportsNoDevicesOnceAndStartsTheServerOnce() async throws {
-    let port = try await closedPort()
+    let closed = try ClosedPort()
     let launches = Box(0)
     let host = ADBHost(
-      port: port,
+      port: closed.port,
       locator: ADBLocator(
         environment: [:], home: "/x", isExecutable: { $0 == "/opt/homebrew/bin/adb" }),
       launcher: { _ in await launches.set(await launches.value + 1) },
@@ -97,12 +98,20 @@ struct ADBTrackDevicesTests {
     let consumer = Task {
       for await list in host.trackDevices() { await lists.set(await lists.value + [list]) }
     }
-    // About thirty failed connects at 10 ms.
+    // Wait for the outage to be reported and the server started, then let about thirty more
+    // failed connects at 10 ms go by: neither may repeat.
+    let reported = try await eventually {
+      let started = await launches.value
+      let seen = await lists.value
+      return started >= 1 && !seen.isEmpty
+    }
+    #expect(reported)
     try await Task.sleep(for: .milliseconds(400))
     consumer.cancel()
     await consumer.value
     #expect(await lists.value == [[]])
     #expect(await launches.value == 1)
+    withExtendedLifetime(closed) {}
   }
 
   @Test func closedConnectionsAreCancelledByTheClient() async throws {
@@ -120,27 +129,30 @@ struct ADBTrackDevicesTests {
     let host = ADBHost(
       port: server.port, locator: Self.noAdb, launcher: { _ in },
       backoff: Backoff(initial: .seconds(5), maximum: .seconds(5)))
-    for await _ in host.trackDevices() {
-      try await Task.sleep(for: .milliseconds(300))
-      break
-    }
+    for await _ in host.trackDevices() { break }
+    #expect(try await eventually { await closed.value == 1 })
     #expect(await connections.value == 1)
-    #expect(await closed.value == 1)
   }
 
   @Test func aSlowConsumerSeesOnlyTheNewestList() async throws {
+    let sent = Box(false)
     let server = try await FakeADBServer.start { peer in
       _ = try await peer.request()
       try await peer.okay()
       for serial in ["a", "b", "c", "d"] {
         try await peer.send(String(data: ADBWire.frame("\(serial) device\n"), encoding: .utf8)!)
       }
-      try await Task.sleep(for: .seconds(2))
+      await sent.set(true)
+      try await Task.sleep(for: .seconds(5))
     }
     defer { server.stop() }
     let host = ADBHost(port: server.port, locator: Self.noAdb)
     let stream = host.trackDevices()
-    try await Task.sleep(for: .milliseconds(300))
+    // All four frames are on the wire once `sent` is set; the consumer has not read any. A
+    // second then covers the client taking them off the socket, which is milliseconds even
+    // on a loaded machine.
+    #expect(try await eventually { await sent.value })
+    try await Task.sleep(for: .seconds(1))
     var received: [String]?
     for await list in stream {
       received = list.map(\.serial)
@@ -161,9 +173,11 @@ struct ADBTrackDevicesTests {
       port: server.port, locator: Self.noAdb, launcher: { _ in },
       backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)))
     for await _ in host.trackDevices() { break }
-    try await Task.sleep(for: .milliseconds(100))
+    // Let any connect already in flight land, then watch: a loop still running at 10 ms would
+    // add dozens of connections in this window.
+    try await Task.sleep(for: .milliseconds(500))
     let settled = await connections.value
-    try await Task.sleep(for: .milliseconds(300))
+    try await Task.sleep(for: .milliseconds(500))
     #expect(await connections.value == settled)
   }
 

@@ -75,4 +75,15 @@ final class FakeADBServer: Sendable {
   }
 
   func stop() { listener.cancel() }
+
+  /// Cancels the listener and returns once its port is released, so a test can bind the same
+  /// port again at once instead of racing the asynchronous cancel.
+  func stopAndWait() async {
+    await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+      listener.stateUpdateHandler = { state in
+        if case .cancelled = state { done.resume() }
+      }
+      listener.cancel()
+    }
+  }
 }
