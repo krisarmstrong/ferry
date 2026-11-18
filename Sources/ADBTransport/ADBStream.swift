@@ -74,6 +74,8 @@ public actor ADBStream {
   private static func received(
     _ chunk: Data?, isComplete: Bool, error: NWError?
   ) -> Result<Data, ADBError> {
+    // Network.framework reports the peer's orderly FIN as ENODATA when data was in flight.
+    if case .posix(.ENODATA) = error { return .failure(.connectionClosed) }
     if let error { return .failure(.failed(error.localizedDescription)) }
     if let chunk, !chunk.isEmpty { return .success(chunk) }
     // With minimumIncompleteLength 1 a receive carries data, an error or the end of the stream.

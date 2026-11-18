@@ -40,6 +40,10 @@ extension ADBHost {
   private static let stdoutPacket: UInt8 = 1
   private static let stderrPacket: UInt8 = 2
   private static let exitPacket: UInt8 = 3
+  /// adbd never sends a shell_v2 packet larger than this.
+  private static let packetLimit = 64 * 1024
+  /// stdout and stderr together; a command that prints more than this is not one Ferry runs.
+  private static let outputLimit = 16 * 1024 * 1024
 
   private static func collectPackets(_ stream: ADBStream) async throws(ADBError) -> ADBShellResult {
     var stdout = Data()
@@ -47,10 +51,20 @@ extension ADBHost {
     while true {
       let header = try await stream.read(exactly: 5)
       let length = Int(ADBWire.u32(header.suffix(4)))
+      guard length <= packetLimit else {
+        throw .protocolViolation("shell packet of \(length) bytes")
+      }
       let body = try await stream.read(exactly: length)
       switch header[header.startIndex] {
-      case stdoutPacket: stdout.append(body)
-      case stderrPacket: stderr.append(body)
+      case stdoutPacket, stderrPacket:
+        guard stdout.count + stderr.count + length <= outputLimit else {
+          throw .protocolViolation("shell output exceeds \(outputLimit) bytes")
+        }
+        if header[header.startIndex] == stdoutPacket {
+          stdout.append(body)
+        } else {
+          stderr.append(body)
+        }
       case exitPacket:
         guard let code = body.first else { throw .protocolViolation("empty exit packet") }
         return ADBShellResult(status: Int32(code), stdout: stdout, stderr: stderr)
@@ -61,7 +75,12 @@ extension ADBHost {
 
   private static func collectLegacy(_ stream: ADBStream) async throws(ADBError) -> ADBShellResult {
     var output = Data()
-    while let chunk = try await stream.readSome(upTo: 64 * 1024) { output.append(chunk) }
+    while let chunk = try await stream.readSome(upTo: packetLimit) {
+      guard output.count + chunk.count <= outputLimit else {
+        throw .protocolViolation("shell output exceeds \(outputLimit) bytes")
+      }
+      output.append(chunk)
+    }
     // `<output>\n<status>\n`: the status is the last line, and the newline before it is ours.
     let newline = UInt8(ascii: "\n")
     guard output.last == newline, let separator = output.dropLast().lastIndex(of: newline),

@@ -26,6 +26,17 @@ extension FakeADBServer.Peer {
     return (id, try ADBWire.text(try await stream.read(exactly: Int(length))))
   }
 
+  /// Ends the stream with a FIN after the queued bytes, then waits for the client to hang up, so
+  /// a large reply is never cut off by the server closing with data still in flight.
+  func finish() async {
+    await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+      stream.connection.send(
+        content: nil, contentContext: .finalMessage, isComplete: true,
+        completion: .contentProcessed { _ in done.resume() })
+    }
+    _ = try? await stream.read(exactly: 1)
+  }
+
   func raw(_ data: Data) async throws { try await stream.write(data) }
 
   static func u32(_ data: Data) -> UInt32 {

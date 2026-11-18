@@ -7,7 +7,7 @@ struct ADBHostRunTests {
   typealias Peer = FakeADBServer.Peer
 
   /// Serves `host-serial:<s>:features` on one connection and the shell service on the next.
-  private func server(
+  func server(
     features: String, service: String, shell: @escaping @Sendable (Peer) async throws -> Void
   ) async throws -> FakeADBServer {
     try await FakeADBServer.start { peer in
@@ -24,7 +24,7 @@ struct ADBHostRunTests {
     }
   }
 
-  private func host(_ server: FakeADBServer) -> ADBHost {
+  func host(_ server: FakeADBServer) -> ADBHost {
     ADBHost(port: server.port, locator: ADBHostTests.noAdb)
   }
 

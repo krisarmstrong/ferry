@@ -25,7 +25,11 @@ public actor ADBSync {
   /// Sync's `SYNC_DATA_MAX`: no side sends a DATA chunk larger than this.
   private static let chunkLimit = 64 * 1024
   private static let enoent: UInt32 = 2
-  private static let nameLimit = 1024
+  /// A file name is at most 255 bytes and a path at most PATH_MAX (4096) on the device, so no
+  /// honest entry or request exceeds 4096.
+  private static let nameLimit = 4096
+  /// Same bound as a DATA chunk: adbd's FAIL messages are short text.
+  private static let messageLimit = 64 * 1024
 
   private let stream: ADBStream
   private let statV2: Bool
@@ -89,7 +93,7 @@ public actor ADBSync {
       switch id {
       case "DATA":
         guard length <= Self.chunkLimit else {
-          throw .protocolViolation("DATA chunk of \(length) bytes")
+          throw await violation("DATA chunk of \(length) bytes")
         }
         let chunk = try await stream.read(exactly: length)
         do {
@@ -106,9 +110,9 @@ public actor ADBSync {
       case "DONE":
         return received
       case "FAIL":
-        throw .failed(try ADBWire.text(try await stream.read(exactly: length)))
+        throw try await failure(length)
       default:
-        throw .protocolViolation("unexpected \(id) in a receive")
+        throw await violation("unexpected \(id) in a receive")
       }
     }
   }
@@ -156,8 +160,8 @@ public actor ADBSync {
     let length = Int(ADBWire.u32(try await stream.read(exactly: 4)))
     switch id {
     case "OKAY": return
-    case "FAIL": throw .failed(try ADBWire.text(try await stream.read(exactly: length)))
-    default: throw .protocolViolation("unexpected \(id) after a send")
+    case "FAIL": throw try await failure(length)
+    default: throw await violation("unexpected \(id) after a send")
     }
   }
 
@@ -171,20 +175,33 @@ public actor ADBSync {
   /// 4-byte id, little-endian length, then the path or argument.
   private func request(_ id: String, _ argument: String) async throws(ADBError) {
     let payload = Data(argument.utf8)
-    guard payload.count <= Self.nameLimit * 4 else {
+    guard payload.count <= Self.nameLimit else {
       throw .protocolViolation("path of \(payload.count) bytes")
     }
     try await stream.write(Data(id.utf8) + ADBWire.le32(UInt32(payload.count)) + payload)
+  }
+
+  /// Closes the connection, whose framing can no longer be trusted, and names the problem.
+  private func violation(_ message: String) async -> ADBError {
+    await stream.close()
+    return .protocolViolation(message)
+  }
+
+  /// The error for a `FAIL` whose message is `length` bytes long.
+  private func failure(_ length: Int) async throws(ADBError) -> ADBError {
+    guard length <= Self.messageLimit else {
+      throw await violation("FAIL message of \(length) bytes")
+    }
+    return .failed(try ADBWire.text(try await stream.read(exactly: length)))
   }
 
   /// Reads a reply id, turning `FAIL` into its message.
   private func expect(_ id: String) async throws(ADBError) {
     let got = try ADBWire.text(try await stream.read(exactly: 4))
     if got == "FAIL" {
-      let length = Int(ADBWire.u32(try await stream.read(exactly: 4)))
-      throw .failed(try ADBWire.text(try await stream.read(exactly: length)))
+      throw try await failure(Int(ADBWire.u32(try await stream.read(exactly: 4))))
     }
-    guard got == id else { throw .protocolViolation("expected \(id), got \(got)") }
+    guard got == id else { throw await violation("expected \(id), got \(got)") }
   }
 
   /// error, dev, ino, mode, nlink, uid, gid, size, atime, mtime, ctime.
@@ -213,10 +230,9 @@ public actor ADBSync {
         _ = try await stream.read(exactly: Self.stat2Length + 4)
         return entries
       case "FAIL":
-        let length = Int(ADBWire.u32(try await stream.read(exactly: 4)))
-        throw .failed(try ADBWire.text(try await stream.read(exactly: length)))
+        throw try await failure(Int(ADBWire.u32(try await stream.read(exactly: 4))))
       default:
-        throw .protocolViolation("unexpected \(id) in a listing")
+        throw await violation("unexpected \(id) in a listing")
       }
     }
   }
@@ -237,10 +253,9 @@ public actor ADBSync {
         _ = try await stream.read(exactly: 16)
         return entries
       case "FAIL":
-        let length = Int(ADBWire.u32(try await stream.read(exactly: 4)))
-        throw .failed(try ADBWire.text(try await stream.read(exactly: length)))
+        throw try await failure(Int(ADBWire.u32(try await stream.read(exactly: 4))))
       default:
-        throw .protocolViolation("unexpected \(id) in a listing")
+        throw await violation("unexpected \(id) in a listing")
       }
     }
   }
@@ -248,7 +263,7 @@ public actor ADBSync {
   /// nil for a name that is not UTF-8: it could not be addressed again, so it is not listed.
   private func readName() async throws(ADBError) -> String? {
     let length = Int(ADBWire.u32(try await stream.read(exactly: 4)))
-    guard length <= Self.nameLimit else { throw .protocolViolation("name of \(length) bytes") }
+    guard length <= Self.nameLimit else { throw await violation("name of \(length) bytes") }
     return String(bytes: try await stream.read(exactly: length), encoding: .utf8)
   }
 
