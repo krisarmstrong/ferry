@@ -37,7 +37,8 @@ Until the helper answers, the menu shows **Checking…**.
 
 ### Turn on Ferry in Finder
 
-macOS asks you to allow Ferry to add locations to Finder. Until you do, the menu shows
+macOS asks you to allow Ferry to add locations to Finder. Ferry adds a location the first
+time a device is connected; from then until you turn it on, the menu shows
 **Turn on Ferry in Finder**.
 
 1. Click the Ferry icon in the menu bar.
@@ -56,9 +57,10 @@ same way.
 2. On the unit: **Settings** (bottom of the Home screen) → **Connected devices** → **USB**.
 3. Tap **Transfer files**.
 
-The unit appears in Finder a few seconds later. Until you tap **Transfer files**, the unit is
-connected but shares no storage, and Ferry's menu shows **Not sharing files** and opens
-these steps for you.
+The unit appears in Finder a few seconds later. Until you tap **Transfer files**, the menu
+shows **No device connected** (the unit offers the Mac no file-transfer connection at all) or
+**Not sharing files** (the unit stays visible but shares no storage). Either way, click **How to
+connect** or **How to turn on file transfer** for these steps.
 
 AirCheck G3 support is planned; it uses different steps.
 
@@ -108,8 +110,21 @@ To see files that were added or changed on the device while it was connected, ch
 - **From the Mac to the device:** drag files or folders onto the device's location, or into
   a folder on it.
 
-Finder shows the progress. Ferry writes each file under a hidden temporary name and renames it
-only when the copy is complete, so a half-copied file never appears under its real name.
+Finder shows how far each copy has got, and the Ferry menu lists copies in progress under
+their device with a percentage. Ferry writes each file under a hidden temporary name and
+renames it only when the copy is complete, so a half-copied file never appears under its real
+name.
+
+Packages, such as `.rtfd` documents, copy as folders. Symbolic links and aliases can't be
+copied to the device: Finder shows "Symbolic links and aliases can't be copied to the device"
+for them, and links inside an app or other bundle are left out of its copy.
+
+### A file changed on both sides
+
+If a file changed on the device (an app on it, or someone at the unit) after the Mac read it,
+and you then save your version from the Mac, Ferry keeps the device's version and saves yours
+beside it as **name (conflict from Mac)**, for example `report (conflict from Mac).txt`. Finder
+then shows the device's version under the original name. Nothing is overwritten.
 
 ### Large files
 
@@ -125,6 +140,11 @@ Rename files and folders, and create new folders, the same way as on any drive.
 
 The device has no Trash. Finder offers **Delete Immediately** instead of **Move to Trash**,
 and the file is removed from the device at once. It cannot be recovered from the Mac.
+
+Ferry deletes a folder only together with everything Finder shows in it. If the device added
+files to a folder since Finder last showed it, the folder and those files stay, and Finder
+puts the folder back. A file the device changed since Finder last showed it is not deleted
+either: Finder puts it back with the device's version.
 
 ### Free up space on the Mac
 
@@ -147,7 +167,12 @@ and its state.
 Above the devices, the menu can also show:
 
 - **Checking…**: Ferry is waiting for its helper to answer, for example just after Ferry opens.
-- **Turn on Ferry in Finder**: see [Turn on Ferry in Finder](#turn-on-ferry-in-finder).
+- **Turn on Ferry in Finder**: see [Turn on Ferry in Finder](#turn-on-ferry-in-finder). It
+  shows only once a device has been connected, since there is nothing to turn on before.
+- **Allow Ferry's helper** or **macOS can't find Ferry's helper**: macOS is not letting the
+  helper run. See [Ferry's helper is not responding](#ferrys-helper-is-not-responding).
+- A copy in progress, under its device: **Copying "name" to the device** or **to this Mac**,
+  with how far it has got.
 - **No device connected**, with a **How to connect** button. The first time the menu stays
   open for about 10 seconds with no device, Ferry opens the setup guide.
 
@@ -223,8 +248,17 @@ complete.
 
 ### "Ferry's helper is not responding"
 
-The menu shows "Ferry's helper is not responding. Quit Ferry and open it again." Quit Ferry
+If the menu says **Allow Ferry's helper** or **macOS can't find Ferry's helper**, macOS is not
+letting the helper run. Click **Open System Settings**, then in **Login Items & Extensions**
+turn on **Ferry** under **Allow in the Background**.
+
+If the menu says "Ferry's helper is not responding. Quit Ferry and open it again.", quit Ferry
 from the menu and open it again from Applications.
+
+### An app or script from the device does not open at once
+
+Files copied from a device are marked as downloaded, like files from the internet, so macOS
+checks an app or script with Gatekeeper before it first opens, and may ask you to confirm.
 
 ## Privacy
 

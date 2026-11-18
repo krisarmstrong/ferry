@@ -77,6 +77,8 @@
         "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs. An SD card is a second location.",
         "Double-click a file to open it. Ferry copies it to the Mac when you open it.",
         "Drag files or folders between the device and the Mac to copy them. A half-copied file never appears under its real name.",
+        "Finder shows how far each copy has got, and the Ferry menu lists copies in progress under their device.",
+        "Packages, such as .rtfd documents, copy as folders. Symbolic links and aliases can't be copied to the device; Finder shows an error for them, and links inside an app or other bundle are left out.",
         "To see files added on the device while it is connected, choose **Refresh** in the Ferry menu.",
         "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it."
       ],
@@ -84,7 +86,15 @@
         {
           "title": "Delete",
           "paragraphs": [
-            "The device has no Trash. Finder offers **Delete Immediately**, and the file is removed from the device at once."
+            "The device has no Trash. Finder offers **Delete Immediately**, and the file is removed from the device at once.",
+            "A folder is deleted only with everything Finder shows in it. If the device added files to the folder since Finder last showed it, the folder and those files stay.",
+            "A file the device changed since Finder last showed it is not deleted. Finder puts it back with the device's version."
+          ]
+        },
+        {
+          "title": "A file changed on both sides",
+          "paragraphs": [
+            "If a file changed on the device after the Mac read it, Ferry keeps the device's version and saves yours beside it as **name (conflict from Mac)**."
           ]
         },
         {
@@ -123,6 +133,14 @@
         {
           "term": "Checking…",
           "detail": "Ferry is waiting for its helper to answer, for example just after Ferry opens."
+        },
+        {
+          "term": "Turn on Ferry in Finder",
+          "detail": "Ferry's locations are all off in System Settings. Click **Open System Settings** and turn on Ferry under File Providers. Shown once a device has been connected."
+        },
+        {
+          "term": "Allow Ferry's helper",
+          "detail": "macOS is not letting Ferry's helper run. Click **Open System Settings** and turn on Ferry under Allow in the Background."
         }
       ],
       "groups": [
@@ -203,7 +221,14 @@
         {
           "title": "Ferry's helper is not responding",
           "paragraphs": [
-            "Quit Ferry from the menu and open it again from Applications."
+            "If the menu says **Allow Ferry's helper** or **macOS can't find Ferry's helper**, click **Open System Settings** and turn on Ferry under Allow in the Background.",
+            "Otherwise, quit Ferry from the menu and open it again from Applications."
+          ]
+        },
+        {
+          "title": "An app or script from the device does not open at once",
+          "paragraphs": [
+            "Files copied from a device are marked as downloaded, so macOS checks an app or script with Gatekeeper before it first opens, as it does for one from the internet."
           ]
         }
       ]

@@ -14,6 +14,15 @@
     "%lld." : {
 
     },
+    "A file changed on both sides" : {
+      "extractionState" : "manual"
+    },
+    "A file the device changed since Finder last showed it is not deleted. Finder puts it back with the device's version." : {
+      "extractionState" : "manual"
+    },
+    "A folder is deleted only with everything Finder shows in it. If the device added files to the folder since Finder last showed it, the folder and those files stay." : {
+      "extractionState" : "manual"
+    },
     "Allow Ferry's helper" : {
       "localizations" : {
         "en" : {
@@ -23,6 +32,9 @@
           }
         }
       }
+    },
+    "An app or script from the device does not open at once" : {
+      "extractionState" : "manual"
     },
     "Android 10 or newer" : {
       "extractionState" : "manual"
@@ -158,13 +170,22 @@
     "Ferry's helper is not responding. Quit Ferry and open it again." : {
 
     },
+    "Ferry's locations are all off in System Settings. Click **Open System Settings** and turn on Ferry under File Providers. Shown once a device has been connected." : {
+      "extractionState" : "manual"
+    },
     "File transfer" : {
 
     },
     "File transfer is off or the device is locked. Choose **Transfer files** on the device, then **Refresh**." : {
       "extractionState" : "manual"
     },
+    "Files copied from a device are marked as downloaded, so macOS checks an app or script with Gatekeeper before it first opens, as it does for one from the internet." : {
+      "extractionState" : "manual"
+    },
     "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it." : {
+      "extractionState" : "manual"
+    },
+    "Finder shows how far each copy has got, and the Ferry menu lists copies in progress under their device." : {
       "extractionState" : "manual"
     },
     "For the LinkRunner 10G, EtherScope nXG and LinkRunner 100G." : {
@@ -187,6 +208,12 @@
     },
     "How to turn on file transfer" : {
 
+    },
+    "If a file changed on the device after the Mac read it, Ferry keeps the device's version and saves yours beside it as **name (conflict from Mac)**." : {
+      "extractionState" : "manual"
+    },
+    "If the menu says **Allow Ferry's helper** or **macOS can't find Ferry's helper**, click **Open System Settings** and turn on Ferry under Allow in the Background." : {
+      "extractionState" : "manual"
     },
     "In Ferry's Settings, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched." : {
       "extractionState" : "manual"
@@ -249,6 +276,12 @@
     "Other Android phone (Android 8 or 9)" : {
 
     },
+    "Otherwise, quit Ferry from the menu and open it again from Applications." : {
+      "extractionState" : "manual"
+    },
+    "Packages, such as .rtfd documents, copy as folders. Symbolic links and aliases can't be copied to the device; Finder shows an error for them, and links inside an app or other bundle are left out." : {
+      "extractionState" : "manual"
+    },
     "Plug the device back in and turn on file transfer. Finder finishes the copy when the device reconnects. A half-copied file never appears under its real name." : {
       "extractionState" : "manual"
     },
@@ -263,9 +296,6 @@
     },
     "Quit" : {
 
-    },
-    "Quit Ferry from the menu and open it again from Applications." : {
-      "extractionState" : "manual"
     },
     "Quit Image Capture or Android File Transfer, then try again." : {
 
@@ -414,6 +444,9 @@
           }
         }
       }
+    },
+    "macOS is not letting Ferry's helper run. Click **Open System Settings** and turn on Ferry under Allow in the Background." : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.0"
