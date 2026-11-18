@@ -56,6 +56,31 @@ struct CompositeTransportTests {
     #expect(await mtp.openCount(of: id) == 0)
   }
 
+  /// Any USB route beats a network one: a network device answering with the serial of a unit on
+  /// the cable never takes that unit over.
+  @Test func aUSBDeviceIsNotServedOverTheNetwork() async throws {
+    let mtp = FakeTransport(devices: [mtpDevice])
+    let adb = FakeTransport(devices: [adbDevice], method: .usbADB)
+    await adb.setMethod(.wifiADB, for: id)
+    let composite = CompositeTransport(mtp: mtp, adb: adb)
+
+    let scan = try await composite.scan()
+    #expect(scan.devices == [mtpDevice.info])
+    #expect(scan.method(of: id) == .usbFileTransfer)
+    _ = try await composite.open(id)
+    #expect(await mtp.openCount(of: id) == 1)
+    #expect(await adb.openCount(of: id) == 0)
+  }
+
+  @Test(arguments: ConnectionMethod.allCases)
+  func preferenceIsUSBADBThenMTPThenNetwork(_ method: ConnectionMethod) {
+    let order: [ConnectionMethod] = [.usbADB, .usbFileTransfer, .wifiADB]
+    let rank = order.firstIndex(of: method)!
+    for (index, other) in order.enumerated() {
+      #expect(method.isPreferred(over: other) == (rank < index))
+    }
+  }
+
   @Test func anADBOnlyDeviceKeepsItsADBNameAndRoute() async throws {
     let adb = FakeTransport(devices: [adbDevice], method: .usbADB)
     await adb.setMethod(.wifiADB, for: id)

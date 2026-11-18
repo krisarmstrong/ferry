@@ -4,8 +4,10 @@ import os
 /// `DeviceTransport` over MTP and ADB at once, serving each device by the method it prefers.
 ///
 /// Both transports name an Android device by its serial (`ro.serialno` is the USB serial MTP
-/// reports), so a device either one lists is one `DeviceID`, listed once. ADB wins wherever it
-/// can serve the device (see `ConnectionMethod.isPreferred(over:)`); MTP serves the rest. A
+/// reports), so a device either one lists is one `DeviceID`, listed once, served by its preferred
+/// route (see `ConnectionMethod.isPreferred(over:)`): ADB over USB, then MTP, then ADB over the
+/// network. A serial alone does not prove a network device is the unit on the cable, so a
+/// network route serves a device only while no USB route presents its serial. A
 /// device keeps the name MTP gave it once MTP has seen it, so its Finder location is not renamed
 /// when the method changes; one only ADB has seen keeps ADB's name.
 ///
@@ -72,14 +74,19 @@ public actor CompositeTransport: DeviceTransport {
     }
     let ejectedIDs = Set(ejected.map(\.id))
     var servers: [DeviceID: Side] = [:]
-    var devices: [DeviceInfo] = []
+    var chosen: [DeviceID: DeviceInfo] = [:]
     for (side, scan) in [(Side.adb, viaADB), (.mtp, viaMTP)] {
-      for info in scan.devices where servers[info.id] == nil && !ejectedIDs.contains(info.id) {
+      for info in scan.devices where !ejectedIDs.contains(info.id) {
+        let method = scan.method(of: info.id)
+        if let best = methods[info.id], chosen[info.id] != nil, !method.isPreferred(over: best) {
+          continue
+        }
         servers[info.id] = side
-        methods[info.id] = scan.method(of: info.id)
-        devices.append(named(info))
+        methods[info.id] = method
+        chosen[info.id] = named(info)
       }
     }
+    let devices = Array(chosen.values)
     self.servers = servers
     let listed = Set(devices.map(\.id)).union(ejectedIDs)
     var leftOut: [String: [DeviceInfo]] = [:]

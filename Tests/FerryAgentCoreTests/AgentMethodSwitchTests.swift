@@ -40,15 +40,67 @@ private struct Switching {
     await waitForMethod(.usbADB)
   }
 
+  /// The item's identifier once the domain is connected again: a device that left one route and
+  /// came back on another is detached and attached, which disconnects its domain meanwhile.
+  func idOnceConnected(_ string: String) async throws -> ItemID? {
+    let item = try path(string)
+    while !Task.isCancelled {
+      do throws(TransportError) {
+        return try await harness.controller.items(of: domain).id(for: item)
+      } catch .deviceDisconnected {
+        await Task.yield()
+      }
+    }
+    return nil
+  }
+
   func waitForMethod(_ method: ConnectionMethod) async {
-    while await harness.hub.devices().first?.method != method, !Task.isCancelled {
+    while await currentMethod != method, !Task.isCancelled {
       await Task.yield()
+    }
+  }
+
+  var currentMethod: ConnectionMethod? {
+    get async {
+      await harness.hub.devices().first { $0.id == mtpDevice.info.id }?.method
     }
   }
 }
 
 @Suite(.timeLimit(.minutes(1)))
 struct AgentMethodSwitchTests {
+  /// The unit is on the cable (MTP) and connected over the network too: USB serves it. Unplugged,
+  /// the network takes over the same Finder location; plugged back in, USB serves it again.
+  @Test func theNetworkServesOnlyWhileNoUSBRouteDoes() async throws {
+    let setup = try await Switching()
+    defer { setup.harness.finish() }
+    let id = setup.mtpDevice.info.id
+    let file = try await setup.harness.id(try path("/Docs/a.txt"), in: setup.domain)
+    await setup.adb.setMethod(.wifiADB, for: id)
+    await setup.adb.attach(setup.adbDevice)
+    setup.harness.tick()
+    _ = await setup.harness.barrier(after: 1)
+    #expect(await setup.harness.hub.devices().first { $0.id == id }?.method == .usbFileTransfer)
+    #expect(await setup.adb.openCount(of: id) == 0)
+
+    await setup.harness.transport.detach(id)
+    setup.harness.tick()
+    await setup.waitForMethod(.wifiADB)
+    #expect(try await setup.idOnceConnected("/Docs/a.txt") == file)
+
+    let back = viaMTP("S1")
+    try await back.seed(try path("/Docs/a.txt"), in: setup.storage, contents: Data("a".utf8))
+    await setup.harness.transport.attach(back)
+    setup.harness.tick()
+    await setup.waitForMethod(.usbFileTransfer)
+    #expect(try await setup.idOnceConnected("/Docs/a.txt") == file)
+    let adds = await setup.harness.manager.calls.filter { call in
+      if case .add(let spec) = call { return spec.identifier == setup.domain }
+      return false
+    }
+    #expect(adds.count == 1)
+  }
+
   /// The Finder location and every item's identity stay put across MTP → ADB → MTP: a swap is a
   /// session replacement, not a new domain.
   @Test func identitiesSurviveTheSwitch() async throws {
