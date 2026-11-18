@@ -553,3 +553,37 @@ model picker.
     (`launchctl print gui/$UID/io.github.krisarmstrong.ferry.agent` fails).
 - [ ] **Step 2:** Record the results in `docs/TESTING.md` and commit
   `docs: record Finder end-to-end results`.
+
+---
+
+## Plan 2b rows (deferred from the final Plan 2 review)
+
+- **I6 Cancellation propagation.** A FileProvider cancel (or the extension's `Progress`
+  cancellation) does not reach the agent: a request keeps running when its client goes away.
+  Carry cancellation over XPC and into the session's transfer progress handler.
+- **T2 Hub stops if the watcher fails.** If `USBWatcher` cannot arm its IOKit notifications its
+  stream finishes, and the hub then never reconciles again. Surface it (log fault, status
+  flag) and retry, or fall back to a slow poll.
+- **T3 Call timeout.** An XPC call to the agent has no deadline; a wedged device can hang the
+  extension's request until FileProvider's own watchdog. Add a per-call timeout that maps to
+  `.serverUnreachable`.
+- **T4 Duplicate display names.** Two devices of one model and the same last four serial
+  characters get identical domain names. Disambiguate further.
+- **T8 Compare all domain properties.** `conformExisting` re-adds a domain only when
+  `supportsSyncingTrash` differs; compare every property Ferry sets, so a later settings change
+  reaches existing domains.
+- **Charge-only device with no interfaces.** U3 recognises an Android device without its MTP
+  interface from its interfaces. A device that configures with no interfaces at all publishes
+  no interface notification, so the watcher may not tick for it. Check what the LinkRunner
+  presents in charge-only mode (owner, live) and, if needed, watch configuration changes.
+
+## Plan 3 rows (deferred from the final Plan 2 review)
+
+- **M4 Hardened runtime.** Enable the hardened runtime on all three targets for notarisation,
+  with only the exceptions the bundled dylibs need.
+- **libusb Apple seize.** libmtp's own calls still enumerate the whole bus through libusb, and
+  Darwin's `darwin_cache_device_descriptor` may `USBDeviceOpenSeize` a device to read its
+  descriptors. Patch the pinned libusb to skip vendor 0x05AC there, so no Apple device is ever
+  seized, even by enumeration.
+- **Preview fixtures.** Wrap `PreviewClient` and the `#Preview` fixtures in `#if DEBUG` so they
+  are not in release builds.

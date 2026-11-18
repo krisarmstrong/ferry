@@ -143,7 +143,10 @@ Ferry.app (SwiftUI menu-bar app, LSUIElement)
 ```
 
 - **Agent** (registered with `SMAppService.agent`, MachServices in its plist):
-  the only process touching hardware. Watches for devices, opens sessions,
+  the only process touching hardware. Watches for devices, choosing candidates from
+  the IOKit registry alone (an Apple device, or anything not MTP-shaped, is never
+  opened or probed; an Android device without its MTP interface is shown as not
+  sharing files), opens sessions,
   serialises calls per device inside an `actor`, adds/removes one
   `NSFileProviderDomain` per device storage, signals enumerators after its own
   writes. Survives the menu-bar app quitting.
@@ -151,9 +154,11 @@ Ferry.app (SwiftUI menu-bar app, LSUIElement)
   the same XPC interface for status/progress; registers the agent on first
   launch ("Open at login" toggle).
 - **FileProvider extension:** maps FileProvider calls to XPC requests:
-  enumerate, fetchContents (agent downloads to a file in the app-group
-  container, extension hands it to the system), createItem (upload), modify
-  (rename/move; content change = upload to temp name then swap), delete.
+  enumerate, fetchContents (the extension creates the file in its domain's temporary
+  directory and sends the agent an open descriptor; the agent downloads into a scratch file of
+  its own and copies into that descriptor, so it never opens a path a client named), createItem
+  (upload, the file likewise sent as a descriptor), modify (rename/move; content change =
+  upload to a temp name, then swap: see "Write safety"), delete.
   Item identifiers are opaque, stable IDs assigned by the agent (see "Item identity").
 - **Packages:**
   - `DeviceKit` — `DeviceTransport` protocol + value types (`DeviceInfo`,
@@ -252,15 +257,23 @@ must not contain file names. Therefore:
   (from a crash or an unplug) are hidden from listings and deleted whenever
   their folder is listed. This is lazy because walking a whole phone at
   connect can take minutes. A content modify uploads the new data to a
-  temp name, deletes the old object, then renames. A device that cannot rename
-  falls back to delete-then-upload, and any failure is surfaced as an error,
-  never hidden. Capabilities are queried per device through `DeviceTransport`.
-- **Item identity.** One domain per device serial + storage description, so it
-  persists across reconnects. Item identifiers are storage-relative paths,
-  which survive reconnects. MTP object IDs are a per-session cache inside the
-  agent and never leave it. When a device is unplugged, its domain is
+  temp name, renames the old object to a hidden `.ferry-backup-<uuid>`, renames the
+  temp into place, and only then deletes the backup; if the temp cannot be renamed,
+  the backup is renamed back, so a failure never loses both versions. Listings hide
+  backups; one from an earlier session (its delete failed, or the agent stopped) is
+  deleted when its folder is listed and no write is in flight there. Only a device
+  that cannot rename at all falls back to delete-then-upload, and any failure is
+  surfaced as an error, never hidden. Capabilities are queried per device through
+  `DeviceTransport`.
+- **Item identity.** One domain per device serial + storage, so it persists
+  across reconnects. Its identifier is the SHA-256 (hex) of "<serial>|<storage key>",
+  never parsed back, so the serial is not in FileProvider's logs or paths. Item
+  identifiers are the agent's opaque random IDs (see "Item identity" above), kept
+  across reconnects and agent restarts; MTP object IDs are a per-session cache inside
+  the agent and never leave it. When a device is unplugged, its domain is
   disconnected (shown as unavailable), not removed. "Eject" in the menu removes
-  it.
+  it, keeping any changes not yet sent to the device (the system moves them aside
+  and the menu says where).
 - **Hardware bar for v1.** Android 8 (Oreo) and newer (owner decision; see
   Constraints). Works on the owner's phones plus at least one Android 8 or 9
   device.
