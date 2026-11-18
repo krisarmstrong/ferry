@@ -108,7 +108,7 @@ public actor FakeDevice: DeviceSession {
   }
 
   /// The item as the device lists it, with any stale size it reports.
-  private func listedItem(_ path: RemotePath, _ node: Node) -> RemoteItem {
+  func listedItem(_ path: RemotePath, _ node: Node) -> RemoteItem {
     let item = Self.item(path, node)
     guard let size = reportedSizes[path] else { return item }
     return RemoteItem(path: path, kind: item.kind, size: size, modified: item.modified)
@@ -212,16 +212,18 @@ public actor FakeDevice: DeviceSession {
     return try relocate(path, to: toFolder.appending(name), in: storage)
   }
 
-  public func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError) {
+  public func delete(_ path: RemotePath, in storage: StorageID, expecting: [RemoteItem]?)
+    async throws(TransportError)
+  {
     var nodes = try nodes(in: storage)
     if let failure = deleteFailure {
       deleteFailure = nil
       throw failure
     }
     guard nodes[path] != nil else { throw .notFound(path) }
-    for key in nodes.keys where Self.isSame(key, orInside: path) {
-      nodes[key] = nil
-    }
+    let doomed = nodes.filter { Self.isSame($0.key, orInside: path) }
+    if let expecting { try requireChecked(doomed, at: path, expecting) }
+    for key in doomed.keys { nodes[key] = nil }
     tree[storage] = nodes
   }
 
@@ -284,35 +286,6 @@ public actor FakeDevice: DeviceSession {
     return listedItem(destination, node)
   }
 
-}
-
-// MARK: Helpers
-
-extension FakeDevice {
-  fileprivate static func isSame(_ path: RemotePath, orInside ancestor: RemotePath) -> Bool {
-    path.components.starts(with: ancestor.components)
-  }
-
-  fileprivate static func item(_ path: RemotePath, _ node: Node) -> RemoteItem {
-    switch node {
-    case .file(let data, let modified):
-      RemoteItem(path: path, kind: .file, size: UInt64(data.count), modified: modified)
-    case .folder(let modified):
-      RemoteItem(path: path, kind: .folder, size: 0, modified: modified)
-    }
-  }
-
-  /// Reads the whole file, or at most `limit` bytes when a limit is given.
-  fileprivate static func read(_ file: URL, upTo limit: UInt64?) throws(TransportError) -> Data {
-    do {
-      guard let limit else { return try Data(contentsOf: file) }
-      let handle = try FileHandle(forReadingFrom: file)
-      defer { try? handle.close() }
-      return try handle.read(upToCount: Int(clamping: limit)) ?? Data()
-    } catch {
-      throw .io(error.localizedDescription)
-    }
-  }
 }
 
 // MARK: Test controls

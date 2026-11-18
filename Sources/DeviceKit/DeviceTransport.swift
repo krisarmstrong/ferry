@@ -45,9 +45,30 @@ public protocol DeviceSession: Sendable {
     async throws(TransportError) -> RemoteItem
   func move(_ path: RemotePath, toFolder: RemotePath, in storage: StorageID)
     async throws(TransportError) -> RemoteItem
-  /// Deleting a folder deletes its contents.
-  func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
+  /// Deleting a folder deletes its contents. `expecting`, if given, is everything the caller
+  /// checked: the item at `path` and, for a folder, every item inside it that Finder would show
+  /// (partials and backups go with it unchecked). The device must still have exactly those, files
+  /// by kind, size and date, folders by kind: another item at `path` is `.changedOnDevice(path)`,
+  /// anything new or changed inside is `.directoryNotEmpty(path)`, and then nothing is deleted.
+  func delete(_ path: RemotePath, in storage: StorageID, expecting: [RemoteItem]?)
+    async throws(TransportError)
   func close() async
+}
+
+extension DeviceSession {
+  /// Deletes whatever is at `path`, with its contents.
+  public func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError) {
+    try await delete(path, in: storage, expecting: nil)
+  }
+}
+
+extension RemoteItem {
+  /// Whether this is the item `checked` describes: a file of the same size and date, or a
+  /// folder (whose date changes with what it holds).
+  public func matches(_ checked: RemoteItem) -> Bool {
+    kind == checked.kind
+      && (kind == .folder || (size == checked.size && modified == checked.modified))
+  }
 }
 
 /// A finished download: the file as the device listed it, and how many bytes arrived. They

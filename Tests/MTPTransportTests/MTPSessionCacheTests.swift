@@ -238,3 +238,60 @@ struct MTPSessionDeleteTreeTests {
     #expect(await device.children(of: SessionFixture.root) == ["d1"])
   }
 }
+
+/// A delete given what the caller checked removes exactly that, and nothing if the device has
+/// anything else there now.
+struct MTPSessionCheckedDeleteTests {
+  private let storage = SessionFixture.storage
+
+  private func path(_ string: String) throws -> RemotePath {
+    try SessionFixture.path(string)
+  }
+
+  @Test func aFileReplacedSinceTheCheckIsNotDeleted() async throws {
+    let device = SessionFixture.makeDevice()
+    let old = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    let checked = try await session.item(at: path("/a.txt"), in: storage)
+    await device.removeObject(old)
+    await device.addFile("a.txt", parent: SessionFixture.root, data: Data("unit edit".utf8))
+
+    await #expect(throws: TransportError.changedOnDevice(try path("/a.txt"))) {
+      try await session.delete(path("/a.txt"), in: storage, expecting: [checked])
+    }
+    #expect(await device.children(of: SessionFixture.root) == ["a.txt"])
+  }
+
+  @Test func aFolderThatGainedAnItemIsNotDeletedAtAll() async throws {
+    let device = SessionFixture.makeDevice()
+    let folder = await device.addFolder("F", parent: SessionFixture.root)
+    await device.addFile("a.txt", parent: folder, data: Data("a".utf8))
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    let checked = [
+      try await session.item(at: path("/F"), in: storage),
+      try await session.item(at: path("/F/a.txt"), in: storage),
+    ]
+    await device.addFile("b.txt", parent: folder, data: Data("new on the unit".utf8))
+
+    await #expect(throws: TransportError.directoryNotEmpty(try path("/F"))) {
+      try await session.delete(path("/F"), in: storage, expecting: checked)
+    }
+    #expect(await device.children(of: folder) == ["a.txt", "b.txt"])
+  }
+
+  @Test func theCheckedTreeGoesWithItsHiddenPartials() async throws {
+    let device = SessionFixture.makeDevice()
+    let folder = await device.addFolder("F", parent: SessionFixture.root)
+    await device.addFile("a.txt", parent: folder, data: Data("a".utf8))
+    await device.addFile(SafeWriter.partialPrefix + "x", parent: folder, data: Data("p".utf8))
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    let checked = [
+      try await session.item(at: path("/F"), in: storage),
+      try await session.item(at: path("/F/a.txt"), in: storage),
+    ]
+
+    try await session.delete(path("/F"), in: storage, expecting: checked)
+
+    #expect(await device.objects.isEmpty)
+  }
+}

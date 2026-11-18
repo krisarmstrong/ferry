@@ -235,7 +235,7 @@ public struct SafeWriter: Sendable {
     await session.partials.recordBackup(backup.path, in: storage)
     // What the rename set aside must be the file the write was checked against: the device can
     // swap the file while the new contents go up, and the swapped-in file is not ours to replace.
-    guard Self.isSameFile(backup, as: replaced) else {
+    guard backup.matches(replaced) else {
       await discard(partial, in: storage)
       await restore(backup.path, to: replaced.path, in: storage)
       throw .changedOnDevice(replaced.path)
@@ -327,13 +327,6 @@ public struct SafeWriter: Sendable {
 // MARK: Backups
 
 extension SafeWriter {
-  /// Whether `backup` is `original` set aside: the same kind, size and date. An object ID would
-  /// say more, but none reaches `DeviceSession`.
-  private static func isSameFile(_ backup: RemoteItem, as original: RemoteItem) -> Bool {
-    backup.kind == original.kind && backup.size == original.size
-      && backup.modified == original.modified
-  }
-
   /// Renames a backup back to the file it was. If that fails the backup stays, hidden, and is
   /// logged: this session keeps it, and a later one renames it back (see `resolveOrphan`).
   private func restore(_ backup: RemotePath, to original: RemotePath, in storage: StorageID)

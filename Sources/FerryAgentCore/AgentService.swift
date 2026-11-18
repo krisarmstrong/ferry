@@ -216,6 +216,8 @@ public actor AgentService: AgentHandling {
         await route.items.removed(path)
         return
       }
+      // Everything the delete was checked against: the device deletes only those.
+      var checked = [current]
       switch current.kind {
       case .file:
         // Compared as FileProvider holds it: at the size a download delivered, if the device
@@ -227,12 +229,18 @@ public actor AgentService: AgentHandling {
         // The listing that checks also reaps partials abandoned in the folder, which Finder
         // never shows.
         if recursive {
-          try await Self.requireSeen(path, on: route)
+          checked += try await Self.requireSeen(path, on: route)
         } else if try await !route.writer.visibleList(path, in: route.storage).isEmpty {
           throw .directoryNotEmpty(path)
         }
       }
-      try await route.session.delete(path, in: route.storage)
+      do throws(TransportError) {
+        try await route.session.delete(path, in: route.storage, expecting: checked)
+      } catch .changedOnDevice {
+        // Changed between the check and the delete: recorded, so FileProvider puts it back.
+        _ = await route.items.observed(try await route.session.item(at: path, in: route.storage))
+        throw .changedOnDevice(path)
+      }
       await route.items.removed(path)
     }
   }

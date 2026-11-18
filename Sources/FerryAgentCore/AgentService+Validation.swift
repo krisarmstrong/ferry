@@ -9,18 +9,20 @@ extension AgentService {
   /// Finder would show in the device folder `folder`, walked fresh, as it is now: a recursive
   /// delete takes only what the user saw go, never what the device added or changed since. Each
   /// item not reported as it is is recorded now, so FileProvider, which puts the folder back on
-  /// that error, shows it there. A tree with
-  /// an item more than `RemotePath.maxTreeDepth` levels below `folder`, or more than
-  /// `deleteWalkLimit` items, is refused the same way, unwalked past that point. The listings
-  /// also reap abandoned partials.
+  /// that error, shows it there. A tree with an item more than `RemotePath.maxTreeDepth` levels
+  /// below `folder`, or more than `deleteWalkLimit` items, is refused the same way, unwalked
+  /// past that point. The listings also reap abandoned partials. Returns every item walked, as
+  /// the device listed it: what the delete may remove.
   static func requireSeen(_ folder: RemotePath, on route: DomainController.Route)
-    async throws(TransportError)
+    async throws(TransportError) -> [RemoteItem]
   {
     var pending = [(folder, 1)]
     var walked = 0
     var unseen: [RemoteItem] = []
+    var seen: [RemoteItem] = []
     while let (current, depth) = pending.popLast() {
       for child in try await route.writer.visibleList(current, in: route.storage) {
+        seen.append(child)
         walked += 1
         guard walked <= deleteWalkLimit, depth <= RemotePath.maxTreeDepth else {
           throw .directoryNotEmpty(folder)
@@ -29,7 +31,7 @@ extension AgentService {
         if child.kind == .folder { pending.append((child.path, depth + 1)) }
       }
     }
-    guard !unseen.isEmpty else { return }
+    guard !unseen.isEmpty else { return seen }
     // Parents first, so each item's parent has its identifier when it is recorded.
     for item in unseen.sorted(by: { $0.path.components.count < $1.path.components.count }) {
       _ = await route.items.observed(item)
