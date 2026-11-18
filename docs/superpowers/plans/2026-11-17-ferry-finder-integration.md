@@ -229,15 +229,16 @@ Rules:
 public enum AgentRequest: Codable, Sendable {
   case status, recheck(DeviceID), eject(DeviceID), removeAllDomains     // .status ⇒ .status(devices:providerEnabled:)
   case item(domain: String, path: RemotePath), list(domain: String, folder: RemotePath)
-  case fetch(domain: String, path: RemotePath, to: URL)                       // URL inside the app-group container
-  case create(domain: String, path: RemotePath, from: URL?, isFolder: Bool)
+  case fetch(domain: String, path: RemotePath)                                 // + writable FileHandle
+  case create(domain: String, path: RemotePath, isFolder: Bool)                 // + readable FileHandle for files
   case rename(domain: String, path: RemotePath, to: String)
   case move(domain: String, path: RemotePath, toFolder: RemotePath)
-  case replaceContents(domain: String, path: RemotePath, from: URL)
+  case replaceContents(domain: String, path: RemotePath)                        // + readable FileHandle
+  // (Task 4 security fix: file contents travel as file descriptors, never paths)
   case delete(domain: String, path: RemotePath)
 }
 public enum AgentResponse: Codable, Sendable { case status(devices: [AttachedDevice], providerEnabled: Bool), item(RemoteItem), items([RemoteItem]), done, failure(TransportError) }
-@objc public protocol AgentXPC { func send(_ request: Data, reply: @escaping @Sendable (Data) -> Void) }   // JSON both ways
+@objc public protocol AgentXPC { func send(_ request: Data, file: FileHandle?, reply: @escaping @Sendable (Data) -> Void) }   // JSON both ways
 public protocol AgentSending: Sendable { func send(_ request: AgentRequest) async throws(TransportError) -> AgentResponse }
 public actor AgentClient: AgentSending {
   public init(machServiceName: String)
@@ -341,6 +342,9 @@ public enum ErrorMapping { public static func fileProviderError(_ e: TransportEr
 Error mapping:
 - `.notFound` → `NSFileProviderError(.noSuchItem)`
 - `.alreadyExists` → `.filenameCollision`
+- (Task 4) `fetch`/`create`/`replaceContents` open their own file (in the extension's container)
+  and send a `FileHandle`; a `fetch` that does not return `.done` is a failure, and the target
+  file is discarded, never handed to FileProvider (it may hold a truncated prefix).
 - `.deviceDisconnected`, `.deviceBusy` and `.noDeviceConnected` → `.serverUnreachable`
 - `.deviceLocked` → `.notAuthenticated`
 - `.insufficientSpace` and `.fileTooLargeForStorage` → `.insufficientQuota`
