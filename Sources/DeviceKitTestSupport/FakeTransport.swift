@@ -5,6 +5,10 @@ import DeviceKit
 public actor FakeTransport: DeviceTransport {
   private var devices: [FakeDevice]
   private var heldElsewhere: Set<DeviceID> = []
+  private var parked: Set<DeviceID> = []
+  /// Attached without file transfer: seen on USB only, as `MTPTransport` sees a device whose
+  /// MTP interface is off.
+  private var withoutFileTransfer: [DeviceInfo] = []
   private var opens: [DeviceID: Int] = [:]
   private var probes: [DeviceID: Int] = [:]
   private var openFailures: [DeviceID: TransportError] = [:]
@@ -22,8 +26,20 @@ public actor FakeTransport: DeviceTransport {
 
   /// Unplugs the device: it leaves the scan and every later call on it is `.deviceDisconnected`.
   public func detach(_ id: DeviceID) async {
+    parked.remove(id)
+    withoutFileTransfer.removeAll { $0.id == id }
     guard let index = devices.firstIndex(where: { $0.info.id == id }) else { return }
     await devices.remove(at: index).setDisconnected()
+  }
+
+  /// Plugs in a device whose file transfer is off: `scan()` lists it in `notSharing` under
+  /// `info`, and it cannot be opened.
+  public func attachWithoutFileTransfer(_ info: DeviceInfo) {
+    withoutFileTransfer.append(info)
+  }
+
+  public func isParked(_ id: DeviceID) -> Bool {
+    parked.contains(id)
   }
 
   /// Another app takes or lets go of the device. While it holds it, `scan()` lists it in
@@ -62,9 +78,12 @@ public actor FakeTransport: DeviceTransport {
     scanCount += 1
     var usable: [DeviceInfo] = []
     var busy: [DeviceInfo] = []
+    var notSharing = withoutFileTransfer
     for device in devices {
       let info = device.info
-      if heldElsewhere.contains(info.id) {
+      if parked.contains(info.id) {
+        notSharing.append(info)
+      } else if heldElsewhere.contains(info.id) {
         busy.append(
           DeviceInfo(
             id: Self.busyID(for: info.id), manufacturer: info.manufacturer, model: info.model))
@@ -73,18 +92,28 @@ public actor FakeTransport: DeviceTransport {
         usable.append(info)
       }
     }
-    return DeviceScan(devices: usable, busy: busy)
+    return DeviceScan(devices: usable, busy: busy, notSharing: notSharing)
   }
 
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {
     guard let device = devices.first(where: { $0.info.id == id }) else {
       throw .deviceNotFound(id)
     }
+    if parked.contains(id) { throw .deviceNotFound(id) }
     if let failure = openFailures.removeValue(forKey: id) { throw failure }
     if heldElsewhere.contains(id) { throw .deviceBusy }
     if await device.isOpen { throw .deviceBusy }
     opens[id, default: 0] += 1
     await device.markOpen()
     return device
+  }
+
+  public func park(_ id: DeviceID) {
+    guard devices.contains(where: { $0.info.id == id }) else { return }
+    parked.insert(id)
+  }
+
+  public func unpark(_ id: DeviceID) {
+    parked.remove(id)
   }
 }

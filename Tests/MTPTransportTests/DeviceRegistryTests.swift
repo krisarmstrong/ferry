@@ -10,23 +10,49 @@ struct DeviceRegistryTests {
     let raw: Int
   }
 
-  /// What the bus holds and what the registry did to it. `attached` is a bitmask of addresses,
-  /// atomic because detection is synchronous.
+  /// What the bus holds and what the registry did to it. A device is its USB address, with the
+  /// registry entry of its current enumeration; each `plug` enumerates anew.
   final class Bus: Sendable {
-    let attached = Atomic<UInt64>(0)
+    let attached = Mutex<[Int: USBDeviceRecord]>([:])
     let log = Log()
+    /// How often each address was resolved to a raw device, which probes an unlisted one.
+    let resolves = Mutex<[Int: Int]>([:])
+    private let enumerations = Atomic<UInt64>(0)
 
     init(_ addresses: [Int]) {
       plug(addresses)
     }
 
-    func plug(_ addresses: [Int]) {
-      attached.store(addresses.reduce(0) { $0 | 1 << $1 }, ordering: .sequentiallyConsistent)
+    /// Plugs in each address: an iPhone at an address in `apple`, otherwise an MTP device.
+    func plug(_ addresses: [Int], apple: Set<Int> = []) {
+      attached.withLock { devices in
+        devices = [:]
+        for address in addresses {
+          devices[address] = record(address, vendor: apple.contains(address) ? 0x05AC : 0x18D1)
+        }
+      }
     }
 
-    var addresses: [Int] {
-      let mask = attached.load(ordering: .sequentiallyConsistent)
-      return (0..<64).filter { mask & 1 << $0 != 0 }
+    /// The device at `address` enumerates again, as after a replug or a USB mode switch.
+    func reenumerate(_ address: Int) {
+      attached.withLock { $0[address] = record(address, vendor: 0x18D1) }
+    }
+
+    var devices: [USBDeviceRecord] {
+      attached.withLock { $0.values.sorted { $0.address < $1.address } }
+    }
+
+    private func record(_ address: Int, vendor: UInt16) -> USBDeviceRecord {
+      let interfaces: [USBInterface] =
+        vendor == 0x05AC
+        ? [
+          USBInterface(interfaceClass: 0x06, subclass: 1, interfaceProtocol: 1, endpoints: 3),
+          USBInterface(interfaceClass: 0xFF, subclass: 0xFE, interfaceProtocol: 2, endpoints: 3),
+        ] : [USBInterface(interfaceClass: 0xFF, subclass: 0xFF, interfaceProtocol: 0, endpoints: 3)]
+      return USBDeviceRecord(
+        registryID: enumerations.add(1, ordering: .sequentiallyConsistent).newValue,
+        locationID: 1 << 24, address: UInt8(address), vendorID: vendor, productID: 0x4EE1,
+        interfaces: interfaces, vendorName: "Vendor", productName: "Product")
     }
   }
 
@@ -78,10 +104,13 @@ struct DeviceRegistryTests {
     return DeviceRegistry(
       label: "test-registry",
       driver: .init(
-        detect: { bus.addresses },
-        location: { BusLocation(bus: 1, address: UInt8($0)) },
-        describe: { Self.busyInfo($0) },
-        open: { raw throws(TransportError) in
+        attached: { bus.devices },
+        candidacy: { USBCandidates.candidacy(of: $0, inTable: true) },
+        resolve: { record in
+          bus.resolves.withLock { $0[Int(record.address), default: 0] += 1 }
+          return Int(record.address)
+        },
+        open: { raw, _ throws(TransportError) in
           let handle = try await log.open(raw)
           return (handle, await log.info(handle))
         },
@@ -193,14 +222,94 @@ struct DeviceRegistryTests {
     #expect(await bus.log.peak == 1)
   }
 
+  // MARK: Candidates, parking, re-enumeration
+
+  @Test func deniedDeviceIsNeitherOpenedNorReported() async throws {
+    let bus = Bus([])
+    bus.plug([1, 2], apple: [2])
+    let registry = makeRegistry(bus)
+
+    #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
+    #expect(await bus.log.opens == [1: 1])
+    #expect(await bus.log.closes == [1: 1])
+  }
+
+  @Test func busyDeviceIsParkedAndNotReopenedUntilRechecked() async throws {
+    let bus = Bus([1])
+    await bus.log.setBusy([1])
+    let registry = makeRegistry(bus)
+    let busy = DeviceScan(devices: [], busy: [Self.busyInfo(1)])
+    #expect(try await registry.scan() == busy)
+    await bus.log.setBusy([])
+
+    #expect(try await registry.scan() == busy)
+    #expect(try await registry.scan() == busy)
+    #expect(await bus.log.opens == [:])
+
+    await registry.unpark(Self.busyInfo(1).id)
+    #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
+    #expect(await bus.log.opens == [1: 1])
+  }
+
+  @Test func busyDeviceIsTriedAgainOnceReplugged() async throws {
+    let bus = Bus([1])
+    await bus.log.setBusy([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    await bus.log.setBusy([])
+
+    bus.reenumerate(1)
+    #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
+  }
+
+  @Test func ejectedDeviceIsNotSharingAndNeverReopened() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    let opened = try await registry.open(Self.id(1))
+    await registry.park(Self.id(1))
+    await registry.release(opened.location)
+
+    for _ in 0..<2 {
+      #expect(try await registry.scan() == DeviceScan(devices: [], notSharing: [Self.info(1)]))
+    }
+    await #expect(throws: TransportError.deviceNotFound(Self.id(1))) {
+      _ = try await registry.open(Self.id(1))
+    }
+    #expect(await bus.log.opens == [1: 2])
+
+    bus.reenumerate(1)
+    #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
+  }
+
+  /// A replug, or a switch from charging to file transfer, can come back at the same address.
+  /// The held record is for the old enumeration, so the new one is opened, not taken as held.
+  @Test func reenumeratedDeviceAtTheSameAddressIsNotTheHeldOne() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    _ = try await registry.open(Self.id(1))
+
+    bus.reenumerate(1)
+    #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
+    #expect(await bus.log.opens == [1: 3])
+  }
+
+  @Test func candidateIsResolvedOncePerEnumeration() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    for _ in 0..<3 { _ = try await registry.scan() }
+    #expect(bus.resolves.withLock { $0 } == [1: 1])
+  }
+
   @Test func detectionFailureIsThrown() async {
     let registry = DeviceRegistry<Int, Handle>(
       label: "test-registry",
       driver: .init(
-        detect: { () throws(TransportError) in throw .io("usb") },
-        location: { BusLocation(bus: 1, address: UInt8($0)) },
-        describe: { Self.busyInfo($0) },
-        open: { (Handle(raw: $0), Self.info($0)) },
+        attached: { () throws(TransportError) in throw .io("usb") },
+        candidacy: { _ in .mtp },
+        resolve: { Int($0.address) },
+        open: { raw, _ in (Handle(raw: raw), Self.info(raw)) },
         close: { _ in }))
 
     await #expect(throws: TransportError.io("usb")) {

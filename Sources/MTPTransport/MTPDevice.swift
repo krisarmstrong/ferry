@@ -4,7 +4,7 @@ import Dispatch
 import Foundation
 import os
 
-/// A detected device, copied out of libmtp's detection array before that array is freed.
+/// A device for libmtp to open, built by `MTPDeviceTable` from the IOKit registry.
 ///
 /// `@unchecked`: the struct's only pointers are the vendor and product strings, which point into
 /// libmtp's static device table and are never written or freed.
@@ -18,57 +18,39 @@ struct RawDeviceRef: @unchecked Sendable {
 /// the handle never leaves it. Methods are synchronous on that queue; callers `await` the hop.
 /// Each operation clears libmtp's error stack first, so a failure drains only its own errors.
 actor MTPDevice {
-  fileprivate static let libraryInitialized: Void = LIBMTP_Init()
+  static let libraryInitialized: Void = LIBMTP_Init()
   private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "MTPDevice")
 
   private let queue: DispatchSerialQueue
   /// `nil` once closed, or once an operation found the device gone; every operation then
   /// throws `.deviceDisconnected`.
   private var handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>?
-  /// Where the device sits on the bus, to tell a lost link from a protocol error.
-  private let busLocation: UInt32
-  private let deviceNumber: UInt8
+  /// The device's IOKit registry entry, to tell a lost link from a protocol error without USB
+  /// I/O. A replug or USB mode switch gets a new entry even at the same address.
+  private let registryID: UInt64
   nonisolated let info: DeviceInfo
 
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     queue.asUnownedSerialExecutor()
   }
 
-  /// Lists attached MTP devices. A bus with no device returns `[]`.
-  static func detect() throws(TransportError) -> [RawDeviceRef] {
-    _ = libraryInitialized
-    var devices: UnsafeMutablePointer<LIBMTP_raw_device_t>?
-    var count: Int32 = 0
-    let result = LIBMTP_Detect_Raw_Devices(&devices, &count)
-    defer { free(devices) }
-    switch result {
-    case LIBMTP_ERROR_NONE:
-      break
-    case LIBMTP_ERROR_NO_DEVICE_ATTACHED:
-      return []
-    default:
-      throw .io("detecting MTP devices failed (libmtp error \(result.rawValue))")
-    }
-    guard let devices else { return [] }
-    return (0..<Int(count)).map { RawDeviceRef(raw: devices[$0]) }
-  }
-
   /// Opens `raw`. Failure usually means another process (Android File Transfer, a camera
   /// importer) holds the interface, so it is reported as `.deviceBusy`.
-  static func open(_ raw: RawDeviceRef) async throws(TransportError) -> MTPDevice {
+  static func open(_ raw: RawDeviceRef, registryID: UInt64) async throws(TransportError)
+    -> MTPDevice
+  {
     let queue = DispatchSerialQueue(label: "io.github.krisarmstrong.ferry.mtp-device")
     // Open and identify on the device's queue too, so no libmtp call for this handle ever
     // runs anywhere else.
     guard let opened = await DeviceOpener(queue: queue).open(raw) else { throw .deviceBusy }
-    return MTPDevice(queue: queue, opened: opened, raw: raw)
+    return MTPDevice(queue: queue, opened: opened, registryID: registryID)
   }
 
-  private init(queue: DispatchSerialQueue, opened: OpenedHandle, raw: RawDeviceRef) {
+  private init(queue: DispatchSerialQueue, opened: OpenedHandle, registryID: UInt64) {
     self.queue = queue
     handle = opened.handle
     info = opened.info
-    busLocation = raw.raw.bus_location
-    deviceNumber = raw.raw.devnum
+    self.registryID = registryID
   }
 
   isolated deinit {
@@ -271,11 +253,11 @@ actor MTPDevice {
     return error
   }
 
-  /// Whether this device is still on the bus. Runs on the device queue like every other libmtp
-  /// call; a detection that itself fails is taken as "present" so the error stays `.io`.
+  /// Whether this enumeration of the device is still attached, from the IOKit registry, with no
+  /// USB I/O. A device that enumerated again (unplugged and replugged, or switched from charging
+  /// to file transfer) has a new entry, so a handle to the old one reads as gone, not locked.
   private func isStillAttached() -> Bool {
-    guard let devices = try? Self.detect() else { return true }
-    return devices.contains { $0.raw.bus_location == busLocation && $0.raw.devnum == deviceNumber }
+    USBRegistry.isAttached(registryID: registryID)
   }
 
   /// Runs a libmtp transfer with `progress` reachable through the callback's context pointer.

@@ -119,6 +119,7 @@ struct AgentHarness {
   let hub: DeviceHub
   let controller: DomainController
   let service: AgentService
+  let clock = ManualClock()
   let scratch: URL
   let store: URL
   private let ticks: AsyncStream<Void>.Continuation
@@ -130,7 +131,7 @@ struct AgentHarness {
     transport = FakeTransport(devices: devices)
     let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
     self.ticks = ticks
-    hub = DeviceHub(transport: transport, arrivals: arrivals, clock: ManualClock())
+    hub = DeviceHub(transport: transport, arrivals: arrivals, clock: clock)
     controller = DomainController(hub: hub, manager: manager, itemStore: store)
     scratch = FileManager.default.temporaryDirectory.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)

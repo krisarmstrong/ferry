@@ -162,6 +162,29 @@ struct DomainControllerTests {
     #expect(entries.map(\.item.path) == [try path("/back.txt")])
   }
 
+  /// The owner's replug: the device comes back not sharing files (charge only), then the user
+  /// turns on file transfer. The hub's one re-check must bring the domain back.
+  @Test func replugNotSharingThenSharingReconnectsWithinOneRecheck() async throws {
+    let device = await makeDevice("A")
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    await harness.transport.detach(device.info.id)
+    harness.tick()
+    _ = await harness.manager.waitForCalls(2)
+
+    let replugged = await makeDevice("A", locked: true)
+    await harness.transport.attach(replugged)
+    harness.tick()
+    await harness.clock.waitForSleeper()
+    await replugged.setLocked(false)
+    await harness.clock.advance(by: DeviceHub.recheckInterval)
+
+    let domain = domainID(device)
+    #expect(
+      await harness.manager.waitForCalls(4).suffix(2) == [.reconnect(domain), .signal(domain)])
+  }
+
   @Test func ejectRemovesOnlyThatDevice() async throws {
     let first = await makeDevice("A", model: "First")
     let second = await makeDevice("B", model: "Second")

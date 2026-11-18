@@ -16,8 +16,11 @@ public enum HubEvent: Sendable, Equatable {
 /// each held session for its storages. A held device's departure is learned only from its own
 /// session reporting `.deviceDisconnected`: the transport reports a held device from its record
 /// without touching it, so a scan says nothing about whether it is still there. A device another
-/// app holds is listed as `.busy` until it leaves a scan. A held session whose storages fail for
-/// any other reason than a lock or a departure is closed, so a later scan can open it afresh.
+/// app holds is listed as `.busy`, and one the transport sees without file transfer as
+/// `.notSharingFiles`, until it leaves a scan; `recheck` on either asks the transport to try it
+/// again. A held session whose storages fail for any other reason than a lock or a departure is
+/// closed, so a later scan can open it afresh. Any device a scan reports as usable and the hub
+/// does not hold is opened: the transport, not the hub, keeps an ejected device out of that list.
 ///
 /// A device that is attached but not sharing files is re-checked every two seconds. MTP has no
 /// event for "file transfer turned on", so this is the hub's one poll, and it runs only while
@@ -98,9 +101,16 @@ public actor DeviceHub {
     }
   }
 
-  /// Re-reads a held device's storages, for instance after file transfer was turned on.
+  /// Re-reads a held device's storages, for instance after file transfer was turned on. A device
+  /// the hub does not hold (busy, failed, not sharing) is offered to the transport again and the
+  /// bus scanned.
   public func recheck(_ id: DeviceID) async {
-    guard let entry = entries[id], case .held(let session) = entry.holding else { return }
+    guard let entry = entries[id] else { return }
+    guard case .held(let session) = entry.holding else {
+      await transport.unpark(id)
+      await reconcile()
+      return
+    }
     let reading = await Self.read(session)
     guard let current = entries[id], current.generation == entry.generation else { return }
     switch reading {
@@ -125,8 +135,11 @@ public actor DeviceHub {
     }
   }
 
-  /// Closes the device's session. It stays listed as `.notSharingFiles` until it is unplugged.
+  /// Closes the device's session. It stays listed as `.notSharingFiles` until it is unplugged:
+  /// the transport is told to leave it alone first, so no scan opens it again meanwhile.
   public func eject(_ id: DeviceID) async {
+    guard case .held = entries[id]?.holding else { return }
+    await transport.park(id)
     guard let entry = entries[id], case .held(let session) = entry.holding else { return }
     store(entry.info, .notSharingFiles, .unheld)
     await session.close()
@@ -157,31 +170,29 @@ public actor DeviceHub {
       log.error("scanning devices failed: \(String(describing: error), privacy: .public)")
       return
     }
-    let present = Set((scan.devices + scan.busy).map(\.id))
+    let present = Set((scan.devices + scan.busy + scan.notSharing).map(\.id))
     for (id, entry) in entries where !present.contains(id) {
       guard case .unheld = entry.holding else { continue }
       entries[id] = nil
       log.info("device \(id.serial, privacy: .private) detached")
       continuation.yield(.detached(id))
     }
-    for info in scan.busy where entries[info.id] == nil {
+    for info in scan.busy where isUnheld(info.id) {
       store(info, .busy, .unheld)
+    }
+    for info in scan.notSharing where isUnheld(info.id) {
+      store(info, .notSharingFiles, .unheld)
     }
     for info in scan.devices {
       await admit(info)
     }
   }
 
-  /// Opens a device the hub does not list yet, or retries one that was busy or failed to open.
+  /// Opens a device the hub does not hold: one it does not list yet, or one that was busy,
+  /// failed, or not sharing files and is now offered as usable.
   private func admit(_ info: DeviceInfo) async {
     let existing = entries[info.id]
-    if let existing {
-      guard case .unheld = existing.holding else { return }
-      switch existing.state {
-      case .busy, .failed: break
-      case .ready, .notSharingFiles: return
-      }
-    }
+    if let existing, case .held = existing.holding { return }
     let generation = existing?.generation
     let session: any DeviceSession
     do throws(TransportError) {
@@ -220,6 +231,13 @@ public actor DeviceHub {
 
   private func probed(_ id: DeviceID) {
     probing.remove(id)
+  }
+
+  /// Not listed, or listed without a session.
+  private func isUnheld(_ id: DeviceID) -> Bool {
+    guard let entry = entries[id] else { return true }
+    if case .held = entry.holding { return false }
+    return true
   }
 
   private static func read(_ session: any DeviceSession) async -> Reading {

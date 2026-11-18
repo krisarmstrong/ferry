@@ -9,8 +9,11 @@ import Testing
 extension DeviceTests {
   @Suite struct MTPDeviceIntegrationTests {
     func openFirstDevice() async throws -> MTPDevice {
-      let raw = try #require(try MTPDevice.detect().first, "no MTP device attached")
-      return try await MTPDevice.open(raw)
+      let candidate = try #require(
+        try USBRegistry.attached().first { MTPTransport.candidacy(of: $0) == .mtp },
+        "no MTP device attached")
+      let raw = try #require(MTPDeviceTable.rawDevice(for: candidate))
+      return try await MTPDevice.open(raw, registryID: candidate.registryID)
     }
 
     @Test func detectsAndOpens() async throws {
