@@ -97,7 +97,16 @@ mode: it enumerates over MTP but publishes no storage (seen on the LinkRunner-10
   like a file from the device, so Gatekeeper checks it (round 8b ruling). Such
   a folder and everything in it are read-only on the Mac (reading and listing
   only), since an app saving it would replace the whole folder; no folder may
-  be renamed to such a name (round 9 ruling).
+  be renamed to such a name (round 9 ruling). Since round 10b its folders take
+  new items on disk (so FileProvider can apply the device's deletions); the
+  agent refuses every change in them, so a Mac app's replace-save leaves its
+  copy, with an error, on the Mac only.
+- **What a delete removes** (round 10 m3/m4). A delete passes everything it
+  checked; the device side deletes only objects matching those by path, kind,
+  size and date (a folder by kind), since no object ID crosses `DeviceSession`.
+  Two gaps remain: an object replaced by one of the same kind, size and date
+  passes, and libmtp keeps the size and date it first read for an object, so a
+  file rewritten in place under the same object ID passes too.
 
 ## Anti-goals (failure even if it "works")
 

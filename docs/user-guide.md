@@ -128,7 +128,12 @@ everything in it, is read-only on the Mac: an app saving it would replace the wh
 which Ferry can't copy. Edit it on the device, or copy it to the Mac. Something you put inside
 one stays on the Mac only: Finder shows "Folders named like an app or a document package, and
 what they hold, can't be changed from this Mac. Change them on the device." For the same
-reason a folder on the device can't be renamed to such a name. Android's app folders, such as
+reason a folder on the device can't be renamed to such a name.
+
+Saving such a document from a Mac app (TextEdit, Keynote) is not sent to the device either.
+The app may leave a copy beside it, such as `Notes 2.rtfd`, which Finder marks with an error:
+your edit is only in that copy, on the Mac. To keep it, copy it to a folder on the Mac. Edit
+these documents on the device, or copy them to the Mac first. Android's app folders, such as
 `Android/data/com.example.app`, count too: macOS reads `.app` as an app.
 
 To remove such a folder, delete it on the device, or delete the folder that holds it from
