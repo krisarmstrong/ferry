@@ -126,7 +126,7 @@ func makeDevice(
 }
 
 func domainID(_ device: FakeDevice, _ key: String = internalKey) -> String {
-  "\(device.info.id.serial)|\(key)"
+  DomainNaming.identifier(for: storageID(device, key))
 }
 
 func storageID(_ device: FakeDevice, _ key: String = internalKey) -> StorageID {
@@ -194,7 +194,9 @@ struct AgentHarness {
   }
 
   static let barrierSpec = DomainSpec(
-    identifier: "ZZBARRIER|\(internalKey)", displayName: "Barrier")
+    identifier: DomainNaming.identifier(
+      for: StorageID(device: DeviceID(serial: "ZZBARRIER"), key: internalKey)),
+    displayName: "Barrier")
 
   /// Writes `contents` to a new file in the scratch folder.
   func file(_ name: String, _ contents: String) throws -> URL {

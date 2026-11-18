@@ -71,4 +71,38 @@ extension DomainControllerTests {
     #expect(
       await harness.service.handle(.removeAllDomains, file: nil) == .removed(preserved: [saved]))
   }
+
+  /// Domain identifiers carry no serial: FileProvider logs them, and they name folders.
+  @Test func domainIdentifierIsAHashOfSerialAndStorage() throws {
+    let storage = StorageID(device: DeviceID(serial: "0123456789abcdef"), key: internalKey)
+    let identifier = DomainNaming.identifier(for: storage)
+
+    #expect(identifier.count == 64)
+    #expect(DomainNaming.isIdentifier(identifier))
+    #expect(!identifier.contains("0123456789abcdef"))
+    #expect(identifier == DomainNaming.identifier(for: storage))
+    #expect(
+      identifier
+        != DomainNaming.identifier(
+          for: StorageID(device: storage.device, key: cardKey)))
+    #expect(!DomainNaming.isIdentifier("0123456789abcdef|Internal shared storage|65537"))
+  }
+
+  /// A domain from an earlier Ferry, named "<serial>|<key>", is removed (keeping unsent changes)
+  /// with its item table, and the device's storage comes back under its new identifier.
+  @Test func oldFormatDomainIsReplacedByItsHashedIdentifier() async throws {
+    let device = await makeDevice("A")
+    let old = "A|\(internalKey)"
+    let store = itemStore()
+    let oldTable = ItemTable.file(for: old, in: store)
+    try FileManager.default.createDirectory(at: store, withIntermediateDirectories: true)
+    try Data("{\"items\":{}}".utf8).write(to: oldTable)
+    let harness = try AgentHarness(devices: [device], existing: [old], store: store)
+    defer { harness.finish() }
+
+    let added = FakeDomainManager.Call.add(
+      DomainSpec(identifier: domainID(device), displayName: "Phone"))
+    #expect(await harness.manager.waitForCalls(2) == [.remove(old), added])
+    #expect(!FileManager.default.fileExists(atPath: oldTable.path))
+  }
 }

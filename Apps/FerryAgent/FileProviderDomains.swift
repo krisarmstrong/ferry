@@ -15,23 +15,25 @@ struct FileProviderDomains: DomainManaging {
 
   /// Adds every existing domain again whose settings differ from `configured`, such as one
   /// added by an earlier Ferry. An add with an existing identifier updates the domain in place,
-  /// so its items, enablement and the agent's item table all stay.
+  /// so its items, enablement and the agent's item table all stay. A domain named by serial is
+  /// left alone: `DomainController` replaces it.
   func conformExisting() async {
     let domains: [NSFileProviderDomain]
     do {
       domains = try await NSFileProviderManager.domains()
     } catch {
-      log.error("listing domains failed: \(error, privacy: .public)")
+      log.error("listing domains failed: \(error, privacy: .private)")
       return
     }
-    for domain in domains where domain.supportsSyncingTrash {
+    for domain in domains
+    where domain.supportsSyncingTrash && DomainNaming.isIdentifier(domain.identifier.rawValue) {
       do {
         try await NSFileProviderManager.add(
           Self.configured(domain.identifier, displayName: domain.displayName))
         log.info("updated settings of \(domain.identifier.rawValue, privacy: .private)")
       } catch {
         log.error(
-          "updating \(domain.identifier.rawValue, privacy: .private) failed: \(error, privacy: .public)"
+          "updating \(domain.identifier.rawValue, privacy: .private) failed: \(error, privacy: .private)"
         )
       }
     }
@@ -88,7 +90,7 @@ struct FileProviderDomains: DomainManaging {
       try await manager(identifier).signalEnumerator(for: .workingSet)
     } catch {
       log.error(
-        "signalling \(identifier, privacy: .private) failed: \(error, privacy: .public)")
+        "signalling \(identifier, privacy: .private) failed: \(error, privacy: .private)")
     }
   }
 
@@ -96,7 +98,7 @@ struct FileProviderDomains: DomainManaging {
     do {
       return try await NSFileProviderManager.domains().contains(where: \.userEnabled)
     } catch {
-      log.error("listing domains failed: \(error, privacy: .public)")
+      log.error("listing domains failed: \(error, privacy: .private)")
       return false
     }
   }

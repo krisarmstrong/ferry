@@ -1,9 +1,11 @@
+import CryptoKit
 import DeviceKit
+import Foundation
 
 /// One FileProvider domain: a single storage of one device.
 public struct DomainSpec: Sendable, Hashable {
-  /// `"<serial>|<StorageID.key>"`, stable across reconnects. The key contains `|` itself, so
-  /// the identifier is never parsed back; the agent maps it to its storage in memory.
+  /// See `DomainNaming.identifier(for:)`. Never parsed back: the agent maps it to its storage in
+  /// memory.
   public let identifier: String
   public let displayName: String
 
@@ -14,6 +16,21 @@ public struct DomainSpec: Sendable, Hashable {
 }
 
 public enum DomainNaming {
+  /// The domain identifier of a storage: SHA-256, in lowercase hex, of `"<serial>|<key>"`.
+  /// Stable across reconnects, and free of the serial, which FileProvider would otherwise write
+  /// to its logs and to the paths of the domain's files.
+  public static func identifier(for storage: StorageID) -> String {
+    SHA256.hash(data: Data("\(storage.device.serial)|\(storage.key)".utf8))
+      .map { String(format: "%02x", $0) }.joined()
+  }
+
+  /// Whether `string` has the form `identifier(for:)` gives. A Ferry domain whose identifier does
+  /// not is from an earlier Ferry that named domains by serial.
+  public static func isIdentifier(_ string: String) -> Bool {
+    string.utf8.count == 64
+      && string.utf8.allSatisfy { (0x30...0x39).contains($0) || (0x61...0x66).contains($0) }
+  }
+
   /// A spec for each storage of each ready device, in order.
   ///
   /// A domain is named after its device's model, with the last four characters of the serial
@@ -35,7 +52,7 @@ public enum DomainNaming {
         models[model, default: 0] > 1 ? "\(model) (\(device.id.serial.suffix(4)))" : model
       return storages.enumerated().map { index, storage in
         let spec = DomainSpec(
-          identifier: "\(device.id.serial)|\(storage.id.key)",
+          identifier: identifier(for: storage.id),
           displayName: index == 0 ? base : base + " – SD card")
         return (spec, storage.id)
       }

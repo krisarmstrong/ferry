@@ -167,7 +167,7 @@ public actor DeviceHub {
     do throws(TransportError) {
       scan = try await transport.scan()
     } catch {
-      log.error("scanning devices failed: \(String(describing: error), privacy: .public)")
+      log.error("scanning devices failed: \(String(describing: error), privacy: .private)")
       return
     }
     let present = Set((scan.devices + scan.busy + scan.notSharing).map(\.id))

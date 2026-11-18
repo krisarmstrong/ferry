@@ -206,16 +206,18 @@ struct DomainControllerTests {
 
   @Test func restartDisconnectsExistingDomainsAndReconnectsOnReady() async throws {
     let device = await makeDevice("A")
-    let gone = "GONE|Internal|vol0"
+    let gone = DomainNaming.identifier(
+      for: StorageID(device: DeviceID(serial: "GONE"), key: internalKey))
     let harness = try AgentHarness(devices: [device], existing: [domainID(device), gone])
     defer { harness.finish() }
 
     let domain = domainID(device)
     let barrier = FakeDomainManager.Call.add(AgentHarness.barrierSpec)
+    // Adopted domains are disconnected in identifier order.
+    let disconnects = [domain, gone].sorted().map(FakeDomainManager.Call.disconnect)
     #expect(
-      await harness.barrier(after: 4) == [
-        .disconnect(domain), .disconnect(gone), .reconnect(domain), .signal(domain), barrier,
-      ])
+      await harness.barrier(after: 4)
+        == disconnects + [.reconnect(domain), .signal(domain), barrier])
     #expect(
       await harness.service.handle(.list(domain: domain, folder: .root), file: nil) == .entries([]))
     #expect(

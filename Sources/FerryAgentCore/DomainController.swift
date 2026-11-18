@@ -194,16 +194,23 @@ public actor DomainController {
   }
 
   /// Records the system's domains as disconnected, so a ready device reconnects its domain
-  /// rather than adding it again, and an absent device's domain does not look live.
+  /// rather than adding it again, and an absent device's domain does not look live. A domain
+  /// named the way an earlier Ferry named them, by serial, is removed first (keeping unsent
+  /// changes) with its item table; its storage comes back under its new identifier once ready.
   private func adoptExisting() async {
     let identifiers: [String]
     do {
       identifiers = try await manager.existing()
     } catch {
-      log.error("listing existing domains failed: \(error, privacy: .public)")
+      log.error("listing existing domains failed: \(error, privacy: .private)")
       return
     }
-    let adopted = identifiers.filter { domains[$0] == nil }.sorted()
+    for identifier in identifiers.filter({ !DomainNaming.isIdentifier($0) }).sorted() {
+      ItemTable.discard(domain: identifier, in: itemStore)
+      _ = await remove(identifier)
+    }
+    let adopted = identifiers.filter { DomainNaming.isIdentifier($0) && domains[$0] == nil }
+      .sorted()
     for identifier in adopted {
       domains[identifier] = Domain(spec: nil, storage: nil, connected: true)
     }
@@ -246,7 +253,7 @@ public actor DomainController {
         try await manager.add(spec)
       } catch {
         log.error(
-          "adding domain \(identifier, privacy: .private) failed: \(error, privacy: .public)")
+          "adding domain \(identifier, privacy: .private) failed: \(error, privacy: .private)")
         domains[identifier] = nil
       }
       return
@@ -264,7 +271,8 @@ public actor DomainController {
         try await manager.reconnect(identifier)
       } catch {
         log.error(
-          "reconnecting domain \(identifier, privacy: .private) failed: \(error, privacy: .public)")
+          "reconnecting domain \(identifier, privacy: .private) failed: \(error, privacy: .private)"
+        )
         domains[identifier]?.connected = false
         return
       }
@@ -279,7 +287,7 @@ public actor DomainController {
         try await manager.add(spec)
       } catch {
         log.error(
-          "renaming domain \(identifier, privacy: .private) failed: \(error, privacy: .public)")
+          "renaming domain \(identifier, privacy: .private) failed: \(error, privacy: .private)")
         domains[identifier]?.spec = existing.spec
       }
     }
@@ -293,7 +301,7 @@ public actor DomainController {
       session = try await hub.session(for: id)
     } catch {
       log.error(
-        "no session for \(id.serial, privacy: .private): \(String(describing: error), privacy: .public)"
+        "no session for \(id.serial, privacy: .private): \(String(describing: error), privacy: .private)"
       )
       return nil
     }
@@ -320,7 +328,7 @@ public actor DomainController {
       try await manager.disconnect(identifier)
     } catch {
       log.error(
-        "disconnecting domain \(identifier, privacy: .private) failed: \(error, privacy: .public)")
+        "disconnecting domain \(identifier, privacy: .private) failed: \(error, privacy: .private)")
     }
   }
 
@@ -352,7 +360,11 @@ extension DomainController {
     do {
       let preserved = try await manager.remove(identifier)
       if let preserved {
-        log.info("unsent changes of a removed domain saved to \(preserved.path, privacy: .private)")
+        log.info(
+          "removed domain \(identifier, privacy: .private) kept unsent changes in \(preserved.path, privacy: .private)"
+        )
+      } else {
+        log.info("removed domain \(identifier, privacy: .private); nothing unsent")
       }
       return preserved
     } catch {
