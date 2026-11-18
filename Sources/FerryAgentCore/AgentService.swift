@@ -29,14 +29,17 @@ public actor AgentService: AgentHandling {
   let transfers = TransferBoard()
   /// Where the agent keeps its scratch copies of clients' files (see `FileTransfer`).
   private let scratchFolder: URL
+  /// adb over the network; `nil` where adb is not used.
+  let wireless: WirelessADB?
 
   public init(
     hub: DeviceHub, domains: DomainController,
-    scratch: URL = FileManager.default.temporaryDirectory
+    scratch: URL = FileManager.default.temporaryDirectory, wireless: WirelessADB? = nil
   ) {
     self.hub = hub
     self.domains = domains
     scratchFolder = scratch
+    self.wireless = wireless
   }
 
   public func handle(
@@ -88,7 +91,8 @@ public actor AgentService: AgentHandling {
     case (.workingSet(let domain, let page), _):
       return try await workingSet(page, in: domain)
     case (.fetch, nil), (.replaceContents, nil), (.status, _), (.recheck, _), (.recheckADB, _),
-      (.refresh, _), (.eject, _), (.removeAllDomains, _):
+      (.refresh, _), (.eject, _), (.removeAllDomains, _), (.connectAddress, _), (.pair, _),
+      (.connectWireless, _), (.enableWireless, _), (.forgetWireless, _):
       throw .io("bad request")
     }
   }
@@ -106,7 +110,8 @@ public actor AgentService: AgentHandling {
           transfers: await transfers.list(),
           awaitingAuthorization: await hub.awaitingAuthorization(),
           adbStatus: await hub.adbStatus(), awaitingUSBDebugging: await hub.awaitingUSBDebugging(),
-          preservedChanges: await domains.preservedByRetirement))
+          preservedChanges: await domains.preservedByRetirement,
+          remembered: await wireless?.remembered() ?? []))
     case .recheck(let id):
       await hub.recheck(id)
       return .done
@@ -120,8 +125,11 @@ public actor AgentService: AgentHandling {
       return .removed(preserved: await domains.eject(id))
     case .removeAllDomains:
       return .removed(preserved: try await domains.removeAll())
+    case .forgetWireless(let id):
+      await wireless?.forget(id)
+      return .done
     default:
-      return nil
+      return await performWirelessRequest(request)
     }
   }
 

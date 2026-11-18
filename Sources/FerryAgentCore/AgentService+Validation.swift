@@ -82,8 +82,8 @@ extension AgentService {
     case .fetch, .replaceContents: true
     case .create(_, _, _, let isFolder): !isFolder
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .item, .list, .rename,
-      .move,
-      .delete, .changes, .workingSet:
+      .move, .delete, .changes, .workingSet, .connectAddress, .pair, .connectWireless,
+      .enableWireless, .forgetWireless:
       false
     }
   }

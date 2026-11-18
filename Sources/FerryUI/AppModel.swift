@@ -40,6 +40,13 @@ import os
   private(set) var awaitingUSBDebugging: Set<DeviceID> = []
   /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
   public private(set) var awaitingAuthorization: [String] = []
+  /// Devices the agent reconnects over the network.
+  public private(set) var remembered: [RememberedDevice] = []
+  /// What the last network request said, for the form and the menu; `nil` once it connected.
+  /// It can carry adb's words, so it is shown verbatim.
+  public internal(set) var wirelessMessage: String?
+  /// The form the network window shows.
+  public var wirelessForm = WirelessForm.address
   /// The last failed action, shown until the next one succeeds. It can carry device-supplied
   /// detail, so it is shown verbatim, never parsed as Markdown.
   public private(set) var actionError: String?
@@ -60,7 +67,7 @@ import os
   /// forward, so reopening the menu does not pull the guide in front of it again.
   private(set) var guideOpenPending = false
 
-  private let client: any AgentSending
+  let client: any AgentSending
   let services: any SystemServicing
   private let sleep: @Sendable (Duration) async throws -> Void
   /// Devices the guide has opened for this app run.
@@ -189,22 +196,6 @@ import os
     await perform(.eject(id))
   }
 
-  /// Whether a location the system saved unsent changes to has anything in it: it can name a
-  /// folder it left empty, or one already gone.
-  static func holdsSomething(_ location: URL) -> Bool {
-    var isFolder: ObjCBool = false
-    guard FileManager.default.fileExists(atPath: location.path, isDirectory: &isFolder) else {
-      return false
-    }
-    guard isFolder.boolValue else { return true }
-    let contents = try? FileManager.default.contentsOfDirectory(atPath: location.path)
-    return !(contents ?? []).isEmpty
-  }
-
-  public func revealPreservedChanges() {
-    services.reveal(preservedChanges)
-  }
-
   /// Mounts an ejected device again.
   public func mount(_ id: DeviceID) async {
     await perform(.recheck(id))
@@ -327,6 +318,7 @@ import os
     adbStatus = report.adbStatus
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
     awaitingAuthorization = report.awaitingAuthorization
+    remembered = report.remembered
     agent = .running
     // The agent replaced a domain on its own and the system kept its unsent changes: shown as an
     // eject's are.

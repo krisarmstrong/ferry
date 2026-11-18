@@ -145,11 +145,14 @@ public struct StatusReport: Codable, Sendable, Equatable {
   /// Where the system saved unsent changes of domains the agent retired on its own (a storage's
   /// domain replaced under its method-neutral key), as `.removed` reports for an eject.
   public let preservedChanges: [URL]
+  /// Devices the agent reconnects over the network, attached or not.
+  public let remembered: [RememberedDevice]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
     awaitingAuthorization: [String] = [], adbStatus: ADBStatus? = nil,
-    awaitingUSBDebugging: [DeviceID] = [], preservedChanges: [URL] = []
+    awaitingUSBDebugging: [DeviceID] = [], preservedChanges: [URL] = [],
+    remembered: [RememberedDevice] = []
   ) {
     self.devices = devices
     self.provider = provider
@@ -158,6 +161,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.adbStatus = adbStatus
     self.awaitingUSBDebugging = awaitingUSBDebugging
     self.preservedChanges = preservedChanges
+    self.remembered = remembered
   }
 }
 
@@ -175,6 +179,18 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// Looks for `adb` again and starts its server, for a user who has just installed it. Answered
   /// with `.done`; the next `.status` shows what it found.
   case recheckADB
+  /// Connects adb to a device at an address the user typed. Answered with `.wireless`.
+  case connectAddress(WirelessEndpoint)
+  /// Pairs with an Android 11+ device at the pairing address and code it shows, then connects to
+  /// it. Answered with `.wireless`.
+  case pair(WirelessEndpoint, code: PairingCode)
+  /// Connects a remembered device again. Answered with `.wireless`.
+  case connectWireless(DeviceID)
+  /// Moves a device on USB debugging to the network as well (Android 8–10). Answered with
+  /// `.wireless`.
+  case enableWireless(DeviceID)
+  /// Disconnects a remembered device from the network and forgets it. Answered with `.done`.
+  case forgetWireless(DeviceID)
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
   /// device reach Finder.
   case refresh(DeviceID)
@@ -224,6 +240,7 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   /// Answers `.eject` and `.removeAllDomains`: where the system saved changes the removed
   /// domains had not sent to the device yet, if any.
   case removed(preserved: [URL])
+  case wireless(WirelessOutcome)
   case done
   case failure(TransportError)
 }

@@ -36,6 +36,13 @@ struct FerryApp: App {
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
 
+    Window(PairDeviceView.windowTitle, id: PairDeviceView.windowID) {
+      PairDeviceView(model: model)
+    }
+    .windowResizability(.contentSize)
+    .defaultLaunchBehavior(.suppressed)
+    .restorationBehavior(.disabled)
+
     // Not restored at launch, like the setup guide; HelpView remembers the last section itself.
     Window(HelpView.windowTitle, id: HelpView.windowID) {
       HelpView(model: model)

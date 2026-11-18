@@ -75,6 +75,68 @@ enum DevicePresentation {
 
   static let installCommand = "brew install --cask android-platform-tools"
 
+  /// Use over Wi-Fi is offered on a device Ferry serves over USB debugging.
+  static func offersWiFi(_ device: AttachedDevice) -> Bool {
+    if case .ready = device.state { device.method == .usbADB } else { false }
+  }
+
+  /// The name a remembered device reported, made safe to show.
+  static func rememberedName(_ device: RememberedDevice) -> String {
+    device.name.isEmpty
+      ? String(localized: LocalizedStringResource("Unknown device", bundle: .module))
+      : DisplayText.escaped(device.name)
+  }
+
+  /// What a network request ended with, for the user; `nil` when it connected. adb's own words
+  /// are escaped.
+  static func message(for outcome: WirelessOutcome) -> String? {
+    switch outcome {
+    case .connected:
+      nil
+    case .awaitingAllow:
+      String(
+        localized: LocalizedStringResource(
+          "Tap Allow on the device to finish connecting.", bundle: .module))
+    case .needsNetwork:
+      String(
+        localized: LocalizedStringResource(
+          "The device has no network address. Connect it to Ethernet or Wi-Fi first.",
+          bundle: .module))
+    case .failed(let failure):
+      message(for: failure)
+    }
+  }
+
+  private static func message(for failure: WirelessFailure) -> String {
+    switch failure {
+    case .adbUnavailable:
+      String(
+        localized: LocalizedStringResource(
+          "adb isn't running. Install it, or choose Check again.", bundle: .module))
+    case .notOverUSB:
+      String(
+        localized: LocalizedStringResource(
+          "Connect the device with a cable and allow USB debugging first.", bundle: .module))
+    case .notRemembered:
+      String(
+        localized: LocalizedStringResource(
+          "Ferry has no address for this device. Connect it by address.", bundle: .module))
+    case .noConnectService:
+      String(
+        localized: LocalizedStringResource(
+          "Paired, but the device isn't offering a connection. Check Wireless debugging is on.",
+          bundle: .module))
+    case .otherDevice:
+      String(
+        localized: LocalizedStringResource(
+          "That address belongs to another device.", bundle: .module))
+    case .adb(let detail):
+      String(
+        localized: LocalizedStringResource(
+          "adb: \(DisplayText.escaped(detail))", bundle: .module))
+    }
+  }
+
   /// A network device waiting for the user to allow this Mac on it. The address comes from
   /// adb's listing, so it is escaped.
   static func waitingLine(for address: String) -> String {

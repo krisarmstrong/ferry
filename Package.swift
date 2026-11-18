@@ -24,7 +24,8 @@ let package = Package(
     .target(name: "DeviceKitTestSupport", dependencies: ["DeviceKit"]),
     .systemLibrary(name: "CLibMTP", pkgConfig: "libmtp", providers: [.brew(["libmtp"])]),
     .target(name: "MTPTransport", dependencies: ["DeviceKit", "CLibMTP"]),
-    .target(name: "FerryAgentCore", dependencies: ["DeviceKit", "FerryIPC", "MTPTransport"]),
+    .target(
+      name: "FerryAgentCore", dependencies: ["ADBTransport", "DeviceKit", "FerryIPC", "MTPTransport"]),
     .target(name: "FerryIPC", dependencies: ["DeviceKit"]),
     .target(name: "FerryProviderCore", dependencies: ["DeviceKit", "FerryIPC"]),
     .target(
@@ -45,7 +46,7 @@ let package = Package(
     .testTarget(
       name: "FerryAgentCoreTests",
       dependencies: [
-        "FerryAgentCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport",
+        "ADBTransport", "FerryAgentCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport",
       ]),
     .testTarget(
       name: "FerryIPCTests", dependencies: ["FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),

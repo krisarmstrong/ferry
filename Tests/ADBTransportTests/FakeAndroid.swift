@@ -55,6 +55,8 @@ final class FakeAndroid: Sendable {
     var hangingPrograms: Set<String> = []
     /// What `getprop <name>` prints.
     var properties: [String: String] = [:]
+    /// What `ip -4 addr` prints.
+    var addresses = ""
     var peers: [ADBStream] = []
     var clock: Int64 = 1_700_000_000
   }

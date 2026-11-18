@@ -43,13 +43,27 @@ public struct MenuContent: View {
           recheck: { Task { await model.recheck(device.id) } },
           mount: { Task { await model.mount(device.id) } },
           showGuide: { openGuide(for: device) },
-          showUSBDebugging: { openUSBDebuggingGuide(for: device) })
+          showUSBDebugging: { openUSBDebuggingGuide(for: device) },
+          network: NetworkActions(
+            offersWiFi: DevicePresentation.offersWiFi(device),
+            isRemembered: model.isRemembered(device.id),
+            useOverWiFi: { Task { await model.useOverWiFi(device.id) } },
+            forget: { Task { await model.forget(device.id) } }))
+      }
+      ForEach(model.rememberedOffline) { device in
+        RememberedRow(
+          device: device, connect: { Task { await model.connectAgain(device.id) } },
+          forget: { Task { await model.forget(device.id) } })
       }
       ForEach(model.awaitingAuthorization, id: \.self) { address in
         Text(verbatim: DevicePresentation.waitingLine(for: address))
           .font(.callout)
           .foregroundStyle(.secondary)
       }
+      NetworkRow(
+        message: model.wirelessMessage,
+        offersForms: model.agent == .running && model.adbStatus == .available,
+        open: openNetworkForm)
       if model.showsADBNotRunning {
         ADBNotRunningRow { Task { await model.recheckADB() } }
       }
@@ -126,6 +140,12 @@ public struct MenuContent: View {
   private func openUSBDebuggingGuide(for device: AttachedDevice) {
     model.showUSBDebuggingGuide(for: device)
   }
+
+  private func openNetworkForm(_ form: WirelessForm) {
+    model.wirelessForm = form
+    NSApp.activate()
+    openWindow(id: PairDeviceView.windowID)
+  }
 }
 
 /// The agent did not answer. If macOS will not run it, the fix is in System Settings.
@@ -189,30 +209,6 @@ private struct TurnOnRow: View {
   }
 }
 
-/// An eject removed a location that still had changes for the device; the system kept them.
-private struct PreservedChangesRow: View {
-  let locations: [URL]
-  let reveal: () -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      ForEach(locations, id: \.self) { location in
-        Text("Unsent changes were saved to \(Self.shown(location))", bundle: .module)
-          .font(.callout)
-      }
-      Button(action: reveal) {
-        Text("Reveal in Finder", bundle: .module)
-      }
-    }
-  }
-
-  /// The path with the home folder as `~`. The folder can be named after a device, which
-  /// chooses its own name, so it is escaped.
-  private static func shown(_ location: URL) -> String {
-    DisplayText.escaped((location.path as NSString).abbreviatingWithTildeInPath)
-  }
-}
-
 private struct NoDeviceRow: View {
   let showGuide: () -> Void
 
@@ -246,6 +242,7 @@ private struct DeviceRow: View {
   let mount: () -> Void
   let showGuide: () -> Void
   let showUSBDebugging: () -> Void
+  let network: NetworkActions
 
   private var hint: DevicePresentation.Hint? {
     DevicePresentation.hint(for: device, awaitingUSBDebugging: awaitingUSBDebugging)
@@ -286,6 +283,7 @@ private struct DeviceRow: View {
       }
       HStack {
         stateAction
+        NetworkButtons(actions: network)
         Spacer()
         // Only a device Ferry holds open can be ejected.
         if case .ready = device.state {

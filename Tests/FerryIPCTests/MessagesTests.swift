@@ -27,6 +27,11 @@ private func tag(_ request: AgentRequest) -> Int {
   case .workingSet: 13
   case .refresh: 14
   case .recheckADB: 15
+  case .connectAddress: 16
+  case .pair: 17
+  case .connectWireless: 18
+  case .enableWireless: 19
+  case .forgetWireless: 20
   }
 }
 
@@ -51,6 +56,9 @@ private func requests() -> [AgentRequest] {
   all.append(.delete(domain: domain, id: camera, base: version, recursive: true))
   all += [.changes(domain: domain, since: nil), .changes(domain: domain, since: Data([1, 2, 3]))]
   all += [.workingSet(domain: domain, page: nil), .workingSet(domain: domain, page: Data([7]))]
+  let address = WirelessEndpoint(parsing: "192.0.2.31")!
+  all += [.connectAddress(address), .pair(address, code: PairingCode("482913")!)]
+  all += [.connectWireless(device), .enableWireless(device), .forgetWireless(device)]
   return all
 }
 
@@ -111,6 +119,7 @@ private func tag(_ response: AgentResponse) -> Int {
   case .page: 6
   case .removed: 7
   case .keptOnDevice: 8
+  case .wireless: 9
   }
 }
 
@@ -153,6 +162,26 @@ private func responses() throws -> [AgentResponse] {
   all.append(.changes(anchor: Data(), updated: [], deleted: [], expired: true))
   all += [.page(entries: [item, root], next: Data([7])), .page(entries: [], next: nil)]
   all += [.removed(preserved: []), .removed(preserved: [URL(filePath: "/tmp/Ferry unsent")])]
+  return all + (try wirelessResponses())
+}
+
+private func wirelessResponses() throws -> [AgentResponse] {
+  let address = try #require(WirelessEndpoint(parsing: "192.0.2.31:5555"))
+  var all: [AgentResponse] = []
+  all += [.wireless(.connected), .wireless(.awaitingAllow(address)), .wireless(.needsNetwork)]
+  for failure: WirelessFailure in [
+    .adbUnavailable, .notOverUSB, .notRemembered, .noConnectService, .otherDevice,
+    .adb("failed to connect"),
+  ] {
+    all.append(.wireless(.failed(failure)))
+  }
+  all.append(
+    .status(
+      StatusReport(
+        devices: [], provider: .enabled,
+        remembered: [
+          RememberedDevice(id: device, name: "EtherScope nXG", addresses: [address])
+        ])))
   return all
 }
 
@@ -161,7 +190,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...15))
+  #expect(Set(requests().map(tag)) == Set(0...20))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
@@ -175,7 +204,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyResponseRoundTripsJSON() throws {
-  #expect(Set(try responses().map(tag)) == Set(0...8))
+  #expect(Set(try responses().map(tag)) == Set(0...9))
   for response in try responses() {
     #expect(try roundTrip(response) == response)
   }
@@ -197,6 +226,35 @@ private func reply(to data: Data) async throws -> AgentResponse {
   var iterator = replies.makeAsyncIterator()
   let data = try #require(await iterator.next())
   return try JSONDecoder().decode(AgentResponse.self, from: data)
+}
+
+/// A pairing code or an address that is not one never decodes, so the agent never sees it.
+@Test(arguments: [("482913", "12a456"), ("192.0.2.31", "-s"), ("37123", "0")])
+func invalidWirelessRequestsReplyBadRequest(valid: String, invalid: String) async throws {
+  let request = AgentRequest.pair(
+    try #require(WirelessEndpoint(parsing: "192.0.2.31:37123")),
+    code: try #require(
+      PairingCode("482913")))
+  let json = try #require(String(data: JSONEncoder().encode(request), encoding: .utf8))
+  #expect(json.contains(valid))
+  let tampered = json.replacing(valid, with: invalid)
+  #expect(throws: DecodingError.self) {
+    try JSONDecoder().decode(AgentRequest.self, from: Data(tampered.utf8))
+  }
+  #expect(try await reply(to: Data(tampered.utf8)) == .failure(.io("bad request")))
+}
+
+/// Wireless requests change what this Mac connects to: only the app may send them.
+@Test func wirelessRequestsAreTheAppsAlone() throws {
+  let address = try #require(WirelessEndpoint(parsing: "192.0.2.31"))
+  let code = try #require(PairingCode("482913"))
+  for request: AgentRequest in [
+    .connectAddress(address), .pair(address, code: code), .connectWireless(device),
+    .enableWireless(device), .forgetWireless(device),
+  ] {
+    #expect(ClientRole.app.allows(request))
+    #expect(!ClientRole.provider.allows(request))
+  }
 }
 
 @Test func undecodableRequestRepliesBadRequest() async throws {

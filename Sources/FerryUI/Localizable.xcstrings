@@ -35,6 +35,9 @@
     "A package, such as an .rtfd or Keynote document, an app, a plug-in or a framework, is one item on the Mac but a folder on the device, so Ferry does not copy it. Control-click it, choose **Compress**, and copy the .zip instead." : {
       "extractionState" : "manual"
     },
+    "Address" : {
+
+    },
     "After that, on the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on." : {
       "extractionState" : "manual"
     },
@@ -72,6 +75,9 @@
     "Can't open" : {
 
     },
+    "Cancel" : {
+
+    },
     "Cancelled." : {
 
     },
@@ -105,6 +111,9 @@
     "Closes the menu. The helper keeps running, so devices stay in Finder." : {
       "extractionState" : "manual"
     },
+    "Connect" : {
+
+    },
     "Connect a NetAlly unit" : {
       "extractionState" : "manual"
     },
@@ -113,6 +122,18 @@
     },
     "Connect another Android phone" : {
       "extractionState" : "manual"
+    },
+    "Connect by Address" : {
+
+    },
+    "Connect by Address…" : {
+
+    },
+    "Connect over the Network" : {
+
+    },
+    "Connect the device with a cable and allow USB debugging first." : {
+
     },
     "Control-click a file you opened and choose **Remove Download**. The file stays on the device." : {
       "extractionState" : "manual"
@@ -185,6 +206,9 @@
     "Ferry Help" : {
 
     },
+    "Ferry has no address for this device. Connect it by address." : {
+
+    },
     "Ferry has no telemetry, no analytics and no account, and sends nothing to any server. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else." : {
       "extractionState" : "manual"
     },
@@ -239,6 +263,9 @@
     "For the LinkRunner 10G, EtherScope nXG and LinkRunner 100G." : {
       "extractionState" : "manual"
     },
+    "Forget" : {
+
+    },
     "Free up space on the Mac" : {
       "extractionState" : "manual"
     },
@@ -261,6 +288,9 @@
       "extractionState" : "manual"
     },
     "How to turn on file transfer" : {
+
+    },
+    "IP address and port" : {
 
     },
     "If a file changed on the device after the Mac read it, Ferry keeps the device's version and saves yours beside it as **name (conflict from Mac)**." : {
@@ -312,10 +342,16 @@
     "No device connected" : {
 
     },
+    "Not connected" : {
+
+    },
     "Not in Finder until you mount it again or plug it back in." : {
 
     },
     "Not sharing files" : {
+
+    },
+    "On the device, open Wireless debugging and choose Pair device with pairing code." : {
 
     },
     "On the device, tick **Always allow from this computer** and tap **Allow**." : {
@@ -368,6 +404,21 @@
     },
     "Packages and app bundles can't be copied to the device" : {
       "extractionState" : "manual"
+    },
+    "Pair" : {
+
+    },
+    "Pair with Code" : {
+
+    },
+    "Pair with Code…" : {
+
+    },
+    "Paired, but the device isn't offering a connection. Check Wireless debugging is on." : {
+
+    },
+    "Pairing code" : {
+
     },
     "Plug the device back in and turn on file transfer. Finder finishes the copy when the device reconnects. A half-copied file never appears under its real name." : {
       "extractionState" : "manual"
@@ -426,6 +477,12 @@
     "Tap **Transfer files**." : {
 
     },
+    "Tap Allow on the device to finish connecting." : {
+
+    },
+    "That address belongs to another device." : {
+
+    },
     "The device appears in Finder once it shares files." : {
 
     },
@@ -437,6 +494,9 @@
     },
     "The device has no Trash. Finder offers **Delete Immediately**, and the file is removed from the device at once." : {
       "extractionState" : "manual"
+    },
+    "The device has no network address. Connect it to Ethernet or Wi-Fi first." : {
+
     },
     "The device is not sharing files." : {
 
@@ -454,6 +514,9 @@
 
     },
     "The device was disconnected." : {
+
+    },
+    "The device's IP address or name. Ferry uses port 5555 unless you add another." : {
 
     },
     "The first time Ferry opens, it starts a small helper that talks to your devices. The helper keeps running after you quit the menu, so devices stay in Finder." : {
@@ -528,6 +591,9 @@
     "Unsent changes were saved to %@" : {
 
     },
+    "Use over Wi-Fi" : {
+
+    },
     "Using Ferry in Finder" : {
       "extractionState" : "manual"
     },
@@ -569,6 +635,12 @@
     },
     "adb isn't running" : {
       "extractionState" : "manual"
+    },
+    "adb isn't running. Install it, or choose Check again." : {
+
+    },
+    "adb: %@" : {
+
     },
     "macOS can't find Ferry's helper" : {
       "localizations" : {

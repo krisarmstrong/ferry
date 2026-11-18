@@ -23,6 +23,7 @@ final class FakeClient: AgentSending {
   private let status = Mutex<AgentResponse>(.status(StatusReport(devices: [], provider: .enabled)))
   private let removeResult = Mutex<AgentResponse>(.removed(preserved: []))
   private let ejectResult = Mutex<AgentResponse>(.removed(preserved: []))
+  private let wirelessResult = Mutex<AgentResponse>(.wireless(.connected))
 
   init(log: CallLog) {
     self.log = log
@@ -31,15 +32,22 @@ final class FakeClient: AgentSending {
   func setStatus(
     _ devices: [AttachedDevice], provider: ProviderState = .enabled,
     transfers: [ActiveTransfer] = [], preserved: [URL] = [], adb: ADBStatus? = nil,
-    awaitingUSBDebugging: [DeviceID] = [], awaitingAuthorization: [String] = []
+    awaitingUSBDebugging: [DeviceID] = [], awaitingAuthorization: [String] = [],
+    remembered: [RememberedDevice] = []
   ) {
     status.withLock {
       $0 = .status(
         StatusReport(
           devices: devices, provider: provider, transfers: transfers,
           awaitingAuthorization: awaitingAuthorization, adbStatus: adb,
-          awaitingUSBDebugging: awaitingUSBDebugging, preservedChanges: preserved))
+          awaitingUSBDebugging: awaitingUSBDebugging, preservedChanges: preserved,
+          remembered: remembered))
     }
+  }
+
+  /// What the agent answers to the next wireless request.
+  func setWireless(_ response: AgentResponse) {
+    wirelessResult.withLock { $0 = response }
   }
 
   func failRemoveAll() {
@@ -76,6 +84,21 @@ final class FakeClient: AgentSending {
     case .removeAllDomains:
       log.record("removeAllDomains")
       return removeResult.withLock { $0 }
+    case .connectAddress(let address):
+      log.record("connectAddress \(address.argument)")
+      return wirelessResult.withLock { $0 }
+    case .pair(let address, _):
+      log.record("pair \(address.argument)")
+      return wirelessResult.withLock { $0 }
+    case .enableWireless(let id):
+      log.record("enableWireless \(id.serial)")
+      return wirelessResult.withLock { $0 }
+    case .connectWireless(let id):
+      log.record("connectWireless \(id.serial)")
+      return wirelessResult.withLock { $0 }
+    case .forgetWireless(let id):
+      log.record("forgetWireless \(id.serial)")
+      return .done
     default:
       return .failure(.unsupported("\(request)"))
     }

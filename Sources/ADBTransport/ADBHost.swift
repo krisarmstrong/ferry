@@ -22,6 +22,12 @@ struct Backoff: Sendable {
   mutating func reset() { current = initial }
 }
 
+/// What device tracking reports: a list, or that the server went away.
+public enum ADBServerEvent: Sendable, Equatable {
+  case devices([ADBDevice])
+  case unavailable
+}
+
 /// Client for the adb server's host protocol (`127.0.0.1:5037`). Every query is its own
 /// connection, as the server expects; `connect` hands its connection over as an `ADBStream`.
 public actor ADBHost {
@@ -67,7 +73,29 @@ public actor ADBHost {
   public nonisolated func trackDevices() -> AsyncStream<[ADBDevice]> {
     // Each list replaces the last, so a slow consumer needs only the newest.
     AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-      let task = Task { await self.track(into: continuation) }
+      let task = Task {
+        await self.track { event in
+          switch event {
+          case .devices(let devices): continuation.yield(devices)
+          case .unavailable: continuation.yield([])
+          }
+        }
+        continuation.finish()
+      }
+      continuation.onTermination = { _ in task.cancel() }
+    }
+  }
+
+  /// As `trackDevices()`, but says when the server went away rather than reporting no devices,
+  /// for a consumer that must act when the server comes back (it drops network connections).
+  /// Nothing is coalesced, so a slow consumer still sees every outage; events come only when adb
+  /// reports a change, so the buffer stays small.
+  public nonisolated func trackServer() -> AsyncStream<ADBServerEvent> {
+    AsyncStream(bufferingPolicy: .unbounded) { continuation in
+      let task = Task {
+        await self.track { continuation.yield($0) }
+        continuation.finish()
+      }
       continuation.onTermination = { _ in task.cancel() }
     }
   }
@@ -107,7 +135,7 @@ public actor ADBHost {
     try await launcher(adb)
   }
 
-  private func query(_ request: String) async throws(ADBError) -> String {
+  func query(_ request: String) async throws(ADBError) -> String {
     let framed = try ADBWire.frame(request)
     let stream = try await ADBStream.open(port: port)
     do throws(ADBError) {
@@ -125,7 +153,7 @@ public actor ADBHost {
   /// Survives server restarts: when the connection closes or the server is missing, reports
   /// no devices once, starts the server at most once per outage, and retries with back-off.
   /// Only the consumer stopping ends it.
-  private func track(into continuation: AsyncStream<[ADBDevice]>.Continuation) async {
+  private func track(_ emit: @Sendable (ADBServerEvent) -> Void) async {
     var backoff = backoff
     var reportedGone = false
     var startedThisOutage = false
@@ -133,7 +161,7 @@ public actor ADBHost {
       var connected = false
       do throws(ADBError) {
         let stream = try await ADBStream.open(port: port)
-        connected = await follow(stream, into: continuation) {
+        connected = await follow(stream, emit: emit) {
           reportedGone = false
           startedThisOutage = false
           backoff.reset()
@@ -142,7 +170,7 @@ public actor ADBHost {
       if Task.isCancelled { break }
       if !reportedGone {
         reportedGone = true
-        continuation.yield([])
+        emit(.unavailable)
       }
       if !connected && !startedThisOutage {
         startedThisOutage = true
@@ -157,14 +185,12 @@ public actor ADBHost {
       Self.log.info("adb server unavailable; retrying in \(delay.components.seconds)s")
       if (try? await Task.sleep(for: delay)) == nil { break }
     }
-    continuation.finish()
   }
 
   /// Emits each frame until the socket closes or the consumer cancels. `onFrame` runs before
   /// each emission; the result says whether the server was reached (the handshake succeeded).
   private func follow(
-    _ stream: ADBStream, into continuation: AsyncStream<[ADBDevice]>.Continuation,
-    onFrame: () -> Void
+    _ stream: ADBStream, emit: @Sendable (ADBServerEvent) -> Void, onFrame: () -> Void
   ) async -> Bool {
     await withTaskCancellationHandler {
       // The server closing, a bad frame or a refused handshake all end up here too.
@@ -177,7 +203,7 @@ public actor ADBHost {
         while true {
           let devices = ADBWire.devices(from: try await stream.readFrame())
           onFrame()
-          continuation.yield(devices)
+          emit(.devices(devices))
         }
       } catch {
         if !Task.isCancelled {

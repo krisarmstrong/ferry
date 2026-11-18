@@ -17,8 +17,10 @@ guard let identity = FerryIdentity() else {
 }
 
 let itemStore: URL
+let wirelessStore: URL
 do {
   itemStore = try DomainController.defaultItemStore()
+  wirelessStore = try WirelessADB.defaultStore()
 } catch {
   log.fault("no item store: \(error, privacy: .public)")
   exit(EXIT_FAILURE)
@@ -31,6 +33,9 @@ let adb = ADBTransport()
 let hub = DeviceHub(
   transport: CompositeTransport(mtp: MTPTransport(), adb: adb),
   arrivals: merged(USBWatcher.ticks(), adb.arrivals))
+// Devices on the network: connected when the user asks, remembered, and reconnected.
+let wireless = WirelessADB(adb: ADBWireless(), store: wirelessStore)
+Task { await wireless.run() }
 let manager = FileProviderDomains()
 let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 Task {
@@ -40,7 +45,7 @@ Task {
 
 // The listener holds its delegate weakly; both live for the whole process.
 let delegate = AgentListenerDelegate(
-  handler: AgentService(hub: hub, domains: domains), identity: identity)
+  handler: AgentService(hub: hub, domains: domains, wireless: wireless), identity: identity)
 let listener = NSXPCListener(machServiceName: identity.machServiceName)
 listener.delegate = delegate
 listener.resume()
