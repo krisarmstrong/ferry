@@ -10,7 +10,8 @@ public enum ADBError: Error, Equatable, Sendable {
   /// The peer closed the connection (a device unplugged mid-stream, or the server stopped).
   case connectionClosed
   case protocolViolation(String)
-  /// A transfer's progress handler asked to stop. The sync connection is closed with it.
+  /// The caller stopped: a transfer's progress handler asked to (the sync connection is closed
+  /// with it), or the task was cancelled.
   case cancelled
   /// An argument the device's shell cannot carry intact (it holds a NUL byte).
   case invalidArgument(String)

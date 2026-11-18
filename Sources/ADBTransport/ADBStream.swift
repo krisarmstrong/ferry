@@ -1,5 +1,8 @@
 import Foundation
 import Network
+import os
+
+private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBStream")
 
 /// One TCP connection to the adb server. After the host handshake it is the raw byte pipe of the
 /// service that was selected (sync, shell, a log stream), which is why reads are by exact length.
@@ -11,7 +14,9 @@ public actor ADBStream {
   }
 
   /// Connects to the server on loopback. A refused connection is a server that is not running.
-  static func open(port: UInt16) async throws(ADBError) -> ADBStream {
+  static func open(port: UInt16, timeout: Duration = .seconds(10)) async throws(ADBError)
+    -> ADBStream
+  {
     guard let port = NWEndpoint.Port(rawValue: port) else {
       throw .protocolViolation("port 0 is not connectable")
     }
@@ -19,27 +24,52 @@ public actor ADBStream {
     let states = AsyncStream<NWConnection.State> { continuation in
       connection.stateUpdateHandler = { continuation.yield($0) }
     }
-    let result: Result<ADBStream, ADBError> = await withTaskCancellationHandler {
+    let failure = await withTaskCancellationHandler {
       connection.start(queue: .global())
-      for await state in states {
-        switch state {
-        case .ready:
-          connection.stateUpdateHandler = nil
-          return .success(ADBStream(connection: connection))
-        case .waiting, .failed, .cancelled:
-          // A refused connect parks in `waiting` and retries; the answer is already known.
-          connection.cancel()
-          return .failure(.serverUnavailable)
-        default:
-          continue
-        }
-      }
-      connection.cancel()
-      return .failure(.serverUnavailable)
+      return await settle(states, timeout: timeout)
     } onCancel: {
       connection.cancel()
     }
-    return try result.get()
+    if let failure {
+      connection.cancel()
+      throw failure
+    }
+    connection.stateUpdateHandler = nil
+    return ADBStream(connection: connection)
+  }
+
+  /// Follows a connection's states until it is ready (`nil`) or has failed. Only a refusal means
+  /// no server: Network.framework also waits out transient conditions (an interface coming up),
+  /// which may yet connect, so any other wait runs on until `timeout`.
+  static func settle(_ states: AsyncStream<NWConnection.State>, timeout: Duration) async
+    -> ADBError?
+  {
+    await withTaskGroup(of: ADBError?.self) { group in
+      group.addTask {
+        for await state in states {
+          switch state {
+          case .ready:
+            return nil
+          case .waiting(let error), .failed(let error):
+            if case .posix(.ECONNREFUSED) = error { return .serverUnavailable }
+            if case .failed = state { return .failed("connecting to the adb server: \(error)") }
+            log.debug("waiting for the adb server: \(String(describing: error), privacy: .public)")
+          case .cancelled:
+            return .cancelled
+          default:
+            continue
+          }
+        }
+        return .cancelled
+      }
+      group.addTask {
+        guard (try? await Task.sleep(for: timeout)) != nil else { return .cancelled }
+        return .failed("the adb server did not answer in time")
+      }
+      let first = await group.next() ?? .cancelled
+      group.cancelAll()
+      return first
+    }
   }
 
   /// Reads exactly `count` bytes, or throws if the peer closes first.
