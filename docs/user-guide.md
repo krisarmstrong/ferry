@@ -126,7 +126,12 @@ A folder on the device named like an app or a document package (`Tool.app`, `Not
 shows in Finder as an app or a document, because macOS goes by the name. Such a folder, and
 everything in it, is read-only on the Mac: an app saving it would replace the whole folder,
 which Ferry can't copy. Edit it on the device, or copy it to the Mac. For the same reason a
-folder on the device can't be renamed to such a name.
+folder on the device can't be renamed to such a name. Android's app folders, such as
+`Android/data/com.example.app`, count too: macOS reads `.app` as an app.
+
+To remove such a folder, delete it on the device, or delete the folder that holds it from
+Finder. Finder may put the holding folder back once, if it had not shown everything inside;
+delete it again.
 
 ### A file changed on both sides
 
