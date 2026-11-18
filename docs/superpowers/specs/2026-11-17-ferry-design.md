@@ -249,8 +249,8 @@ must not contain file names. Therefore:
 
 - **Agent lifecycle.** The menu-bar app registers the agent on first launch.
   The agent then runs while registered, whether or not the menu-bar app is
-  open. Settings has "Remove Ferry", which removes all domains and then
-  unregisters the agent. A Mac where the app was never launched shows nothing.
+  open. Settings has "Remove Ferry", which removes all domains (keeping unsent
+  file contents, as Eject does) and then unregisters the agent. A Mac where the app was never launched shows nothing.
 - **Write safety.** An upload goes to a hidden temp name
   (`.ferry-partial-<uuid>`) and is renamed when it completes. On failure
   the agent deletes the partial object. Leftover objects with that prefix
@@ -273,7 +273,9 @@ must not contain file names. Therefore:
   the agent and never leave it. When a device is unplugged, its domain is
   disconnected (shown as unavailable), not removed. "Eject" in the menu removes
   it, keeping any changes not yet sent to the device (the system moves them aside
-  and the menu says where).
+  and the menu says where). Removing a location, by Eject or "Remove Ferry", keeps
+  unsent file contents only: pending deletes and renames are dropped, which errs
+  on the safe side (the device keeps the file under its old name).
 - **Hardware bar for v1.** Android 8 (Oreo) and newer (owner decision; see
   Constraints). Works on the owner's phones plus at least one Android 8 or 9
   device.

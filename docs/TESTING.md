@@ -113,3 +113,8 @@ with a note.
 | Relaunch after Remove Ferry: agent re-registers, location back, still enabled (no re-enabling) | pass |
 | Phone set to file transfer off ⇒ menu shows "Not sharing files" and the guide | not run live (unit-tested) |
 
+
+Notes:
+- Removing a Finder location (Eject, or Remove Ferry) keeps unsent file contents, which the
+  system moves aside (the menu says where, if anything was kept), but pending deletes and renames
+  are dropped: the safe side, since the device keeps the file under its old name.
