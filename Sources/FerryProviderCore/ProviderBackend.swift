@@ -23,7 +23,7 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// FileProvider understands: transport failures go through `ErrorMapping`, local file errors are
 /// Cocoa errors.
 public actor ProviderBackend {
-  private let domain: String
+  let domain: String
   private let client: any AgentSending
 
   public init(domain: String, client: any AgentSending) {
@@ -118,29 +118,6 @@ public actor ProviderBackend {
     Int64(clamping: Int(exactly: date.timeIntervalSince1970.rounded(.down)) ?? 0)
   }
 
-  /// Copies the folder at `local` into the device folder `parent`: subfolders and regular
-  /// files, depth first. Symbolic links inside it have nothing MTP can store and are left out.
-  private func uploadTree(_ local: URL, into parent: ItemID) async throws {
-    let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
-    let children = try FileManager.default.contentsOfDirectory(
-      at: local, includingPropertiesForKeys: keys)
-    for child in children.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-      let values = try child.resourceValues(forKeys: Set(keys))
-      if values.isSymbolicLink == true { continue }
-      let name = child.lastPathComponent
-      if values.isDirectory == true {
-        let folder = try await entry(
-          .create(domain: domain, parent: parent, name: name, isFolder: true))
-        try await uploadTree(child, into: folder.id)
-      } else if values.isRegularFile == true {
-        let handle = try FileHandle(forReadingFrom: child)
-        defer { try? handle.close() }
-        _ = try await entry(
-          .create(domain: domain, parent: parent, name: name, isFolder: false), file: handle)
-      }
-    }
-  }
-
   /// Applies the changed fields in order: parent (move), then filename (rename), then contents.
   /// New contents carry `base`, the version they were made from, and `onConflict` says what the
   /// agent does if the device's file has moved on from it.
@@ -172,7 +149,11 @@ public actor ProviderBackend {
       }
       latest = current
     }
-    if changed.contains(.contents), let contents {
+    if changed.contains(.contents), let contents, template.kind == .folder {
+      // A package edited on the Mac: its folder is the new contents.
+      try await syncTree(contents, into: itemID)
+      latest = try await entry(.item(domain: domain, id: itemID))
+    } else if changed.contains(.contents), let contents {
       let handle = try FileHandle(forReadingFrom: contents)
       defer { try? handle.close() }
       latest = try await entry(
@@ -246,7 +227,7 @@ public actor ProviderBackend {
       deleted: deleted.map(NSFileProviderItemIdentifier.init))
   }
 
-  private func entry(
+  func entry(
     _ request: AgentRequest, file: FileHandle? = nil, progress: TransferProgressHandler? = nil
   ) async throws -> ProviderEntry {
     let response = try await send(request, file: file, progress: progress)
@@ -256,7 +237,7 @@ public actor ProviderBackend {
 
   /// Sends `request`, turning a thrown error and a `.failure` reply alike into a FileProvider
   /// error.
-  private func send(
+  func send(
     _ request: AgentRequest, file: FileHandle? = nil, progress: TransferProgressHandler? = nil
   ) async throws -> AgentResponse {
     let response = try await reply(request, file: file, progress: progress)
@@ -290,7 +271,7 @@ public actor ProviderBackend {
       NSLocalizedDescriptionKey: "Symbolic links and aliases can’t be copied to the device."
     ])
 
-  private static func unexpected(_ response: AgentResponse) -> any Error {
+  static func unexpected(_ response: AgentResponse) -> any Error {
     log.error("unexpected response from agent: \(String(describing: response), privacy: .private)")
     return ErrorMapping.fileProviderError(.io("Unexpected response from the Ferry agent."))
   }

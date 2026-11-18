@@ -68,6 +68,50 @@ struct ItemKindTests {
     #expect(await agent.items[try path("/Notes.rtfd/link")] == nil)
   }
 
+  /// Editing a package already on the device: FileProvider sends the package with its folder
+  /// as the new contents. The device folder is brought in line: changed and new files go up,
+  /// files no longer in the package go.
+  @Test func aPackageEditUpdatesTheDeviceFolder() async throws {
+    let agent = FakeAgent(
+      [
+        try folder("/Notes.rtfd"), try file("/Notes.rtfd/TXT.rtf", size: 3),
+        try file("/Notes.rtfd/old.png", size: 3), try file("/Notes.rtfd/same.png", size: 4),
+      ],
+      contents: [
+        try path("/Notes.rtfd/TXT.rtf"): Data("old".utf8),
+        try path("/Notes.rtfd/old.png"): Data("old".utf8),
+        try path("/Notes.rtfd/same.png"): Data("same".utf8),
+      ])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let package = dir.appending(path: "Notes.rtfd", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: package.appending(path: "Media"), withIntermediateDirectories: true)
+    try Data("edited".utf8).write(to: package.appending(path: "TXT.rtf"))
+    try Data("png".utf8).write(to: package.appending(path: "Media/a.png"))
+    let same = package.appending(path: "same.png")
+    try Data("same".utf8).write(to: same)
+    try FileManager.default.setAttributes(
+      [.modificationDate: epoch.addingTimeInterval(-60)], ofItemAtPath: same.path)
+    let id = try await agent.identifier(try path("/Notes.rtfd"))
+
+    let item = try await backend.modify(
+      id, to: ItemTemplate(parent: .root, filename: "Notes.rtfd", kind: .folder),
+      changed: .contents, contents: package)
+
+    #expect(item.itemIdentifier == id)
+    #expect(await agent.contents[try path("/Notes.rtfd/TXT.rtf")] == Data("edited".utf8))
+    #expect(await agent.contents[try path("/Notes.rtfd/Media/a.png")] == Data("png".utf8))
+    #expect(await agent.items[try path("/Notes.rtfd/old.png")] == nil)
+    // Unchanged since the device's copy was made: not sent again.
+    let replaced = await agent.requests.filter {
+      if case .replaceContents = $0 { return true }
+      return false
+    }
+    #expect(replaced.count == 1)
+  }
+
   @Test(arguments: [UTType.symbolicLink, UTType.aliasFile])
   func aLinkIsRefusedForGoodWithAMessage(type: UTType) async throws {
     let agent = FakeAgent()

@@ -207,7 +207,8 @@ public actor AgentService: AgentHandling {
       case .folder:
         // The listing that checks also reaps partials abandoned in the folder, which Finder
         // never shows.
-        if !recursive, try await !route.writer.visibleList(path, in: route.storage).isEmpty {
+        let wholeItem = recursive || Self.isPackage(path)
+        if !wholeItem, try await !route.writer.visibleList(path, in: route.storage).isEmpty {
           throw .directoryNotEmpty(path)
         }
       }
@@ -339,41 +340,6 @@ extension AgentService {
       }
       return await route.items.changed(item, id: id)
     }
-  }
-}
-
-// MARK: Validating requests
-
-extension AgentService {
-  /// A transfer of the item at `path` starting on `route`'s device, its size not known yet.
-  fileprivate static func transfer(
-    _ path: RemotePath, _ direction: ActiveTransfer.Direction, on route: DomainController.Route
-  ) -> ActiveTransfer {
-    ActiveTransfer(
-      device: route.storage.device, name: path.name ?? "", direction: direction, completed: 0,
-      total: 0)
-  }
-
-  /// Whether a request must come with a file: a readable one to upload, a writable one to fetch
-  /// into.
-  private static func takesFile(_ request: AgentRequest) -> Bool {
-    switch request {
-    case .fetch, .replaceContents: true
-    case .create(_, _, _, let isFolder): !isFolder
-    case .status, .recheck, .refresh, .eject, .removeAllDomains, .item, .list, .rename, .move,
-      .delete, .changes, .workingSet:
-      false
-    }
-  }
-
-  /// A name a client may give an item: one path component, never a partial's or a backup's. A
-  /// listing hides those and deletes abandoned ones, so the agent never creates one under a
-  /// client's name.
-  private static func creatable(_ name: String) throws(TransportError) -> String {
-    guard let validated = try RemotePath.root.appending(name).name,
-      !SafeWriter.isPartial(validated), !SafeWriter.isBackup(validated)
-    else { throw .invalidName(name) }
-    return validated
   }
 }
 
