@@ -37,7 +37,9 @@ public actor AgentService: AgentHandling {
       guard Self.takesFile(request) == (file != nil) else { throw .io("bad request") }
       return try await perform(request, file: file?.fileDescriptor)
     } catch {
-      log.error("request failed: \(String(describing: error), privacy: .private)")
+      log.log(
+        level: error == .cancelled ? .info : .error,
+        "request failed: \(String(describing: error), privacy: .private)")
       return .failure(error)
     }
   }
