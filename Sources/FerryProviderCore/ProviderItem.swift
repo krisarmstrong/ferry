@@ -71,7 +71,7 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
 
   /// `0083;<seconds since 1970, hex>;Ferry;<identifier>`: downloaded (0x0003) from an untrusted
   /// source (0x0080) by Ferry. Built from the item alone, so it is the same every time.
-  private var quarantine: Data {
+  var quarantine: Data {
     let seconds = max(0, Int(entry.item.modified.timeIntervalSince1970.rounded(.down)))
     return Data("0083;\(String(seconds, radix: 16));Ferry;\(entry.id.rawValue)".utf8)
   }
@@ -96,9 +96,9 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// across launches. FileProvider keeps an item's metadata until its version changes, so a
   /// Ferry that changes capabilities must change the version too, or items already known keep
   /// the old ones.
-  /// Bumped when Ferry changes what an item's metadata holds (2: the quarantine attribute), so
-  /// items FileProvider already knows pick it up.
-  static let metadataRevision = 2
+  /// Bumped when Ferry changes what an item's metadata holds (2: the quarantine attribute on
+  /// files; 3: on packages too), so items FileProvider already knows pick it up.
+  static let metadataRevision = 3
 
   public var itemVersion: NSFileProviderItemVersion {
     let content = ContentVersion(entry.item).encoded

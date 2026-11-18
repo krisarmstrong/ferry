@@ -166,13 +166,15 @@ extension ProviderBackend {
     return try await entry(request, file: reader)
   }
 
-  /// Extracts the archive at `archive` into a new folder in `dir` and returns it.
-  static func unpack(_ archive: URL, in dir: URL) throws -> URL {
+  /// Extracts the archive at `archive` into a new folder in `dir` and returns it, with every
+  /// folder and file in it, and the folder itself, carrying `quarantine` as
+  /// `com.apple.quarantine`: FileProvider sets an item's attributes on the package itself only.
+  static func unpack(_ archive: URL, in dir: URL, quarantine: Data) throws -> URL {
     let folder = dir.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     let reader = try FileHandle(forReadingFrom: archive)
     defer { try? reader.close() }
     do throws(TransportError) {
-      try PackageArchive.extract(from: reader, to: folder)
+      try PackageArchive.extract(from: reader, to: folder, quarantine: quarantine)
     } catch {
       try? FileManager.default.removeItem(at: folder)
       throw ErrorMapping.fileProviderError(error)

@@ -41,11 +41,16 @@ public enum PackageArchive {
   /// `destination`.
   /// A tree past `budget` is `.packageTooLarge`. Whatever fails, nothing is left at
   /// `destination`.
+  ///
+  /// With `quarantine`, the folder and every folder and file in it get that value as
+  /// `com.apple.quarantine`, so contents from a device are checked by Gatekeeper; one that cannot
+  /// be marked fails the extraction.
   public static func extract(
-    from handle: FileHandle, to destination: URL, budget: TreeBudget = .standard
+    from handle: FileHandle, to destination: URL, budget: TreeBudget = .standard,
+    quarantine: Data? = nil
   ) throws(TransportError) {
     do throws(TransportError) {
-      try extractEntries(from: handle, to: destination, budget: budget)
+      try extractEntries(from: handle, to: destination, budget: budget, quarantine: quarantine)
     } catch {
       try? FileManager.default.removeItem(at: destination)
       throw error
@@ -53,11 +58,12 @@ public enum PackageArchive {
   }
 
   private static func extractEntries(
-    from handle: FileHandle, to destination: URL, budget: TreeBudget
+    from handle: FileHandle, to destination: URL, budget: TreeBudget, quarantine: Data?
   ) throws(TransportError) {
     var usage = TreeBudget.Usage(budget)
     do {
       try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+      try mark(destination, quarantine)
       guard try handle.read(upToCount: magic.count) == magic else { throw bad("not a package") }
       for _ in 0..<maxEntries {
         guard let kind = Kind(rawValue: try byte(handle)) else { throw bad("unknown record") }
@@ -67,10 +73,12 @@ public enum PackageArchive {
         case .folder:
           try usage.add(depth: depth)
           try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
+          try mark(target, quarantine)
         case .file:
           let size = try integer(handle, bytes: 8)
           try usage.add(depth: depth, size: size)
           try copyFile(from: handle, size: size, to: target)
+          try mark(target, quarantine)
         case .end:
           return
         }
@@ -189,6 +197,15 @@ public enum PackageArchive {
       try output.write(contentsOf: block)
       remaining -= UInt64(block.count)
     }
+  }
+
+  /// Sets `quarantine` as `com.apple.quarantine` on `url`, which extraction just made.
+  private static func mark(_ url: URL, _ quarantine: Data?) throws {
+    guard let quarantine else { return }
+    let result = quarantine.withUnsafeBytes { bytes in
+      setxattr(url.path, "com.apple.quarantine", bytes.baseAddress, bytes.count, 0, XATTR_NOFOLLOW)
+    }
+    guard result == 0 else { throw bad("cannot mark \(url.lastPathComponent) as downloaded") }
   }
 
   private static func bad(_ reason: String) -> TransportError {

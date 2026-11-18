@@ -95,6 +95,15 @@ struct ItemKindTests {
     #expect(try Data(contentsOf: url.appending(path: "TXT.rtf")) == Data("rtf".utf8))
     #expect(try Data(contentsOf: url.appending(path: "Media/a.png")) == Data("png".utf8))
     #expect(item.contentType == UTType("com.apple.rtfd"))
+    // Everything in it is marked as downloaded from the device, as the package itself is.
+    let expected = try #require(item.extendedAttributes["com.apple.quarantine"])
+    for inside in ["", "TXT.rtf", "Media", "Media/a.png"] {
+      let target = inside.isEmpty ? url : url.appending(path: inside)
+      var value = [UInt8](repeating: 0, count: 256)
+      let length = getxattr(target.path, "com.apple.quarantine", &value, value.count, 0, 0)
+      #expect(length > 0, "\(inside)")
+      #expect(Data(value.prefix(max(length, 0))) == expected, "\(inside)")
+    }
     // Only the folder is left: the archive it came in is gone.
     #expect(try FileManager.default.contentsOfDirectory(atPath: fetchDir.path).count == 1)
   }

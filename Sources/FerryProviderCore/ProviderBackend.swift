@@ -67,7 +67,7 @@ public actor ProviderBackend {
     guard item.isPackage else { return (url, item) }
     // A document package came as one archive: FileProvider takes it as the folder it holds.
     defer { try? FileManager.default.removeItem(at: url) }
-    return (try Self.unpack(url, in: dir), item)
+    return (try Self.unpack(url, in: dir, quarantine: item.quarantine), item)
   }
 
   /// Makes a folder (a package too: FileProvider then creates its contents inside it), or
