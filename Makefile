@@ -34,14 +34,18 @@ check-app:
 	@test -f "$(UI_RESOURCES)/help.json" || { echo "error: no help.json in $(UI_RESOURCES)" >&2; exit 1; }
 	@test -d "$(UI_RESOURCES)/en.lproj" || { echo "error: no en.lproj in $(UI_RESOURCES)" >&2; exit 1; }
 	@echo "app bundle carries help.json and en.lproj"
-	@# Every part reads its team from FerryTeamID, and the agent's Mach service is named for it.
-	@for plist in "$(APP)/Contents/Info.plist" "$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Info.plist"; do \
-	  /usr/libexec/PlistBuddy -c "Print :FerryTeamID" "$$plist" | grep -Eq '^[A-Z0-9]{10}$$' \
-	    || { echo "error: no team ID in $$plist" >&2; exit 1; }; \
-	done
-	@launchctl plist __TEXT,__info_plist "$(APP)/Contents/MacOS/FerryAgent" | grep -Eq '"FerryTeamID" = "[A-Z0-9]{10}"' \
-	  || { echo "error: no team ID in the agent's Info.plist" >&2; exit 1; }
+	@# Every part reads its team from FerryTeamID, and the agent's Mach service is named for it:
+	@# all of them, and the team that signed the bundle, must be one team.
 	@agent="$(APP)/Contents/Library/LaunchAgents/io.github.krisarmstrong.ferry.agent.plist"; \
-	  grep -Eq '<key>[A-Z0-9]{10}[.]io[.]github[.]krisarmstrong[.]ferry[.]agent</key>' "$$agent" \
-	    || { echo "error: $$agent is missing or its Mach service has no team ID" >&2; exit 1; }
+	  teams="$$(/usr/libexec/PlistBuddy -c 'Print :FerryTeamID' '$(APP)/Contents/Info.plist') \
+	  $$(/usr/libexec/PlistBuddy -c 'Print :FerryTeamID' '$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Info.plist') \
+	  $$(launchctl plist __TEXT,__info_plist '$(APP)/Contents/MacOS/FerryAgent' | sed -n 's/.*"FerryTeamID" = "\([A-Z0-9]*\)".*/\1/p') \
+	  $$(sed -n 's/.*<key>\([A-Z0-9]\{10\}\)[.]io[.]github[.]krisarmstrong[.]ferry[.]agent<.key>.*/\1/p' "$$agent") \
+	  $$(codesign -dv '$(APP)' 2>&1 | sed -n 's/^TeamIdentifier=//p')"; \
+	  set -- $$teams; \
+	  [ $$# -eq 5 ] || { echo "error: a part of $(APP) records no team ID: $$teams" >&2; exit 1; }; \
+	  for team in "$$@"; do \
+	    echo "$$team" | grep -Eq '^[A-Z0-9]{10}$$' && [ "$$team" = "$$1" ] \
+	      || { echo "error: the parts of $(APP) name different teams: $$teams" >&2; exit 1; }; \
+	  done
 	@echo "app bundle carries its team ID in every part"

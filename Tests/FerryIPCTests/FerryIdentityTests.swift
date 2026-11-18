@@ -42,4 +42,20 @@ struct FerryIdentityTests {
 
     #expect(FerryIdentity(bundle: bundle)?.teamID == "ABCDE12345")
   }
+
+  /// A build that did not record the team has no identity, so the process stops at launch
+  /// rather than naming a service nobody registered.
+  @Test func aBundleWithoutTheTeamHasNoIdentity() throws {
+    let bundleURL = FileManager.default.temporaryDirectory.appending(
+      path: "Identity-\(UUID().uuidString).bundle", directoryHint: .isDirectory)
+    let contents = bundleURL.appending(path: "Contents", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: bundleURL) }
+    let plist: [String: Any] = ["CFBundleIdentifier": "test.identity"]
+    try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+      .write(to: contents.appending(path: "Info.plist"))
+    let bundle = try #require(Bundle(url: bundleURL))
+
+    #expect(FerryIdentity(bundle: bundle) == nil)
+  }
 }
