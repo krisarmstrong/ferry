@@ -19,9 +19,9 @@ public protocol DomainManaging: Sendable {
   /// Tells the system the domain's working set changed. A replicated FileProvider extension
   /// ignores signals for any other container; it then asks the agent for `.changes`.
   func signal(_ identifier: String) async
-  /// Whether the user has enabled Ferry's domains. New domains start disabled and only the user
-  /// can enable them, so `false` is a normal state.
-  func isUserEnabled() async -> Bool
+  /// Whether the user has enabled Ferry's domains, or none exists yet. New domains start disabled
+  /// and only the user can enable them, so `.disabled` is a normal state.
+  func providerState() async -> ProviderState
   /// The identifiers of the Ferry domains the system has, including ones from before this
   /// process started.
   func existing() async throws -> [String]
@@ -160,8 +160,8 @@ public actor DomainController {
     domains.filter { $0.value.connected && $0.value.storage?.device == device }.keys.sorted()
   }
 
-  func isUserEnabled() async -> Bool {
-    await manager.isUserEnabled()
+  func providerState() async -> ProviderState {
+    await manager.providerState()
   }
 
   /// The domain's table, loaded on first use. Nothing awaits between the lookup and the insert,

@@ -45,7 +45,7 @@ private struct StubHandler: AgentHandling {
     case .status:
       started.yield()
       for await _ in release {}
-      return .status(devices: [], providerEnabled: false)
+      return .status(StatusReport(devices: [], provider: .disabled))
     default:
       return .failure(.unsupported("\(request)"))
     }

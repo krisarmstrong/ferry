@@ -51,7 +51,8 @@ public actor AgentService: AgentHandling {
     switch (request, file) {
     case (.status, _):
       await hub.firstScan()
-      return .status(devices: await hub.devices(), providerEnabled: await domains.isUserEnabled())
+      return .status(
+        StatusReport(devices: await hub.devices(), provider: await domains.providerState()))
     case (.recheck(let id), _):
       await hub.recheck(id)
       return .done

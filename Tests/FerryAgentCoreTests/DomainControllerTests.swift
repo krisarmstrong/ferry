@@ -60,19 +60,20 @@ struct DomainControllerTests {
     defer { harness.finish() }
 
     #expect(await harness.barrier(after: 0) == [.add(AgentHarness.barrierSpec)])
-    guard case .status(let devices, let enabled) = await harness.service.handle(.status, file: nil)
-    else {
+    guard case .status(let report) = await harness.service.handle(.status, file: nil) else {
       Issue.record("expected a status")
       return
     }
-    #expect(devices.first { $0.id == device.info.id }?.state == .notSharingFiles)
-    #expect(!enabled)
+    #expect(report.devices.first { $0.id == device.info.id }?.state == .notSharingFiles)
+    #expect(report.provider == .disabled)
     #expect(
       await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
         == .failure(.deviceDisconnected))
 
-    await harness.manager.setUserEnabled(true)
-    guard case .status(_, true) = await harness.service.handle(.status, file: nil) else {
+    await harness.manager.setProvider(.enabled)
+    guard case .status(let enabled) = await harness.service.handle(.status, file: nil),
+      enabled.provider == .enabled
+    else {
       Issue.record("expected an enabled provider")
       return
     }

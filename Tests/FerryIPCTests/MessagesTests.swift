@@ -124,7 +124,10 @@ private func responses() throws -> [AgentResponse] {
   let locked = AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: "B"), manufacturer: "Pixel", model: "8"),
     state: .failed(.deviceLocked))
-  var all: [AgentResponse] = [.status(devices: [ready, locked], providerEnabled: true)]
+  var all: [AgentResponse] = [
+    .status(StatusReport(devices: [ready, locked], provider: .enabled)),
+    .status(StatusReport(devices: [], provider: .noDomains)),
+  ]
   all += [.entry(item), .entry(root), .entries([item, root]), .entries([])]
   all += [.done, .failure(.deviceDisconnected)]
   all.append(.changes(anchor: Data([9]), updated: [item], deleted: [.random()], expired: false))
@@ -203,4 +206,14 @@ func requirementCompiles(_ text: String) throws {
   var requirement: SecRequirement?
   #expect(SecRequirementCreateWithString(text as CFString, [], &requirement) == errSecSuccess)
   #expect(requirement != nil)
+}
+
+struct ProviderStateTests {
+  @Test(arguments: [
+    ([], ProviderState.noDomains), ([false], .disabled), ([false, false], .disabled),
+    ([false, true], .enabled), ([true], .enabled),
+  ])
+  func stateFollowsTheDomains(enabled: [Bool], state: ProviderState) {
+    #expect(ProviderState(domainsEnabled: enabled) == state)
+  }
 }

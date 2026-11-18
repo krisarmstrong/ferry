@@ -291,5 +291,5 @@ private struct DeviceRow: View {
 }
 
 #Preview("Turn on in Finder") {
-  MenuContent(model: .preview([PreviewClient.ready], providerEnabled: false))
+  MenuContent(model: .preview([PreviewClient.ready], provider: .disabled))
 }

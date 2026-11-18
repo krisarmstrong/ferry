@@ -21,7 +21,7 @@ actor FakeDomainManager: DomainManaging {
   /// Set by `holdExisting()`: `existing()` waits until `releaseExisting()`.
   private var existingHeld = false
   private var existingWaiter: CheckedContinuation<Void, Never>?
-  private var userEnabled = false
+  private var provider = ProviderState.disabled
   /// Where removing each domain saves its unsent changes.
   private var preserved: [String: URL] = [:]
   private var waiters: [Int: (count: Int, continuation: CheckedContinuation<Void, Never>)] = [:]
@@ -46,7 +46,7 @@ actor FakeDomainManager: DomainManaging {
   func signal(_ identifier: String) async {
     record(.signal(identifier))
   }
-  func isUserEnabled() async -> Bool { userEnabled }
+  func providerState() async -> ProviderState { provider }
   func existing() async throws -> [String] {
     if existingHeld {
       await withCheckedContinuation { existingWaiter = $0 }
@@ -65,8 +65,8 @@ actor FakeDomainManager: DomainManaging {
     existingWaiter = nil
   }
 
-  func setUserEnabled(_ enabled: Bool) {
-    userEnabled = enabled
+  func setProvider(_ state: ProviderState) {
+    provider = state
   }
 
   /// Removing `identifier` saves unsent changes to `location`.

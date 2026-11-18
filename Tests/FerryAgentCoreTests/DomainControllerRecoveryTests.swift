@@ -123,11 +123,11 @@ extension DomainControllerTests {
     }
     await device.resume(.storages)
 
-    guard case .status(let devices, _) = await status.value else {
+    guard case .status(let report) = await status.value else {
       Issue.record("expected a status")
       return
     }
-    #expect(devices.map(\.id) == [device.info.id])
+    #expect(report.devices.map(\.id) == [device.info.id])
   }
 
   /// An ejected unit stays listed (the transport keeps reporting it through its resets), but its

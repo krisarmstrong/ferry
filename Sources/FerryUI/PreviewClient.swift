@@ -23,22 +23,22 @@ struct PreviewClient: AgentSending {
     state: .failed(.io("LIBMTP_Get_Storage failed")))
 
   let devices: [AttachedDevice]
-  let providerEnabled: Bool
+  let provider: ProviderState
 
   func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
     -> AgentResponse
   {
     switch request {
-    case .status: .status(devices: devices, providerEnabled: providerEnabled)
+    case .status: .status(StatusReport(devices: devices, provider: provider))
     default: .done
     }
   }
 }
 
 extension AppModel {
-  static func preview(_ devices: [AttachedDevice], providerEnabled: Bool = true) -> AppModel {
+  static func preview(_ devices: [AttachedDevice], provider: ProviderState = .enabled) -> AppModel {
     AppModel(
-      client: PreviewClient(devices: devices, providerEnabled: providerEnabled),
+      client: PreviewClient(devices: devices, provider: provider),
       services: PreviewServices())
   }
 }

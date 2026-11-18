@@ -94,12 +94,14 @@ struct FileProviderDomains: DomainManaging {
     }
   }
 
-  func isUserEnabled() async -> Bool {
+  /// A failed listing reads as no domains: the menu then asks nothing of the user.
+  func providerState() async -> ProviderState {
     do {
-      return try await NSFileProviderManager.domains().contains(where: \.userEnabled)
+      return ProviderState(
+        domainsEnabled: try await NSFileProviderManager.domains().map(\.userEnabled))
     } catch {
       log.error("listing domains failed: \(error, privacy: .private)")
-      return false
+      return .noDomains
     }
   }
 

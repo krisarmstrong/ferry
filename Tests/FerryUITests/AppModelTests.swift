@@ -20,7 +20,7 @@ final class CallLog: Sendable {
 /// Answers `.status` with whatever the test last set, and records every request.
 final class FakeClient: AgentSending {
   let log: CallLog
-  private let status = Mutex<AgentResponse>(.status(devices: [], providerEnabled: true))
+  private let status = Mutex<AgentResponse>(.status(StatusReport(devices: [], provider: .enabled)))
   private let removeResult = Mutex<AgentResponse>(.removed(preserved: []))
   private let ejectResult = Mutex<AgentResponse>(.removed(preserved: []))
 
@@ -28,8 +28,8 @@ final class FakeClient: AgentSending {
     self.log = log
   }
 
-  func setStatus(_ devices: [AttachedDevice], providerEnabled: Bool = true) {
-    status.withLock { $0 = .status(devices: devices, providerEnabled: providerEnabled) }
+  func setStatus(_ devices: [AttachedDevice], provider: ProviderState = .enabled) {
+    status.withLock { $0 = .status(StatusReport(devices: devices, provider: provider)) }
   }
 
   func failRemoveAll() {
@@ -84,7 +84,7 @@ final class StartingClient: AgentSending {
       return count > 0
     }
     if failing { throw .deviceDisconnected }
-    return .status(devices: [], providerEnabled: true)
+    return .status(StatusReport(devices: [], provider: .enabled))
   }
 }
 
@@ -151,10 +151,10 @@ struct AppModelTests {
 
   @Test func disabledProviderShowsTurnOnRow() async {
     let client = FakeClient(log: log)
-    client.setStatus([], providerEnabled: false)
+    client.setStatus([], provider: .disabled)
     let model = AppModel(client: client, services: FakeServices(log: log))
     await model.refresh()
-    #expect(model.providerEnabled == false)
+    #expect(model.provider == .disabled)
     #expect(model.showsTurnOnRow)
     #expect(model.agent == .running)
     #expect(model.actionError == nil)
@@ -164,9 +164,19 @@ struct AppModelTests {
         == "open x-apple.systempreferences:com.apple.LoginItems-Settings.extension")
   }
 
+  /// Before any device has been ready there is no location to turn on, so the menu does not ask.
+  @Test func noDomainsShowsNoTurnOnRow() async {
+    let client = FakeClient(log: log)
+    client.setStatus([], provider: .noDomains)
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.refresh()
+    #expect(model.agent == .running)
+    #expect(!model.showsTurnOnRow)
+  }
+
   @Test func providerIsAssumedOnUntilTheAgentSaysOtherwise() {
     let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
-    #expect(model.providerEnabled)
+    #expect(model.provider == .enabled)
     #expect(!model.showsTurnOnRow)
     #expect(model.agent == .checking)
   }

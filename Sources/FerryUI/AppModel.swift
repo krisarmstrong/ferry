@@ -28,7 +28,7 @@ import os
 
   public private(set) var devices: [AttachedDevice] = []
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
-  public private(set) var providerEnabled = true
+  public private(set) var provider = ProviderState.enabled
   public private(set) var agent = AgentState.checking
   /// The last failed action, shown until the next one succeeds. It can carry device-supplied
   /// detail, so it is shown verbatim, never parsed as Markdown.
@@ -71,16 +71,17 @@ import os
   /// No answer from the agent yet, so whether a device is attached is not known.
   public var isChecking: Bool { agent == .checking }
 
-  /// File transfer is off in Finder: not an error, but the user must turn Ferry on.
+  /// Ferry's locations exist and are all off in Finder: not an error, but the user must turn
+  /// Ferry on. With no location yet there is nothing to turn on.
   public var showsTurnOnRow: Bool {
-    agent == .running && !providerEnabled
+    agent == .running && provider == .disabled
   }
 
   public func refresh() async {
     do {
       switch try await client.send(.status, file: nil) {
-      case .status(let devices, let providerEnabled):
-        apply(devices, providerEnabled: providerEnabled)
+      case .status(let report):
+        apply(report)
       default:
         Self.log.error("agent answered status with something else")
         agent = .unreachable
@@ -270,13 +271,15 @@ import os
     await refresh()
   }
 
-  private func apply(_ devices: [AttachedDevice], providerEnabled: Bool) {
+  private func apply(_ report: StatusReport) {
+    let devices = report.devices
     self.devices = devices
-    self.providerEnabled = providerEnabled
+    provider = report.provider
     agent = .running
     let states = devices.map { DevicePresentation.kind(of: $0.state) }.joined(separator: ",")
     Self.log.info(
-      "devices: [\(states, privacy: .public)] provider: \(providerEnabled, privacy: .public)")
+      "devices: [\(states, privacy: .public)] provider: \(report.provider.rawValue, privacy: .public)"
+    )
     for device in devices where device.state == .notSharingFiles {
       guard guidedDevices.insert(device.id).inserted, !isGuidePresented else { continue }
       showGuide(for: device)

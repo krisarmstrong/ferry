@@ -99,6 +99,37 @@ public enum ConflictPolicy: String, Codable, Sendable {
   case fail
 }
 
+/// Whether Finder shows Ferry's locations: the user turns each File Provider domain on in System
+/// Settings, and a new domain starts off.
+public enum ProviderState: String, Codable, Sendable {
+  /// At least one domain is turned on.
+  case enabled
+  /// Every domain is off: the user has a step to take.
+  case disabled
+  /// No domain exists yet, because no device has been ready, so there is nothing to turn on.
+  case noDomains
+
+  /// The state of domains whose `userEnabled` flags are `enabled`.
+  public init(domainsEnabled enabled: [Bool]) {
+    if enabled.isEmpty {
+      self = .noDomains
+    } else {
+      self = enabled.contains(true) ? .enabled : .disabled
+    }
+  }
+}
+
+/// The agent's answer to `.status`.
+public struct StatusReport: Codable, Sendable, Equatable {
+  public let devices: [AttachedDevice]
+  public let provider: ProviderState
+
+  public init(devices: [AttachedDevice], provider: ProviderState) {
+    self.devices = devices
+    self.provider = provider
+  }
+}
+
 /// A request from the app or the FileProvider extension to the agent, sent as JSON.
 ///
 /// It arrives from a sandboxed process the agent does not control. Items are named by `ItemID`,
@@ -107,7 +138,7 @@ public enum ConflictPolicy: String, Codable, Sendable {
 /// `replaceContents` come with an open file descriptor, so the agent never opens a file the peer
 /// named.
 public enum AgentRequest: Codable, Sendable, Equatable {
-  /// Answered with `.status(devices:providerEnabled:)`.
+  /// Answered with `.status`.
   case status
   case recheck(DeviceID)
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
@@ -142,7 +173,7 @@ public enum AgentRequest: Codable, Sendable, Equatable {
 }
 
 public enum AgentResponse: Codable, Sendable, Equatable {
-  case status(devices: [AttachedDevice], providerEnabled: Bool)
+  case status(StatusReport)
   case entry(ProviderEntry)
   case entries([ProviderEntry])
   /// Answers `.changes`: each changed item's latest state, the items gone, and the anchor to ask
