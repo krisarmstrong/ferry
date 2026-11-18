@@ -106,12 +106,13 @@ actor MTPDevice {
     guard !storages.isEmpty else { throw .deviceLocked }
     let keys = storageKeys(for: storages)
     for storage in storages {
-      // What the device calls its storages, so the method-neutral keys can be checked against
-      // real devices. A description names the storage, never the user's files.
-      let summary =
-        "storage \(String(format: "%08X", storage.raw)) type \(storage.type) description "
-        + "\(storage.description ?? "nil") volume \(storage.volume ?? "nil") key \(keys[storage.raw] ?? "")"
-      Self.log.info("\(summary, privacy: .public)")
+      // How each storage was keyed, so the method-neutral keys can be checked against real
+      // devices. Description, volume and key can carry a user's volume label: private.
+      let id = "\(String(format: "%08X", storage.raw)) type \(storage.type)"
+      let named = "\(storage.description ?? "nil")|\(storage.volume ?? "nil")"
+      let key = keys[storage.raw] ?? ""
+      Self.log.info(
+        "storage \(id, privacy: .public): \(named, privacy: .private) as \(key, privacy: .private)")
     }
     return zip(storages, capacities).map { storage, space in
       let info = StorageInfo(
