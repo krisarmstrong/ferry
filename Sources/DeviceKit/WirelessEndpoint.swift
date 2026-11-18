@@ -48,6 +48,29 @@ public struct WirelessEndpoint: Hashable, Sendable, Codable {
     return (text[..<colon], text[text.index(after: colon)...])
   }
 
+  /// Whether `other` names the same host: the same address for IP literals (so `2001:db8::5`
+  /// and `2001:DB8:0::5` match), the same name, ignoring ASCII case, for hostnames. Zones are
+  /// refused at parsing, so a link-local IPv6 address never gets here: it would need its zone
+  /// to be compared, and to be reached at all.
+  public func isSameHost(as other: WirelessEndpoint) -> Bool {
+    if let mine = Self.addressBytes(host), let theirs = Self.addressBytes(other.host) {
+      return mine == theirs
+    }
+    return host.lowercased() == other.host.lowercased()
+  }
+
+  private static func addressBytes(_ host: String) -> [UInt8]? {
+    if isIPv4(host) {
+      var address = in_addr()
+      inet_pton(AF_INET, host, &address)
+      return withUnsafeBytes(of: &address) { Array($0) }
+    }
+    guard isIPv6(host) else { return nil }
+    var address = in6_addr()
+    inet_pton(AF_INET6, host, &address)
+    return withUnsafeBytes(of: &address) { Array($0) }
+  }
+
   /// The address as adb takes it: `host:port`, with an IPv6 literal in brackets.
   public var argument: String {
     Self.isIPv6(host) ? "[\(host)]:\(port)" : "\(host):\(port)"

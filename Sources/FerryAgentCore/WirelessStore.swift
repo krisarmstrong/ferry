@@ -7,7 +7,10 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// The file remembered devices are kept in: serial → name, and each address with how it was
 /// learnt. Addresses are
 /// read back through `WirelessEndpoint` validation, so one that is not an address never reaches
-/// adb; an unreadable file is an empty list.
+/// adb; an unreadable file is an empty list. A remembered hostname (a `.local` name in
+/// particular) can be re-pointed by DNS or mDNS on the LAN; as with an IP address taken over by
+/// another host, what guards it is that a reconnected address must answer as the remembered
+/// device.
 enum WirelessStore {
   private struct Stored: Codable {
     var devices: [String: Device]
@@ -70,6 +73,8 @@ enum WirelessStore {
       try FileManager.default.createDirectory(
         at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
       try JSONEncoder().encode(stored).write(to: file, options: .atomic)
+      // Readable by the user only: it names devices and where they are.
+      try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
     } catch {
       log.error("saving remembered devices failed: \(error, privacy: .private)")
     }

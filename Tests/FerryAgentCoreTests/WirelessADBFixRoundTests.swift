@@ -128,7 +128,7 @@ struct WirelessADBFixRoundTests {
   @Test(.timeLimit(.minutes(1)))
   func aWaitingAddressIsCheckedAgainstWhatIsKnownWhenItResolves() async throws {
     let adb = FakeWirelessADB()
-    let served = Mutex<Set<DeviceID>>([])
+    let served = Mutex<[DeviceID: String]>([:])
     let address = Self.endpoint("192.0.2.40")
     await adb.set {
       $0.units[address.argument] = .init(info: Self.etherScope, authorized: false)
@@ -139,7 +139,7 @@ struct WirelessADBFixRoundTests {
     let running = Task { await wireless.run() }
     defer { running.cancel() }
     #expect(await wireless.connect(address) == .awaitingAllow(address))
-    served.withLock { $0 = [Self.etherScope.id] }
+    served.withLock { $0 = [Self.etherScope.id: "EtherScope nXG"] }
     await adb.set {
       $0.units[address.argument]?.authorized = true
       $0.listed[address.argument] = .device
@@ -158,7 +158,7 @@ struct WirelessADBFixRoundTests {
     await adb.set { $0.units[Self.impostor.argument] = .init(info: Self.etherScope) }
     let wireless = WirelessADB(
       adb: adb, store: WirelessADBTests.storeFile(), timing: Self.fast,
-      known: { [Self.etherScope.id] })
+      known: { [Self.etherScope.id: "EtherScope nXG"] })
     _ = await wireless.connect(Self.impostor)
     let shown = try #require(await wireless.unconfirmed().first)
     let otherDevice = UnconfirmedAddress(
@@ -177,7 +177,7 @@ struct WirelessADBFixRoundTests {
     await adb.set { $0.units[Self.impostor.argument] = .init(info: Self.etherScope) }
     let wireless = WirelessADB(
       adb: adb, store: WirelessADBTests.storeFile(), timing: Self.fast,
-      known: { [Self.etherScope.id, Self.linkRunner.id] })
+      known: { [Self.etherScope.id: "EtherScope nXG", Self.linkRunner.id: "LinkRunner-100G"] })
     _ = await wireless.connect(Self.impostor)
     await adb.set { $0.units[Self.impostor.argument] = .init(info: Self.linkRunner) }
     _ = await wireless.connect(Self.impostor)

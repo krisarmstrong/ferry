@@ -29,7 +29,9 @@ do {
 FileTransfer.sweep()
 
 // MTP and the user's adb server together: each device is served by the best method it offers.
-// What the network may serve, as WirelessADB decides; ADBTransport asks it on every scan.
+// What the network may serve, as WirelessADB decides; ADBTransport asks it on every scan. It
+// serves no network route until WirelessADB below has loaded its store, so a scan the hub makes
+// first cannot serve a connection the adb server kept from before this agent started.
 let vouching = WirelessVouching()
 let adb = ADBTransport(serving: { vouching.serves($0, as: $1) })
 let hub = DeviceHub(
@@ -41,7 +43,9 @@ let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 // claiming the serial of a device the hub serves is not believed without the user.
 let wireless = WirelessADB(
   adb: ADBWireless(), store: wirelessStore,
-  known: { Set(await hub.devices().map(\.id)) }, vouching: vouching)
+  known: {
+    Dictionary(await hub.devices().map { ($0.id, $0.info.model) }) { first, _ in first }
+  }, vouching: vouching)
 Task { await wireless.run() }
 Task {
   await manager.conformExisting()

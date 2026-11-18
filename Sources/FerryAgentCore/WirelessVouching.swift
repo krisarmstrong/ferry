@@ -1,8 +1,10 @@
 import DeviceKit
 import os
 
-/// Which network routes the hub may serve, as `WirelessADB` decides; `ADBTransport` asks it on
-/// every scan, so it answers at once from a snapshot.
+/// Which network routes the hub may serve, as `WirelessADB` decides. `ADBTransport` asks it on
+/// every scan, so it answers at once from a snapshot. It serves none until `WirelessADB` has
+/// loaded its store: the adb server outlives the agent and may already hold a connection that
+/// claims a remembered device.
 ///
 /// A route is served when it is an address remembered for the device it answers as (or, for a
 /// device paired with a code, adb's own mDNS connection named for it), or when it answers as a
@@ -12,6 +14,8 @@ import os
 /// be, so a scan cannot race the decision.
 public final class WirelessVouching: Sendable {
   private struct State {
+    /// False until the store is loaded: until then no network route is served at all.
+    var loaded = false
     var vouched: [DeviceID: Set<String>] = [:]
     var paired: Set<DeviceID> = []
     /// Addresses being decided, with how many decisions are under way for each.
@@ -32,7 +36,7 @@ public final class WirelessVouching: Sendable {
 
   public func serves(_ adbSerial: String, as id: DeviceID) -> Bool {
     state.withLock { state in
-      if state.unsettled[adbSerial] != nil { return false }
+      if !state.loaded || state.unsettled[adbSerial] != nil { return false }
       if state.vouched[id]?.contains(adbSerial) == true { return true }
       let mdnsName =
         adbSerial.hasPrefix("adb-\(id.serial)-") && adbSerial.hasSuffix("._adb-tls-connect._tcp")
@@ -43,6 +47,7 @@ public final class WirelessVouching: Sendable {
 
   func remember(_ entries: [DeviceID: WirelessADB.Entry]) {
     state.withLock { state in
+      state.loaded = true
       state.vouched = entries.mapValues { Set($0.addresses.map(\.endpoint.argument)) }
       state.paired = Set(
         entries.filter { $0.value.addresses.contains { $0.learnt == .paired } }.keys)

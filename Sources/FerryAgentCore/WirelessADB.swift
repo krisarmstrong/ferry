@@ -102,14 +102,15 @@ public actor WirelessADB {
     let confirmed: Bool
     let addresses: [WirelessEndpoint]
     /// The devices Ferry knew when the connect was made.
-    let known: Set<DeviceID>
+    let known: [DeviceID: String]
     /// `forgets` when it was made: a device forgotten since is not adopted.
     let epoch: UInt64
   }
 
   /// What was true when a connect began: the devices Ferry knew, and the count of forgets.
   struct Basis {
-    let known: Set<DeviceID>
+    /// Each known device with the name Ferry has for it.
+    let known: [DeviceID: String]
     let epoch: UInt64
   }
 
@@ -118,6 +119,8 @@ public actor WirelessADB {
     var learnt: Learnt
     var expected: DeviceID?
     var confirmed = false
+    /// The count of forgets this connect must not predate: when a queued reconnect was planned.
+    var since: UInt64?
   }
 
   /// How many addresses to keep per device. A paired device moves ports; older ones only cost a
@@ -138,7 +141,7 @@ public actor WirelessADB {
   var forgets: UInt64 = 0
   var forgotten: [DeviceID: UInt64] = [:]
   /// The devices Ferry serves now, by any method.
-  let known: @Sendable () async -> Set<DeviceID>
+  let known: @Sendable () async -> [DeviceID: String]
   /// What the hub may serve over the network, kept in step with `entries`.
   let vouching: WirelessVouching
   /// The reconnects started at agent start or when adb's server came back, if still running.
@@ -146,12 +149,13 @@ public actor WirelessADB {
   /// How many startup reconnects run at once.
   static let reconnectLimit = 4
 
-  /// `known` lists the devices Ferry serves now (the hub's), so a network host claiming one of
-  /// their serials is not believed without the user. `vouching` is shared with the
+  /// `known` lists the devices Ferry serves now (the hub's), with their names, so a network host
+  /// claiming one of their serials is not believed without the user, and the user is asked about
+  /// it by the name Ferry has, not the one the host reports. `vouching` is shared with the
   /// `ADBTransport` that serves network routes.
   public init(
     adb: any WirelessADBControl, store: URL, timing: Timing = Timing(),
-    known: @escaping @Sendable () async -> Set<DeviceID> = { [] },
+    known: @escaping @Sendable () async -> [DeviceID: String] = { [:] },
     vouching: WirelessVouching = WirelessVouching()
   ) {
     self.adb = adb
@@ -197,7 +201,7 @@ public actor WirelessADB {
         case .failed(let detail):
           return .failed(.adb(detail))
         case .paired(let guid):
-          guard let service = await connectService(guid: guid, host: endpoint.host) else {
+          guard let service = await connectService(guid: guid, pairedAt: endpoint) else {
             return .failed(.noConnectService)
           }
           return await attempt(

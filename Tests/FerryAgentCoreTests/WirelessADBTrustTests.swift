@@ -30,7 +30,7 @@ struct WirelessADBTrustTests {
     await adb.set { $0.units[Self.impostor.argument] = .init(info: Self.etherScope) }
     let wireless = WirelessADB(
       adb: adb, store: WirelessADBTests.storeFile(), timing: Self.fast,
-      known: { [Self.etherScope.id] })
+      known: { [Self.etherScope.id: "EtherScope nXG"] })
     #expect(await wireless.connect(Self.impostor) == .needsConfirmation(Self.impostor))
     #expect(await adb.calls == [.connect("192.0.2.99:5555"), .disconnect("192.0.2.99:5555")])
     #expect(await wireless.remembered().isEmpty)
@@ -89,7 +89,7 @@ struct WirelessADBTrustTests {
     await adb.set { $0.units[Self.impostor.argument] = .init(info: Self.etherScope) }
     let wireless = WirelessADB(
       adb: adb, store: WirelessADBTests.storeFile(), timing: Self.fast,
-      known: { [Self.etherScope.id] })
+      known: { [Self.etherScope.id: "EtherScope nXG"] })
     _ = await wireless.connect(Self.impostor)
     let offer = try #require(await wireless.unconfirmed().first)
     await adb.set { $0.units[Self.impostor.argument] = .init(info: WirelessADBTests.linkRunner) }
