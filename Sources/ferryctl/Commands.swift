@@ -55,6 +55,7 @@ private func message(for error: TransportError) -> String {
   case .macDiskFull(let needed, let free):
     "Not enough space on this Mac: need \(needed) bytes, \(free) free."
   case .directoryNotEmpty(let path): "\(path) is not empty."
+  case .readOnly(let path): "\(path) is read-only from the Mac."
   case .folderTooDeep(let path):
     "\(path) holds folders nested more than \(RemotePath.maxTreeDepth) deep."
   case .changedOnDevice(let path): "\(path) changed on the phone."

@@ -66,24 +66,7 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// on disk by its extension, so Finder still shows it as a document or an app; the quarantine
   /// makes Gatekeeper check such an app as a download.
   private var isPackageNamed: Bool {
-    entry.item.kind == .folder && Self.isPackageName(filename)
-  }
-
-  /// A package-named folder or anything inside one, which is read-only on the Mac (see
-  /// `capabilities`).
-  private var isInPackageFolder: Bool {
-    let path = entry.item.path
-    let folders = entry.item.kind == .folder ? path.components : path.components.dropLast()
-    return folders.contains(where: Self.isPackageName)
-  }
-
-  /// Whether a folder of this name is a package to macOS: its extension is a declared type
-  /// conforming to `com.apple.package` (`Ferry.app`, `Notes.rtfd`).
-  static func isPackageName(_ name: String) -> Bool {
-    let ext = (name as NSString).pathExtension
-    guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .directory)
-    else { return false }
-    return type.isDeclared && type.conforms(to: .package)
+    entry.item.kind == .folder && RemotePath.isPackageName(filename)
   }
 
   static let quarantineAttribute = "com.apple.quarantine"
@@ -105,7 +88,9 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// an app or a document, and an app saving one replaces the whole folder, which Ferry refuses.
   /// Edit it on the device, or copy it to the Mac.
   public var capabilities: NSFileProviderItemCapabilities {
-    if isInPackageFolder { return .allowsReading }
+    if entry.item.path.isInPackageFolder(isFolder: entry.item.kind == .folder) {
+      return [.allowsReading, Self.allowsEvicting]
+    }
     var capabilities: NSFileProviderItemCapabilities = [
       .allowsReading, .allowsWriting, Self.allowsEvicting,
     ]

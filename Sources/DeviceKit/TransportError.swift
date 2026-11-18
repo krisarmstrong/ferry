@@ -32,6 +32,9 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   /// A folder asked to be deleted with its contents holds items more than
   /// `RemotePath.maxTreeDepth` levels down.
   case folderTooDeep(RemotePath)
+  /// The item is a package-named folder or lies inside one, which is read-only from the Mac
+  /// (see `RemotePath.isInPackageFolder`).
+  case readOnly(RemotePath)
   case cancelled
   case io(String)
 }

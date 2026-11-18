@@ -23,7 +23,9 @@ struct ReadOnlyPackageTests {
     ("/Docs/Notes.rtfd/TXT.rtf", .file),
   ])
   func aPackageFolderAndWhatItHoldsAreReadOnly(path: String, kind: ItemKind) throws {
-    #expect(try item(path, kind: kind).capabilities == [.allowsReading])
+    // Evictable still: the device keeps it, and Finder can free the Mac's copy.
+    #expect(
+      try item(path, kind: kind).capabilities == [.allowsReading, ProviderItem.allowsEvicting])
   }
 
   @Test(arguments: [
@@ -53,5 +55,34 @@ struct ReadOnlyPackageTests {
       #expect(error.localizedDescription.contains("package"))
     }
     #expect(!(await agent.requests.contains { if case .rename = $0 { true } else { false } }))
+  }
+
+  /// A rename to a package name is refused before anything changes, a move sent with it too.
+  @Test func aMoveAndRenameToAPackageNameSendsNothing() async throws {
+    let agent = FakeAgent([try folder("/DCIM"), try folder("/Docs")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let id = try await agent.identifier(try path("/DCIM"))
+    let docs = try await agent.id(try path("/Docs"))
+
+    await #expect(throws: (any Error).self) {
+      _ = try await backend.modify(
+        id, to: ItemTemplate(parent: docs, filename: "Pics.app", kind: .package),
+        changed: [.parent, .filename], contents: nil)
+    }
+    #expect(await agent.requests == [.item(domain: domain, id: try #require(ItemID(id)))])
+  }
+
+  /// The agent refuses a direct delete of something read-only: FileProvider puts it back.
+  @Test func aReadOnlyRefusalOfADeleteIsARejectedDeletion() async throws {
+    let agent = FakeAgent([try file("/a.txt")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    await agent.set(deleteFailure: .readOnly(try path("/a.txt")))
+
+    do {
+      try await backend.delete(try await agent.identifier(try path("/a.txt")))
+      Issue.record("the delete succeeded")
+    } catch {
+      #expect((error as NSError).code == NSFileProviderError.Code.deletionRejected.rawValue)
+    }
   }
 }

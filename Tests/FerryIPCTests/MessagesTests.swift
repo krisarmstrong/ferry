@@ -76,6 +76,7 @@ private func tag(_ error: TransportError) -> Int {
   case .changedOnDevice: 20
   case .macDiskFull: 21
   case .folderTooDeep: 22
+  case .readOnly: 23
   }
 }
 
@@ -92,7 +93,7 @@ private func errors() throws -> [TransportError] {
   all.append(.nameChangedByDevice(requested: "Ä.txt", actual: "A.txt"))
   all.append(.downloadSizeMismatch(listed: 10, received: 9))
   all += [.directoryNotEmpty(photo), .changedOnDevice(photo), .macDiskFull(needed: 9, free: 1)]
-  all.append(.folderTooDeep(photo))
+  all += [.folderTooDeep(photo), .readOnly(photo)]
   return all
 }
 
@@ -154,7 +155,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyErrorRoundTripsJSON() throws {
-  #expect(Set(try errors().map(tag)) == Set(0...22))
+  #expect(Set(try errors().map(tag)) == Set(0...23))
   for error in try errors() {
     #expect(try roundTrip(AgentResponse.failure(error)) == .failure(error))
   }

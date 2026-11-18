@@ -57,6 +57,10 @@ public enum ErrorMapping {
       return described(
         .fileReadCorruptFile,
         "The device sent \(received) bytes of a file it lists as \(listed) bytes.")
+    // Final until the item changes; `ProviderBackend.delete` makes a refused delete a rejected
+    // deletion, which FileProvider puts back.
+    case .readOnly:
+      return readOnlyRefused
     case .folderTooDeep(let path):
       return described(
         .featureUnsupported,
@@ -88,6 +92,14 @@ public enum ErrorMapping {
         NSLocalizedDescriptionKey: nsError.localizedDescription, NSUnderlyingErrorKey: nsError,
       ])
   }
+
+  static let readOnlyRefused = NSFileProviderError(
+    .cannotSynchronize,
+    userInfo: [
+      NSLocalizedDescriptionKey:
+        "Folders named like an app or a document package, and what they hold, can’t be changed "
+        + "from this Mac. Change them on the device."
+    ])
 
   private static func described(_ code: CocoaError.Code, _ description: String) -> CocoaError {
     CocoaError(code, userInfo: [NSLocalizedDescriptionKey: description])

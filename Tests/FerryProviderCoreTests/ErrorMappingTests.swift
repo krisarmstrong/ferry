@@ -18,6 +18,7 @@ struct ErrorMappingTests {
       .io("pipe broke"), .downloadSizeMismatch(listed: 7, received: 3),
       .directoryNotEmpty(try RemotePath("/a")), .changedOnDevice(try RemotePath("/a")),
       .macDiskFull(needed: 2, free: 1), .folderTooDeep(try RemotePath("/Deep")),
+      .readOnly(try RemotePath("/Notes.rtfd/TXT.rtf")),
     ]
   }
 
@@ -105,6 +106,7 @@ struct ErrorMappingTests {
     case .downloadSizeMismatch: .cocoa(.fileReadCorruptFile, ["7", "3"])
     case .io(let message): .cocoa(.xpcConnectionReplyInvalid, [message])
     case .folderTooDeep: .cocoa(.featureUnsupported, ["Deep", "64"])
+    case .readOnly: .fileProvider(.cannotSynchronize)
     }
   }
 }

@@ -126,6 +126,11 @@ actor ItemTable {
     return Self.corrected(item, by: records[id]?.received).matches(reported)
   }
 
+  /// The kind of the item at `path` as last reported, or `nil` if it was never reported.
+  func kind(at path: RemotePath) -> ItemKind? {
+    ids[path].flatMap { records[$0]?.reported?.kind }
+  }
+
   /// `nil` when the table does not know `id`: the item was deleted, or never reported.
   func path(for id: ItemID) -> RemotePath? {
     id == .root ? .root : records[id]?.path

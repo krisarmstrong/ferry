@@ -148,6 +148,10 @@ public actor ProviderBackend {
 
     if !changed.isDisjoint(with: [.parent, .filename]) {
       var current = try await entry(.item(domain: domain, id: itemID))
+      // Refused before anything changes, so a move sent with it does not go ahead alone.
+      if Self.renamesFolderToPackageName(current, to: template, changed) {
+        throw Self.packageNameRefused
+      }
       if changed.contains(.parent), current.parent != template.parent {
         current = try await entry(.move(domain: domain, id: itemID, toFolder: template.parent))
       }
@@ -158,9 +162,6 @@ public actor ProviderBackend {
         // Compared as paths, so another normal form of the same name is no change, but a change
         // of case is: the agent lets an item take a name only its own name collides with.
         if renamed != current.item.path {
-          if current.item.kind == .folder, ProviderItem.isPackageName(template.filename) {
-            throw Self.packageNameRefused
-          }
           current = try await entry(.rename(domain: domain, id: itemID, to: template.filename))
         }
       }
@@ -224,7 +225,7 @@ public actor ProviderBackend {
     // Already gone counts as deleted, as FileProvider expects.
     case .done, .failure(.unknownItem), .failure(.notFound):
       return
-    case .failure(.changedOnDevice):
+    case .failure(.changedOnDevice), .failure(.readOnly):
       guard let current = try? await item(id) else {
         throw NSFileProviderError(.deletionRejected)
       }
@@ -287,31 +288,6 @@ public actor ProviderBackend {
     }
   }
 
-  /// Packages, documents and apps alike: one item to FileProvider where the device would hold a
-  /// folder. `.cannotSynchronize` is final until the item changes.
-  static let packageRefused = NSFileProviderError(
-    .cannotSynchronize,
-    userInfo: [
-      NSLocalizedDescriptionKey:
-        "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
-    ])
-
-  /// macOS would open the folder as an app or a document, read-only (see
-  /// `ProviderItem.capabilities`). `.cannotSynchronize` is final until the item changes.
-  static let packageNameRefused = NSFileProviderError(
-    .cannotSynchronize,
-    userInfo: [
-      NSLocalizedDescriptionKey:
-        "A folder on the device can’t take a package name, such as .app or .rtfd: macOS would "
-        + "open it as an app or a document."
-    ])
-
-  static let linkRefused = NSFileProviderError(
-    .cannotSynchronize,
-    userInfo: [
-      NSLocalizedDescriptionKey: "Symbolic links and aliases can’t be copied to the device."
-    ])
-
   static func unexpected(_ response: AgentResponse) -> any Error {
     log.error("unexpected response from agent: \(String(describing: response), privacy: .private)")
     return ErrorMapping.fileProviderError(.io("Unexpected response from the Ferry agent."))
@@ -353,6 +329,45 @@ public actor ProviderBackend {
       throw ErrorMapping.forFileProvider(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO))
     }
     return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+  }
+}
+
+// MARK: Refusals
+
+extension ProviderBackend {
+  /// Packages, documents and apps alike: one item to FileProvider where the device would hold a
+  /// folder. `.cannotSynchronize` is final until the item changes.
+  static let packageRefused = NSFileProviderError(
+    .cannotSynchronize,
+    userInfo: [
+      NSLocalizedDescriptionKey:
+        "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
+    ])
+
+  /// macOS would open the folder as an app or a document, read-only (see
+  /// `ProviderItem.capabilities`). `.cannotSynchronize` is final until the item changes.
+  static let packageNameRefused = NSFileProviderError(
+    .cannotSynchronize,
+    userInfo: [
+      NSLocalizedDescriptionKey:
+        "A folder on the device can’t take a package name, such as .app or .rtfd: macOS would "
+        + "open it as an app or a document."
+    ])
+
+  static let linkRefused = NSFileProviderError(
+    .cannotSynchronize,
+    userInfo: [
+      NSLocalizedDescriptionKey: "Symbolic links and aliases can’t be copied to the device."
+    ])
+
+  /// Whether the change renames a folder to a package name, which macOS would open as an app
+  /// or a document (read-only, see `ProviderItem.capabilities`).
+  static func renamesFolderToPackageName(
+    _ current: ProviderEntry, to template: ItemTemplate, _ changed: ItemChanges
+  ) -> Bool {
+    changed.contains(.filename) && current.item.kind == .folder
+      && RemotePath.isPackageName(template.filename)
+      && current.item.path.name != template.filename.precomposedStringWithCanonicalMapping
   }
 }
 

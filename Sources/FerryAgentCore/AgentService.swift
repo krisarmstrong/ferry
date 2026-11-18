@@ -168,7 +168,7 @@ public actor AgentService: AgentHandling {
   {
     let name = try Self.creatable(name)
     return try await gated(domain) { route throws(TransportError) in
-      let path = try await route.path(of: parent).appending(name)
+      let path = try await route.writableFolder(parent).appending(name)
       return await route.items.created(try await route.session.makeFolder(path, in: route.storage))
     }
   }
@@ -190,7 +190,7 @@ public actor AgentService: AgentHandling {
   {
     try await gated(domain) { route throws(TransportError) in
       let path = try await route.changeable(id)
-      let destination = try await route.path(of: folder)
+      let destination = try await route.writableFolder(folder)
       let item = try await route.session.move(path, toFolder: destination, in: route.storage)
       await route.items.moved(path, to: item.path)
       return await route.items.changed(item, id: id)
@@ -216,6 +216,7 @@ public actor AgentService: AgentHandling {
         await route.items.removed(path)
         return
       }
+      if path.isInPackageFolder(isFolder: current.kind == .folder) { throw .readOnly(path) }
       // Everything the delete was checked against: the device deletes only those.
       var checked = [current]
       switch current.kind {
@@ -320,7 +321,7 @@ extension AgentService {
     let scratch = try await FileTransfer.copyIn(source, into: scratchFolder)
     defer { FileTransfer.remove(scratch) }
     return try await gated(domain) { route throws(TransportError) in
-      let path = try await route.path(of: parent).appending(name)
+      let path = try await route.writableFolder(parent).appending(name)
       let item = try await transfers.track(
         Self.transfer(path, .toDevice, on: route), report: progress
       ) { handler throws(TransportError) in
@@ -346,7 +347,7 @@ extension AgentService {
     let scratch = try await FileTransfer.copyIn(source, into: scratchFolder)
     defer { FileTransfer.remove(scratch) }
     return try await gated(domain) { route throws(TransportError) in
-      let path = try await route.path(of: id)
+      let path = try await route.changeable(id)
       // The file the save was checked against, which the write then requires to be there still.
       var checked: RemoteItem?
       if let base {
@@ -375,19 +376,5 @@ extension AgentService {
       }
       return .entry(await route.items.changed(item, id: id))
     }
-  }
-}
-
-extension DomainController.Route {
-  /// The path of an item this domain's table knows.
-  func path(of id: ItemID) async throws(TransportError) -> RemotePath {
-    guard let path = await items.path(for: id) else { throw .unknownItem }
-    return path
-  }
-
-  /// The path of an item that may be renamed, moved or deleted: anything but the root.
-  func changeable(_ id: ItemID) async throws(TransportError) -> RemotePath {
-    guard id != .root else { throw .unsupported("changing the storage root") }
-    return try await path(of: id)
   }
 }
