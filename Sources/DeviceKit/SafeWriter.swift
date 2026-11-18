@@ -71,11 +71,11 @@ public struct SafeWriter: Sendable {
     let size = try LocalFile.regularFileSize(file)
 
     // Reject before a byte moves when the storage is gone or too small.
-    guard let free = try await session.storages().first(where: { $0.id == storage })?.free else {
+    guard let target = try await session.storages().first(where: { $0.id == storage }) else {
       throw .storageNotFound(storage.key)
     }
-    if size > free {
-      throw .insufficientSpace(needed: size, free: free)
+    if size > target.free {
+      throw .insufficientSpace(needed: size, free: target.free)
     }
     // Read once, before the upload. `commit` sets aside whatever sits at that path when the
     // upload ends: an item swapped in during the upload is not detected.
@@ -88,7 +88,7 @@ public struct SafeWriter: Sendable {
     await session.partials.registerInFlight(partial, in: storage)
     do {
       let item = try await commit(
-        Source(file: file, size: size), via: partial,
+        Source(file: file, size: size, onFAT: target.isFATLike), via: partial,
         to: Destination(path: path, name: name, replacing: existing), in: storage,
         progress: progress)
       await session.partials.unregisterInFlight(partial, in: storage)
@@ -176,6 +176,8 @@ public struct SafeWriter: Sendable {
   private struct Source {
     let file: URL
     let size: UInt64
+    /// The storage it goes to is FAT-based (see `StorageInfo.isFATLike`).
+    let onFAT: Bool
   }
 
   private struct Destination {
@@ -191,8 +193,7 @@ public struct SafeWriter: Sendable {
     _ source: Source, via partial: RemotePath, to destination: Destination,
     in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
-    let (file, size) = (source.file, source.size)
-    try await upload(file, size: size, to: partial, in: storage, progress: progress)
+    try await upload(source, to: partial, in: storage, progress: progress)
     guard let replaced = destination.replacing else {
       do {
         return try await session.rename(partial, to: destination.name, in: storage)
@@ -201,8 +202,7 @@ public struct SafeWriter: Sendable {
         // Only a device that cannot rename gets the direct-upload fallback; anything else
         // (the name appeared, the device went away, a cancel, an I/O failure) surfaces.
         guard case .unsupported = error else { throw error }
-        return try await upload(
-          file, size: size, to: destination.path, in: storage, progress: progress)
+        return try await upload(source, to: destination.path, in: storage, progress: progress)
       }
     }
 
@@ -216,8 +216,7 @@ public struct SafeWriter: Sendable {
       guard case .unsupported = error else { throw error }
       // No rename: nothing can be set aside, so the old file goes before a direct upload.
       try await session.delete(replaced.path, in: storage)
-      return try await upload(
-        file, size: size, to: destination.path, in: storage, progress: progress)
+      return try await upload(source, to: destination.path, in: storage, progress: progress)
     }
     await session.partials.recordBackup(backup.path, in: storage)
 
@@ -253,9 +252,9 @@ public struct SafeWriter: Sendable {
   /// short. The original error is always the one thrown.
   @discardableResult
   private func upload(
-    _ file: URL, size: UInt64, to target: RemotePath, in storage: StorageID,
-    progress: ProgressHandler
+    _ source: Source, to target: RemotePath, in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
+    let (file, size, onFAT) = (source.file, source.size, source.onFAT)
     let item: RemoteItem
     do {
       item = try await session.upload(from: file, to: target, in: storage, progress: progress)
@@ -265,7 +264,9 @@ public struct SafeWriter: Sendable {
         throw error
       }
       await discard(target, in: storage)
-      if size > UInt64(UInt32.max), case .io = error {
+      // FAT's 4 GB limit is blamed only where the device says the storage is FAT: elsewhere
+      // the device's own error says more than a guess would.
+      if onFAT, size > UInt64(UInt32.max), case .io = error {
         throw .fileTooLargeForStorage(size: size)
       }
       throw error

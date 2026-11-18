@@ -28,6 +28,8 @@ struct RawStorage: Equatable {
   let raw: UInt32
   let description: String?
   let volume: String?
+  /// PTP's FilesystemType code.
+  var fileSystem: UInt16 = 0
 }
 
 private func isBlank(_ value: String?, placeholder: String) -> Bool {

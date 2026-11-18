@@ -17,12 +17,19 @@ public struct StorageInfo: Hashable, Sendable, Codable {
   public let description: String
   public let capacity: UInt64
   public let free: UInt64
+  /// The device says the storage is FAT-based, so no file over 4 GB fits. MTP says so only for
+  /// a camera-style DCF filesystem; an Android SD card reports a generic one even when it is
+  /// FAT32, so this is often `false` where the limit applies.
+  public let isFATLike: Bool
 
-  public init(id: StorageID, description: String, capacity: UInt64, free: UInt64) {
+  public init(
+    id: StorageID, description: String, capacity: UInt64, free: UInt64, isFATLike: Bool = false
+  ) {
     self.id = id
     self.description = description
     self.capacity = capacity
     self.free = free
+    self.isFATLike = isFATLike
   }
 }
 

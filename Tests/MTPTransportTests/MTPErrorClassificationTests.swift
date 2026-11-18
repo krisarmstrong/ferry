@@ -84,9 +84,31 @@ struct MTPErrorClassificationTests {
 
   @Test func generalMixedWithOtherErrorsIsIO() {
     let (error, _) = classify(
-      [.init(code: .general, text: "a"), .init(code: .storageFull, text: "b")],
+      [.init(code: .general, text: "a"), .init(code: .other(99), text: "b")],
       generalMeansLocked: true)
     #expect(error == .io("listing folder failed: a; b"))
+  }
+
+  /// libmtp's own text for a PTP response: "PTP Layer error 2005: …" and "Error 2005: PTP
+  /// Operation Not Supported". A device that cannot rename then gets SafeWriter's direct upload.
+  @Test func operationNotSupportedIsUnsupported() {
+    let (error, _) = classify([
+      .init(code: .ptpLayer, text: "PTP Layer error 2005: set object property failed"),
+      .init(code: .ptpLayer, text: "Error 2005: PTP Operation Not Supported"),
+    ])
+    #expect(error == .unsupported("listing folder"))
+  }
+
+  @Test(arguments: [
+    [MTPErrorEntry(code: .storageFull, text: "")],
+    [MTPErrorEntry(code: .ptpLayer, text: "Error 200c: PTP Store Full")],
+  ])
+  func storageFullIsInsufficientSpace(entries: [MTPErrorEntry]) {
+    let (error, _) = classify(entries)
+    guard case .insufficientSpace = error else {
+      Issue.record("expected insufficient space, got \(error)")
+      return
+    }
   }
 
   @Test func generalOutsideStorageReadIsIO() {

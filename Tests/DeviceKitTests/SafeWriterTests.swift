@@ -10,13 +10,13 @@ struct SafeWriterTests {
   var deviceID: DeviceID { Self.deviceID }
   var storageID: StorageID { Self.storageID }
 
-  func makeDevice(free: UInt64 = 5_000_000_000) -> FakeDevice {
+  func makeDevice(free: UInt64 = 5_000_000_000, isFATLike: Bool = false) -> FakeDevice {
     FakeDevice(
       info: DeviceInfo(id: deviceID, manufacturer: "Fake", model: "Phone"),
       storages: [
         StorageInfo(
           id: StorageID(device: deviceID, key: "Internal|vol0"), description: "Internal",
-          capacity: 10_000_000_000, free: free)
+          capacity: 10_000_000_000, free: free, isFATLike: isFATLike)
       ])
   }
 
@@ -99,8 +99,11 @@ struct SafeWriterTests {
     #expect(await device.allPaths(in: storageID).isEmpty)
   }
 
-  @Test func oversizeRejectionMapsToTooLarge() async throws {
-    let device = makeDevice()
+  /// Only a storage known to be FAT has a 4 GB file limit to blame. Elsewhere the device's own
+  /// error is the one shown.
+  @Test(arguments: [true, false])
+  func oversizeRejectionMapsToTooLargeOnlyOnFAT(isFATLike: Bool) async throws {
+    let device = makeDevice(isFATLike: isFATLike)
     let writer = SafeWriter(session: device)
     let size: UInt64 = 4_294_967_296
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -111,7 +114,9 @@ struct SafeWriterTests {
     try handle.close()
 
     await device.failUpload(afterBytes: 0, with: .io("rejected"))
-    await #expect(throws: TransportError.fileTooLargeForStorage(size: size)) {
+    let expected: TransportError =
+      isFATLike ? .fileTooLargeForStorage(size: size) : .io("rejected")
+    await #expect(throws: expected) {
       _ = try await writer.write(from: url, to: RemotePath("/big.bin"), replacing: false)
     }
     #expect(await device.allPaths(in: storageID).isEmpty)

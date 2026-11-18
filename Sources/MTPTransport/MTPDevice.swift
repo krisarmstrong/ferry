@@ -98,7 +98,8 @@ actor MTPDevice {
         RawStorage(
           raw: storage.pointee.id,
           description: storage.pointee.StorageDescription.map { String(cString: $0) },
-          volume: storage.pointee.VolumeIdentifier.map { String(cString: $0) }))
+          volume: storage.pointee.VolumeIdentifier.map { String(cString: $0) },
+          fileSystem: storage.pointee.FilesystemType))
       capacities.append((storage.pointee.MaxCapacity, storage.pointee.FreeSpaceInBytes))
       node = storage.pointee.next
     }
@@ -107,7 +108,8 @@ actor MTPDevice {
     return zip(storages, capacities).map { storage, space in
       let info = StorageInfo(
         id: StorageID(device: info.id, key: keys[storage.raw] ?? ""),
-        description: storage.description ?? "", capacity: space.capacity, free: space.free)
+        description: storage.description ?? "", capacity: space.capacity, free: space.free,
+        isFATLike: storage.fileSystem == Self.dcfFileSystem)
       return (raw: storage.raw, info: info)
     }
   }
@@ -170,7 +172,11 @@ actor MTPDevice {
         LIBMTP_Send_File_From_File(handle, path, metadata, reportProgress, context)
       }
     }
-    try check(result, cancelled: cancelled, during: "uploading")
+    do {
+      try check(result, cancelled: cancelled, during: "uploading")
+    } catch .insufficientSpace {
+      throw .insufficientSpace(needed: size, free: 0)
+    }
     return metadata.pointee.item_id
   }
 
@@ -224,6 +230,9 @@ actor MTPDevice {
     defer { LIBMTP_destroy_file_t(file) }
     return MTPEntry(file.pointee)
   }
+
+  /// PTP's FilesystemType for DCF, the FAT-based camera filesystem: the only FAT MTP names.
+  private static let dcfFileSystem: UInt16 = 0x0003
 
   // MARK: Helpers
 

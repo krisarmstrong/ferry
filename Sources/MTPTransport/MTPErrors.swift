@@ -32,6 +32,13 @@ enum MTPErrorCode: Sendable, Equatable {
 struct MTPErrorEntry: Sendable, Equatable {
   let code: MTPErrorCode
   let text: String
+
+  /// Whether the entry reports the PTP response `code` (four hex digits), as libmtp words it:
+  /// "PTP Layer error 2005: …" and "Error 2005: …".
+  func names(response code: String) -> Bool {
+    let text = text.lowercased()
+    return text.hasPrefix("error \(code):") || text.hasPrefix("ptp layer error \(code):")
+  }
 }
 
 extension TransportError {
@@ -57,6 +64,13 @@ extension TransportError {
     }
     if generalMeansLocked, codes.allSatisfy({ $0 == .general }) {
       return deviceStillPresent() ? .deviceLocked : .deviceDisconnected
+    }
+    if codes.contains(.storageFull) || entries.contains(where: { $0.names(response: "200c") }) {
+      // libmtp knows neither figure; the caller fills in what it knows.
+      return .insufficientSpace(needed: 0, free: 0)
+    }
+    if entries.contains(where: { $0.names(response: "2005") }) {
+      return .unsupported(operation)
     }
     let messages = entries.map(\.text).filter { !$0.isEmpty }
     guard !messages.isEmpty else { return .io("\(operation) failed") }
