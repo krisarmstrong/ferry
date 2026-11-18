@@ -10,6 +10,7 @@ struct ADBLimitsTests {
   private static let packetLimit = 64 * 1024
   private static let nameLimit = 4096
   private static let outputLimit = 16 * 1024 * 1024
+  private static let token = "limit-token"
 
   private func isViolation(_ error: any Error) -> Bool {
     if case .protocolViolation = error as? ADBError { return true }
@@ -24,7 +25,7 @@ struct ADBLimitsTests {
     let fixture = ADBHostRunTests()
     let server = try await fixture.server(features: features, service: service, shell: script)
     defer { server.stop() }
-    return try await fixture.host(server).run(serial: "S", command: "x")
+    return try await fixture.host(server).run(serial: "S", command: "x", token: Self.token)
   }
 
   @Test(arguments: [Self.packetLimit, Self.packetLimit + 1])
@@ -67,13 +68,13 @@ struct ADBLimitsTests {
 
   @Test(arguments: [0, 1])
   func legacyTotalOutputIsCapped(_ extra: Int) async throws {
-    let trailer = Data("\n0\n".utf8)
+    let trailer = Data("\n\(Self.token) 0\n".utf8)
     let script: @Sendable (Peer) async throws -> Void = { peer in
       try await peer.raw(Data(repeating: 0x61, count: Self.outputLimit - trailer.count + extra))
       try await peer.raw(trailer)
       await peer.finish()
     }
-    let service = "shell:x; echo; echo $?"
+    let service = "shell:" + ADBShell.legacyWrapper("x", token: Self.token)
     if extra == 0 {
       let result = try await run(features: "", service: service, script: script)
       #expect(result.stdout.count == Self.outputLimit - trailer.count)

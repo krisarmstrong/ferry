@@ -23,6 +23,33 @@ public enum ADBShell {
     return String(quoted)
   }
 
+  /// The legacy (`shell:`) service has no exit-status channel, so the command is wrapped to print
+  /// `\n<token> <status>\n` after it. The command runs in a subshell, so an `exit` in it still
+  /// reaches the trailer, and `$?` is read before anything else runs. The token is fresh per
+  /// call, so neither the command's own output nor a connection that drops mid-output can pass
+  /// for the trailer.
+  static func legacyWrapper(_ command: String, token: String) -> String {
+    "(\(command)); printf '\\n%s %d\\n' '\(token)' $?"
+  }
+
+  static func newToken() -> String { "ferry-" + UUID().uuidString }
+
+  /// Splits `<stdout>\n<token> <status>\n`. The status line is the last line; the newline
+  /// before it is the wrapper's, not the command's. A pty-backed `shell:` (very old adbd) ends
+  /// lines in `\r\n`, so the status line is trimmed of a trailing `\r`; stdout is left as sent.
+  static func parseLegacy(_ output: Data, token: String) throws(ADBError) -> ADBShellResult {
+    let newline = UInt8(ascii: "\n")
+    let bytes = Array(output)
+    guard bytes.last == newline, let separator = bytes.dropLast().lastIndex(of: newline),
+      var line = String(bytes: bytes[(separator + 1)..<(bytes.count - 1)], encoding: .utf8)
+    else { throw .protocolViolation("shell reply carries no exit status") }
+    if line.hasSuffix("\r") { line.removeLast() }
+    guard line.hasPrefix(token + " "), let status = Int32(line.dropFirst(token.count + 1))
+    else { throw .protocolViolation("shell reply carries no exit status") }
+    return ADBShellResult(
+      status: status, stdout: Data(bytes[..<separator]), stderr: Data())
+  }
+
   /// `program` is a trusted literal such as `rm`; `args` are quoted.
   public static func command(_ program: String, _ args: [String]) throws(ADBError) -> String {
     var words = [program]
@@ -41,19 +68,30 @@ extension ADBHost {
   /// Runs `command` on the device. With `shell_v2` the status and the two streams arrive
   /// separately; without it the status rides on a final line and stderr is merged into stdout.
   public func run(serial: String, command: String) async throws(ADBError) -> ADBShellResult {
+    try await run(serial: serial, command: command, token: ADBShell.newToken())
+  }
+
+  func run(
+    serial: String, command: String, token: String
+  ) async throws(ADBError) -> ADBShellResult {
     if try await features(serial).contains("shell_v2") {
       let stream = try await connect(serial, service: "shell,v2,raw:\(command)")
       defer { stream.cancel() }
+      // Nothing is ever typed in: closing stdin up front lets a command that reads it end. A
+      // failed write means the command already finished; the read below reports what happened.
+      try? await stream.write(Data([Self.closeStdinPacket]) + ADBWire.le32(0))
       return try await Self.collectPackets(stream)
     }
-    let stream = try await connect(serial, service: "shell:\(command); echo; echo $?")
+    let stream = try await connect(
+      serial, service: "shell:" + ADBShell.legacyWrapper(command, token: token))
     defer { stream.cancel() }
-    return try await Self.collectLegacy(stream)
+    return try await Self.collectLegacy(stream, token: token)
   }
 
   private static let stdoutPacket: UInt8 = 1
   private static let stderrPacket: UInt8 = 2
   private static let exitPacket: UInt8 = 3
+  private static let closeStdinPacket: UInt8 = 4
   /// adbd never sends a shell_v2 packet larger than this.
   private static let packetLimit = 64 * 1024
   /// stdout and stderr together; a command that prints more than this is not one Ferry runs.
@@ -87,7 +125,9 @@ extension ADBHost {
     }
   }
 
-  private static func collectLegacy(_ stream: ADBStream) async throws(ADBError) -> ADBShellResult {
+  private static func collectLegacy(
+    _ stream: ADBStream, token: String
+  ) async throws(ADBError) -> ADBShellResult {
     var output = Data()
     while let chunk = try await stream.readSome(upTo: packetLimit) {
       guard output.count + chunk.count <= outputLimit else {
@@ -95,12 +135,6 @@ extension ADBHost {
       }
       output.append(chunk)
     }
-    // `<output>\n<status>\n`: the status is the last line, and the newline before it is ours.
-    let newline = UInt8(ascii: "\n")
-    guard output.last == newline, let separator = output.dropLast().lastIndex(of: newline),
-      let status = String(bytes: output[(separator + 1)...].dropLast(), encoding: .utf8)
-        .flatMap({ Int32($0) })
-    else { throw .protocolViolation("shell reply carries no exit status") }
-    return ADBShellResult(status: status, stdout: Data(output[..<separator]), stderr: Data())
+    return try ADBShell.parseLegacy(output, token: token)
   }
 }

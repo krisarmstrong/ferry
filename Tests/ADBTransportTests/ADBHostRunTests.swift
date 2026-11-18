@@ -8,7 +8,8 @@ struct ADBHostRunTests {
 
   /// Serves `host-serial:<s>:features` on one connection and the shell service on the next.
   func server(
-    features: String, service: String, shell: @escaping @Sendable (Peer) async throws -> Void
+    features: String, service: String, stdin: Box<Data>? = nil,
+    shell: @escaping @Sendable (Peer) async throws -> Void
   ) async throws -> FakeADBServer {
     try await FakeADBServer.start { peer in
       let first = try await peer.request()
@@ -20,6 +21,11 @@ struct ADBHostRunTests {
       let started = try await peer.request()
       guard started == service else { throw ScriptError.unexpected(started) }
       try await peer.okay()
+      if service.hasPrefix("shell,v2") {
+        // The client closes stdin first; a server that exits with that unread resets the socket.
+        await stdin?.set(try await peer.stream.read(exactly: 5))
+        if stdin == nil { _ = try await peer.stream.read(exactly: 5) }
+      }
       try await shell(peer)
     }
   }
@@ -54,37 +60,46 @@ struct ADBHostRunTests {
     }
   }
 
+  private static let token = "ferry-test-token"
+
+  private func legacyService(_ command: String) -> String {
+    "shell:" + ADBShell.legacyWrapper(command, token: Self.token)
+  }
+
   @Test func withoutShellV2TheStatusRidesOnTheLastLine() async throws {
-    let server = try await server(
-      features: "cmd", service: "shell:ls /x; echo; echo $?"
-    ) { peer in
-      try await peer.send("a\nb\n\n3\n")
+    let server = try await server(features: "cmd", service: legacyService("ls /x")) { peer in
+      try await peer.send("a\nb\n\n\(Self.token) 3\n")
     }
     defer { server.stop() }
-    let result = try await host(server).run(serial: "S", command: "ls /x")
+    let result = try await host(server).run(serial: "S", command: "ls /x", token: Self.token)
     #expect(result.status == 3)
     #expect(String(bytes: result.stdout, encoding: .utf8) == "a\nb\n")
     #expect(result.stderr.isEmpty)
   }
 
-  @Test func legacyOutputWithoutTrailingNewlineKeepsItsBytes() async throws {
-    let service = "shell:printf abc; echo; echo $?"
-    let server = try await server(features: "", service: service) { peer in
-      try await peer.send("abc\n0\n")
+  @Test func legacyReplyWithoutTheSentinelIsAProtocolViolation() async throws {
+    // A drop mid-output whose last line is a number must not read as a status.
+    let server = try await server(features: "", service: legacyService("x")) { peer in
+      try await peer.send("partial\n0\n")
     }
     defer { server.stop() }
-    let result = try await host(server).run(serial: "S", command: "printf abc")
-    #expect(result.status == 0)
-    #expect(String(bytes: result.stdout, encoding: .utf8) == "abc")
+    await #expect {
+      _ = try await host(server).run(serial: "S", command: "x", token: Self.token)
+    } throws: {
+      if case .protocolViolation = $0 as? ADBError { return true }
+      return false
+    }
   }
 
-  @Test func legacyReplyWithoutAStatusLineIsAProtocolViolation() async throws {
-    let server = try await server(features: "", service: "shell:x; echo; echo $?") { peer in
-      try await peer.send("")
+  @Test func shellV2ClosesStdinSoACommandThatReadsItCannotHang() async throws {
+    let first = Box(Data())
+    let server = try await server(
+      features: "shell_v2", service: "shell,v2,raw:cat", stdin: first
+    ) { peer in
+      try await peer.raw(Peer.shellPacket(3, Data([0])))
     }
     defer { server.stop() }
-    await #expect(throws: ADBError.self) {
-      _ = try await host(server).run(serial: "S", command: "x")
-    }
+    _ = try await host(server).run(serial: "S", command: "cat")
+    #expect(await first.value == Data([4, 0, 0, 0, 0]))
   }
 }
