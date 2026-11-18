@@ -324,6 +324,16 @@ struct MayAlreadyExistTests {
     #expect(try await backend.existing(matching: template) == nil)
   }
 
+  @Test func aPackageMatchesThePackageFolderOfTheSameName() async throws {
+    let agent = FakeAgent([try folder("/Notes.rtfd")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+
+    let match = try await backend.existing(
+      matching: ItemTemplate(parent: .root, filename: "Notes.rtfd", kind: .package))
+
+    #expect(match?.itemIdentifier == (try await agent.identifier(try path("/Notes.rtfd"))))
+  }
+
   @Test func aFolderMatchesAFolderOfTheSameName() async throws {
     let agent = FakeAgent([try folder("/DCIM")])
     let backend = ProviderBackend(domain: domain, client: agent)

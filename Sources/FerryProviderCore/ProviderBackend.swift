@@ -116,7 +116,7 @@ public actor ProviderBackend {
     let name = template.filename.precomposedStringWithCanonicalMapping
     guard let entry = entries.first(where: { $0.item.path.name == name }) else { return nil }
     switch (template.kind, entry.item.kind) {
-    case (.folder, .folder):
+    case (.folder, .folder), (.package, .folder):
       return ProviderItem(entry)
     case (.file, .file):
       guard let size = template.size, let modified = template.modified, size == entry.item.size,

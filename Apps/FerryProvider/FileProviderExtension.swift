@@ -82,7 +82,7 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
         if mayAlreadyExist {
           if let match = try await backend.existing(matching: template) { return match }
           // Found on the Mac without contents and not on the device: nothing to create.
-          if template.kind == .file, url == nil { return nil }
+          if template.kind == .file || template.kind == .package, url == nil { return nil }
         }
         return try await backend.create(template, contents: url, progress: update)
       },
