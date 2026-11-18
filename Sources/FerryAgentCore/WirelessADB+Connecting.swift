@@ -204,7 +204,10 @@ extension WirelessADB {
     }
     let isNew = entries[info.id]?.addresses.contains { $0.endpoint == endpoint } != true
     let trusted = purpose.learnt == .usb || purpose.confirmed
-    let knownNow = await knownNames().merging(known) { now, _ in now }
+    var knownNow = await knownNames().merging(known) { now, _ in now }
+    if isNew, !trusted, knownNow[info.id] == nil, let location = await located(info.id) {
+      knownNow[info.id] = location
+    }
     // After the last suspension: a forget that ran meanwhile wins.
     if let forgottenAt = forgotten[info.id], forgottenAt > since {
       log.info("\(endpoint.argument, privacy: .private) answers as a forgotten device")

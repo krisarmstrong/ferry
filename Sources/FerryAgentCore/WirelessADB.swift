@@ -142,6 +142,9 @@ public actor WirelessADB {
   var forgotten: [DeviceID: UInt64] = [:]
   /// The devices Ferry serves now, by any method.
   let known: @Sendable () async -> [DeviceID: String]
+  /// The name of the Finder location Ferry has for a device, if it has one (see
+  /// `DomainController.location(of:)`).
+  let located: @Sendable (DeviceID) async -> String?
   /// What the hub may serve over the network, kept in step with `entries`.
   let vouching: WirelessVouching
   /// The reconnects started at agent start or when adb's server came back, if still running.
@@ -151,17 +154,20 @@ public actor WirelessADB {
 
   /// `known` lists the devices Ferry serves now (the hub's), with their names, so a network host
   /// claiming one of their serials is not believed without the user, and the user is asked about
-  /// it by the name Ferry has, not the one the host reports. `vouching` is shared with the
-  /// `ADBTransport` that serves network routes.
+  /// it by the name Ferry has, not the one the host reports. `located` extends that to devices
+  /// that are unplugged but have a Finder location, which such a host would otherwise take over.
+  /// `vouching` is shared with the `ADBTransport` that serves network routes.
   public init(
     adb: any WirelessADBControl, store: URL, timing: Timing = Timing(),
     known: @escaping @Sendable () async -> [DeviceID: String] = { [:] },
+    located: @escaping @Sendable (DeviceID) async -> String? = { _ in nil },
     vouching: WirelessVouching = WirelessVouching()
   ) {
     self.adb = adb
     file = store
     self.timing = timing
     self.known = known
+    self.located = located
     self.vouching = vouching
     let entries = WirelessStore.load(store)
     self.entries = entries

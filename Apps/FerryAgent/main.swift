@@ -45,7 +45,7 @@ let wireless = WirelessADB(
   adb: ADBWireless(), store: wirelessStore,
   known: {
     Dictionary(await hub.devices().map { ($0.id, $0.info.model) }) { first, _ in first }
-  }, vouching: vouching)
+  }, located: { await domains.location(of: $0) }, vouching: vouching)
 Task { await wireless.run() }
 Task {
   await manager.conformExisting()

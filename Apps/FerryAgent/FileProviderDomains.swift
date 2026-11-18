@@ -110,6 +110,10 @@ struct FileProviderDomains: DomainManaging {
     try await NSFileProviderManager.domains().map(\.identifier.rawValue)
   }
 
+  func displayName(of identifier: String) async -> String? {
+    try? await domain(identifier).displayName
+  }
+
   /// The registered domain, which carries the display name a manager needs.
   private func domain(_ identifier: String) async throws -> NSFileProviderDomain {
     let wanted = NSFileProviderDomainIdentifier(identifier)

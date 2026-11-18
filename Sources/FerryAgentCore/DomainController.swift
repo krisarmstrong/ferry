@@ -25,6 +25,12 @@ public protocol DomainManaging: Sendable {
   /// The identifiers of the Ferry domains the system has, including ones from before this
   /// process started.
   func existing() async throws -> [String]
+  /// The name the system shows for a domain, if it has the domain.
+  func displayName(of identifier: String) async -> String?
+}
+
+extension DomainManaging {
+  public func displayName(of identifier: String) async -> String? { nil }
 }
 
 /// Keeps one FileProvider domain per storage of each ready device, and maps a domain back to
