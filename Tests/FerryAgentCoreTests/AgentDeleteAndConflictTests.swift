@@ -236,6 +236,52 @@ struct AgentDeleteAndConflictTests {
       await setup.send(.list(domain: setup.domain, folder: .root)).entryNames == ["a.txt"])
   }
 
+  // MARK: Stale listed sizes (round 8 C1)
+
+  /// A device whose metadata is stale lists `global.o` as 32 bytes and sends 40. FileProvider
+  /// holds the version of the 40 bytes it received, and sends that as the base.
+  private func fetchedStale() async throws -> (Setup, ItemID, ContentVersion) {
+    let setup = try await setup([])
+    let file = try path("/Docs/global.o")
+    try await setup.device.seed(file, in: setup.storage, contents: Data(count: 40))
+    await setup.device.reportSize(32, for: file)
+    let id = try await setup.id("/Docs/global.o")
+    let (_, handle) = try setup.harness.writable("out", "")
+    guard
+      case .entry(let entry) = await setup.send(.fetch(domain: setup.domain, id: id), file: handle)
+    else { throw TransportError.unknownItem }
+    #expect(entry.item.size == 40)
+    return (setup, id, ContentVersion(entry.item))
+  }
+
+  @Test func deletingAFileWithAStaleListedSizeAtItsFetchedVersionDeletesIt() async throws {
+    let (setup, id, base) = try await fetchedStale()
+    defer { setup.harness.finish() }
+
+    let reply = await setup.send(
+      .delete(domain: setup.domain, id: id, base: base, recursive: false))
+
+    #expect(reply == .done)
+    #expect(await setup.device.contents(of: try path("/Docs/global.o"), in: setup.storage) == nil)
+  }
+
+  @Test func savingAFileWithAStaleListedSizeAtItsFetchedVersionIsNoConflict() async throws {
+    let (setup, id, base) = try await fetchedStale()
+    defer { setup.harness.finish() }
+
+    let reply = await setup.send(
+      .replaceContents(domain: setup.domain, id: id, base: base, onConflict: .keepBoth),
+      file: try setup.harness.readable("mac.o", "user edit"))
+
+    #expect(reply.isEntry)
+    #expect(
+      await setup.device.contents(of: try path("/Docs/global.o"), in: setup.storage)
+        == Data("user edit".utf8))
+    #expect(
+      await setup.device.contents(
+        of: try path("/Docs/global (conflict from Mac).o"), in: setup.storage) == nil)
+  }
+
   @Test(arguments: [
     ("report.txt", 1, "report (conflict from Mac).txt"),
     ("report.txt", 3, "report (conflict from Mac 3).txt"),

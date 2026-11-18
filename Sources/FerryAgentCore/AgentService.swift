@@ -212,8 +212,9 @@ public actor AgentService: AgentHandling {
       }
       switch current.kind {
       case .file:
-        if let base, ContentVersion(current) != base {
-          _ = await route.items.observed(current)
+        // Compared as FileProvider holds it: at the size a download delivered, if the device
+        // still lists the file with the stale size it had then.
+        if let base, ContentVersion(await route.items.observed(current).item) != base {
           throw .changedOnDevice(path)
         }
       case .folder:
@@ -330,9 +331,10 @@ extension AgentService {
     return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
       if let base {
-        let current = try await route.session.item(at: path, in: route.storage)
-        if current.kind == .file, ContentVersion(current) != base {
-          let entry = await route.items.observed(current)
+        // As FileProvider holds it: at the size a download delivered (see `delete`).
+        let entry = await route.items.observed(
+          try await route.session.item(at: path, in: route.storage))
+        if entry.item.kind == .file, ContentVersion(entry.item) != base {
           switch onConflict {
           case .fail:
             throw .changedOnDevice(path)
