@@ -125,13 +125,17 @@ public struct StatusReport: Codable, Sendable, Equatable {
   public let provider: ProviderState
   /// Transfers running now, oldest first.
   public let transfers: [ActiveTransfer]
+  /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
+  public let awaitingAuthorization: [String]
 
   public init(
-    devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = []
+    devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
+    awaitingAuthorization: [String] = []
   ) {
     self.devices = devices
     self.provider = provider
     self.transfers = transfers
+    self.awaitingAuthorization = awaitingAuthorization
   }
 }
 

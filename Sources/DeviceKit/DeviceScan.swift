@@ -19,13 +19,17 @@ public struct DeviceScan: Sendable, Equatable, Codable {
   public let method: ConnectionMethod
   /// Devices the transport reaches another way than `method`.
   public let methods: [DeviceID: ConnectionMethod]
+  /// Network devices (`host:port`) waiting for the user to allow this Mac on them. They name no
+  /// unit until they are allowed, so they are not devices yet.
+  public let awaitingAuthorization: [String]
 
   /// `method` is how the transport reaches what it lists: MTP is always `.usbFileTransfer`. A
   /// transport with more than one route names the exceptions in `methods`.
   public init(
     devices: [DeviceInfo], busy: [DeviceInfo] = [], notSharing: [DeviceInfo] = [],
     ejected: [DeviceInfo] = [], rescanAfter: Duration? = nil,
-    method: ConnectionMethod = .usbFileTransfer, methods: [DeviceID: ConnectionMethod] = [:]
+    method: ConnectionMethod = .usbFileTransfer, methods: [DeviceID: ConnectionMethod] = [:],
+    awaitingAuthorization: [String] = []
   ) {
     self.devices = devices
     self.busy = busy
@@ -34,6 +38,7 @@ public struct DeviceScan: Sendable, Equatable, Codable {
     self.rescanAfter = rescanAfter
     self.method = method
     self.methods = methods.filter { $0.value != method }
+    self.awaitingAuthorization = awaitingAuthorization
   }
 
   /// How the transport reaches `id`.

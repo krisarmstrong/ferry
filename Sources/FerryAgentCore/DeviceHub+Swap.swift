@@ -38,6 +38,9 @@ extension DeviceHub {
 
   func isSwapping(_ id: DeviceID) -> Bool { swapping.contains(id) }
 
+  /// Network devices waiting for the user to allow this Mac, as of the most recent scan.
+  public func awaitingAuthorization() -> [String] { awaiting }
+
   /// Swaps and ejects waiting for a device's requests to finish.
   var ejectsAwaitingRequests: Int { drainWaiters.values.map(\.count).reduce(0, +) }
 
@@ -107,7 +110,7 @@ extension DeviceHub {
     }
     switch reading {
     case .state(let state) where usable:
-      store(entry.info, state, .held(session), method: method)
+      store(entry.info, state, .held(session), method: await session.method)
     case .state, .gone:
       await session.close()
       if await resumeKept(entry.info, generation: entry.generation) { return }

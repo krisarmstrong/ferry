@@ -108,7 +108,7 @@ enum ADBWire {
   }
 
   /// Wireless serials are `host:port` (adb connect) or an mDNS name (`adb-<id>._adb-tls-connect…`).
-  private static func isWireless(_ serial: String) -> Bool {
+  static func isWireless(_ serial: String) -> Bool {
     serial.contains(":") || serial.contains("._adb-tls-connect.")
   }
 }

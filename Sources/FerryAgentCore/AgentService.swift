@@ -103,7 +103,8 @@ public actor AgentService: AgentHandling {
       return .status(
         StatusReport(
           devices: await hub.devices(), provider: await domains.providerState(),
-          transfers: await transfers.list()))
+          transfers: await transfers.list(),
+          awaitingAuthorization: await hub.awaitingAuthorization()))
     case .recheck(let id):
       await hub.recheck(id)
       return .done

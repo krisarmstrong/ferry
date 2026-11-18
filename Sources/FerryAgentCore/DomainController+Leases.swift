@@ -5,6 +5,12 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 
 /// The hub's sessions, as the controller uses them.
 extension DomainController {
+  /// The domain's item table, for a request that does not touch the device. Waits, and fails,
+  /// as `route(_:)` does.
+  func items(of domain: String) async throws(TransportError) -> ItemTable {
+    try await connected(domain).items
+  }
+
   /// A lease on the device's session. A device the hub no longer serves is disconnected, which
   /// FileProvider retries, whatever the hub says about it.
   func leaseSession(of device: DeviceID) async throws(TransportError) -> SessionLease {

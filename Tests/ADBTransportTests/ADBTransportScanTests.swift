@@ -59,7 +59,7 @@ struct ADBTransportScanTests {
     let scan = try await transport.scan()
     #expect(scan.method(of: Fixture.linkRunner) == .usbADB)
     #expect(scan.method(of: DeviceID(serial: "fedcba9876543210")) == .wifiADB)
-    #expect(scan.method(of: DeviceID(serial: "192.0.2.50:5555")) == .wifiADB)
+    #expect(scan.awaitingAuthorization == ["192.0.2.50:5555"])
     #expect(scan.method(of: DeviceID(serial: "abc")) == .usbADB)
     await hub.kill()
   }
@@ -88,7 +88,8 @@ struct ADBTransportScanTests {
     let transport = Fixture.transport(port: hub.port)
     let scan = try await transport.scan()
     #expect(scan.devices.isEmpty)
-    #expect(scan.notSharing.map(\.id.serial) == ["192.0.2.31:5555", "abc"])
+    #expect(scan.notSharing.map(\.id.serial) == ["abc"])
+    #expect(scan.awaitingAuthorization == ["192.0.2.31:5555"])
     await hub.kill()
   }
 

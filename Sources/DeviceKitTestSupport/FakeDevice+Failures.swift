@@ -47,6 +47,10 @@ extension FakeDevice {
 
   /// Runs `hook` when the next upload starts, as an app on the device changing files while the
   /// upload goes up.
+  func setMethod(_ method: ConnectionMethod) {
+    self.method = method
+  }
+
   public func onNextUpload(_ hook: @escaping @Sendable () async -> Void) {
     uploadHook = hook
   }

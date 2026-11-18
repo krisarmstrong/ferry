@@ -21,15 +21,21 @@ public struct StorageInfo: Hashable, Sendable, Codable {
   /// a camera-style DCF filesystem; an Android SD card reports a generic one even when it is
   /// FAT32, so this is often `false` where the limit applies.
   public let isFATLike: Bool
+  /// The key this storage had before keys were method-neutral (see `StorageKey`), when it
+  /// differs: MTP keyed every storage `"<description>|<volume>"`. A domain under the former key
+  /// is this storage's, superseded.
+  public let formerKey: String?
 
   public init(
-    id: StorageID, description: String, capacity: UInt64, free: UInt64, isFATLike: Bool = false
+    id: StorageID, description: String, capacity: UInt64, free: UInt64, isFATLike: Bool = false,
+    formerKey: String? = nil
   ) {
     self.id = id
     self.description = description
     self.capacity = capacity
     self.free = free
     self.isFATLike = isFATLike
+    self.formerKey = formerKey
   }
 }
 

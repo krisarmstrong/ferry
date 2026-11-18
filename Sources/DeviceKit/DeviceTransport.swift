@@ -19,6 +19,8 @@ public protocol DeviceTransport: Sendable {
 
 public protocol DeviceSession: Sendable {
   var info: DeviceInfo { get }
+  /// How this session reaches the device.
+  var method: ConnectionMethod { get async }
   /// Partials being written on this device. Shared by every `SafeWriter` over the session and
   /// by the session itself, so no listing reaps a partial that is still being written.
   var partials: PartialRegistry { get }

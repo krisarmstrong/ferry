@@ -241,4 +241,34 @@ struct DeviceHubMethodTests {
     #expect(await harness.adb.isParked(id))
     #expect(await !adbDevice.isOpen)
   }
+
+  /// Both routes are there when the hub first sees the device, but ADB cannot read storages yet:
+  /// MTP serves it rather than it showing as not sharing, and ADB takes over once it is ready.
+  @Test func aNotReadyADBAtFirstSightLeavesTheDeviceOnMTP() async throws {
+    await adbDevice.setLocked(true)
+    var harness = MethodHarness(mtp: [mtpDevice], adb: [adbDevice])
+    defer { harness.finish() }
+
+    #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
+    #expect(try await harness.hub.session(for: id).info == mtpDevice.info)
+    #expect(await !adbDevice.isOpen)
+
+    await adbDevice.setLocked(false)
+    harness.tick()
+    #expect(await harness.next() == .changed(ready(mtpDevice, .usbADB)))
+    #expect(await mtpDevice.closeCount == 0)
+  }
+
+  /// A network device waiting for "Allow" is reported for the menu, not listed as a device.
+  @Test func devicesAwaitingAuthorizationAreReported() async {
+    let harness = MethodHarness()
+    defer { harness.finish() }
+    await harness.adb.awaitAuthorization("192.0.2.31:5555")
+    harness.tick()
+    while await harness.hub.awaitingAuthorization().isEmpty, !Task.isCancelled {
+      await Task.yield()
+    }
+    #expect(await harness.hub.awaitingAuthorization() == ["192.0.2.31:5555"])
+    #expect(await harness.hub.devices().isEmpty)
+  }
 }

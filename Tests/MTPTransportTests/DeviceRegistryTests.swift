@@ -111,6 +111,18 @@ struct DeviceRegistryTests {
     }
   }
 
+  /// A device Ferry cannot open (file transfer off, or another app holds it) is named by the USB
+  /// serial the registry carries, which is the serial MTP and ADB report once open; only a device
+  /// without one falls back to its USB location.
+  @Test(arguments: [("0123456789abcdef", "0123456789abcdef"), (nil, "usb-1-3"), ("", "usb-1-3")])
+  func unopenedDevicesAreNamedByTheirUSBSerial(_ serial: String?, _ expected: String) {
+    let record = USBDeviceRecord(
+      registryID: 9, locationID: 1 << 24 | 3 << 16, address: 3, vendorID: 0x18D1,
+      productID: 0x4EE7, interfaces: [], vendorName: "NetAlly", productName: "LinkRunner-100G",
+      serial: serial)
+    #expect(DeviceRegistry<Int, Int>.describe(record).id == DeviceID(serial: expected))
+  }
+
   static func id(_ raw: Int) -> DeviceID { DeviceID(serial: "S\(raw)") }
 
   static func info(_ raw: Int) -> DeviceInfo {

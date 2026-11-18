@@ -182,18 +182,37 @@ struct CompositeTransportTests {
     #expect(scan.rescanAfter == .seconds(2))
   }
 
-  /// MTP names a device without file transfer by its USB location, and ADB names it by its
-  /// serial: nothing ties the two together, so such a unit is listed twice. Pinned so a fix
-  /// (reading the USB serial from the registry) is a deliberate change.
-  @Test func aDeviceWithoutFileTransferButWithADBIsListedTwice() async throws {
-    let usbOnly = DeviceInfo(
-      id: DeviceID(serial: "usb-0-3"), manufacturer: "NetAlly", model: "LinkRunner-100G")
+  /// MTP names a device without file transfer by its USB serial, which is ADB's `ro.serialno`:
+  /// a unit with file transfer off but ADB on is one device, served over ADB.
+  @Test func aDeviceWithoutFileTransferButWithADBIsOneDevice() async throws {
     let mtp = FakeTransport(devices: [])
-    await mtp.attachWithoutFileTransfer(usbOnly)
+    await mtp.attachWithoutFileTransfer(mtpDevice.info)
     let adb = FakeTransport(devices: [adbDevice], method: .usbADB)
 
     let scan = try await CompositeTransport(mtp: mtp, adb: adb).scan()
-    #expect(scan.devices == [adbDevice.info])
-    #expect(scan.notSharing == [usbOnly])
+    #expect(scan.devices == [mtpDevice.info])
+    #expect(scan.notSharing.isEmpty)
+    #expect(scan.method(of: id) == .usbADB)
+  }
+
+  /// File transfer off and USB debugging not allowed yet: one not-sharing entry, not two.
+  @Test func aDeviceNotSharingEitherWayIsListedOnce() async throws {
+    let mtp = FakeTransport(devices: [])
+    await mtp.attachWithoutFileTransfer(mtpDevice.info)
+    let adb = FakeTransport(devices: [], method: .usbADB)
+    await adb.attachWithoutFileTransfer(adbDevice.info)
+
+    let scan = try await CompositeTransport(mtp: mtp, adb: adb).scan()
+    #expect(scan.notSharing == [mtpDevice.info])
+  }
+
+  /// A network device waiting for "Allow" is not a device yet: its `host:port` names no unit.
+  /// It is passed on for the menu to say what to do.
+  @Test func networkDevicesAwaitingAuthorizationArePassedOn() async throws {
+    let adb = FakeTransport(devices: [], method: .usbADB)
+    await adb.awaitAuthorization("192.0.2.31:5555")
+    let scan = try await CompositeTransport(mtp: FakeTransport(devices: []), adb: adb).scan()
+    #expect(scan.notSharing.isEmpty && scan.devices.isEmpty)
+    #expect(scan.awaitingAuthorization == ["192.0.2.31:5555"])
   }
 }

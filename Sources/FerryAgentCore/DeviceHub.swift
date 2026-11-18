@@ -93,6 +93,8 @@ public actor DeviceHub {
 
   var isRechecking: Bool { poller != nil }
 
+  /// Network devices waiting for the user to allow this Mac, from the most recent scan.
+  var awaiting: [String] = []
   /// MTP sessions kept open, idle, while ADB serves their device.
   var kept: [DeviceID: any DeviceSession] = [:]
   /// Leases handed out and not yet released, by device.
@@ -217,6 +219,7 @@ public actor DeviceHub {
       return
     }
     scheduleRescan(after: scan.rescanAfter)
+    awaiting = scan.awaitingAuthorization
     let present = Set((scan.devices + scan.busy + scan.notSharing + scan.ejected).map(\.id))
     for (id, entry) in entries where !present.contains(id) {
       guard case .unheld = entry.holding else { continue }
@@ -290,10 +293,11 @@ public actor DeviceHub {
       return
     }
     backoff[info.id] = nil
+    let opened = await session.method
     log.info(
-      "device \(info.id.serial, privacy: .private) opened over \(method.rawValue, privacy: .public)"
+      "device \(info.id.serial, privacy: .private) opened over \(opened.rawValue, privacy: .public)"
     )
-    store(info, state, .held(session), method: method)
+    store(info, state, .held(session), method: opened)
   }
 
   /// Reads a held device's storages off this tick, so a long transfer queued on its session

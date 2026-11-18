@@ -25,6 +25,8 @@ public actor FakeDevice: DeviceSession {
 
   public nonisolated let info: DeviceInfo
   public nonisolated let partials = PartialRegistry()
+  /// How the transport that opened it reaches it.
+  public internal(set) var method = ConnectionMethod.usbFileTransfer
   var storageInfos: [StorageInfo]
   let deviceCapabilities: DeviceCapabilities
   var tree: [StorageID: [RemotePath: Node]]

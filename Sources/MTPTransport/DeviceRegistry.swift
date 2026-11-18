@@ -273,12 +273,15 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     return raw
   }
 
-  /// Names a device from its registry properties, for one Ferry cannot open. Its serial is
-  /// unknown, so it is identified by where it is, which is unique while it stays plugged in.
+  /// Names a device from its registry properties, for one Ferry cannot open. It is identified by
+  /// its USB serial, which Android sets to the serial MTP and ADB report once open, so the device
+  /// is one device whichever way it is seen. One without a serial is identified by where it is,
+  /// which is unique while it stays plugged in.
   static func describe(_ record: USBDeviceRecord) -> DeviceInfo {
     let location = record.location
+    let serial = record.serial.flatMap { $0.isEmpty ? nil : $0 }
     return DeviceInfo(
-      id: DeviceID(serial: "usb-\(location.bus)-\(location.address)"),
+      id: DeviceID(serial: serial ?? "usb-\(location.bus)-\(location.address)"),
       manufacturer: record.vendorName ?? "Unknown", model: record.productName ?? "USB device")
   }
 }

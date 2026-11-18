@@ -149,13 +149,7 @@ public actor DomainController {
       items: items, lease: lease, hub: hub)
   }
 
-  /// The domain's item table, for a request that does not touch the device. Waits, and fails,
-  /// as `route(_:)` does.
-  func items(of domain: String) async throws(TransportError) -> ItemTable {
-    try await connected(domain).items
-  }
-
-  private func connected(_ domain: String) async throws(TransportError) -> (
+  func connected(_ domain: String) async throws(TransportError) -> (
     storage: StorageID, items: ItemTable
   ) {
     if !adopted {
@@ -260,8 +254,9 @@ public actor DomainController {
     for (identifier, domain) in domains where domain.connected && !live.contains(identifier) {
       await disconnect(identifier)
     }
-    for (spec, storage) in wanted where !ejecting.contains(storage.device) {
-      await connect(spec, storage)
+    for domain in wanted where !ejecting.contains(domain.storage.device) {
+      if let former = domain.former { await retire(former) }
+      await connect(domain.spec, domain.storage)
     }
   }
 
@@ -339,6 +334,16 @@ public actor DomainController {
 // MARK: Removing
 
 extension DomainController {
+  /// Removes a ready storage's domain under its former key, unsent changes kept as Remove Ferry
+  /// does, unless a live storage claims it.
+  private func retire(_ former: StorageID) async {
+    let identifier = DomainNaming.identifier(for: former)
+    guard let domain = domains[identifier], [nil, former].contains(domain.storage) else { return }
+    domains[identifier] = nil
+    await discardTable(of: identifier)
+    _ = await remove(identifier)
+  }
+
   private func removeDomains(of id: DeviceID) async -> [URL] {
     ejecting.insert(id)
     let identifiers = domains.filter { $0.value.storage?.device == id }.keys.sorted()

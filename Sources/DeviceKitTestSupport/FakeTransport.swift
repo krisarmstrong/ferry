@@ -49,6 +49,14 @@ public actor FakeTransport: DeviceTransport {
 
   private var rescanAfter: Duration?
 
+  private var awaiting: [String] = []
+
+  /// A network device at `address` waits for the user to allow this Mac, as adb lists one
+  /// `unauthorized` under its `host:port`.
+  public func awaitAuthorization(_ address: String) {
+    awaiting.append(address)
+  }
+
   /// The transport reaches `id` by `method` from now on, as adb does a device whose cable was
   /// pulled while it stays connected over the network.
   public func setMethod(_ method: ConnectionMethod, for id: DeviceID) {
@@ -125,7 +133,7 @@ public actor FakeTransport: DeviceTransport {
     }
     return DeviceScan(
       devices: usable, busy: busy, notSharing: notSharing, ejected: ejected,
-      rescanAfter: rescanAfter, method: method, methods: methods)
+      rescanAfter: rescanAfter, method: method, methods: methods, awaitingAuthorization: awaiting)
   }
 
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {
@@ -138,6 +146,7 @@ public actor FakeTransport: DeviceTransport {
     if await device.isOpen { throw .deviceBusy }
     opens[id, default: 0] += 1
     await device.markOpen()
+    await device.setMethod(methods[id] ?? method)
     return device
   }
 

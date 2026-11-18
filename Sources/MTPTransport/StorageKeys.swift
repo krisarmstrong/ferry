@@ -17,29 +17,50 @@ import Foundation
 /// also carry the raw ID as `|#XXXXXXXX` so they stay distinct. Two storages claiming one volume
 /// are keyed this way too.
 func storageKeys(for storages: [RawStorage]) -> [UInt32: String] {
+  let former = formerStorageKeys(for: storages)
   let neutral = storages.map(neutralKey)
   var neutralCounts: [String: Int] = [:]
   for key in neutral.compactMap({ $0 }) {
     neutralCounts[key, default: 0] += 1
   }
-  let base = storages.map { "\($0.description ?? "")|\($0.volume ?? "")" }
-  var counts: [String: Int] = [:]
-  for key in base {
-    counts[key, default: 0] += 1
-  }
   var keys: [UInt32: String] = [:]
-  for (storage, (key, neutral)) in zip(storages, zip(base, neutral)) {
+  for (storage, neutral) in zip(storages, neutral) {
     if let neutral, neutralCounts[neutral] == 1 {
       keys[storage.raw] = neutral
-      continue
+    } else if neutral != nil {
+      keys[storage.raw] = withRawID(storage)
+    } else {
+      keys[storage.raw] = former[storage.raw]
     }
+  }
+  return keys
+}
+
+/// The keys MTP gave storages before keys were method-neutral: `"<description>|<volume>"`, with
+/// `|#XXXXXXXX` added where that pair says nothing or is shared. A domain named after one of
+/// these belongs to the storage, superseded by its method-neutral key.
+func formerStorageKeys(for storages: [RawStorage]) -> [UInt32: String] {
+  var counts: [String: Int] = [:]
+  for storage in storages {
+    counts[base(storage), default: 0] += 1
+  }
+  var keys: [UInt32: String] = [:]
+  for storage in storages {
     let uninformative =
       isBlank(storage.description, placeholder: "Unknown storage")
       && isBlank(storage.volume, placeholder: "Unknown volume")
-    let ambiguous = uninformative || counts[key, default: 0] > 1 || neutral != nil
-    keys[storage.raw] = ambiguous ? key + "|#" + String(format: "%08X", storage.raw) : key
+    let ambiguous = uninformative || counts[base(storage), default: 0] > 1
+    keys[storage.raw] = ambiguous ? withRawID(storage) : base(storage)
   }
   return keys
+}
+
+private func base(_ storage: RawStorage) -> String {
+  "\(storage.description ?? "")|\(storage.volume ?? "")"
+}
+
+private func withRawID(_ storage: RawStorage) -> String {
+  base(storage) + "|#" + String(format: "%08X", storage.raw)
 }
 
 /// Android's storage ID for its primary shared storage (`StorageVolume.STORAGE_ID_PRIMARY`).

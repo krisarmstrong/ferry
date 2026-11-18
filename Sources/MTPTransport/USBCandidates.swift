@@ -57,10 +57,13 @@ public struct USBDeviceRecord: Sendable, Hashable {
   public let interfaces: [USBInterface]?
   public let vendorName: String?
   public let productName: String?
+  /// The USB serial number string, which Android sets to `ro.serialno`.
+  public let serial: String?
 
   public init(
     registryID: UInt64, locationID: UInt32, address: UInt8, vendorID: UInt16, productID: UInt16,
-    interfaces: [USBInterface]?, vendorName: String? = nil, productName: String? = nil
+    interfaces: [USBInterface]?, vendorName: String? = nil, productName: String? = nil,
+    serial: String? = nil
   ) {
     self.registryID = registryID
     self.locationID = locationID
@@ -70,6 +73,7 @@ public struct USBDeviceRecord: Sendable, Hashable {
     self.interfaces = interfaces
     self.vendorName = vendorName
     self.productName = productName
+    self.serial = serial
   }
 
   /// Where libusb finds the device: on Darwin its bus is the top byte of the location ID.

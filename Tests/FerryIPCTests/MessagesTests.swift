@@ -132,6 +132,9 @@ private func responses() throws -> [AgentResponse] {
   var all: [AgentResponse] = [
     .status(StatusReport(devices: [ready, locked], provider: .enabled)),
     .status(StatusReport(devices: [], provider: .noDomains)),
+    .status(
+      StatusReport(
+        devices: [], provider: .enabled, awaitingAuthorization: ["192.0.2.31:5555"])),
   ]
   all += [.entry(item), .entry(root), .entries([item, root]), .entries([])]
   all.append(.keptOnDevice(item))

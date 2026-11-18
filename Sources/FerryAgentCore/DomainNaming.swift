@@ -16,6 +16,12 @@ public struct DomainSpec: Sendable, Hashable {
 }
 
 public enum DomainNaming {
+  struct Wanted {
+    let spec: DomainSpec
+    let storage: StorageID
+    let former: StorageID?
+  }
+
   /// The domain identifier of a storage: SHA-256, in lowercase hex, of `"<serial>|<key>"`.
   /// Stable across reconnects, and free of the serial, which FileProvider would otherwise write
   /// to its logs and to the paths of the domain's files.
@@ -40,12 +46,14 @@ public enum DomainNaming {
     domains(for: devices).map(\.spec)
   }
 
-  static func domains(for devices: [AttachedDevice]) -> [(spec: DomainSpec, storage: StorageID)] {
+  /// Each wanted domain with its storage, and the storage as MTP keyed it before keys were
+  /// method-neutral, when that differs.
+  static func domains(for devices: [AttachedDevice]) -> [Wanted] {
     var models: [String: Int] = [:]
     for device in devices {
       models[device.info.model, default: 0] += 1
     }
-    return devices.flatMap { device -> [(spec: DomainSpec, storage: StorageID)] in
+    return devices.flatMap { device -> [Wanted] in
       guard case .ready(let storages) = device.state else { return [] }
       let model = device.info.model
       let base =
@@ -54,7 +62,8 @@ public enum DomainNaming {
         let spec = DomainSpec(
           identifier: identifier(for: storage.id),
           displayName: index == 0 ? base : base + " – SD card")
-        return (spec, storage.id)
+        let former = storage.formerKey.map { StorageID(device: device.id, key: $0) }
+        return Wanted(spec: spec, storage: storage.id, former: former)
       }
     }
   }

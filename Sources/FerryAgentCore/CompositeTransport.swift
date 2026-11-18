@@ -16,8 +16,9 @@ import os
 /// can park only a device it holds, so it may still offer one that ADB served when it was
 /// ejected. Parking and unparking reach both.
 ///
-/// MTP's `busy` and `notSharing` devices are named by USB location and ADB's unauthorised network
-/// devices by `host:port`: neither matches a serial, so such a device can be listed once by each.
+/// A device both list as busy or not sharing is listed once, as MTP names it. MTP names such a
+/// device by its USB serial when the registry has one, so it merges with ADB's identity; one
+/// without falls back to its USB location and cannot be matched.
 ///
 /// A transport whose scan fails is left out of that scan; only when both fail does the scan
 /// fail.
@@ -36,6 +37,8 @@ public actor CompositeTransport: DeviceTransport {
   private var servers: [DeviceID: Side] = [:]
   /// Each device as MTP last named it.
   private var mtpNames: [DeviceID: DeviceInfo] = [:]
+  /// Devices MTP offered as usable in the most recent scan.
+  private var overMTP: Set<DeviceID> = []
 
   public init(mtp: any DeviceTransport, adb: any DeviceTransport) {
     self.mtp = mtp
@@ -65,6 +68,12 @@ public actor CompositeTransport: DeviceTransport {
     for info in viaMTP.devices + viaMTP.ejected {
       mtpNames[info.id] = info
     }
+    // A device MTP cannot open is named from its USB descriptors: second best, kept only until
+    // MTP opens it.
+    for info in viaMTP.busy + viaMTP.notSharing where mtpNames[info.id] == nil {
+      mtpNames[info.id] = info
+    }
+    overMTP = Set(viaMTP.devices.map(\.id))
     var methods: [DeviceID: ConnectionMethod] = [:]
     var ejected: [DeviceInfo] = []
     for (scan, info) in viaMTP.ejected.map({ (viaMTP, $0) }) + viaADB.ejected.map({ (viaADB, $0) })
@@ -93,8 +102,9 @@ public actor CompositeTransport: DeviceTransport {
     for (list, pick) in [("busy", \DeviceScan.busy), ("notSharing", \DeviceScan.notSharing)] {
       for scan in [viaMTP, viaADB] {
         for info in scan[keyPath: pick] where !listed.contains(info.id) {
+          guard methods[info.id] == nil else { continue }
           leftOut[list, default: []].append(info)
-          methods[info.id] = methods[info.id] ?? scan.method(of: info.id)
+          methods[info.id] = scan.method(of: info.id)
         }
       }
     }
@@ -102,18 +112,40 @@ public actor CompositeTransport: DeviceTransport {
     return DeviceScan(
       devices: devices.sorted { $0.id.serial < $1.id.serial }, busy: leftOut["busy"] ?? [],
       notSharing: leftOut["notSharing"] ?? [], ejected: ejected, rescanAfter: rescanAfter,
-      method: .usbFileTransfer, methods: methods)
+      method: .usbFileTransfer, methods: methods,
+      awaitingAuthorization: viaMTP.awaitingAuthorization + viaADB.awaitingAuthorization)
   }
 
   private func named(_ info: DeviceInfo) -> DeviceInfo {
     mtpNames[info.id] ?? info
   }
 
+  /// Opens `id` over the transport that serves it. A device ADB serves but whose storages ADB
+  /// cannot read yet (locked, or not mounted yet) is opened over MTP instead when MTP offers it,
+  /// so a device that works over MTP never shows as not sharing; the hub moves it to ADB once
+  /// ADB is ready. If MTP cannot open it either, the ADB session is returned as it is.
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {
     switch servers[id] {
-    case .adb: try await adb.open(id)
-    case .mtp: try await mtp.open(id)
+    case .mtp: return try await mtp.open(id)
     case nil: throw .deviceNotFound(id)
+    case .adb:
+      let session = try await adb.open(id)
+      guard overMTP.contains(id), await !Self.isReady(session) else { return session }
+      do throws(TransportError) {
+        let fallback = try await mtp.open(id)
+        await session.close()
+        return fallback
+      } catch {
+        return session
+      }
+    }
+  }
+
+  private static func isReady(_ session: any DeviceSession) async -> Bool {
+    do throws(TransportError) {
+      return try await !session.storages().isEmpty
+    } catch {
+      return false
     }
   }
 

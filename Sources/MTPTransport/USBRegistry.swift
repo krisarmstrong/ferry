@@ -67,7 +67,8 @@ public enum USBRegistry {
       registryID: registryID, locationID: locationID, address: address, vendorID: vendor,
       productID: product, interfaces: configuration == 0 ? nil : interfaces(of: service),
       vendorName: string(service, "USB Vendor Name"),
-      productName: string(service, "USB Product Name"))
+      productName: string(service, "USB Product Name"),
+      serial: string(service, "USB Serial Number"))
   }
 
   private static func interfaces(of device: io_service_t) -> [USBInterface] {

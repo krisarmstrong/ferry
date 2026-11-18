@@ -17,6 +17,8 @@ actor MTPSession: DeviceSession {
   static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "MTPSession")
 
+  nonisolated let method = ConnectionMethod.usbFileTransfer
+
   nonisolated let info: DeviceInfo
   nonisolated let partials: PartialRegistry
   let device: any MTPDeviceOperations

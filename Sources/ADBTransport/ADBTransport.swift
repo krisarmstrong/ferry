@@ -27,8 +27,10 @@ public struct ADBRoutes: Sendable, Equatable {
 /// The server lists devices by its own serial: the USB serial, or `host:port` over the network.
 /// A device is known by its `ro.serialno` instead, read once per adb serial, which is the USB
 /// serial MTP reports too, so one device over USB and Wi-Fi (or MTP) is one `DeviceID`. An
-/// unauthorised device is reported in `notSharing` under its adb serial; an offline one, or one
-/// in recovery or the bootloader, is left out.
+/// unauthorised USB device is reported in `notSharing` under its adb serial (its USB serial); an
+/// unauthorised network device names no unit until it is allowed, so its `host:port` is passed
+/// on in `awaitingAuthorization` instead. An offline device, or one in recovery or the
+/// bootloader, is left out.
 ///
 /// A scan touches a device only with `getprop`, over a shell connection of its own, and only for
 /// an adb serial it has not seen listed as ready since the server last answered. That includes a
@@ -174,16 +176,14 @@ public actor ADBTransport: DeviceTransport {
       let unauthorized = listed.filter { $0.state == .unauthorized }
         .filter { !known.contains(Self.describe($0).id) }
         .sorted { $0.serial < $1.serial }
-      var overNetwork = Set(unauthorized.filter(\.isWireless).map { DeviceID(serial: $0.serial) })
-      for (id, device) in found where device.usb == nil {
-        overNetwork.insert(id)
-      }
+      let overNetwork = found.filter { $0.value.usb == nil }.keys
       return DeviceScan(
         devices: found.values.map(\.info).filter { parked[$0.id] == nil }.sorted(by: Self.serial),
-        notSharing: unauthorized.map(Self.describe),
+        notSharing: unauthorized.filter { !$0.isWireless }.map(Self.describe),
         ejected: parked.values.map(\.info).sorted(by: Self.serial), rescanAfter: rescanAfter,
         method: .usbADB,
-        methods: Dictionary(uniqueKeysWithValues: overNetwork.map { ($0, .wifiADB) }))
+        methods: Dictionary(uniqueKeysWithValues: overNetwork.map { ($0, .wifiADB) }),
+        awaitingAuthorization: unauthorized.filter(\.isWireless).map(\.serial))
     }
   }
 
