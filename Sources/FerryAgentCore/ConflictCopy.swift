@@ -26,11 +26,20 @@ enum ConflictCopy {
   /// `report (conflict from Mac).txt`, then `report (conflict from Mac 2).txt` and so on. The
   /// marker goes before the last extension, so the copy opens in the same app. A name that
   /// starts with its only dot (`.profile`) has no extension.
+  /// A name longer than a device stores (`maxNameBytes` of UTF-8) loses characters from the end
+  /// of its base, never the marker or the extension.
   static func name(for name: String, attempt: Int) -> String {
     let marker = attempt == 1 ? " (conflict from Mac)" : " (conflict from Mac \(attempt))"
-    guard let dot = name.lastIndex(of: "."), dot != name.startIndex else { return name + marker }
-    return name[..<dot] + marker + name[dot...]
+    let dot = name.lastIndex(of: ".").flatMap { $0 == name.startIndex ? nil : $0 }
+    var base = name[..<(dot ?? name.endIndex)]
+    let tail = marker + (dot.map { String(name[$0...]) } ?? "")
+    while base.utf8.count + tail.utf8.count > maxNameBytes, !base.isEmpty {
+      base = base.dropLast()
+    }
+    return base + tail
   }
+
+  private static let maxNameBytes = 255
 
   private static let maxAttempts = 99
 

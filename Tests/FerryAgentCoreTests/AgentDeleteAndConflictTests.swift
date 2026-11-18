@@ -290,6 +290,17 @@ struct AgentDeleteAndConflictTests {
   func conflictNames(name: String, attempt: Int, expected: String) {
     #expect(ConflictCopy.name(for: name, attempt: attempt) == expected)
   }
+
+  /// A device stores a name of at most 255 UTF-8 bytes: the name gives way, the marker and the
+  /// extension stay.
+  @Test(arguments: [String(repeating: "a", count: 250), String(repeating: "é", count: 125)])
+  func aConflictNameFitsInTheDevicesLimit(base: String) {
+    let copy = ConflictCopy.name(for: base + ".txt", attempt: 12)
+
+    #expect(copy.utf8.count <= 255)
+    #expect(copy.hasSuffix(" (conflict from Mac 12).txt"))
+    #expect(base.hasPrefix(copy.prefix { $0 != " " }))
+  }
 }
 
 extension AgentDeleteAndConflictTests {
