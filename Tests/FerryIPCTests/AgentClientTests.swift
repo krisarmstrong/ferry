@@ -86,14 +86,14 @@ private struct Harness {
   let release: AsyncStream<Void>.Continuation
 
   /// `signedOnly` uses the production delegate, which admits only Ferry-signed peers.
-  init(signedOnly: Bool = false, refusals: Int = 0) {
+  init(signedOnly: Bool = false, refusals: Int = 0, role: ClientRole? = nil) {
     let (started, startedContinuation) = AsyncStream.makeStream(of: Void.self)
     let (releaseStream, release) = AsyncStream.makeStream(of: Void.self)
     let handler = StubHandler(started: startedContinuation, release: releaseStream)
     delegate = RefusingDelegate(
       inner: signedOnly
         ? AgentListenerDelegate(handler: handler, identity: testIdentity)
-        : AgentListenerDelegate(handler: handler, codeSigningRequirement: nil),
+        : AgentListenerDelegate(handler: handler, role: role),
       refusals: refusals)
     listener.delegate = delegate
     listener.resume()
@@ -216,4 +216,44 @@ func progressReachesTheRequestBeforeItsReply() async throws {
   _ = try await harness.client.send(
     .list(domain: "d", folder: .root), file: nil, progress: quiet.record)
   #expect(quiet.all.isEmpty)
+}
+
+/// Each Ferry process may send only the requests it needs: a compromised extension cannot eject
+/// devices or remove every domain, and the app cannot touch items.
+@Test(.timeLimit(.minutes(1)))
+func theProviderMaySendOnlyItemRequests() async throws {
+  let harness = Harness(role: .provider)
+  defer { harness.finish() }
+  #expect(
+    try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
+      == .entries(try listing()))
+  for request: AgentRequest in [
+    .status, .eject(DeviceID(serial: "A")), .removeAllDomains, .recheck(DeviceID(serial: "A")),
+    .refresh(DeviceID(serial: "A")),
+  ] {
+    #expect(
+      try await harness.client.send(request, file: nil) == .failure(.io("request not allowed")),
+      "\(request)")
+  }
+}
+
+@Test(.timeLimit(.minutes(1)))
+func theAppMayNotSendItemRequests() async throws {
+  let harness = Harness(role: .app)
+  defer { harness.finish() }
+  #expect(
+    try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
+      == .failure(.io("request not allowed")))
+}
+
+@Test func eachRoleHasItsOwnRequirement() throws {
+  let identity = try #require(FerryIdentity(teamID: "ABCDE12345"))
+  #expect(
+    identity.requirement(for: .provider) == """
+      anchor apple generic and certificate leaf[subject.OU] = "ABCDE12345" and \
+      identifier "io.github.krisarmstrong.ferry.provider"
+      """)
+  #expect(identity.requirement(for: .app).hasSuffix(#"identifier "io.github.krisarmstrong.ferry""#))
+  // This test process is not Ferry: it has no role.
+  #expect(ClientRole.signed(pid: getpid(), by: identity) == nil)
 }

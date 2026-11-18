@@ -40,11 +40,44 @@ public struct FerryIdentity: Sendable, Equatable {
     """
   }
 
+  /// Admits only the client in `role`, signed by this team.
+  public func requirement(for role: ClientRole) -> String {
+    """
+    anchor apple generic and certificate leaf[subject.OU] = "\(teamID)" and \
+    identifier "\(role.signingIdentifier)"
+    """
+  }
+
   /// The agent itself, as its clients require it to be signed.
   public var agentRequirement: String {
     """
     anchor apple generic and certificate leaf[subject.OU] = "\(teamID)" and \
     identifier "io.github.krisarmstrong.ferry.agent"
     """
+  }
+}
+
+/// Which Ferry process a connection to the agent comes from. Each may send only the requests it
+/// needs: the app manages devices and domains, the FileProvider extension works on items.
+public enum ClientRole: Sendable, CaseIterable {
+  case app
+  case provider
+
+  var signingIdentifier: String {
+    switch self {
+    case .app: "io.github.krisarmstrong.ferry"
+    case .provider: "io.github.krisarmstrong.ferry.provider"
+    }
+  }
+
+  /// Whether a client in this role may send `request`.
+  public func allows(_ request: AgentRequest) -> Bool {
+    switch request {
+    case .status, .recheck, .refresh, .eject, .removeAllDomains:
+      self == .app
+    case .item, .list, .fetch, .create, .rename, .move, .replaceContents, .delete, .changes,
+      .workingSet:
+      self == .provider
+    }
   }
 }

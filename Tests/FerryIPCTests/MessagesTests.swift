@@ -172,7 +172,7 @@ private struct UnreachableHandler: AgentHandling {
 }
 
 private func reply(to data: Data) async throws -> AgentResponse {
-  let service = AgentService(handler: UnreachableHandler())
+  let service = AgentService(handler: UnreachableHandler(), role: nil)
   let (replies, continuation) = AsyncStream.makeStream(of: Data.self)
   service.send(data, id: "test", file: nil) { continuation.yield($0) }
   var iterator = replies.makeAsyncIterator()
