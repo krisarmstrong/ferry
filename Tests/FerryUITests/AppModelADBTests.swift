@@ -41,6 +41,37 @@ struct AppModelADBTests {
     #expect(model.showsInstallADB == shows)
   }
 
+  /// adb is installed but its server does not answer: Check again is how the user retries.
+  @Test(arguments: [
+    (ADBStatus?.some(.serverDown), true, true), (.some(.serverDown), false, false),
+    (.some(.notInstalled), true, false), (.some(.available), true, false), (nil, true, false),
+  ])
+  func notRunningRowShowsOnlyWithADeviceAndAStoppedServer(
+    status: ADBStatus?, withDevice: Bool, shows: Bool
+  ) async {
+    let client = FakeClient(log: log)
+    client.setStatus(withDevice ? [device("A1", model: "Pixel 8", .ready([]))] : [], adb: status)
+    let model = model(client)
+    await model.refresh()
+    #expect(model.showsADBNotRunning == shows)
+  }
+
+  /// Check again is no reason to drop the notice of unsent changes.
+  @Test func checkAgainKeepsTheUnsentChangesNotice() async throws {
+    let folder = FileManager.default.temporaryDirectory.appending(path: "ferry-kept-\(UUID())")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    try Data("x".utf8).write(to: folder.appending(path: "file"))
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let client = FakeClient(log: log)
+    client.setStatus([], preserved: [folder])
+    let model = model(client)
+    await model.refresh()
+    #expect(model.preservedChanges == [folder])
+    client.setStatus([])
+    await model.recheckADB()
+    #expect(model.preservedChanges == [folder])
+  }
+
   @Test func checkAgainAsksTheAgentThenReadsStatus() async {
     let client = FakeClient(log: log)
     client.setStatus([device("A1", model: "Pixel 8", .ready([]))], adb: .notInstalled)

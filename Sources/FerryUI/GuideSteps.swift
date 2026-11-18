@@ -87,8 +87,8 @@ public enum GuideSteps {
         LocalizedStringResource("Ask NetAlly to enable ADB on the tester.", bundle: .module),
         LocalizedStringResource(
           """
-          On the tester: **Settings** → **System** → **About tester**. Tap **Build number** \
-          until developer mode is on.
+          After that, on the tester: **Settings** → **System** → **About tester**. Tap \
+          **Build number** until developer mode is on.
           """, bundle: .module),
         LocalizedStringResource(
           "Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
@@ -98,7 +98,7 @@ public enum GuideSteps {
           With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. \
           The tester offers ADB only after this.
           """, bundle: .module),
-        allowThisComputer,
+        promptOK,
       ]
     case .otherAndroid8to9:
       [
@@ -111,7 +111,7 @@ public enum GuideSteps {
         LocalizedStringResource(
           "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
           bundle: .module),
-        allowThisComputer,
+        promptOK,
       ]
     case .otherAndroid10Plus:
       [
@@ -124,7 +124,7 @@ public enum GuideSteps {
         LocalizedStringResource(
           "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
           bundle: .module),
-        allowThisComputer,
+        promptAllow,
       ]
     }
   }
@@ -168,7 +168,12 @@ public enum GuideSteps {
     }
   }
 
-  private static let allowThisComputer = LocalizedStringResource(
+  /// The USB debugging prompt names its button OK on Android 8 and 9, Allow on 10 and newer.
+  private static let promptOK = LocalizedStringResource(
+    "On the device, tick **Always allow from this computer** and tap **OK**.",
+    bundle: .module)
+
+  private static let promptAllow = LocalizedStringResource(
     "On the device, tick **Always allow from this computer** and tap **Allow**.",
     bundle: .module)
 

@@ -50,6 +50,9 @@ public struct MenuContent: View {
           .font(.callout)
           .foregroundStyle(.secondary)
       }
+      if model.showsADBNotRunning {
+        ADBNotRunningRow { Task { await model.recheckADB() } }
+      }
       if model.showsInstallADB {
         InstallADBRow(
           copy: { model.copyInstallCommand() }, checkAgain: { Task { await model.recheckADB() } })
@@ -256,7 +259,7 @@ private struct DeviceRow: View {
             .font(.headline)
           Text(verbatim: "·")
             .foregroundStyle(.secondary)
-          Text(DevicePresentation.status(of: device.state))
+          Text(DevicePresentation.status(of: device))
             .foregroundStyle(.secondary)
         }
         .lineLimit(1)

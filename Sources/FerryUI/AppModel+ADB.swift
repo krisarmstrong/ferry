@@ -12,6 +12,12 @@ extension AppModel {
     agent == .running && adbStatus == .notInstalled && !devices.isEmpty
   }
 
+  /// adb is installed but its server does not answer, and a device is attached that could use
+  /// it: the same rule as `showsInstallADB`.
+  public var showsADBNotRunning: Bool {
+    agent == .running && adbStatus == .serverDown && !devices.isEmpty
+  }
+
   /// The Check again button: the agent looks for adb and starts its server.
   public func recheckADB() async {
     await perform(.recheckADB)

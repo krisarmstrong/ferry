@@ -4,6 +4,7 @@ import SwiftUI
 struct InstallADBRow: View {
   let copy: () -> Void
   let checkAgain: () -> Void
+  @State private var copied = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -18,13 +19,44 @@ struct InstallADBRow: View {
         .textSelection(.enabled)
         .foregroundStyle(.secondary)
       HStack {
-        Button(action: copy) {
-          Text("Copy", bundle: .module)
+        Button {
+          copy()
+          copied = true
+        } label: {
+          Text(copied ? "Copied" : "Copy", bundle: .module)
+        }
+        .help(Text("Copy the install command", bundle: .module))
+        .task(id: copied) {
+          guard copied else { return }
+          try? await Task.sleep(for: .seconds(2))
+          copied = false
         }
         Button(action: checkAgain) {
           Text("Check again", bundle: .module)
         }
       }
     }
+    .accessibilityElement(children: .contain)
+  }
+}
+
+/// adb is installed but its server does not answer.
+struct ADBNotRunningRow: View {
+  let checkAgain: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label {
+        Text("adb isn't running", bundle: .module)
+          .font(.headline)
+      } icon: {
+        Image(systemName: "exclamationmark.triangle")
+          .foregroundStyle(.yellow)
+      }
+      Button(action: checkAgain) {
+        Text("Check again", bundle: .module)
+      }
+    }
+    .accessibilityElement(children: .contain)
   }
 }

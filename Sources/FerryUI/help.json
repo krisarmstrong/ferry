@@ -75,17 +75,18 @@
       "symbol": "terminal",
       "paragraphs": [
         "With USB debugging on, Ferry serves the device over ADB, which is faster than file transfer and adds more tools. File transfer keeps working without it.",
-        "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check again** once it is installed."
+        "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check again** once it is installed.",
+        "Menu names vary a little between phone makers. Look for Developer options and the USB debugging switch."
       ],
       "groups": [
         {
           "title": "NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG",
           "steps": [
             "Ask NetAlly to enable ADB on the tester.",
-            "On the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on.",
+            "After that, on the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on.",
             "Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
             "With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester offers ADB only after this.",
-            "On the device, tick **Always allow from this computer** and tap **Allow**."
+            "On the device, tick **Always allow from this computer** and tap **OK**."
           ],
           "note": "Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555."
         },
@@ -95,7 +96,7 @@
             "Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.",
             "Open **Settings** → **System** → **About phone** and tap **Build number** until developer mode is on.",
             "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
-            "On the device, tick **Always allow from this computer** and tap **Allow**."
+            "On the device, tick **Always allow from this computer** and tap **OK**."
           ]
         },
         {
@@ -210,15 +211,23 @@
             },
             {
               "term": "Allow USB debugging on the device",
-              "detail": "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **Allow**."
+              "detail": "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **OK** or **Allow**."
             },
             {
-              "term": "Waiting for Allow on",
+              "term": "Waiting for Allow",
+              "detail": "Only adb lists the device, and USB debugging is not allowed yet. Tap **OK** or **Allow** on the device."
+            },
+            {
+              "term": "Waiting for you to allow this Mac on…",
               "detail": "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device."
             },
             {
               "term": "Install adb for more tools…",
               "detail": "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check again**."
+            },
+            {
+              "term": "adb isn't running",
+              "detail": "adb is installed but its server is not answering. Click **Check again**."
             }
           ]
         },

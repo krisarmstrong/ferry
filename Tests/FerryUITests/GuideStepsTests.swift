@@ -52,14 +52,15 @@ struct GuideStepsTests {
     let steps = Self.debugging(.netAllyAndroid8Board)
     #expect(steps.count == 5)
     #expect(steps[0] == "Ask NetAlly to enable ADB on the tester.")
+    // These units take the developer-mode steps only once NetAlly has enabled ADB.
+    #expect(steps[1].hasPrefix("After that,"))
     #expect(steps[1].contains("**Settings** → **System** → **About tester**"))
     #expect(steps[1].contains("**Build number**"))
     #expect(steps[2].contains("**Settings** → **System** → **Developer options**"))
     #expect(steps[2].contains("**USB debugging**"))
     // The board offers ADB only after the toggle is cycled with the cable in.
     #expect(steps[3].contains("cable") && steps[3].contains("off and on"))
-    #expect(
-      steps[4].contains("**Always allow from this computer**") && steps[4].contains("**Allow**"))
+    #expect(steps[4].contains("**Always allow from this computer**"))
   }
 
   /// How a NetAlly unit is unlocked is NetAlly's to share, not Ferry's.
@@ -101,5 +102,18 @@ struct GuideStepsTests {
 
   @Test func everyTopicHasATitle() {
     for topic in GuideTopic.allCases { #expect(!String(localized: topic.title).isEmpty) }
+  }
+
+  /// Android 8 and 9 (and the NetAlly board, which runs Android 8) name the prompt's button OK;
+  /// Android 10 and newer name it Allow.
+  @Test(arguments: [
+    (DeviceFamily.netAllyAndroid8Board, "**OK**"), (.otherAndroid8to9, "**OK**"),
+    (.otherAndroid10Plus, "**Allow**"),
+  ])
+  func thePromptButtonIsNamedPerAndroidVersion(family: DeviceFamily, button: String) {
+    let last = Self.debugging(family).last ?? ""
+    #expect(last.contains("**Always allow from this computer**"))
+    #expect(last.contains(button))
+    #expect(last.contains(button == "**OK**" ? "**Allow**" : "**OK**") == false)
   }
 }

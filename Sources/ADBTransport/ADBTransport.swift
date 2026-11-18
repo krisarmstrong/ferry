@@ -185,24 +185,6 @@ public actor ADBTransport: DeviceTransport {
     }
   }
 
-  /// The devices adb lists over USB as unauthorised: USB debugging is on, the user has not
-  /// allowed this Mac yet.
-  private static func waitingForAllow(_ listed: [ADBDevice]) -> Set<DeviceID> {
-    Set(
-      listed.filter { $0.state == .unauthorized && !$0.isWireless }
-        .map { describe($0).id })
-  }
-
-  /// Looks for `adb` again and starts its server, which the user may have just installed. A
-  /// missing `adb` is no error: the next scan reports `.notInstalled`.
-  public func startADBServer() async {
-    do throws(ADBError) {
-      try await host.startServer()
-    } catch {
-      Self.log.info("starting adb: \(String(describing: error), privacy: .public)")
-    }
-  }
-
   /// The named devices among `usable`, one per `ro.serialno`, USB first for info and route.
   private func assemble(_ usable: [ADBDevice]) -> [DeviceID: Found] {
     var found: [DeviceID: Found] = [:]
@@ -361,5 +343,32 @@ public actor ADBTransport: DeviceTransport {
       }
     }
     return named
+  }
+}
+
+extension ADBTransport {
+  /// The devices adb lists over USB as unauthorised: USB debugging is on, the user has not
+  /// allowed this Mac yet.
+  private static func waitingForAllow(_ listed: [ADBDevice]) -> Set<DeviceID> {
+    Set(
+      listed.filter { $0.state == .unauthorized && !$0.isWireless }
+        .map { describe($0).id })
+  }
+
+  /// Looks for `adb` again and starts its server, which the user may have just installed. A
+  /// missing `adb` is no error: the next scan reports `.notInstalled`.
+  public func startADBServer() async {
+    do throws(ADBError) {
+      try await host.startServer()
+    } catch {
+      Self.log.log(
+        level: Self.startFailureLevel(error),
+        "starting adb: \(String(describing: error), privacy: .public)")
+    }
+  }
+
+  /// A missing `adb` is a state the menu already shows; any other failure to start is a problem.
+  static func startFailureLevel(_ error: ADBError) -> OSLogType {
+    error == .adbNotInstalled ? .info : .error
   }
 }

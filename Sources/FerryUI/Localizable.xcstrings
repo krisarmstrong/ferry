@@ -35,6 +35,9 @@
     "A package, such as an .rtfd or Keynote document, an app, a plug-in or a framework, is one item on the Mac but a folder on the device, so Ferry does not copy it. Control-click it, choose **Compress**, and copy the .zip instead." : {
       "extractionState" : "manual"
     },
+    "After that, on the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on." : {
+      "extractionState" : "manual"
+    },
     "Allow Ferry's helper" : {
       "localizations" : {
         "en" : {
@@ -114,7 +117,13 @@
     "Control-click a file you opened and choose **Remove Download**. The file stays on the device." : {
       "extractionState" : "manual"
     },
+    "Copied" : {
+
+    },
     "Copy" : {
+
+    },
+    "Copy the install command" : {
 
     },
     "Copying “%@” to the device · %lld%%" : {
@@ -285,6 +294,9 @@
     "Menu items" : {
       "extractionState" : "manual"
     },
+    "Menu names vary a little between phone makers. Look for Developer options and the USB debugging switch." : {
+      "extractionState" : "manual"
+    },
     "More tools with USB debugging…" : {
       "extractionState" : "manual"
     },
@@ -309,13 +321,16 @@
     "On the device, tick **Always allow from this computer** and tap **Allow**." : {
       "extractionState" : "manual"
     },
-    "On the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on." : {
+    "On the device, tick **Always allow from this computer** and tap **OK**." : {
       "extractionState" : "manual"
     },
     "On the unit: **Settings** (bottom of the Home screen) → **Connected devices** → **USB**." : {
 
     },
     "Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555." : {
+      "extractionState" : "manual"
+    },
+    "Only adb lists the device, and USB debugging is not allowed yet. Tap **OK** or **Allow** on the device." : {
       "extractionState" : "manual"
     },
     "Open **Settings** → **About phone** and tap **Build number** until developer mode is on." : {
@@ -474,6 +489,9 @@
     "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **Allow**." : {
       "extractionState" : "manual"
     },
+    "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **OK** or **Allow**." : {
+      "extractionState" : "manual"
+    },
     "USB · ADB" : {
       "extractionState" : "manual"
     },
@@ -513,11 +531,14 @@
     "Using Ferry in Finder" : {
       "extractionState" : "manual"
     },
-    "Waiting for Allow on" : {
+    "Waiting for Allow" : {
       "extractionState" : "manual"
     },
-    "Waiting for Allow on %@" : {
+    "Waiting for you to allow this Mac on %@" : {
 
+    },
+    "Waiting for you to allow this Mac on…" : {
+      "extractionState" : "manual"
     },
     "Wi-Fi · ADB" : {
       "extractionState" : "manual"
@@ -540,7 +561,13 @@
     "Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched. You can then move Ferry to the Trash." : {
 
     },
+    "adb is installed but its server is not answering. Click **Check again**." : {
+      "extractionState" : "manual"
+    },
     "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check again**." : {
+      "extractionState" : "manual"
+    },
+    "adb isn't running" : {
       "extractionState" : "manual"
     },
     "macOS can't find Ferry's helper" : {

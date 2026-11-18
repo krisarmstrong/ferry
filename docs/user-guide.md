@@ -105,12 +105,12 @@ transfer, **More tools with USB debugging…** in the menu opens the steps below
 ### NetAlly LinkRunner 10G, LinkRunner 100G and EtherScope nXG
 
 1. Ask NetAlly to enable ADB on the tester.
-2. On the tester: **Settings** → **System** → **About tester**. Tap **Build number** until
-   developer mode is on.
+2. After that, on the tester: **Settings** → **System** → **About tester**. Tap
+   **Build number** until developer mode is on.
 3. Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.
 4. With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester
    offers ADB only after this.
-5. On the device, tick **Always allow from this computer** and tap **Allow**.
+5. On the device, tick **Always allow from this computer** and tap **OK**.
 
 Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555.
 
@@ -120,7 +120,7 @@ Once ADB is enabled, NetAlly testers also listen for ADB over the network on por
 2. Open **Settings** → **System** → **About phone** and tap **Build number** until developer
    mode is on.
 3. Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.
-4. On the device, tick **Always allow from this computer** and tap **Allow**.
+4. On the device, tick **Always allow from this computer** and tap **OK**.
 
 ### Android 10 or newer
 
@@ -129,8 +129,12 @@ Once ADB is enabled, NetAlly testers also listen for ADB over the network on por
 3. Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.
 4. On the device, tick **Always allow from this computer** and tap **Allow**.
 
-Until you tap **Allow**, the menu shows **Allow USB debugging on the device** and Ferry keeps
-serving the device over file transfer. The method it uses shows under each ready device.
+Menu names vary a little between phone makers. Look for Developer options and the USB
+debugging switch.
+
+Until you tap **OK** or **Allow**, the menu shows **Allow USB debugging on the device** and
+Ferry keeps serving the device over file transfer. A device that only adb lists shows
+**Waiting for Allow** instead of a state. The method it uses shows under each ready device.
 
 ## Using Ferry in Finder
 
@@ -263,8 +267,9 @@ Under each ready device, the menu says how Ferry reaches it:
 A device on file transfer also shows **More tools with USB debugging…**, which opens the
 [steps](#usb-debugging-adb), or **Allow USB debugging on the device** once USB debugging is on
 and waits for you to tap **Allow**. When `adb` is not installed and a device is connected, the
-menu shows **Install adb for more tools…**. A device on your network that waits for you to allow
-this Mac shows **Waiting for Allow on** its address.
+menu shows **Install adb for more tools…**. When `adb` is installed but its server is not
+answering, it shows **adb isn't running** with **Check again**. A device on your network that
+waits for you to allow this Mac shows **Waiting for you to allow this Mac on** its address.
 
 Menu items:
 
@@ -373,6 +378,7 @@ Do step 1 first. It is the step that removes the Finder locations and stops the 
 
 ## Coming next
 
-- **Wi-Fi connection**, without a cable.
+- **Pair and connect over Wi-Fi from Ferry**: today Ferry uses network devices that adb
+  already lists.
 - **Send to device** in Finder: send selected files to a connected device from the
   Control-click menu.

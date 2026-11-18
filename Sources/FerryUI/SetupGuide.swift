@@ -24,6 +24,7 @@ public struct SetupGuide: View {
       } label: {
         Text("Set up", bundle: .module)
       }
+      .labelsHidden()
       .pickerStyle(.segmented)
       Picker(selection: $model.guideFamily) {
         Text("Choose your device", bundle: .module)

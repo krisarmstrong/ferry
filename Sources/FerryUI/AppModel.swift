@@ -299,7 +299,7 @@ import os
   }
 
   func perform(_ request: AgentRequest) async {
-    preservedChanges = []
+    if request != .recheckADB { preservedChanges = [] }
     do {
       switch try await client.send(request, file: nil) {
       case .done:

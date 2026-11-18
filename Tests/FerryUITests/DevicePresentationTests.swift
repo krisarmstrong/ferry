@@ -81,6 +81,16 @@ struct DevicePresentationTests {
     }
   }
 
+  /// An unauthorised device only adb lists is waiting for Allow, not for file transfer.
+  @Test func theStatusWordMatchesTheHint() {
+    let waiting = Self.attached(.notSharingFiles, .usbADB)
+    #expect(String(localized: DevicePresentation.status(of: waiting)) == "Waiting for Allow")
+    let transfer = Self.attached(.notSharingFiles, .usbFileTransfer)
+    #expect(String(localized: DevicePresentation.status(of: transfer)) == "Not sharing files")
+    let ready = Self.attached(Self.ready, .usbADB)
+    #expect(String(localized: DevicePresentation.status(of: ready)) == "Ready")
+  }
+
   @Test func theInstallCommandIsExact() {
     #expect(DevicePresentation.installCommand == "brew install --cask android-platform-tools")
   }
@@ -88,7 +98,7 @@ struct DevicePresentationTests {
   @Test func aWaitingAddressIsEscaped() {
     #expect(
       DevicePresentation.waitingLine(for: "192.0.2.31:5555")
-        == "Waiting for Allow on 192.0.2.31:5555")
+        == "Waiting for you to allow this Mac on 192.0.2.31:5555")
     #expect(!DevicePresentation.waitingLine(for: "a\u{202E}b:5555").contains("\u{202E}"))
   }
 }

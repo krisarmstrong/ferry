@@ -15,6 +15,15 @@ extension AttachedDevice {
 
 /// Text the menu shows for device states and errors.
 enum DevicePresentation {
+  /// The status word for `device`: one only adb lists, as unauthorised, waits for Allow rather
+  /// than for file transfer.
+  static func status(of device: AttachedDevice) -> LocalizedStringResource {
+    if device.state == .notSharingFiles, device.method == .usbADB {
+      return LocalizedStringResource("Waiting for Allow", bundle: .module)
+    }
+    return status(of: device.state)
+  }
+
   static func status(of state: DeviceState) -> LocalizedStringResource {
     switch state {
     case .ready: LocalizedStringResource("Ready", bundle: .module)
@@ -71,7 +80,8 @@ enum DevicePresentation {
   static func waitingLine(for address: String) -> String {
     let address = DisplayText.escaped(address)
     return String(
-      localized: LocalizedStringResource("Waiting for Allow on \(address)", bundle: .module))
+      localized: LocalizedStringResource(
+        "Waiting for you to allow this Mac on \(address)", bundle: .module))
   }
 
   static func storageLine(_ storage: StorageInfo) -> String {
