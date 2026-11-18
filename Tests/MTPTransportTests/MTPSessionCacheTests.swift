@@ -43,8 +43,9 @@ struct MTPSessionCacheTests {
     #expect(relisted == 0, "listed the folder \(relisted) more times")
   }
 
-  /// Correctness over speed: each delete lists the folder once, to act on what is there now.
-  @Test func eachDeleteListsTheFolderOnce() async throws {
+  /// Correctness over speed: each delete lists every folder on the way from the root, to act on
+  /// what is there now.
+  @Test func eachDeleteListsThePathFromTheRoot() async throws {
     let (device, session) = try await bigFolder(100)
     let listed = await device.listCount
 
@@ -52,7 +53,8 @@ struct MTPSessionCacheTests {
       try await session.delete(SessionFixture.path("/Big/f\(index).txt"), in: storage)
     }
 
-    #expect(await device.listCount - listed == 10)
+    // The root and `/Big`, for each delete.
+    #expect(await device.listCount - listed == 20)
     #expect(
       await device.children(of: try #require(await device.objectID(named: "Big"))).count == 90)
   }
@@ -69,6 +71,24 @@ struct MTPSessionCacheTests {
       try await session.delete(SessionFixture.path("/a.txt"), in: storage)
     }
     #expect(await device.children(of: other) == ["a.txt"])
+  }
+
+  /// The cached root listing still names `/A` by the ID of a folder the device has since moved
+  /// into `/B`: resolving through it would delete `/B/A/x.txt`.
+  @Test func aFileInAFolderTheDeviceMovedIsNotDeletedThere() async throws {
+    let device = SessionFixture.makeDevice()
+    let folderA = await device.addFolder("A", parent: SessionFixture.root)
+    let folderB = await device.addFolder("B", parent: SessionFixture.root)
+    await device.addFile("x.txt", parent: folderA, data: Data("x".utf8))
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    _ = try await session.list(.root, in: storage)
+    _ = try await session.list(SessionFixture.path("/A"), in: storage)
+    await device.moveObject(folderA, to: folderB)
+
+    await #expect(throws: TransportError.notFound(try SessionFixture.path("/A/x.txt"))) {
+      try await session.delete(SessionFixture.path("/A/x.txt"), in: storage)
+    }
+    #expect(await device.children(of: folderA) == ["x.txt"])
   }
 
   /// Android's MTP server gives a file an app renamed a new object ID: to libmtp it is one

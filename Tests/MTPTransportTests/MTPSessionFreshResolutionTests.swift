@@ -6,8 +6,10 @@ import Testing
 @testable import MTPTransport
 
 /// A listing caches the folder, and the device can change behind it (an app on the phone, the
-/// user at the unit). Operations that act on one item resolve it fresh, so they never act on a
-/// stale size or on an object ID the device has since reused or dropped.
+/// user at the unit). An operation that changes the device lists the item's path fresh from the
+/// root and acts on the object found there, never on an object ID the device has since dropped
+/// or replaced; a download, which changes nothing, may start from the cache. The stub keeps
+/// object info as libmtp does, so a file grown in place keeps its listed size.
 struct MTPSessionFreshResolutionTests {
   private let storage = SessionFixture.storage
 

@@ -22,7 +22,7 @@ actor MTPSession: DeviceSession {
   let device: any MTPDeviceOperations
   /// Where a move on a device without MoveObject keeps its local copy (see `copyThenDelete`).
   let scratch: URL
-  private let resolver: PathResolver
+  let resolver: PathResolver
   private let gate = OperationGate()
   /// Raw storage ID by `StorageID.key`, refreshed by `refreshStorages()`.
   private var rawStorages: [String: UInt32] = [:]
@@ -131,10 +131,12 @@ actor MTPSession: DeviceSession {
     return try await freshEntry(path, storage: storage)
   }
 
-  /// The object at `path` with its folder listed again first.
+  /// The object at `path` with every folder from the root down to it listed again first: a
+  /// cached ancestor could name a folder the device has since moved, and the object found
+  /// through it would be somewhere else.
   func freshEntry(_ path: RemotePath, storage: UInt32) async throws(TransportError) -> MTPEntry {
-    guard let parent = path.parent else { throw .notFound(path) }
-    await resolver.invalidate(parent, storage: storage)
+    guard path.parent != nil else { throw .notFound(path) }
+    await resolver.invalidate(.root, storage: storage)
     guard let entry = try await resolver.entry(at: path, storage: storage) else {
       throw .notFound(path)
     }
@@ -181,12 +183,13 @@ actor MTPSession: DeviceSession {
     return current
   }
 
-  /// The ID of the folder at `path` and its children, listed fresh from the device since the
-  /// children are what an existence check reads. A missing path or a file is `.notFound`.
+  /// The ID of the folder at `path` and its children, listed fresh from the device, from the
+  /// root down: the children are what an existence check reads, and the folder is where a
+  /// change lands. A missing path or a file is `.notFound`.
   func folder(_ path: RemotePath, storage: UInt32) async throws(TransportError)
     -> Folder
   {
-    await resolver.invalidate(path, storage: storage)
+    await resolver.invalidate(.root, storage: storage)
     let children = try await resolver.entries(in: path, storage: storage)
     let id = try await resolver.objectID(for: path, storage: storage)
     return Folder(id: id, children: children)
@@ -360,40 +363,5 @@ extension MTPSession {
         return try await stored(source.objectID, at: renamed)
       }
     }
-  }
-
-  /// Deletes the object the folder, listed fresh, has at `path`. Once it is gone only it leaves
-  /// that listing, which stays cached for downloads; a failure drops the listing.
-  func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError) {
-    try await operation { () throws(TransportError) in
-      guard let parent = path.parent else { throw .notFound(path) }
-      let raw = try await raw(storage)
-      let entry = try await freshEntry(path, storage: raw)
-      do throws(TransportError) {
-        try await deleteTree(entry, at: path, depth: 0, storage: raw)
-      } catch {
-        await resolver.invalidate(parent, storage: raw)
-        throw error
-      }
-      await resolver.removed(entry.objectID, at: path, storage: raw)
-    }
-  }
-
-  /// Deletes `entry`, `depth` levels below `top`, emptying a folder child by child first, since
-  /// MTP devices need not delete a non-empty folder. Children are listed fresh from the device,
-  /// not from the cache. Past `RemotePath.maxTreeDepth` levels it stops with `.folderTooDeep`,
-  /// so a device that reports a loop cannot recurse without end; what it deleted on the way
-  /// down stays deleted. (The agent walks a tree before it deletes it, and refuses one that deep
-  /// before anything goes.)
-  private func deleteTree(_ entry: MTPEntry, at top: RemotePath, depth: Int, storage: UInt32)
-    async throws(TransportError)
-  {
-    guard depth <= RemotePath.maxTreeDepth else { throw .folderTooDeep(top) }
-    if entry.isFolder {
-      for child in try await device.list(storage: storage, parent: entry.objectID) {
-        try await deleteTree(child, at: top, depth: depth + 1, storage: storage)
-      }
-    }
-    try await device.delete(objectID: entry.objectID)
   }
 }
