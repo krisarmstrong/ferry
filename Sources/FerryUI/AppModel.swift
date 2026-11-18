@@ -48,7 +48,7 @@ import os
   private let client: any AgentSending
   private let services: any SystemServicing
   private let sleep: @Sendable (Duration) async throws -> Void
-  /// Devices the guide has opened for, or that Ferry ejected, this app run.
+  /// Devices the guide has opened for this app run.
   private var guidedDevices: Set<DeviceID> = []
   private var emptyGuideShown = false
 
@@ -162,9 +162,8 @@ import os
     return guideOpenPending
   }
 
+  /// An ejected device reports `.ejected`, which never opens the guide.
   public func eject(_ id: DeviceID) async {
-    // An ejected device reports `.notSharingFiles`, which must not open the guide.
-    guidedDevices.insert(id)
     await perform(.eject(id))
   }
 

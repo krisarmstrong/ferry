@@ -12,8 +12,9 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// app holds is listed as `.busy`, and one the transport sees without file transfer as
 /// `.notSharingFiles`, until it leaves a scan; `recheck` on either asks the transport to try it
 /// again. A held session whose storages fail for any other reason than a lock or a departure is
-/// closed, so a later scan can open it afresh. Any device a scan reports as usable and the hub
-/// does not hold is opened: the transport, not the hub, keeps an ejected device out of that list.
+/// closed, so a later scan can open it afresh, after a back-off. An ejected device is listed as
+/// `.ejected` while the transport reports it so; any other device a scan reports as usable and
+/// the hub does not hold is opened.
 ///
 /// A device that is attached but not sharing files is re-checked every two seconds. MTP has no
 /// event for "file transfer turned on", so this is the hub's one poll, and it runs only while
@@ -255,7 +256,7 @@ public actor DeviceHub {
   }
 
   /// Opens a device the hub does not hold: one it does not list yet, or one that was busy,
-  /// failed, or not sharing files and is now offered as usable.
+  /// failed, not sharing files or ejected and is now offered as usable.
   private func admit(_ info: DeviceInfo) async {
     let existing = entries[info.id]
     if let existing, case .held = existing.holding { return }

@@ -119,7 +119,7 @@ public actor DomainController {
   }
 
   /// Removes the device's domains, then closes its session, and returns where unsent changes
-  /// were saved. The device stays listed as not sharing files until it is unplugged. A transfer
+  /// were saved. The device stays listed as ejected until it is unplugged or mounted. A transfer
   /// in progress on the device finishes before the close, since the session runs its operations
   /// one at a time; the close is awaited outside the operation queue, so other devices' domains
   /// keep updating meanwhile.
