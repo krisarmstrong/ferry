@@ -88,20 +88,6 @@ struct AgentDeleteAndConflictTests {
         == .done)
   }
 
-  /// FileProvider deletes a package as one item, without the recursive option: its folder on
-  /// the device goes with what is inside it.
-  @Test func aPackageDeletesWithItsContents() async throws {
-    let setup = try await setup([("/Notes.rtfd/TXT.rtf", "rtf")])
-    defer { setup.harness.finish() }
-    let package = try await setup.id("/Notes.rtfd")
-
-    #expect(
-      await setup.send(.delete(domain: setup.domain, id: package, base: nil, recursive: false))
-        == .done)
-    #expect(
-      await setup.device.contents(of: try path("/Notes.rtfd/TXT.rtf"), in: setup.storage) == nil)
-  }
-
   @Test func aRecursiveDeleteRemovesTheFolderAndItsFiles() async throws {
     let setup = try await setup([("/Reports/r1.txt", "one"), ("/Reports/Sub/r2.txt", "two")])
     defer { setup.harness.finish() }

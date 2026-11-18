@@ -115,13 +115,13 @@ their device with a percentage. Ferry writes each file under a hidden temporary 
 renames it only when the copy is complete, so a half-copied file never appears under its real
 name.
 
-Packages, such as `.rtfd` documents, are one item, as on the Mac: they copy, open and save
-whole, including ones made on the device. On the device a package is a folder. A package
-deeper than 32 folders, with more than 100,000 items or more than 8 GB is refused with "This
-package is too large or too deep to copy between the device and this Mac." Symbolic links and aliases can't be
-copied to the device: Finder shows "Symbolic links and aliases can't be copied to the device"
-for them. Apps and other code bundles (plug-ins, frameworks, extensions) are not copied to the
-device either: Finder shows "Apps and code bundles can't be copied to the device."
+Ferry copies files and folders. A package, such as an `.rtfd` or Keynote document, an app, a
+plug-in or a framework, is one item on the Mac but a folder on the device, so Ferry does not
+copy it: Finder shows "Packages and app bundles can't be copied to the device. Compress it into
+a .zip first." Control-click it, choose **Compress**, and copy the `.zip`. On the device every
+folder is a plain folder, so a package made there shows as a folder with its files in it. Symbolic links and aliases can't be copied to the
+device either: Finder shows "Symbolic links and aliases can't be copied to the device" for
+them.
 
 ### A file changed on both sides
 
@@ -259,10 +259,11 @@ turn on **Ferry** under **Allow in the Background**.
 If the menu says "Ferry's helper is not responding. Quit Ferry and open it again.", quit Ferry
 from the menu and open it again from Applications.
 
-### "Apps and code bundles can't be copied to the device"
+### "Packages and app bundles can't be copied to the device"
 
-Ferry does not copy apps, plug-ins, frameworks or extensions to a device: a test unit has no use
-for them. Copy the documents you need instead.
+A package, such as an `.rtfd` or Keynote document, an app, a plug-in or a framework, is one item
+on the Mac but a folder on the device, so Ferry does not copy it. Control-click it, choose
+**Compress**, and copy the `.zip` instead.
 
 ### An app or script from the device does not open at once
 

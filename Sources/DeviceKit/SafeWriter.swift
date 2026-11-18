@@ -53,7 +53,7 @@ public struct SafeWriter: Sendable {
   private static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "SafeWriter")
 
-  let session: any DeviceSession
+  private let session: any DeviceSession
 
   public init(session: any DeviceSession) {
     self.session = session
@@ -242,7 +242,7 @@ public struct SafeWriter: Sendable {
 
   /// Renames a backup back to the file it was. If that fails the backup stays, hidden, and is
   /// logged: this session keeps it, and a later one renames it back (see `resolveOrphan`).
-  func restore(_ backup: RemotePath, to original: RemotePath, in storage: StorageID)
+  private func restore(_ backup: RemotePath, to original: RemotePath, in storage: StorageID)
     async
   {
     guard let name = original.name else { return }
@@ -292,7 +292,7 @@ public struct SafeWriter: Sendable {
   ///
   /// Two or more colliding items are `.alreadyExists`, naming one that would not be replaced:
   /// the rename would meet it after the old file was set aside.
-  func existing(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
+  private func existing(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem?
   {
     guard let parent = path.parent, let name = path.name else { return nil }
@@ -313,7 +313,7 @@ public struct SafeWriter: Sendable {
     return chosen
   }
 
-  func discard(_ path: RemotePath, in storage: StorageID) async {
+  private func discard(_ path: RemotePath, in storage: StorageID) async {
     do {
       try await session.delete(path, in: storage)
     } catch .notFound {

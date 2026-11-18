@@ -26,8 +26,6 @@ private func tag(_ request: AgentRequest) -> Int {
   case .changes: 12
   case .workingSet: 13
   case .refresh: 14
-  case .createPackage: 15
-  case .replacePackage: 16
   }
 }
 
@@ -50,10 +48,6 @@ private func requests() -> [AgentRequest] {
   all.append(.delete(domain: domain, id: camera, base: version, recursive: true))
   all += [.changes(domain: domain, since: nil), .changes(domain: domain, since: Data([1, 2, 3]))]
   all += [.workingSet(domain: domain, page: nil), .workingSet(domain: domain, page: Data([7]))]
-  all += [
-    .createPackage(domain: domain, parent: camera, name: "Notes.rtfd"),
-    .replacePackage(domain: domain, id: photo),
-  ]
   return all
 }
 
@@ -81,7 +75,6 @@ private func tag(_ error: TransportError) -> Int {
   case .directoryNotEmpty: 19
   case .changedOnDevice: 20
   case .macDiskFull: 21
-  case .packageTooLarge: 22
   }
 }
 
@@ -98,7 +91,6 @@ private func errors() throws -> [TransportError] {
   all.append(.nameChangedByDevice(requested: "Ä.txt", actual: "A.txt"))
   all.append(.downloadSizeMismatch(listed: 10, received: 9))
   all += [.directoryNotEmpty(photo), .changedOnDevice(photo), .macDiskFull(needed: 9, free: 1)]
-  all.append(.packageTooLarge)
   return all
 }
 
@@ -151,14 +143,14 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...16))
+  #expect(Set(requests().map(tag)) == Set(0...14))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
 }
 
 @Test func everyErrorRoundTripsJSON() throws {
-  #expect(Set(try errors().map(tag)) == Set(0...22))
+  #expect(Set(try errors().map(tag)) == Set(0...21))
   for error in try errors() {
     #expect(try roundTrip(AgentResponse.failure(error)) == .failure(error))
   }

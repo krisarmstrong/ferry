@@ -28,13 +28,9 @@ public actor AgentService: AgentHandling {
   private let domains: DomainController
   let transfers = TransferBoard()
 
-  /// How much of a document package on the device a fetch will download.
-  let packageBudget: TreeBudget
-
-  public init(hub: DeviceHub, domains: DomainController, packageBudget: TreeBudget = .standard) {
+  public init(hub: DeviceHub, domains: DomainController) {
     self.hub = hub
     self.domains = domains
-    self.packageBudget = packageBudget
   }
 
   public func handle(
@@ -86,12 +82,8 @@ public actor AgentService: AgentHandling {
         expired: changes.expired)
     case (.workingSet(let domain, let page), _):
       return try await workingSet(page, in: domain)
-    case (.createPackage(let domain, let parent, let name), let file?):
-      return .entry(try await createPackage(from: file, as: name, in: parent, of: domain))
-    case (.replacePackage(let domain, let id), let file?):
-      return .entry(try await replacePackage(id, from: file, in: domain))
-    case (.fetch, nil), (.replaceContents, nil), (.createPackage, nil), (.replacePackage, nil),
-      (.status, _), (.recheck, _), (.refresh, _), (.eject, _), (.removeAllDomains, _):
+    case (.fetch, nil), (.replaceContents, nil), (.status, _), (.recheck, _), (.refresh, _),
+      (.eject, _), (.removeAllDomains, _):
       throw .io("bad request")
     }
   }
@@ -143,15 +135,7 @@ public actor AgentService: AgentHandling {
   {
     try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: folder)
-      // A package's inside is part of the package, never items of its own.
-      if Packages.isPackageOrInside(path) {
-        await route.items.removedContents(of: path)
-        return []
-      }
       let items = try await route.writer.visibleList(path, in: route.storage)
-      for child in items where child.kind == .folder && Packages.isPackageOrInside(child.path) {
-        await route.items.removedContents(of: child.path)
-      }
       return await route.items.listed(path, children: items)
     }
   }
@@ -235,8 +219,7 @@ public actor AgentService: AgentHandling {
       case .folder:
         // The listing that checks also reaps partials abandoned in the folder, which Finder
         // never shows.
-        let wholeItem = recursive || Self.isPackage(path)
-        if !wholeItem, try await !route.writer.visibleList(path, in: route.storage).isEmpty {
+        if !recursive, try await !route.writer.visibleList(path, in: route.storage).isEmpty {
           throw .directoryNotEmpty(path)
         }
       }
@@ -297,9 +280,6 @@ extension AgentService {
     try FileTransfer.requireRegular(target)
     let scratch = FileTransfer.scratchURL()
     defer { FileTransfer.remove(scratch) }
-    if let package = try await packageFetch(id, in: domain, into: target, progress: progress) {
-      return package
-    }
     let entry = try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
       let downloaded = try await transfers.track(

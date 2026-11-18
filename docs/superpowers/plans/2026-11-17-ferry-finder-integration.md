@@ -583,10 +583,31 @@ model picker.
 - **Cancel over the progress channel (round 5).** Round 5 added `AgentClientXPC` and request
   identifiers for progress; carry a cancel the same way (see I6 above).
 - **Localize provider and agent messages (round 5).** The FileProvider errors Ferry builds
-  ("Symbolic links and aliases can't be copied to the device", the described errors) and the
-  conflict-copy suffix are English only; FerryUI is the only target with a string catalog.
-  The described errors also use Ferry's own error domain, which FileProvider's contract
-  restricts to Cocoa or FileProvider errors.
+  ("Symbolic links and aliases can't be copied to the device", "Packages and app bundles
+  can't be copied to the device. Compress it into a .zip first.", the described errors) and
+  the conflict-copy suffix are English only; FerryUI is the only target with a string catalog.
+  (The described errors are Cocoa errors since `a01b604`, as FileProvider's contract asks.)
+
+## Round 8 scope ruling: packages cut (2026-11-18)
+
+Document packages and code bundles are no longer supported (see the spec's Non-goals). Removed:
+`PackageArchive`, `Packages`, `AgentService+Packages`, `ProviderBackend+Packages`,
+`SafeWriter+Tree`, `TreeBudget`, the `.createPackage` / `.replacePackage` requests and
+`TransportError.packageTooLarge`, with their tests. Creating a package fails for good with the
+zip message; every device folder is a plain folder (metadata revision 4). Fetched files keep
+their quarantine.
+
+## Plan 2b rows (round 8)
+
+- **Upload re-lists its folder.** `MTPSession.upload`, `makeFolder` and `rename` list the
+  target folder fresh for the collision check, so copying M files into a folder of N entries
+  is O(N·M) device listing. Round 8 made item, download and delete resolve from the cache
+  (verified by one `GetObjectInfo`), not these. Keep a per-folder name index that each
+  mutation updates instead.
+- **Editing a package-named folder on the device.** A folder such as `Notes.rtfd` on the
+  device is a plain folder, but the Mac still opens it as a document by its extension. An app
+  that saves it by replacing the whole folder sends a package create, which is refused with
+  the zip message. Decide whether to say so in Help or to refuse the edit earlier.
 
 ## Plan 3 rows (deferred from the final Plan 2 review)
 

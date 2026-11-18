@@ -26,13 +26,9 @@ public actor ProviderBackend {
   let domain: String
   private let client: any AgentSending
 
-  /// How much of a document package's tree is sent (see `sendingPackage`).
-  let treeBudget: TreeBudget
-
-  public init(domain: String, client: any AgentSending, treeBudget: TreeBudget = .standard) {
+  public init(domain: String, client: any AgentSending) {
     self.domain = domain
     self.client = client
-    self.treeBudget = treeBudget
   }
 
   public func item(_ id: NSFileProviderItemIdentifier) async throws -> ProviderItem {
@@ -55,25 +51,21 @@ public actor ProviderBackend {
     let itemID = try Self.itemID(id)
     let url = dir.appending(path: UUID().uuidString, directoryHint: .notDirectory)
     let handle = try Self.createExclusively(url)
-    let item: ProviderItem
     do {
       defer { try? handle.close() }
-      item = ProviderItem(
+      let item = ProviderItem(
         try await entry(.fetch(domain: domain, id: itemID), file: handle, progress: progress))
+      return (url, item)
     } catch {
       try? FileManager.default.removeItem(at: url)
       throw error
     }
-    guard item.isPackage else { return (url, item) }
-    // A document package came as one archive: FileProvider takes it as the folder it holds.
-    defer { try? FileManager.default.removeItem(at: url) }
-    return (try Self.unpack(url, in: dir, quarantine: item.quarantine), item)
   }
 
-  /// Makes a folder, sends a document package whole, or uploads `contents` as a file.
-  /// Symbolic links and aliases have nothing MTP can store, and apps and other code bundles
-  /// have no use on a unit, so they fail with `.cannotSynchronize`, which FileProvider takes as
-  /// final until the item changes on the Mac, with a message saying why.
+  /// Makes a folder or uploads `contents` as a file. Symbolic links and aliases have nothing
+  /// MTP can store, and a package (a document or an app) is one item to FileProvider where the
+  /// device would hold a folder, so they fail with `.cannotSynchronize`, which FileProvider
+  /// takes as final until the item changes on the Mac, with a message saying why.
   public func create(
     _ template: ItemTemplate, contents: URL?, progress: TransferProgressHandler? = nil
   ) async throws -> ProviderItem {
@@ -83,14 +75,8 @@ public actor ProviderBackend {
     switch template.kind {
     case .link:
       throw Self.linkRefused
-    case .code:
-      throw Self.codeRefused
     case .package:
-      guard let contents else { throw CocoaError(.featureUnsupported) }
-      return ProviderItem(
-        try await sendingPackage(
-          contents,
-          as: .createPackage(domain: domain, parent: template.parent, name: template.filename)))
+      throw Self.packageRefused
     case .folder:
       return ProviderItem(try await entry(request))
     case .file:
@@ -160,10 +146,7 @@ public actor ProviderBackend {
       }
       latest = current
     }
-    if changed.contains(.contents), let contents, template.kind == .package {
-      latest = try await sendingPackage(
-        contents, as: .replacePackage(domain: domain, id: itemID))
-    } else if changed.contains(.contents), let contents {
+    if changed.contains(.contents), let contents {
       let handle = try FileHandle(forReadingFrom: contents)
       defer { try? handle.close() }
       latest = try await entry(
@@ -275,11 +258,14 @@ public actor ProviderBackend {
     }
   }
 
-  /// Apps and other code bundles: no use on a unit, and one item to FileProvider where the
-  /// device would hold a folder. `.cannotSynchronize` is final until the item changes.
-  static let codeRefused = NSFileProviderError(
+  /// Packages, documents and apps alike: one item to FileProvider where the device would hold a
+  /// folder. `.cannotSynchronize` is final until the item changes.
+  static let packageRefused = NSFileProviderError(
     .cannotSynchronize,
-    userInfo: [NSLocalizedDescriptionKey: "Apps and code bundles can’t be copied to the device."])
+    userInfo: [
+      NSLocalizedDescriptionKey:
+        "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
+    ])
 
   static let linkRefused = NSFileProviderError(
     .cannotSynchronize,

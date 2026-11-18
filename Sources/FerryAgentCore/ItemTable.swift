@@ -187,15 +187,6 @@ actor ItemTable {
     }
   }
 
-  /// Forgets everything inside `path`, keeping `path` itself: what a document package holds is
-  /// part of it, not items of its own.
-  func removedContents(of path: RemotePath) {
-    let inside = subtree(of: path).filter { $0.key != path }
-    guard !inside.isEmpty else { return }
-    defer { save() }
-    forget(inside)
-  }
-
   /// Forgets the item at `path` and everything inside it.
   func removed(_ path: RemotePath) {
     guard path != .root else { return }
@@ -370,8 +361,6 @@ extension ItemTable {
         guard let id = ItemID(rawValue: raw), id != .root, record.path != .root,
           ids[record.path] == nil
         else { throw CocoaError(.fileReadCorruptFile) }
-        // What a document package holds is part of it, never an item (an older table kept it).
-        if Packages.isInsidePackage(record.path) { continue }
         records[id] = record
         ids[record.path] = id
       }

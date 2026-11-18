@@ -79,6 +79,19 @@ mode: it enumerates over MTP but publishes no storage (seen on the LinkRunner-10
 - Auto-update (Sparkle), localisation beyond English (but strings go in a
   String Catalog from day one), Intel builds.
 - Photo/camera (PTP) import — Image Capture already does that.
+- **Packages** (amended 2026-11-18, round-8 scope ruling). Ferry copies files
+  and plain folders only. A package (any type conforming to `com.apple.package`
+  or `com.apple.bundle`: an `.rtfd` or Keynote document, an app, plug-in,
+  framework or extension) is one item to FileProvider but a folder on the
+  device, and keeping it opaque cost most of rounds 6-8's risk (an archive
+  transport, a tree writer, budgets, link loss) for near-zero value to NetAlly
+  users, whose files are reports, captures, screenshots and scripts. Creating
+  one on the device fails for good (`cannotSynchronize`) with "Packages and app
+  bundles can't be copied to the device. Compress it into a .zip first." A
+  folder is a package by its type or, since `cp -R` sends a plain folder first,
+  by its name. On the device every folder is presented as a plain folder
+  (content type `public.folder`), whatever its name, and its children are
+  ordinary items.
 
 ## Anti-goals (failure even if it "works")
 

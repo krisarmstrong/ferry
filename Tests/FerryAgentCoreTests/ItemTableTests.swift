@@ -269,23 +269,3 @@ struct ItemTableTests {
     #expect(Set(all.map(\.id)).subtracting(delivered).isEmpty)
   }
 }
-
-/// A table saved before packages were opaque can hold what a package contains; loading it
-/// drops those, so they never reach FileProvider's working set again.
-struct ItemTablePackageTests {
-  @Test func loadingDropsWhatAPackageHolds() async throws {
-    let tables = store()
-    let first = ItemTable(domain: tableDomain, store: tables)
-    _ = await first.observed(try folder("/Notes.rtfd"))
-    _ = await first.observed(try file("/Notes.rtfd/TXT.rtf"))
-    _ = await first.observed(try file("/a.txt"))
-
-    let reloaded = ItemTable(domain: tableDomain, store: tables)
-
-    #expect(await reloaded.knows(try path("/Notes.rtfd")))
-    #expect(await reloaded.knows(try path("/a.txt")))
-    #expect(await !reloaded.knows(try path("/Notes.rtfd/TXT.rtf")))
-    let (entries, _) = await reloaded.workingSet(after: nil, size: 10)
-    #expect(entries.compactMap(\.item.path.name).sorted() == ["Notes.rtfd", "a.txt"])
-  }
-}

@@ -17,7 +17,7 @@ struct ErrorMappingTests {
       .nameChangedByDevice(requested: "Résumé.txt", actual: "RESUME.TXT"), .cancelled,
       .io("pipe broke"), .downloadSizeMismatch(listed: 7, received: 3),
       .directoryNotEmpty(try RemotePath("/a")), .changedOnDevice(try RemotePath("/a")),
-      .macDiskFull(needed: 2, free: 1), .packageTooLarge,
+      .macDiskFull(needed: 2, free: 1),
     ]
   }
 
@@ -87,7 +87,6 @@ struct ErrorMappingTests {
     case .invalidName: .cocoa(.fileWriteInvalidFileName, [])
     case .cancelled: .cocoa(.userCancelled, [])
     case .macDiskFull: .cocoa(.fileWriteOutOfSpace, [])
-    case .packageTooLarge: .cocoa(.fileReadTooLarge, ["too large or too deep"])
     case .nameChangedByDevice(let requested, let actual):
       .cocoa(.fileWriteInvalidFileName, [requested, actual])
     case .unsupported(let what): .cocoa(.featureUnsupported, [what])

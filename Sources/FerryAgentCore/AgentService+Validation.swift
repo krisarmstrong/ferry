@@ -1,22 +1,10 @@
 import DeviceKit
 import FerryIPC
 import Foundation
-import UniformTypeIdentifiers
 
 // MARK: Validating requests
 
 extension AgentService {
-  /// A folder named like a package (`Notes.rtfd`, `Ferry.app`), which FileProvider handles as
-  /// one item: deleting it means deleting what is inside it.
-  static func isPackage(_ path: RemotePath) -> Bool {
-    guard let name = path.name else { return false }
-    let ext = (name as NSString).pathExtension
-    guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .package) else {
-      return false
-    }
-    return type.isDeclared
-  }
-
   /// A transfer of the item at `path` starting on `route`'s device, its size not known yet.
   static func transfer(
     _ path: RemotePath, _ direction: ActiveTransfer.Direction, on route: DomainController.Route
@@ -30,7 +18,7 @@ extension AgentService {
   /// into.
   static func takesFile(_ request: AgentRequest) -> Bool {
     switch request {
-    case .fetch, .replaceContents, .createPackage, .replacePackage: true
+    case .fetch, .replaceContents: true
     case .create(_, _, _, let isFolder): !isFolder
     case .status, .recheck, .refresh, .eject, .removeAllDomains, .item, .list, .rename, .move,
       .delete, .changes, .workingSet:

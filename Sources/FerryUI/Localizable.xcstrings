@@ -23,6 +23,12 @@
     "A folder is deleted only with everything Finder shows in it. If the device added files to the folder since Finder last showed it, the folder and those files stay." : {
       "extractionState" : "manual"
     },
+    "A package, such as an .rtfd document or an app, can't be copied to the device: compress it into a .zip first. On the device every folder is a plain folder, so a package made there shows as a folder with its files in it. Symbolic links and aliases can't be copied to the device either; Finder shows an error for them." : {
+      "extractionState" : "manual"
+    },
+    "A package, such as an .rtfd or Keynote document, an app, a plug-in or a framework, is one item on the Mac but a folder on the device, so Ferry does not copy it. Control-click it, choose **Compress**, and copy the .zip instead." : {
+      "extractionState" : "manual"
+    },
     "Allow Ferry's helper" : {
       "localizations" : {
         "en" : {
@@ -47,9 +53,6 @@
     },
     "Another app is using the device. Quit Image Capture or Android File Transfer." : {
 
-    },
-    "Apps and code bundles can't be copied to the device" : {
-      "extractionState" : "manual"
     },
     "Can't open" : {
 
@@ -154,9 +157,6 @@
     },
     "Ferry Help" : {
 
-    },
-    "Ferry does not copy apps, plug-ins, frameworks or extensions to a device. Copy the documents you need instead." : {
-      "extractionState" : "manual"
     },
     "Ferry does not use the network. No telemetry, no analytics, no account. Nothing leaves your Mac." : {
       "extractionState" : "manual"
@@ -285,7 +285,7 @@
     "Otherwise, quit Ferry from the menu and open it again from Applications." : {
       "extractionState" : "manual"
     },
-    "Packages, such as .rtfd documents, copy, open and save whole. Symbolic links and aliases, and apps and other code bundles, can't be copied to the device; Finder shows an error for them." : {
+    "Packages and app bundles can't be copied to the device" : {
       "extractionState" : "manual"
     },
     "Plug the device back in and turn on file transfer. Finder finishes the copy when the device reconnects. A half-copied file never appears under its real name." : {

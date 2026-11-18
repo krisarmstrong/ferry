@@ -36,53 +36,6 @@ public enum FileTransfer {
     }
   }
 
-  /// Deletes a scratch folder and everything in it. One that was never created is gone already.
-  static func removeTree(_ url: URL) {
-    try? FileManager.default.removeItem(at: url)
-  }
-
-  static func makeFolder(_ url: URL) throws(TransportError) {
-    do {
-      try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
-    } catch {
-      throw .io("cannot make transfer folder: \(error.localizedDescription)")
-    }
-  }
-
-  /// Writes the folder tree at `folder` into `target`, a regular file, as a `PackageArchive`
-  /// replacing its contents, and flushes it.
-  static func writeArchive(of folder: URL, to target: Int32) throws(TransportError) {
-    try requireRegular(target)
-    guard ftruncate(target, 0) == 0, lseek(target, 0, SEEK_SET) == 0 else {
-      throw .io("cannot reset file: \(errorText())")
-    }
-    let handle = FileHandle(fileDescriptor: target, closeOnDealloc: false)
-    try PackageArchive.write(tree: folder, to: handle)
-    guard fsync(target) == 0 else { throw .io("cannot flush file: \(errorText())") }
-  }
-
-  /// Copies the archive in `source` into a scratch file, then extracts it into a new scratch
-  /// folder, which it returns.
-  static func extractArchive(_ source: Int32) async throws(TransportError) -> URL {
-    let archive = try await copyIn(source)
-    defer { remove(archive) }
-    let folder = scratchURL()
-    let handle: FileHandle
-    do {
-      handle = try FileHandle(forReadingFrom: archive)
-    } catch {
-      throw .io("cannot open package: \(error.localizedDescription)")
-    }
-    defer { try? handle.close() }
-    do throws(TransportError) {
-      try PackageArchive.extract(from: handle, to: folder)
-    } catch {
-      removeTree(folder)
-      throw error
-    }
-    return folder
-  }
-
   /// Deletes a scratch file. One that was never created is already gone.
   static func remove(_ url: URL) {
     unlink(url.path)

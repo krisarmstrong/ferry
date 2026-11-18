@@ -35,20 +35,14 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   public var contentType: UTType {
     switch entry.item.kind {
     case .folder:
-      // A folder named like a document package (`Notes.rtfd`) is one, as on a Mac volume. A
-      // folder named like code (an app, plug-in or any other bundle) stays a folder, so Finder
-      // never offers code from a USB device as something to launch.
-      return Packages.documentType(named: filename) ?? .folder
+      // Whatever its name (`Notes.rtfd`, `Ferry.app`): Ferry does not copy packages, so Finder
+      // lists what a device folder holds and never offers code from a USB device to launch.
+      return .folder
     case .file:
       let ext = (filename as NSString).pathExtension
       guard !ext.isEmpty else { return .data }
       return UTType(filenameExtension: ext, conformingTo: .data) ?? .data
     }
-  }
-
-  /// A document package: one item to FileProvider, fetched and sent whole.
-  public var isPackage: Bool {
-    entry.item.kind == .folder && Packages.documentType(named: filename) != nil
   }
 
   public var documentSize: NSNumber? {
@@ -57,13 +51,13 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
 
   public var contentModificationDate: Date? { entry.item.modified }
 
-  /// Every file and document package from the device carries `com.apple.quarantine` as a downloaded file does, so
+  /// Every file from the device carries `com.apple.quarantine` as a downloaded file does, so
   /// Gatekeeper checks an app or script from a USB device before it first runs. FileProvider
   /// writes an item's syncable extended attributes onto the file on disk; the extension's
   /// Info.plist declares this one syncable. A marker set on the fetched file itself does not
   /// reach the disk: FileProvider takes only its contents.
   public var extendedAttributes: [String: Data] {
-    guard entry.item.kind == .file || isPackage else { return [:] }
+    guard entry.item.kind == .file else { return [:] }
     return [Self.quarantineAttribute: quarantine]
   }
 
@@ -71,7 +65,7 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
 
   /// `0083;<seconds since 1970, hex>;Ferry;<identifier>`: downloaded (0x0003) from an untrusted
   /// source (0x0080) by Ferry. Built from the item alone, so it is the same every time.
-  var quarantine: Data {
+  private var quarantine: Data {
     let seconds = max(0, Int(entry.item.modified.timeIntervalSince1970.rounded(.down)))
     return Data("0083;\(String(seconds, radix: 16));Ferry;\(entry.id.rawValue)".utf8)
   }
@@ -97,8 +91,9 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// Ferry that changes capabilities must change the version too, or items already known keep
   /// the old ones.
   /// Bumped when Ferry changes what an item's metadata holds (2: the quarantine attribute on
-  /// files; 3: on packages too), so items FileProvider already knows pick it up.
-  static let metadataRevision = 3
+  /// files; 3: on packages too; 4: every folder a plain folder, none quarantined), so items
+  /// FileProvider already knows pick it up.
+  static let metadataRevision = 4
 
   public var itemVersion: NSFileProviderItemVersion {
     let content = ContentVersion(entry.item).encoded

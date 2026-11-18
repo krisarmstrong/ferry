@@ -54,7 +54,6 @@ private func message(for error: TransportError) -> String {
     "The phone saved \"\(requested)\" as \"\(actual)\"."
   case .macDiskFull(let needed, let free):
     "Not enough space on this Mac: need \(needed) bytes, \(free) free."
-  case .packageTooLarge: "The package is too large or too deep to copy."
   case .directoryNotEmpty(let path): "\(path) is not empty."
   case .changedOnDevice(let path): "\(path) changed on the phone."
   case .cancelled: "Cancelled."

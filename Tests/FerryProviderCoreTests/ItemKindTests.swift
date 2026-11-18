@@ -7,18 +7,20 @@ import Synchronization
 import Testing
 import UniformTypeIdentifiers
 
-/// Packages are folders on the device; symbolic links and aliases have no contents MTP can
-/// store, so they are refused for good with a message that says so.
+/// Ferry copies files and plain folders. A package (a document such as an `.rtfd`, or an app or
+/// other code bundle) is refused for good with one message, and so are symbolic links and
+/// aliases, which have no contents MTP can store. On the device every folder is a plain folder.
 struct ItemKindTests {
   @Test(arguments: [
     (UTType.folder, ItemTemplate.Kind.folder),
     (UTType("com.apple.rtfd")!, .package),
+    (UTType("com.apple.iwork.keynote.key")!, .package),
     (UTType.package, .package),
-    (UTType.applicationBundle, .code),
-    (UTType.bundle, .code),
-    (UTType.pluginBundle, .code),
-    (UTType.framework, .code),
-    (UTType.applicationExtension, .code),
+    (UTType.applicationBundle, .package),
+    (UTType.bundle, .package),
+    (UTType.pluginBundle, .package),
+    (UTType.framework, .package),
+    (UTType.applicationExtension, .package),
     (UTType.symbolicLink, .link),
     (UTType.aliasFile, .link),
     (UTType.data, .file),
@@ -30,122 +32,46 @@ struct ItemKindTests {
     #expect(template.kind == kind)
   }
 
-  /// A document package goes to the agent as one archive, made whole on the device.
-  @Test func aPackageIsCreatedWhole() async throws {
-    let agent = FakeAgent()
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let dir = try scratchDirectory()
-    defer { try? FileManager.default.removeItem(at: dir) }
-    let package = try localPackage("rtf", in: dir)
-
-    let made = try await backend.create(
-      try ItemTemplate(
-        Template(
-          parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!)),
-      contents: package)
-
-    #expect(
-      await agent.requests == [.createPackage(domain: domain, parent: .root, name: "Notes.rtfd")])
-    #expect(made.contentType == UTType("com.apple.rtfd"))
-    let sent = try await extracted(agent.packages[try path("/Notes.rtfd")], in: dir)
-    #expect(try Data(contentsOf: sent.appending(path: "TXT.rtf")) == Data("rtf".utf8))
-    #expect(try Data(contentsOf: sent.appending(path: "Media/a.png")) == Data("png".utf8))
-  }
-
-  /// An edit of a document package replaces it whole.
-  @Test func aPackageEditReplacesItWhole() async throws {
-    let agent = FakeAgent()
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let dir = try scratchDirectory()
-    defer { try? FileManager.default.removeItem(at: dir) }
-    let template = try ItemTemplate(
-      Template(
-        parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!))
-    let made = try await backend.create(template, contents: try localPackage("old", in: dir))
-    let edited = dir.appending(path: "edited")
-    try FileManager.default.createDirectory(at: edited, withIntermediateDirectories: false)
-
-    _ = try await backend.modify(
-      made.itemIdentifier, to: template, changed: .contents,
-      contents: try localPackage("new", in: edited))
-
-    #expect(
-      await agent.requests.last
-        == .replacePackage(domain: domain, id: try #require(ItemID(made.itemIdentifier))))
-    let sent = try await extracted(agent.packages[try path("/Notes.rtfd")], in: dir)
-    #expect(try Data(contentsOf: sent.appending(path: "TXT.rtf")) == Data("new".utf8))
-  }
-
-  /// A fetched document package is a folder holding all of it, as FileProvider places it.
-  @Test func aPackageIsFetchedAsAFolder() async throws {
-    let agent = FakeAgent()
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let dir = try scratchDirectory()
-    defer { try? FileManager.default.removeItem(at: dir) }
-    let made = try await backend.create(
-      try ItemTemplate(
-        Template(
-          parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!)),
-      contents: try localPackage("rtf", in: dir))
-    let fetchDir = dir.appending(path: "fetch")
-    try FileManager.default.createDirectory(at: fetchDir, withIntermediateDirectories: false)
-
-    let (url, item) = try await backend.fetch(made.itemIdentifier, into: fetchDir)
-
-    var isFolder: ObjCBool = false
-    #expect(FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder))
-    #expect(isFolder.boolValue)
-    #expect(try Data(contentsOf: url.appending(path: "TXT.rtf")) == Data("rtf".utf8))
-    #expect(try Data(contentsOf: url.appending(path: "Media/a.png")) == Data("png".utf8))
-    #expect(item.contentType == UTType("com.apple.rtfd"))
-    // Everything in it is marked as downloaded from the device, as the package itself is.
-    let expected = try #require(item.extendedAttributes["com.apple.quarantine"])
-    for inside in ["", "TXT.rtf", "Media", "Media/a.png"] {
-      let target = inside.isEmpty ? url : url.appending(path: inside)
-      var value = [UInt8](repeating: 0, count: 256)
-      let length = getxattr(target.path, "com.apple.quarantine", &value, value.count, 0, 0)
-      #expect(length > 0, "\(inside)")
-      #expect(Data(value.prefix(max(length, 0))) == expected, "\(inside)")
-    }
-    // Only the folder is left: the archive it came in is gone.
-    #expect(try FileManager.default.contentsOfDirectory(atPath: fetchDir.path).count == 1)
-  }
-
-  /// Copied with `cp -R` or by Finder, a bundle's folder can first arrive as a plain folder; its
-  /// name still makes it code.
-  @Test(arguments: ["Tool.app", "Plugin.bundle", "Kit.framework"])
-  func aFolderNamedLikeCodeIsCode(name: String) throws {
+  /// Copied with `cp -R`, a package's folder can first arrive as a plain folder; its name still
+  /// makes it a package.
+  @Test(arguments: ["Tool.app", "Plugin.bundle", "Kit.framework", "Notes.rtfd", "Talk.key"])
+  func aFolderNamedLikeAPackageIsOne(name: String) throws {
     let template = try ItemTemplate(
       Template(parent: .rootContainer, filename: name, contentType: .folder))
-    #expect(template.kind == .code)
+    #expect(template.kind == .package)
     #expect(
       try ItemTemplate(Template(parent: .rootContainer, filename: "DCIM", contentType: .folder))
         .kind == .folder)
   }
 
-  /// Apps and other code bundles have no use on a unit, and FileProvider treats them as one
-  /// item where the device would show a folder: they are refused for good, with a message.
+  /// Documents and code alike: FileProvider treats a package as one item where the device
+  /// would hold a folder, so it is refused for good with the one message, and nothing is sent.
   @Test(arguments: [
+    ("Notes.rtfd", UTType("com.apple.rtfd")!), ("Talk.key", UTType("com.apple.iwork.keynote.key")!),
     ("Ferry.app", UTType.applicationBundle), ("Plugin.bundle", UTType.bundle),
     ("Viewer.plugin", UTType.pluginBundle), ("Share.appex", UTType.applicationExtension),
+    ("Copied.rtfd", UTType.folder),
   ])
-  func aCodeBundleIsRefusedForGoodWithAMessage(name: String, type: UTType) async throws {
+  func aPackageIsRefusedForGoodWithTheZipMessage(name: String, type: UTType) async throws {
     let agent = FakeAgent()
     let backend = ProviderBackend(domain: domain, client: agent)
     let dir = try scratchDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
-    let bundle = try localPackage("code", in: dir, named: name)
+    let package = try localPackage("text", in: dir, named: name)
 
     do {
       _ = try await backend.create(
         try ItemTemplate(Template(parent: .rootContainer, filename: name, contentType: type)),
-        contents: bundle)
-      Issue.record("the bundle was copied")
+        contents: package)
+      Issue.record("the package was copied")
     } catch {
       let error = error as NSError
       #expect(error.domain == NSFileProviderErrorDomain)
       #expect(error.code == NSFileProviderError.Code.cannotSynchronize.rawValue)
-      #expect(error.localizedDescription.contains("Apps and code bundles"))
+      #expect(
+        error.localizedDescription
+          == "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
+      )
     }
     #expect(await agent.requests.isEmpty)
   }
@@ -173,22 +99,19 @@ struct ItemKindTests {
     #expect(await agent.requests.isEmpty)
   }
 
-  /// Only document packages: a folder named like an app, plug-in or other bundle stays a
-  /// folder, so Finder never offers code from a USB device as something to launch.
+  /// Whatever its name, a device folder is a plain folder: Finder lists what is in it, never
+  /// offers it as a document to open or as code to launch, and it carries no quarantine.
   @Test(arguments: [
-    ("Notes.rtfd", "com.apple.rtfd"), ("Talk.key", "com.apple.iwork.keynote.key"),
-    ("Ferry.app", "public.folder"), ("x.bundle", "public.folder"),
-    ("x.plugin", "public.folder"), ("x.appex", "public.folder"),
-    ("x.systemextension", "public.folder"), ("x.kext", "public.folder"),
-    ("x.scptd", "public.folder"), ("x.pkg", "public.folder"),
-    ("DCIM", "public.folder"), ("report.txt", "public.folder"),
+    "Notes.rtfd", "Talk.key", "Ferry.app", "x.bundle", "x.plugin", "x.appex",
+    "x.systemextension", "x.kext", "x.scptd", "x.pkg", "com.foo.app", "DCIM", "report.txt",
   ])
-  func aDeviceFolderNamedLikeADocumentPackageIsOne(name: String, identifier: String) throws {
+  func aDeviceFolderIsAlwaysAPlainFolder(name: String) throws {
     let item = ProviderItem(
       ProviderEntry(
         id: .random(), parent: .root,
         item: RemoteItem(path: try path("/" + name), kind: .folder, size: 0, modified: epoch)))
-    #expect(item.contentType.identifier == identifier)
+    #expect(item.contentType == .folder)
+    #expect(item.extendedAttributes.isEmpty)
   }
 }
 
@@ -279,7 +202,9 @@ struct MayAlreadyExistTests {
     #expect(try await backend.existing(matching: template) == nil)
   }
 
-  @Test func aPackageMatchesThePackageFolderOfTheSameName() async throws {
+  /// After FileProvider lost its state, a folder the device holds under a package's name is
+  /// still matched, so re-importing it never puts the package refusal on the device's own folder.
+  @Test func aPackageNamedTemplateMatchesTheDeviceFolderOfTheSameName() async throws {
     let agent = FakeAgent([try folder("/Notes.rtfd")])
     let backend = ProviderBackend(domain: domain, client: agent)
 
@@ -313,15 +238,4 @@ func localPackage(_ text: String, in folder: URL, named name: String = "Notes.rt
   try Data(text.utf8).write(to: package.appending(path: "TXT.rtf"))
   try Data("png".utf8).write(to: package.appending(path: "Media/a.png"))
   return package
-}
-
-/// The tree in a package archive the fake agent received, extracted into a new folder.
-func extracted(_ archive: Data?, in folder: URL) throws -> URL {
-  let file = folder.appending(path: "archive-\(UUID().uuidString)")
-  try (archive ?? Data()).write(to: file)
-  let reader = try FileHandle(forReadingFrom: file)
-  defer { try? reader.close() }
-  let out = folder.appending(path: "extracted-\(UUID().uuidString)")
-  try PackageArchive.extract(from: reader, to: out)
-  return out
 }

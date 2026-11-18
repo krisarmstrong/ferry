@@ -36,11 +36,8 @@ public struct ItemTemplate: Sendable, Equatable {
   public enum Kind: Sendable, Equatable {
     case file
     case folder
-    /// An app or other code bundle (a plug-in, a framework, an extension), which Ferry does not
-    /// copy to a device.
-    case code
-    /// A document package (an `.rtfd`, a Keynote file): one item to FileProvider, a folder on
-    /// the device, always sent whole (see `Packages`).
+    /// A package: a document (an `.rtfd`, a Keynote file) or an app or other code bundle. One
+    /// item to FileProvider where the device would hold a folder, so Ferry does not copy it.
     case package
     /// A symbolic link or a Finder alias, which MTP has no way to store.
     case link
@@ -80,11 +77,23 @@ public struct ItemTemplate: Sendable, Equatable {
     let type = item.contentType ?? .data
     let isLink = type.conforms(to: .symbolicLink) || type.conforms(to: .aliasFile)
     if isLink || (item.symlinkTargetPath ?? nil) != nil { return .link }
-    // By type, or by name: a bundle copied in pieces can first arrive as a plain folder.
-    let isCode = Packages.isCode(type) || Packages.isCodeBundle(named: item.filename)
-    if type.conforms(to: .directory), isCode { return .code }
-    if Packages.isDocumentPackage(type) { return .package }
-    return type.conforms(to: .directory) ? .folder : .file
+    guard type.conforms(to: .directory) else { return .file }
+    // By type, or by name: a package copied with `cp -R` first arrives as a plain folder.
+    return isPackage(type) || isPackage(named: item.filename) ? .package : .folder
+  }
+
+  /// A package or a bundle: a framework is a bundle Finder shows as a folder, but it is code.
+  private static func isPackage(_ type: UTType) -> Bool {
+    type.conforms(to: .package) || type.conforms(to: .bundle)
+  }
+
+  /// Whether a folder of this name is a package: its extension is a declared package type.
+  private static func isPackage(named name: String) -> Bool {
+    let ext = (name as NSString).pathExtension
+    guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .directory) else {
+      return false
+    }
+    return type.isDeclared && isPackage(type)
   }
 }
 
