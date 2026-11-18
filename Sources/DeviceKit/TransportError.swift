@@ -1,3 +1,5 @@
+import os
+
 public enum TransportError: Error, Equatable, Sendable, Codable {
   case noDeviceConnected
   case deviceNotFound(DeviceID)
@@ -21,4 +23,11 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   case nameChangedByDevice(requested: String, actual: String)
   case cancelled
   case io(String)
+}
+
+extension TransportError {
+  /// How a failed call is logged: a cancel is the user's own doing, not a fault.
+  public var logType: OSLogType {
+    self == .cancelled ? .info : .error
+  }
 }

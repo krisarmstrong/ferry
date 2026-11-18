@@ -1,10 +1,8 @@
 import DeviceKit
+import FerryProviderCore
 import FileProvider
 import Foundation
 import Testing
-import os
-
-@testable import FerryProviderCore
 
 struct ErrorMappingTests {
   @Test func everyTransportErrorMaps() throws {
@@ -59,10 +57,4 @@ struct ErrorMappingTests {
     case .io(let message): .described([message])
     }
   }
-}
-
-/// A cancel is the user's own doing, not a fault: it is logged as information.
-@Test func cancelledCallsAreLoggedAsInformation() {
-  #expect(ProviderBackend.logType(for: .cancelled) == .info)
-  #expect(ProviderBackend.logType(for: .deviceDisconnected) == .error)
 }

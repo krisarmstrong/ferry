@@ -38,7 +38,7 @@ public actor AgentService: AgentHandling {
       return try await perform(request, file: file?.fileDescriptor)
     } catch {
       log.log(
-        level: error == .cancelled ? .info : .error,
+        level: error.logType,
         "request failed: \(String(describing: error), privacy: .private)")
       return .failure(error)
     }

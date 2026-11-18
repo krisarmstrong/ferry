@@ -177,7 +177,7 @@ public actor ProviderBackend {
       response = try await client.send(request, file: file)
     } catch {
       log.log(
-        level: Self.logType(for: error),
+        level: error.logType,
         "\(String(describing: request), privacy: .private) failed: \(error, privacy: .private)")
       throw ErrorMapping.fileProviderError(error)
     }
@@ -187,11 +187,6 @@ public actor ProviderBackend {
       throw ErrorMapping.fileProviderError(error)
     }
     return response
-  }
-
-  /// How a failed call is logged: a cancel is the user's own doing, not a fault.
-  static func logType(for error: TransportError) -> OSLogType {
-    error == .cancelled ? .info : .error
   }
 
   private static func unexpected(_ response: AgentResponse) -> any Error {
