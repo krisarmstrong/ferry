@@ -95,7 +95,8 @@ struct ADBTransportLifecycleTests {
     try await Self.eject(transport)
 
     await hub.kill()
-    #expect(try await transport.scan() == DeviceScan(devices: []))
+    #expect(
+      try await transport.scan() == DeviceScan(devices: [], ejected: [Fixture.linkRunnerInfo]))
     clock.advance(by: .seconds(60))
     try await hub.start(port: port)
     hub.set([])
@@ -128,6 +129,53 @@ struct ADBTransportLifecycleTests {
     #expect(scan == DeviceScan(devices: []))
     hub.set([.init(Fixture.linkRunnerSerial, device: android)])
     #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
+    await hub.kill()
+  }
+
+  /// The hub ejects whatever it holds, whatever the last scan said: the park comes from the
+  /// hold, as MTP's does.
+  @Test func aHeldDeviceListedOfflineAtTheLastScanStillParks() async throws {
+    let (hub, android) = try await Self.linkRunnerHub()
+    let transport = Fixture.transport(port: hub.port)
+    _ = try await transport.scan()
+    let session = try await transport.open(Fixture.linkRunner)
+    hub.set([.init(Fixture.linkRunnerSerial, "offline", device: nil)])
+    _ = try await transport.scan()
+    await transport.park(Fixture.linkRunner)
+    await session.close()
+    hub.set([.init(Fixture.linkRunnerSerial, device: android)])
+    let scan = try await transport.scan()
+    #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.devices.isEmpty)
+    #expect(try await transport.scan().ejected == [Fixture.linkRunnerInfo])
+    await hub.kill()
+  }
+
+  @Test func aHeldDeviceParkedDuringAnOutageStaysEjected() async throws {
+    let (hub, _) = try await Self.linkRunnerHub()
+    let port = hub.port
+    let transport = Fixture.transport(port: port)
+    _ = try await transport.scan()
+    let session = try await transport.open(Fixture.linkRunner)
+    await hub.kill()
+    _ = try await transport.scan()
+    await transport.park(Fixture.linkRunner)
+    await session.close()
+    // Unknown whether it is attached while the server is down, but it stays ejected for the hub.
+    #expect(
+      try await transport.scan() == DeviceScan(devices: [], ejected: [Fixture.linkRunnerInfo]))
+    try await hub.start(port: port)
+    let scan = try await transport.scan()
+    #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.devices.isEmpty)
+    #expect(try await transport.scan().ejected == [Fixture.linkRunnerInfo])
+    await hub.kill()
+  }
+
+  @Test func statusIsUnknownUntilTheFirstScan() async throws {
+    let (hub, _) = try await Self.linkRunnerHub()
+    let transport = Fixture.transport(port: hub.port)
+    #expect(await transport.status == nil)
+    _ = try await transport.scan()
+    #expect(await transport.status == .available)
     await hub.kill()
   }
 

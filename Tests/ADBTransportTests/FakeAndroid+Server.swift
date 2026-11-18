@@ -40,7 +40,14 @@ extension FakeAndroid {
     } else if service.hasPrefix("shell,v2,raw:") {
       // The client closes stdin first.
       _ = try await peer.stream.read(exactly: 5)
-      let result = shell(String(service.dropFirst("shell,v2,raw:".count)))
+      let command = String(service.dropFirst("shell,v2,raw:".count))
+      let program = command.split(separator: " ").first.map(String.init) ?? ""
+      if state.withLock({ $0.hangingPrograms.contains(program) }) {
+        // Answers nothing until the client gives up and closes.
+        _ = try? await peer.stream.read(exactly: 1)
+        return
+      }
+      let result = shell(command)
       var reply = Data()
       if !result.stdout.isEmpty { reply += Peer.shellPacket(1, Data(result.stdout.utf8)) }
       if !result.stderr.isEmpty { reply += Peer.shellPacket(2, Data(result.stderr.utf8)) }

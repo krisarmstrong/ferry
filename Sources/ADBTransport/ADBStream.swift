@@ -20,25 +20,44 @@ public actor ADBStream {
     guard let port = NWEndpoint.Port(rawValue: port) else {
       throw .protocolViolation("port 0 is not connectable")
     }
-    let deadline = ContinuousClock.now + timeout
-    while true {
+    let connection = try await connect(until: .now + timeout) {
       let connection = NWConnection(host: .ipv4(.loopback), port: port, using: .tcp)
       let states = AsyncStream<NWConnection.State> { continuation in
         connection.stateUpdateHandler = { continuation.yield($0) }
       }
+      return Attempt(
+        value: connection, states: states, start: { connection.start(queue: .global()) },
+        cancel: { connection.cancel() })
+    }
+    connection.stateUpdateHandler = nil
+    return ADBStream(connection: connection)
+  }
+
+  /// One connection attempt, as `connect` drives it.
+  struct Attempt<Value: Sendable>: Sendable {
+    let value: Value
+    let states: AsyncStream<NWConnection.State>
+    let start: @Sendable () -> Void
+    let cancel: @Sendable () -> Void
+  }
+
+  /// Makes attempts until one is ready (its value is returned), one fails, or `deadline`
+  /// passes. A stalled attempt is cancelled and replaced: a new connection gets a new local
+  /// port, where retrying the stalled one would not.
+  static func connect<Value: Sendable>(
+    until deadline: ContinuousClock.Instant, _ attempt: () -> Attempt<Value>
+  ) async throws(ADBError) -> Value {
+    while true {
+      let next = attempt()
       let outcome = await withTaskCancellationHandler {
-        connection.start(queue: .global())
-        return await settle(states, until: deadline)
+        next.start()
+        return await settle(next.states, until: deadline)
       } onCancel: {
-        connection.cancel()
+        next.cancel()
       }
-      if outcome == .ready {
-        connection.stateUpdateHandler = nil
-        return ADBStream(connection: connection)
-      }
-      connection.cancel()
+      if outcome == .ready { return next.value }
+      next.cancel()
       if case .failed(let error) = outcome { throw error }
-      // Stalled: a new connection gets a new local port, where retrying this one would not.
       guard ContinuousClock.now + retryDelay < deadline else { throw timedOut }
       guard (try? await Task.sleep(for: retryDelay)) != nil else { throw .cancelled }
     }
@@ -99,29 +118,34 @@ public actor ADBStream {
   public func read(exactly count: Int) async throws(ADBError) -> Data {
     var data = Data()
     while data.count < count {
-      let remaining = count - data.count
-      let result: Result<Data, ADBError> = await withCheckedContinuation { continuation in
-        connection.receive(minimumIncompleteLength: 1, maximumLength: remaining) {
-          continuation.resume(returning: Self.received($0, isComplete: $2, error: $3))
-        }
-      }
-      data.append(try result.get())
+      data.append(try await receive(upTo: count - data.count).get())
     }
     return data
   }
 
   /// Whatever the peer sends next (at most `count` bytes), or nil once it has closed cleanly.
   func readSome(upTo count: Int) async throws(ADBError) -> Data? {
-    let result: Result<Data, ADBError> = await withCheckedContinuation { continuation in
-      connection.receive(minimumIncompleteLength: 1, maximumLength: count) {
-        continuation.resume(returning: Self.received($0, isComplete: $2, error: $3))
-      }
-    }
     do {
-      return try result.get()
+      return try await receive(upTo: count).get()
     } catch .connectionClosed {
       return nil
     }
+  }
+
+  /// One receive. A cancelled task closes the connection, which ends a receive the peer would
+  /// never answer (a wedged device), and gets `.cancelled`.
+  private func receive(upTo count: Int) async throws(ADBError) -> Result<Data, ADBError> {
+    let result: Result<Data, ADBError> = await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: count) {
+          continuation.resume(returning: Self.received($0, isComplete: $2, error: $3))
+        }
+      }
+    } onCancel: { [connection] in
+      connection.cancel()
+    }
+    if case .failure = result, Task.isCancelled { throw .cancelled }
+    return result
   }
 
   static func received(
@@ -136,11 +160,15 @@ public actor ADBStream {
   }
 
   public func write(_ data: Data) async throws(ADBError) {
-    let error: NWError? = await withCheckedContinuation { continuation in
-      connection.send(
-        content: data, completion: .contentProcessed { continuation.resume(returning: $0) })
+    let error: NWError? = await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        connection.send(
+          content: data, completion: .contentProcessed { continuation.resume(returning: $0) })
+      }
+    } onCancel: { [connection] in
+      connection.cancel()
     }
-    if let error { throw Self.failure(error) }
+    if let error { throw Task.isCancelled ? .cancelled : Self.failure(error) }
   }
 
   /// A peer that went away is a closed connection, however the socket says so: Network.framework

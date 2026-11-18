@@ -51,6 +51,8 @@ final class FakeAndroid: Sendable {
     /// Bytes of DATA a SEND or RECV carries before the device drops off.
     var dropAfterBytes: (id: String, bytes: Int)?
     var sendFailure: String?
+    /// Programs the shell starts but never answers for, as on a wedged device.
+    var hangingPrograms: Set<String> = []
     /// What `getprop <name>` prints.
     var properties: [String: String] = [:]
     var peers: [ADBStream] = []

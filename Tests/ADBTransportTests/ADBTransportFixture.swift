@@ -31,13 +31,14 @@ enum TransportFixture {
   }
 
   static func transport(
-    port: UInt16, locator: ADBLocator = findsAdb, clock: TestClock = TestClock()
+    port: UInt16, locator: ADBLocator = findsAdb, clock: TestClock = TestClock(),
+    answerLimit: Duration = .seconds(10)
   ) -> ADBTransport {
     ADBTransport(
       host: ADBHost(
         port: port, locator: locator, launcher: { _ in },
         backoff: Backoff(initial: .milliseconds(20), maximum: .milliseconds(100))),
-      locator: locator, now: { clock.now })
+      locator: locator, answerLimit: answerLimit, now: { clock.now })
   }
 
   /// A hub serving `entries`, started on a free port; the caller kills it.
