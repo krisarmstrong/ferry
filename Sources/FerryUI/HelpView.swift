@@ -40,8 +40,9 @@ public struct HelpView: View {
 
   private func sectionsView(_ content: HelpContent) -> some View {
     let sections = content.sections(matching: query)
+    let shown = content.shownSection(selection: selection, query: query)
     return NavigationSplitView {
-      List(sections, selection: selectedID) { section in
+      List(sections, selection: shownID(shown)) { section in
         Label {
           Text(HelpText.resource(section.title))
         } icon: {
@@ -50,18 +51,26 @@ public struct HelpView: View {
       }
       .navigationSplitViewColumnWidth(min: 200, ideal: 220)
     } detail: {
-      if let section = sections.first(where: { $0.id == selection }) ?? sections.first {
-        HelpSectionDetail(section: section, model: model)
+      if let shown {
+        HelpSectionDetail(section: shown, model: model)
       } else {
         ContentUnavailableView.search(text: query)
       }
     }
     .searchable(text: $query, placement: .toolbar)
     .frame(minWidth: 640, minHeight: 420)
+    .onAppear {
+      // A section remembered from an earlier help that no longer has it.
+      let known = content.sections.contains { $0.id == selection }
+      if !known, let first = content.sections.first {
+        selection = first.id
+      }
+    }
   }
 
-  private var selectedID: Binding<String?> {
-    Binding(get: { selection }, set: { if let id = $0 { selection = id } })
+  /// The sidebar's selection is the section the detail shows.
+  private func shownID(_ shown: HelpSection?) -> Binding<String?> {
+    Binding(get: { shown?.id }, set: { if let id = $0 { selection = id } })
   }
 }
 
@@ -77,7 +86,7 @@ struct HelpSectionDetail: View {
           .font(.title2)
           .bold()
         HelpBodyView(blocks: section.body, model: model)
-        ForEach(section.groups, id: \.title) { group in
+        ForEach(Array(section.groups.enumerated()), id: \.offset) { _, group in
           VStack(alignment: .leading, spacing: 10) {
             Text(HelpText.resource(group.title))
               .font(.headline)
@@ -100,7 +109,7 @@ private struct HelpBodyView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      ForEach(blocks.paragraphs, id: \.self) { paragraph in
+      ForEach(Array(blocks.paragraphs.enumerated()), id: \.offset) { _, paragraph in
         Text(HelpText.attributed(paragraph))
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -109,7 +118,7 @@ private struct HelpBodyView: View {
       }
       if !blocks.definitions.isEmpty {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 8) {
-          ForEach(blocks.definitions, id: \.term) { definition in
+          ForEach(Array(blocks.definitions.enumerated()), id: \.offset) { _, definition in
             GridRow {
               Text(HelpText.resource(definition.term))
                 .fontWeight(.semibold)

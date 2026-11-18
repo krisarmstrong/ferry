@@ -10,7 +10,6 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// `GuideSteps`.
 struct HelpContent: Decodable, Sendable, Equatable {
   let version: Int
-  let title: String
   let sections: [HelpSection]
 
   /// The help that ships in the bundle, or `nil` if it is missing or does not decode. The tests
@@ -30,6 +29,13 @@ struct HelpContent: Decodable, Sendable, Equatable {
       log.fault("help.json does not load: \(error, privacy: .public)")
       return nil
     }
+  }
+
+  /// The section the window shows, in the sidebar and the detail alike: the selected one if the
+  /// search shows it, else the first the search shows. `nil` when the search shows none.
+  func shownSection(selection: String, query: String) -> HelpSection? {
+    let shown = sections(matching: query)
+    return shown.first { $0.id == selection } ?? shown.first
   }
 
   /// The sections that mention `query` in their title or any of their text, ignoring case,

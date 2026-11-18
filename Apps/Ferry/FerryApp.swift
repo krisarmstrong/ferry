@@ -23,7 +23,7 @@ struct FerryApp: App {
       MenuContent(model: model)
     } label: {
       Image("MenuBarGlyph")
-        .accessibilityLabel(Text("Ferry"))
+        .accessibilityLabel(Text(verbatim: "Ferry"))
     }
     .menuBarExtraStyle(.window)
 

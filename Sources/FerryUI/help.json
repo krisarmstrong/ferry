@@ -1,6 +1,5 @@
 {
   "version": 1,
-  "title": "Ferry Help",
   "sections": [
     {
       "id": "getting-started",
@@ -224,14 +223,6 @@
       "steps": [
         "In Ferry's Settings, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched.",
         "Drag Ferry from Applications to the Trash."
-      ]
-    },
-    {
-      "id": "coming-next",
-      "title": "Coming next",
-      "symbol": "calendar",
-      "paragraphs": [
-        "ADB connection, Wi-Fi connection, and **Send to device** in Finder's Control-click menu."
       ]
     }
   ]

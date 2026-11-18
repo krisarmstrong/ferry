@@ -14,9 +14,6 @@
     "%lld." : {
 
     },
-    "ADB connection, Wi-Fi connection, and **Send to device** in Finder's Control-click menu." : {
-      "extractionState" : "manual"
-    },
     "Android 10 or newer" : {
       "extractionState" : "manual"
     },
@@ -60,9 +57,6 @@
       "extractionState" : "manual"
     },
     "Closes the menu. The helper keeps running, so devices stay in Finder." : {
-      "extractionState" : "manual"
-    },
-    "Coming next" : {
       "extractionState" : "manual"
     },
     "Connect a NetAlly unit" : {
