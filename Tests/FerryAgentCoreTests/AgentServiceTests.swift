@@ -257,10 +257,10 @@ struct AgentServiceTests {
 
     #expect(
       await harness.service.handle(.list(domain: "nope", folder: .root), file: nil)
-        == .failure(.storageNotFound("nope")))
+        == .failure(.deviceDisconnected))
     #expect(
       await harness.service.handle(.item(domain: "nope", id: .root), file: nil)
-        == .failure(.storageNotFound("nope")))
+        == .failure(.deviceDisconnected))
   }
 
   @Test(arguments: ["a/b", "..", ".", "", "x\0y", SafeWriter.partialPrefix + "x"])

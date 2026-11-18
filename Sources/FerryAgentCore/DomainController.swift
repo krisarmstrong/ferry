@@ -78,6 +78,12 @@ public actor DomainController {
   private var retired = false
   /// Hub events handled so far.
   private(set) var handledEvents = 0
+  /// Set once the domains from before this process are adopted, whether or not listing them
+  /// worked; until then requests wait (see `route(_:)`).
+  private var adopted = false
+  private var adoptionWaiters: [CheckedContinuation<Void, Never>] = []
+  /// Requests waiting for the domains from before this process to be adopted.
+  var requestsAwaitingAdoption: Int { adoptionWaiters.count }
 
   /// `itemStore` is the folder holding the item tables, one file per domain. It must be the
   /// agent's own: the sandboxed extension can write to the app group's container.
@@ -98,6 +104,11 @@ public actor DomainController {
   /// of the hub's events.
   public func run() async {
     await serially { await self.adoptExisting() }
+    adopted = true
+    for waiter in adoptionWaiters {
+      waiter.resume()
+    }
+    adoptionWaiters = []
     for await event in hub.events {
       await serially { await self.handle(event) }
       handledEvents += 1
@@ -121,11 +132,17 @@ public actor DomainController {
     }
   }
 
-  func route(_ domain: String) throws(TransportError) -> Route {
-    guard let entry = domains[domain] else { throw .storageNotFound(domain) }
-    guard entry.connected, let storage = entry.storage, let link = links[storage.device] else {
-      throw .deviceDisconnected
+  /// What a request on `domain` runs against. Waits until the domains from before this process
+  /// are adopted. A domain that is unknown, not adopted or not connected is `.deviceDisconnected`,
+  /// which FileProvider retries: anything it reads as "no such item" would make it delete the
+  /// domain's items locally, and a request can arrive before an agent restart's adoption.
+  func route(_ domain: String) async throws(TransportError) -> Route {
+    if !adopted {
+      await withCheckedContinuation { adoptionWaiters.append($0) }
     }
+    guard let entry = domains[domain], entry.connected, let storage = entry.storage,
+      let link = links[storage.device]
+    else { throw .deviceDisconnected }
     return Route(
       storage: storage, session: link.session, writer: link.writer, items: table(for: domain))
   }

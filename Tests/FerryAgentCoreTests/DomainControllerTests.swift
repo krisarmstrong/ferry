@@ -69,7 +69,7 @@ struct DomainControllerTests {
     #expect(!enabled)
     #expect(
       await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
-        == .failure(.storageNotFound(domainID(device))))
+        == .failure(.deviceDisconnected))
 
     await harness.manager.setUserEnabled(true)
     guard case .status(_, true) = await harness.service.handle(.status, file: nil) else {
@@ -206,7 +206,7 @@ struct DomainControllerTests {
       await harness.hub.devices().first { $0.id == first.info.id }?.state == .notSharingFiles)
     #expect(
       await harness.service.handle(.list(domain: domainID(first), folder: .root), file: nil)
-        == .failure(.storageNotFound(domainID(first))))
+        == .failure(.deviceDisconnected))
     #expect(
       await harness.service.handle(.list(domain: domainID(second), folder: .root), file: nil)
         == .entries([]))
@@ -223,7 +223,7 @@ struct DomainControllerTests {
     #expect(await harness.manager.calls.last == .removeAll)
     #expect(
       await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
-        == .failure(.storageNotFound(domainID(device))))
+        == .failure(.deviceDisconnected))
   }
 
   @Test func restartDisconnectsExistingDomainsAndReconnectsOnReady() async throws {
@@ -242,6 +242,31 @@ struct DomainControllerTests {
       await harness.service.handle(.list(domain: domain, folder: .root), file: nil) == .entries([]))
     #expect(
       await harness.service.handle(.list(domain: gone, folder: .root), file: nil)
+        == .failure(.deviceDisconnected))
+  }
+
+  /// Right after an agent restart the extension may ask about a domain the controller has not
+  /// adopted yet. "No such item" would make FileProvider delete the domain's items locally, so
+  /// the request waits for adoption and the domain reads as disconnected, never as missing.
+  @Test func requestBeforeAdoptionWaitsAndIsNeverNoSuchItem() async throws {
+    let domain = domainID(await makeDevice("GONE"))
+    let manager = FakeDomainManager(existing: [domain])
+    await manager.holdExisting()
+    let harness = try AgentHarness(manager: manager)
+    defer { harness.finish() }
+
+    let pending = Task { [service = harness.service] in
+      await service.handle(.list(domain: domain, folder: .root), file: nil)
+    }
+    for _ in 0..<1_000 where await harness.controller.requestsAwaitingAdoption == 0 {
+      try await Task.sleep(for: .milliseconds(1))
+    }
+    #expect(await harness.controller.requestsAwaitingAdoption == 1)
+    await manager.releaseExisting()
+
+    #expect(await pending.value == .failure(.deviceDisconnected))
+    #expect(
+      await harness.service.handle(.list(domain: "unknown", folder: .root), file: nil)
         == .failure(.deviceDisconnected))
   }
 

@@ -19,7 +19,8 @@ public enum ErrorMapping {
     // The phone is locked or not set to share files, which the user fixes on the phone.
     case .deviceLocked:
       return NSFileProviderError(.notAuthenticated)
-    // An unknown domain names a storage that no longer exists, so nothing in it does either.
+    // The item, or the storage a write was aimed at (an SD card taken out), is gone. An unknown
+    // or not yet adopted domain is never this: the agent reports it as `.deviceDisconnected`.
     case .notFound, .unknownItem, .storageNotFound:
       return NSFileProviderError(.noSuchItem)
     case .alreadyExists:

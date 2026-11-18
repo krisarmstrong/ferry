@@ -18,6 +18,9 @@ actor FakeDomainManager: DomainManaging {
 
   private(set) var calls: [Call] = []
   private let preexisting: [String]
+  /// Set by `holdExisting()`: `existing()` waits until `releaseExisting()`.
+  private var existingHeld = false
+  private var existingWaiter: CheckedContinuation<Void, Never>?
   private var userEnabled = false
   private var waiters: [Int: (count: Int, continuation: CheckedContinuation<Void, Never>)] = [:]
   private var nextWaiter = 0
@@ -36,7 +39,23 @@ actor FakeDomainManager: DomainManaging {
     record(.signal(identifier))
   }
   func isUserEnabled() async -> Bool { userEnabled }
-  func existing() async throws -> [String] { preexisting }
+  func existing() async throws -> [String] {
+    if existingHeld {
+      await withCheckedContinuation { existingWaiter = $0 }
+    }
+    return preexisting
+  }
+
+  /// Makes `existing()` wait, as listing the system's domains can take a while after a restart.
+  func holdExisting() {
+    existingHeld = true
+  }
+
+  func releaseExisting() {
+    existingHeld = false
+    existingWaiter?.resume()
+    existingWaiter = nil
+  }
 
   func setUserEnabled(_ enabled: Bool) {
     userEnabled = enabled
@@ -125,14 +144,17 @@ struct AgentHarness {
   private let ticks: AsyncStream<Void>.Continuation
   private let runner: Task<Void, Never>
 
-  init(devices: [FakeDevice] = [], existing: [String] = [], store: URL = itemStore()) throws {
+  init(
+    devices: [FakeDevice] = [], existing: [String] = [], store: URL = itemStore(),
+    manager: FakeDomainManager? = nil
+  ) throws {
     self.store = store
-    manager = FakeDomainManager(existing: existing)
+    self.manager = manager ?? FakeDomainManager(existing: existing)
     transport = FakeTransport(devices: devices)
     let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
     self.ticks = ticks
     hub = DeviceHub(transport: transport, arrivals: arrivals, clock: clock)
-    controller = DomainController(hub: hub, manager: manager, itemStore: store)
+    controller = DomainController(hub: hub, manager: self.manager, itemStore: store)
     scratch = FileManager.default.temporaryDirectory.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
