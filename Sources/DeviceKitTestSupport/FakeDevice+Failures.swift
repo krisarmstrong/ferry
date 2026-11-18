@@ -19,6 +19,12 @@ extension FakeDevice {
     renameFailure = error.map { RenameFailure(skipping: skipping, remaining: count, error: $0) }
   }
 
+  /// Every backup a rename sets aside is stored as `actual`, as a FAT card or 7-bit firmware
+  /// would, and the rename reports the change.
+  public func storeBackups(as actual: String) {
+    backupStoredAs = actual
+  }
+
   /// The next `storages()` throws `error`.
   public func failNextStorages(with error: TransportError) {
     storagesFailure = error

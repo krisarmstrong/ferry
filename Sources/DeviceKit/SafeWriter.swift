@@ -213,6 +213,14 @@ public struct SafeWriter: Sendable {
         in: storage)
     } catch {
       await discard(partial, in: storage)
+      if case .nameChangedByDevice(_, let actual) = error {
+        // The device kept the old file under a name of its own choosing, which is neither the
+        // user's name nor a hidden backup: it goes back to the user's name.
+        if let stored = try? replaced.path.parent?.appending(actual) {
+          await restore(stored, to: replaced.path, in: storage)
+        }
+        throw error
+      }
       guard case .unsupported = error else { throw error }
       // No rename: nothing can be set aside, so the old file goes before a direct upload.
       try await session.delete(replaced.path, in: storage)

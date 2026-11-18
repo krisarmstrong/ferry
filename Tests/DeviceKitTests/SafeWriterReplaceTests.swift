@@ -145,4 +145,25 @@ extension SafeWriterTests {
     }
     #expect(await device.allPaths(in: storageID).isEmpty)
   }
+
+  /// The device stored the set-aside copy under another name, which would leave the user's file
+  /// renamed to something odd. It is renamed back, and the replace fails with the device's
+  /// change.
+  @Test func aBackupTheDeviceRenamedIsPutBack() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let path = try RemotePath("/a.txt")
+    try await device.seed(path, in: storageID, contents: Data([9]))
+    await device.storeBackups(as: "FERRY~1")
+    try await withTempFile(Data([1, 2])) { file in
+      await #expect {
+        _ = try await writer.write(from: file, to: path, replacing: true)
+      } throws: { error in
+        if case TransportError.nameChangedByDevice(_, "FERRY~1") = error { return true }
+        return false
+      }
+    }
+    #expect(await device.allPaths(in: storageID) == [path])
+    #expect(await device.contents(of: path, in: storageID) == Data([9]))
+  }
 }

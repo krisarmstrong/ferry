@@ -34,6 +34,8 @@ public actor FakeDevice: DeviceSession {
   var uploadFailure: (afterBytes: UInt64, error: TransportError)?
   var uploadTruncation: UInt64?
   var renameFailure: RenameFailure?
+  /// The name the device stores a backup under instead of the one it was sent.
+  var backupStoredAs: String?
 
   struct RenameFailure {
     var skipping: Int
@@ -176,6 +178,10 @@ public actor FakeDevice: DeviceSession {
     }
     guard let parent = path.parent else { throw .invalidName(path.description) }
     guard nodes[path] != nil else { throw .notFound(path) }
+    if let actual = backupStoredAs, SafeWriter.isBackup(newName) {
+      _ = try relocate(path, to: parent.appending(actual), in: storage)
+      throw .nameChangedByDevice(requested: newName, actual: actual)
+    }
     return try relocate(path, to: parent.appending(newName), in: storage)
   }
 
