@@ -40,8 +40,12 @@ private func requests() -> [AgentRequest] {
   all.append(.create(domain: domain, parent: .root, name: "Camera", isFolder: true))
   all.append(.rename(domain: domain, id: photo, to: "renamed.jpg"))
   all.append(.move(domain: domain, id: photo, toFolder: .root))
-  all.append(.replaceContents(domain: domain, id: photo))
-  all.append(.delete(domain: domain, id: camera))
+  let version = ContentVersion(
+    RemoteItem(path: .root, kind: .file, size: 3, modified: Date(timeIntervalSince1970: 7)))
+  all.append(.replaceContents(domain: domain, id: photo, base: nil, onConflict: .keepBoth))
+  all.append(.replaceContents(domain: domain, id: photo, base: version, onConflict: .fail))
+  all.append(.delete(domain: domain, id: camera, base: nil, recursive: false))
+  all.append(.delete(domain: domain, id: camera, base: version, recursive: true))
   all += [.changes(domain: domain, since: nil), .changes(domain: domain, since: Data([1, 2, 3]))]
   all += [.workingSet(domain: domain, page: nil), .workingSet(domain: domain, page: Data([7]))]
   return all
@@ -68,6 +72,8 @@ private func tag(_ error: TransportError) -> Int {
   case .cancelled: 16
   case .io: 17
   case .downloadSizeMismatch: 18
+  case .directoryNotEmpty: 19
+  case .changedOnDevice: 20
   }
 }
 
@@ -83,6 +89,7 @@ private func errors() throws -> [TransportError] {
   all += [.sizeMismatch(expected: 10, actual: 9), .cancelled, .io("read failed")]
   all.append(.nameChangedByDevice(requested: "Ä.txt", actual: "A.txt"))
   all.append(.downloadSizeMismatch(listed: 10, received: 9))
+  all += [.directoryNotEmpty(photo), .changedOnDevice(photo)]
   return all
 }
 
@@ -139,7 +146,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyErrorRoundTripsJSON() throws {
-  #expect(Set(try errors().map(tag)) == Set(0...17))
+  #expect(Set(try errors().map(tag)) == Set(0...20))
   for error in try errors() {
     #expect(try roundTrip(AgentResponse.failure(error)) == .failure(error))
   }

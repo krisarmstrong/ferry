@@ -85,14 +85,15 @@ public actor AgentService: AgentHandling {
       return .entry(try await upload(file, as: name, in: parent, of: domain))
     case (.create(let domain, let parent, let name, _), nil):
       return .entry(try await makeFolder(name, in: parent, of: domain))
-    case (.replaceContents(let domain, let id), let file?):
-      return .entry(try await replace(id, with: file, in: domain))
+    case (.replaceContents(let domain, let id, let base, let onConflict), let file?):
+      return .entry(
+        try await replace(id, with: file, base: base, onConflict: onConflict, in: domain))
     case (.rename(let domain, let id, let name), _):
       return .entry(try await rename(id, to: name, in: domain))
     case (.move(let domain, let id, let folder), _):
       return .entry(try await move(id, to: folder, in: domain))
-    case (.delete(let domain, let id), _):
-      try await delete(id, in: domain)
+    case (.delete(let domain, let id, let base, let recursive), _):
+      try await delete(id, base: base, recursive: recursive, in: domain)
       return .done
     case (.changes(let domain, let since), _):
       let changes = try await domains.route(domain).items.changes(since: since)
@@ -193,13 +194,33 @@ public actor AgentService: AgentHandling {
   }
 
   /// Copies `source` into a scratch file, then writes that over the file through the writer.
-  private func replace(_ id: ItemID, with source: Int32, in domain: String)
-    async throws(TransportError) -> ProviderEntry
-  {
+  ///
+  /// If the device's file is no longer at `base` (an app on the device, or the user at the
+  /// unit, changed it since the Mac read it), the device's file is kept: with `.keepBoth` the
+  /// Mac's contents go up beside it as a conflict copy and the device's item is returned, so
+  /// FileProvider fetches the device's contents; with `.fail` nothing is written.
+  private func replace(
+    _ id: ItemID, with source: Int32, base: ContentVersion?, onConflict: ConflictPolicy,
+    in domain: String
+  ) async throws(TransportError) -> ProviderEntry {
     let scratch = try await FileTransfer.copyIn(source)
     defer { FileTransfer.remove(scratch) }
     return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
+      if let base {
+        let current = try await route.session.item(at: path, in: route.storage)
+        if current.kind == .file, ContentVersion(current) != base {
+          let entry = await route.items.observed(current)
+          switch onConflict {
+          case .fail:
+            throw .changedOnDevice(path)
+          case .keepBoth:
+            _ = await route.items.created(
+              try await ConflictCopy.upload(scratch, beside: path, route))
+            return entry
+          }
+        }
+      }
       let item = try await route.writer.write(
         from: scratch, to: path, in: route.storage, replacing: true,
         progress: Self.ignoreProgress)
@@ -231,9 +252,29 @@ public actor AgentService: AgentHandling {
     }
   }
 
-  private func delete(_ id: ItemID, in domain: String) async throws(TransportError) {
+  /// Deletes the item as the device has it now. A file the device changed since `base` is kept
+  /// and its new state recorded, so FileProvider puts it back. A folder is deleted with its
+  /// contents only if `recursive`: without it, one that holds anything Finder would show is
+  /// kept, since Finder may have last seen it empty.
+  private func delete(
+    _ id: ItemID, base: ContentVersion?, recursive: Bool, in domain: String
+  ) async throws(TransportError) {
     try await gated(domain) { route throws(TransportError) in
       let path = try await route.changeable(id)
+      let current = try await route.session.item(at: path, in: route.storage)
+      switch current.kind {
+      case .file:
+        if let base, ContentVersion(current) != base {
+          _ = await route.items.observed(current)
+          throw .changedOnDevice(path)
+        }
+      case .folder:
+        // The listing that checks also reaps partials abandoned in the folder, which Finder
+        // never shows.
+        if !recursive, try await !route.writer.visibleList(path, in: route.storage).isEmpty {
+          throw .directoryNotEmpty(path)
+        }
+      }
       try await route.session.delete(path, in: route.storage)
       await route.items.removed(path)
     }
@@ -277,7 +318,7 @@ public actor AgentService: AgentHandling {
     return validated
   }
 
-  private static let ignoreProgress: ProgressHandler = { _, _ in true }
+  static let ignoreProgress: ProgressHandler = { _, _ in true }
   static let workingSetPageSize = 500
 }
 

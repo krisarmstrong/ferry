@@ -23,6 +23,10 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   /// The device stored the object under a name other than the one it was sent (a FAT card's
   /// de-duplication, 7-bit firmware, truncation).
   case nameChangedByDevice(requested: String, actual: String)
+  /// A folder asked to be deleted on its own still holds items.
+  case directoryNotEmpty(RemotePath)
+  /// The device's copy of the file changed since the version the request was based on.
+  case changedOnDevice(RemotePath)
   case cancelled
   case io(String)
 }

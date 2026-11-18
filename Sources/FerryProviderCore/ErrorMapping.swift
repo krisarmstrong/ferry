@@ -35,6 +35,12 @@ public enum ErrorMapping {
       return CocoaError(.fileWriteInvalidFileName)
     case .cancelled:
       return CocoaError(.userCancelled)
+    case .directoryNotEmpty:
+      return NSFileProviderError(.directoryNotEmpty)
+    // A replace asked to fail on conflict. A delete's conflict is `.deletionRejected`, which
+    // `ProviderBackend.delete` builds with the device's item.
+    case .changedOnDevice:
+      return NSFileProviderError(.localVersionConflictingWithServer)
     // The upload landed under another name. Saying both lets the user find it.
     case .nameChangedByDevice(let requested, let actual):
       return described(

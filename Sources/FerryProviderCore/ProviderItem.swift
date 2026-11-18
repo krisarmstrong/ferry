@@ -70,16 +70,23 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// Ferry that changes capabilities must change the version too, or items already known keep
   /// the old ones.
   public var itemVersion: NSFileProviderItemVersion {
-    let item = entry.item
-    var content = Data()
-    withUnsafeBytes(of: item.size.bigEndian) { content.append(contentsOf: $0) }
-    withUnsafeBytes(of: item.modified.timeIntervalSince1970.bitPattern.bigEndian) {
-      content.append(contentsOf: $0)
-    }
+    let content = ContentVersion(entry.item).encoded
     // Neither an identifier nor a name contains "/", so the fields cannot run together.
     let metadata = Data(
       SHA256.hash(
         data: Data("\(entry.parent.rawValue)/\(filename)/\(capabilities.rawValue)".utf8)))
     return NSFileProviderItemVersion(contentVersion: content, metadataVersion: metadata)
+  }
+}
+
+extension ContentVersion {
+  /// The base of a change FileProvider sends, or `nil` when there is none to check against:
+  /// FileProvider has never seen the item in sync (`beforeFirstSyncComponent`), or the version is
+  /// not one Ferry made.
+  public init?(base version: NSFileProviderItemVersion) {
+    guard version.contentVersion != NSFileProviderItemVersion.beforeFirstSyncComponent else {
+      return nil
+    }
+    self.init(encoded: version.contentVersion)
   }
 }

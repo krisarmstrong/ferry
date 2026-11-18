@@ -102,7 +102,7 @@ struct AgentServiceTests {
         isFolder: false),
       file: hello)
     let replaced = await harness.service.handle(
-      .replaceContents(domain: domain, id: old), file: newer)
+      .replaceContents(domain: domain, id: old, base: nil, onConflict: .keepBoth), file: newer)
 
     guard case .entry = created, case .entry(let entry) = replaced else {
       Issue.record("expected entries, got \(created) and \(replaced)")
@@ -169,7 +169,8 @@ struct AgentServiceTests {
     let create = AgentRequest.create(
       domain: domain, parent: try await setup.id(paths.docs), name: "new.txt", isFolder: false)
     #expect(await harness.service.handle(create, file: pipe.fileHandleForReading) == rejected)
-    let replace = AgentRequest.replaceContents(domain: domain, id: old)
+    let replace = AgentRequest.replaceContents(
+      domain: domain, id: old, base: nil, onConflict: .keepBoth)
     #expect(await harness.service.handle(replace, file: folder) == rejected)
 
     #expect(await device.allPaths(in: storageID(device)) == [paths.docs, paths.old])
@@ -187,7 +188,10 @@ struct AgentServiceTests {
     let file = AgentRequest.create(domain: domain, parent: .root, name: "new", isFolder: false)
     #expect(await service.handle(file, file: nil) == bad)
     #expect(await service.handle(.fetch(domain: domain, id: old), file: nil) == bad)
-    #expect(await service.handle(.replaceContents(domain: domain, id: old), file: nil) == bad)
+    #expect(
+      await service.handle(
+        .replaceContents(domain: domain, id: old, base: nil, onConflict: .keepBoth), file: nil)
+        == bad)
     let stray = try harness.readable("x.txt", "x")
     let folder = AgentRequest.create(domain: domain, parent: .root, name: "Moved", isFolder: true)
     #expect(await service.handle(folder, file: stray) == bad)
@@ -227,7 +231,9 @@ struct AgentServiceTests {
     #expect(renamed.item.path == paths.renamed)
     #expect(moved.item.path == paths.movedFile)
     #expect(moved.parent == made.id)
-    #expect(await service.handle(.delete(domain: domain, id: old), file: nil) == .done)
+    #expect(
+      await service.handle(.delete(domain: domain, id: old, base: nil, recursive: false), file: nil)
+        == .done)
     #expect(
       await service.handle(.item(domain: domain, id: old), file: nil) == .failure(.unknownItem))
 

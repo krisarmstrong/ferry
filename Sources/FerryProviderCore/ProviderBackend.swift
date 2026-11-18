@@ -80,12 +80,14 @@ public actor ProviderBackend {
   }
 
   /// Applies the changed fields in order: parent (move), then filename (rename), then contents.
+  /// New contents carry `base`, the version they were made from, and `onConflict` says what the
+  /// agent does if the device's file has moved on from it.
   /// The item is read first when its parent or name may change, so a field reported as changed
   /// that names what the item already has sends nothing. The item keeps `id` throughout: a
   /// different identifier would tell FileProvider to merge the item into another.
   public func modify(
     _ id: NSFileProviderItemIdentifier, to template: ItemTemplate, changed: ItemChanges,
-    contents: URL?
+    contents: URL?, base: ContentVersion? = nil, onConflict: ConflictPolicy = .keepBoth
   ) async throws -> ProviderItem {
     let itemID = try Self.itemID(id)
     var latest: ProviderEntry?
@@ -110,7 +112,9 @@ public actor ProviderBackend {
     if changed.contains(.contents), let contents {
       let handle = try FileHandle(forReadingFrom: contents)
       defer { try? handle.close() }
-      latest = try await entry(.replaceContents(domain: domain, id: itemID), file: handle)
+      latest = try await entry(
+        .replaceContents(domain: domain, id: itemID, base: base, onConflict: onConflict),
+        file: handle)
     }
     if let latest { return ProviderItem(latest) }
     return ProviderItem(try await entry(.item(domain: domain, id: itemID)))
@@ -140,9 +144,29 @@ public actor ProviderBackend {
     try await changes(from: anchor)
   }
 
-  public func delete(_ id: NSFileProviderItemIdentifier) async throws {
-    let response = try await send(.delete(domain: domain, id: try Self.itemID(id)))
-    guard case .done = response else { throw Self.unexpected(response) }
+  /// Deletes the item, as the extension's `deleteItem` asks: `base` is the version FileProvider
+  /// last had, and a folder's contents go with it only if `recursive`. A file the device changed
+  /// since `base` is refused with `.deletionRejected` carrying the device's item, which
+  /// FileProvider puts back.
+  public func delete(
+    _ id: NSFileProviderItemIdentifier, base: ContentVersion? = nil, recursive: Bool = false
+  ) async throws {
+    let itemID = try Self.itemID(id)
+    let response = try await reply(
+      .delete(domain: domain, id: itemID, base: base, recursive: recursive))
+    switch response {
+    case .done:
+      return
+    case .failure(.changedOnDevice):
+      guard let current = try? await item(id) else {
+        throw NSFileProviderError(.deletionRejected)
+      }
+      throw NSError.fileProviderErrorForRejectedDeletion(of: current)
+    case .failure(let error):
+      throw ErrorMapping.fileProviderError(error)
+    default:
+      throw Self.unexpected(response)
+    }
   }
 
   // MARK: Requests
@@ -171,22 +195,29 @@ public actor ProviderBackend {
   private func send(_ request: AgentRequest, file: FileHandle? = nil) async throws
     -> AgentResponse
   {
-    if Task.isCancelled { throw CocoaError(.userCancelled) }
-    let response: AgentResponse
-    do {
-      response = try await client.send(request, file: file)
-    } catch {
-      log.log(
-        level: error.logType,
-        "\(String(describing: request), privacy: .private) failed: \(error, privacy: .private)")
-      throw ErrorMapping.fileProviderError(error)
-    }
+    let response = try await reply(request, file: file)
     if case .failure(let error) = response {
       log.info(
         "\(String(describing: request), privacy: .private) refused: \(error, privacy: .private)")
       throw ErrorMapping.fileProviderError(error)
     }
     return response
+  }
+
+  /// Sends `request` and returns the agent's reply as it is, `.failure` included. Only a thrown
+  /// error becomes a FileProvider error.
+  private func reply(_ request: AgentRequest, file: FileHandle? = nil) async throws
+    -> AgentResponse
+  {
+    if Task.isCancelled { throw CocoaError(.userCancelled) }
+    do {
+      return try await client.send(request, file: file)
+    } catch {
+      log.log(
+        level: error.logType,
+        "\(String(describing: request), privacy: .private) failed: \(error, privacy: .private)")
+      throw ErrorMapping.fileProviderError(error)
+    }
   }
 
   private static func unexpected(_ response: AgentResponse) -> any Error {

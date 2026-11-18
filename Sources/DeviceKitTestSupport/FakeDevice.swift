@@ -133,7 +133,8 @@ public actor FakeDevice: DeviceSession {
     let total = UInt64(data.count)
     guard progress(0, total) else { throw .cancelled }
 
-    nodes[path] = .file(data, modified: Date())
+    let node = Node.file(data, modified: Date())
+    nodes[path] = node
     tree[storage] = nodes
     if let failure {
       uploadFailure = nil
@@ -143,7 +144,7 @@ public actor FakeDevice: DeviceSession {
       tree[storage]?[path] = nil
       throw .cancelled
     }
-    return Self.item(path, .file(data, modified: Date()))
+    return Self.item(path, node)
   }
 
   public func makeFolder(_ path: RemotePath, in storage: StorageID) async throws(TransportError)

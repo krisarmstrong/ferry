@@ -26,7 +26,7 @@ struct AgentIdentityTests {
       .rename(domain: domain, id: unknown, to: "b"),
       .move(
         domain: domain, id: try await harness.id(path("/a.txt"), in: domain), toFolder: unknown),
-      .delete(domain: domain, id: unknown),
+      .delete(domain: domain, id: unknown, base: nil, recursive: false),
     ] {
       #expect(await service.handle(request, file: nil) == .failure(.unknownItem), "\(request)")
     }
@@ -45,7 +45,9 @@ struct AgentIdentityTests {
     let domain = domainID(device)
     let refused = AgentResponse.failure(.unsupported("changing the storage root"))
 
-    #expect(await harness.service.handle(.delete(domain: domain, id: .root), file: nil) == refused)
+    #expect(
+      await harness.service.handle(
+        .delete(domain: domain, id: .root, base: nil, recursive: false), file: nil) == refused)
     #expect(
       await harness.service.handle(.rename(domain: domain, id: .root, to: "x"), file: nil)
         == refused)

@@ -165,7 +165,9 @@ struct AgentChangeTests {
     let doomed = try #require(top.first { $0.item.path.name == "f0.txt" })
     let reshaped = try #require(top.first { $0.item.path.name == "x" })
 
-    #expect(await domain.send(.delete(domain: domain.name, id: doomed.id)) == .done)
+    #expect(
+      await domain.send(.delete(domain: domain.name, id: doomed.id, base: nil, recursive: false))
+        == .done)
     try await domain.device.delete(path("/x"), in: domain.storage)
     _ = try await domain.device.makeFolder(path("/x"), in: domain.storage)
     let relisted = try await domain.list()

@@ -94,6 +94,8 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
   ) -> Progress {
     let identifier = item.itemIdentifier
     let changes = ItemChanges(changedFields)
+    let base = ContentVersion(base: version)
+    let onConflict: ConflictPolicy = options.contains(.failOnConflict) ? .fail : .keepBoth
     let template: ItemTemplate
     do {
       template = try ItemTemplate(item)
@@ -104,7 +106,9 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
     let backend = backend
     return answer(
       {
-        try await backend.modify(identifier, to: template, changed: changes, contents: newContents)
+        try await backend.modify(
+          identifier, to: template, changed: changes, contents: newContents, base: base,
+          onConflict: onConflict)
       },
       then: { result in
         switch result {
@@ -120,8 +124,10 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
     completionHandler: @escaping ((any Error)?) -> Void
   ) -> Progress {
     let backend = backend
+    let base = ContentVersion(base: version)
+    let recursive = options.contains(.recursive)
     return answer(
-      { try await backend.delete(identifier) },
+      { try await backend.delete(identifier, base: base, recursive: recursive) },
       then: { result in
         switch result {
         case .success: completionHandler(nil)

@@ -53,6 +53,8 @@ actor FakeAgent: AgentSending {
   var failure: TransportError?
   /// Thrown by `send` itself, as `AgentClient` does when the connection is lost.
   var thrown: TransportError?
+  /// Answered to the next `.delete` instead of performing it.
+  var deleteFailure: TransportError?
   /// Written into the fetch target before failing, as a download cut short would.
   var fetchFailure: TransportError?
   /// Answered to `.changes`: the changes since `changeAnchor`, which an older anchor finds
@@ -92,6 +94,10 @@ actor FakeAgent: AgentSending {
   func set(failure: TransportError?, thrown: TransportError? = nil) {
     self.failure = failure
     self.thrown = thrown
+  }
+
+  func set(deleteFailure: TransportError) {
+    self.deleteFailure = deleteFailure
   }
 
   func set(fetchFailure: TransportError) {
@@ -171,7 +177,7 @@ actor FakeAgent: AgentSending {
       let moved = try path(folder).appending(name)
       try requireFree(moved, except: nil)
       return .entry(try entry(relocate(source, to: moved, id: id), id: id))
-    case .replaceContents(_, let id):
+    case .replaceContents(_, let id, _, _):
       let old = try existing(try path(id))
       let data = (try? file?.readToEnd()) ?? Data()
       let item = RemoteItem(
@@ -180,11 +186,8 @@ actor FakeAgent: AgentSending {
       items[old.path] = item
       contents[old.path] = data
       return .entry(try entry(item, id: id))
-    case .delete(_, let id):
-      let path = try path(id)
-      _ = try existing(path)
-      items[path] = nil
-      paths[id] = nil
+    case .delete(_, let id, _, _):
+      try delete(id)
       return .done
     case .changes(_, let since):
       return changeReply(since)
@@ -193,6 +196,17 @@ actor FakeAgent: AgentSending {
     case .status, .recheck, .refresh, .eject, .removeAllDomains:
       throw .unsupported("\(request)")
     }
+  }
+
+  private func delete(_ id: ItemID) throws(TransportError) {
+    if let deleteFailure {
+      self.deleteFailure = nil
+      throw deleteFailure
+    }
+    let path = try path(id)
+    _ = try existing(path)
+    items[path] = nil
+    paths[id] = nil
   }
 
   private func listing(_ folder: ItemID) throws(TransportError) -> [ProviderEntry] {

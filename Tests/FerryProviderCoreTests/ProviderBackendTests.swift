@@ -171,7 +171,7 @@ import UniformTypeIdentifiers
         .item(domain: domain, id: id),
         .move(domain: domain, id: id, toFolder: docs),
         .rename(domain: domain, id: id, to: "b.txt"),
-        .replaceContents(domain: domain, id: id),
+        .replaceContents(domain: domain, id: id, base: nil, onConflict: .keepBoth),
       ])
     #expect(await agent.contents[try path("/Docs/b.txt")] == Data("new!".utf8))
   }
@@ -214,7 +214,8 @@ import UniformTypeIdentifiers
     let backend = ProviderBackend(domain: domain, client: agent)
     let id = try await agent.id(try path("/a.txt"))
     try await backend.delete(NSFileProviderItemIdentifier(id))
-    #expect(await agent.requests == [.delete(domain: domain, id: id)])
+    #expect(
+      await agent.requests == [.delete(domain: domain, id: id, base: nil, recursive: false)])
     await #expect(throws: NSFileProviderError(.noSuchItem)) {
       try await backend.delete(NSFileProviderItemIdentifier(id))
     }
@@ -285,5 +286,87 @@ import UniformTypeIdentifiers
     #expect(changed.itemIdentifier == id)
     #expect(changed.parentItemIdentifier == NSFileProviderItemIdentifier(docs.rawValue))
     #expect(changed.filename == "b.txt")
+  }
+}
+
+/// The base versions and options FileProvider gives a change reach the agent, and the agent's
+/// refusals come back as the errors FileProvider documents for them.
+struct ProviderBackendConflictTests {
+  private let version = ContentVersion(
+    RemoteItem(path: .root, kind: .file, size: 3, modified: Date(timeIntervalSince1970: 9)))
+
+  @Test func deleteSendsTheBaseAndWhetherItIsRecursive() async throws {
+    let agent = FakeAgent([try folder("/Docs")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let id = try await agent.id(try path("/Docs"))
+
+    try await backend.delete(NSFileProviderItemIdentifier(id), base: version, recursive: true)
+
+    #expect(
+      await agent.requests == [.delete(domain: domain, id: id, base: version, recursive: true)])
+  }
+
+  @Test func aFolderThatIsNotEmptyIsDirectoryNotEmpty() async throws {
+    let agent = FakeAgent([try folder("/Docs")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let id = try await agent.id(try path("/Docs"))
+    await agent.set(deleteFailure: .directoryNotEmpty(try path("/Docs")))
+
+    await #expect(throws: NSFileProviderError(.directoryNotEmpty)) {
+      try await backend.delete(NSFileProviderItemIdentifier(id), base: nil, recursive: false)
+    }
+  }
+
+  /// FileProvider puts the item back from the item in the error.
+  @Test func aFileChangedOnTheDeviceRejectsTheDeletionWithTheDevicesItem() async throws {
+    let agent = FakeAgent([try file("/a.txt", size: 9)])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let id = try await agent.id(try path("/a.txt"))
+    await agent.set(deleteFailure: .changedOnDevice(try path("/a.txt")))
+
+    do {
+      try await backend.delete(NSFileProviderItemIdentifier(id), base: version, recursive: false)
+      Issue.record("the delete succeeded")
+    } catch {
+      let error = error as NSError
+      #expect(error.domain == NSFileProviderErrorDomain)
+      #expect(error.code == NSFileProviderError.Code.deletionRejected.rawValue)
+      let item = error.userInfo[NSFileProviderErrorItemKey] as? NSFileProviderItem
+      #expect(item?.itemIdentifier == NSFileProviderItemIdentifier(id))
+      #expect(item?.documentSize == 9)
+    }
+  }
+
+  @Test func modifySendsTheBaseAndTheConflictPolicy() async throws {
+    let agent = FakeAgent([try file("/a.txt")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let id = try await agent.id(try path("/a.txt"))
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+
+    _ = try await backend.modify(
+      NSFileProviderItemIdentifier(id),
+      to: ItemTemplate(parent: .root, filename: "a.txt", isFolder: false), changed: .contents,
+      contents: try writeContents(Data("new".utf8), in: dir), base: version, onConflict: .fail)
+
+    #expect(
+      await agent.requests == [
+        .replaceContents(domain: domain, id: id, base: version, onConflict: .fail)
+      ])
+  }
+
+  @Test func theBaseIsReadFromTheVersionFerryGave() throws {
+    let item = ProviderItem(
+      ProviderEntry(
+        id: .random(), parent: .root,
+        item: RemoteItem(
+          path: try path("/a.txt"), kind: .file, size: 3,
+          modified: Date(timeIntervalSince1970: 9))))
+
+    #expect(ContentVersion(base: item.itemVersion) == version)
+    let unsynced = NSFileProviderItemVersion(
+      contentVersion: NSFileProviderItemVersion.beforeFirstSyncComponent,
+      metadataVersion: NSFileProviderItemVersion.beforeFirstSyncComponent)
+    #expect(ContentVersion(base: unsynced) == nil)
   }
 }
