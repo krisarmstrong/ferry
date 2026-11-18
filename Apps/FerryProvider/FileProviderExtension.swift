@@ -78,17 +78,14 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
     let (progress, update) = FileProgress.make(.uploading)
     return answer(
       progress: progress,
-      { () async throws -> ProviderItem? in
-        if mayAlreadyExist {
-          if let match = try await backend.existing(matching: template) { return match }
-          // Found on the Mac without contents and not on the device: nothing to create.
-          if template.kind == .file || template.kind == .package, url == nil { return nil }
-        }
-        return try await backend.create(template, contents: url, progress: update)
+      {
+        try await backend.create(
+          template, contents: url, mayAlreadyExist: mayAlreadyExist, progress: update)
       },
       then: { result in
         switch result {
-        case .success(let item): completionHandler(item, [], false, nil)
+        case .success(let synced):
+          completionHandler(synced?.item, [], synced?.shouldFetchContent ?? false, nil)
         case .failure(let error): completionHandler(nil, [], false, error)
         }
       })

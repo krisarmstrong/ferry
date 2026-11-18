@@ -88,24 +88,38 @@ public actor ProviderBackend {
     return ProviderItem(try await entry(request, file: handle, progress: progress))
   }
 
-  /// For a create FileProvider marks `.mayAlreadyExist` (an import after its state was lost, or
-  /// a merge): the device's item of that name in the parent, if it is the same item: a folder
-  /// for a folder, or a file of the same size and modification time (to the second, all MTP
-  /// keeps). `nil` when none matches; the caller then creates the item, or, with no contents to
-  /// send, reports that it has none.
-  public func existing(matching template: ItemTemplate) async throws -> ProviderItem? {
+  /// `create`, for a create FileProvider may mark `.mayAlreadyExist` (an import after its state
+  /// was lost, or a merge). Then the device's item of that name and kind in the parent is the
+  /// item, not a collision: a folder for a folder (or for a package-named one, since a device
+  /// folder is never a package), a file for a file. A matched file whose size or modification
+  /// time (to the second, all MTP keeps) is not the template's is the device's version, so
+  /// FileProvider fetches it. With no match and no contents for a file there is nothing to
+  /// create: `nil`.
+  public func create(
+    _ template: ItemTemplate, contents: URL?, mayAlreadyExist: Bool,
+    progress: TransferProgressHandler? = nil
+  ) async throws -> SyncedItem? {
+    if mayAlreadyExist {
+      if let match = try await existing(matching: template) { return match }
+      if template.kind == .file || template.kind == .package, contents == nil { return nil }
+    }
+    return SyncedItem(
+      try await create(template, contents: contents, progress: progress), shouldFetchContent: false)
+  }
+
+  private func existing(matching template: ItemTemplate) async throws -> SyncedItem? {
     let response = try await send(.list(domain: domain, folder: template.parent))
     guard case .entries(let entries) = response else { throw Self.unexpected(response) }
     let name = template.filename.precomposedStringWithCanonicalMapping
     guard let entry = entries.first(where: { $0.item.path.name == name }) else { return nil }
     switch (template.kind, entry.item.kind) {
     case (.folder, .folder), (.package, .folder):
-      return ProviderItem(entry)
+      return SyncedItem(ProviderItem(entry), shouldFetchContent: false)
     case (.file, .file):
-      guard let size = template.size, let modified = template.modified, size == entry.item.size,
-        Self.seconds(modified) == Self.seconds(entry.item.modified)
-      else { return nil }
-      return ProviderItem(entry)
+      let same =
+        template.size == entry.item.size
+        && template.modified.map(Self.seconds) == Self.seconds(entry.item.modified)
+      return SyncedItem(ProviderItem(entry), shouldFetchContent: !same)
     default:
       return nil
     }
