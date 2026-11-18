@@ -20,7 +20,7 @@ struct ShellShapeTests {
     let made = try await Task { try await backend.create(template, contents: nil) }.value
 
     #expect(
-      template == ItemTemplate(parent: try #require(ItemID(docs)), filename: "Sub", isFolder: true))
+      template == ItemTemplate(parent: try #require(ItemID(docs)), filename: "Sub", kind: .folder))
     #expect(made.parentItemIdentifier == docs)
     #expect(try ItemTemplate(Template(parent: .rootContainer, filename: "f")).parent == .root)
     #expect(throws: NSFileProviderError(.noSuchItem)) {

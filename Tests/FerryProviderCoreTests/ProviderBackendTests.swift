@@ -104,14 +104,14 @@ import UniformTypeIdentifiers
     let dcim = try await agent.id(try path("/DCIM"))
 
     let made = try await backend.create(
-      ItemTemplate(parent: dcim, filename: "a.txt", isFolder: false), contents: upload)
+      ItemTemplate(parent: dcim, filename: "a.txt", kind: .file), contents: upload)
     #expect(made.itemIdentifier == (try await agent.identifier(try path("/DCIM/a.txt"))))
     #expect(made.parentItemIdentifier == NSFileProviderItemIdentifier(dcim))
     #expect(made.documentSize == 3)
     #expect(await agent.contents[try path("/DCIM/a.txt")] == Data("abc".utf8))
 
     let folder = try await backend.create(
-      ItemTemplate(parent: .root, filename: "Music", isFolder: true), contents: nil)
+      ItemTemplate(parent: .root, filename: "Music", kind: .folder), contents: nil)
     #expect(folder.itemIdentifier == (try await agent.identifier(try path("/Music"))))
     #expect(folder.contentType == .folder)
     #expect(
@@ -126,7 +126,7 @@ import UniformTypeIdentifiers
     let backend = ProviderBackend(domain: domain, client: agent)
     await #expect(throws: CocoaError.self) {
       try await backend.create(
-        ItemTemplate(parent: .root, filename: "a", isFolder: false), contents: nil)
+        ItemTemplate(parent: .root, filename: "a", kind: .file), contents: nil)
     }
     #expect(await agent.requests.isEmpty)
   }
@@ -141,7 +141,7 @@ import UniformTypeIdentifiers
       for index in 0..<20 {
         group.addTask {
           _ = try await backend.create(
-            ItemTemplate(parent: .root, filename: "f\(index)", isFolder: true), contents: nil)
+            ItemTemplate(parent: .root, filename: "f\(index)", kind: .folder), contents: nil)
         }
       }
       try await group.waitForAll()
@@ -159,7 +159,7 @@ import UniformTypeIdentifiers
 
     let changed = try await backend.modify(
       NSFileProviderItemIdentifier(id),
-      to: ItemTemplate(parent: docs, filename: "b.txt", isFolder: false),
+      to: ItemTemplate(parent: docs, filename: "b.txt", kind: .file),
       changed: ItemChanges([.parentItemIdentifier, .filename, .contents, .lastUsedDate]),
       contents: upload)
 
@@ -184,7 +184,7 @@ import UniformTypeIdentifiers
     // Finder may report a filename change with the name it already has, in another normal form.
     let item = try await backend.modify(
       NSFileProviderItemIdentifier(id),
-      to: ItemTemplate(parent: .root, filename: "e\u{301}.txt", isFolder: false),
+      to: ItemTemplate(parent: .root, filename: "e\u{301}.txt", kind: .file),
       changed: ItemChanges([.parentItemIdentifier, .filename, .lastUsedDate]), contents: nil)
     #expect(item.itemIdentifier == NSFileProviderItemIdentifier(id))
     #expect(await agent.requests == [.item(domain: domain, id: id)])
@@ -197,14 +197,14 @@ import UniformTypeIdentifiers
     let id = try await agent.identifier(try path("/readme.txt"))
 
     let renamed = try await backend.modify(
-      id, to: ItemTemplate(parent: .root, filename: "README.txt", isFolder: false),
+      id, to: ItemTemplate(parent: .root, filename: "README.txt", kind: .file),
       changed: .filename, contents: nil)
     #expect(renamed.filename == "README.txt")
     #expect(renamed.itemIdentifier == id)
 
     await #expect(throws: NSFileProviderError(.filenameCollision)) {
       try await backend.modify(
-        id, to: ItemTemplate(parent: .root, filename: "OTHER.txt", isFolder: false),
+        id, to: ItemTemplate(parent: .root, filename: "OTHER.txt", kind: .file),
         changed: .filename, contents: nil)
     }
   }
@@ -279,7 +279,7 @@ import UniformTypeIdentifiers
     let docs = try await agent.id(try path("/Docs"))
 
     let changed = try await backend.modify(
-      id, to: ItemTemplate(parent: docs, filename: "b.txt", isFolder: false),
+      id, to: ItemTemplate(parent: docs, filename: "b.txt", kind: .file),
       changed: [.parent, .filename], contents: nil)
 
     #expect(changed.itemIdentifier == id)
@@ -345,7 +345,7 @@ struct ProviderBackendConflictTests {
 
     _ = try await backend.modify(
       NSFileProviderItemIdentifier(id),
-      to: ItemTemplate(parent: .root, filename: "a.txt", isFolder: false), changed: .contents,
+      to: ItemTemplate(parent: .root, filename: "a.txt", kind: .file), changed: .contents,
       contents: try writeContents(Data("new".utf8), in: dir), base: version, onConflict: .fail)
 
     #expect(

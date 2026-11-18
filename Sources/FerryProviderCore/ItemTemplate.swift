@@ -32,14 +32,24 @@ import UniformTypeIdentifiers
 /// }
 /// ```
 public struct ItemTemplate: Sendable, Equatable {
+  /// What an item is on the Mac, and so what it becomes on the device.
+  public enum Kind: Sendable, Equatable {
+    case file
+    /// A folder, or a package (an `.rtfd` document, an app): a folder on disk that Finder shows
+    /// as one item. On the device it is a folder with the same name.
+    case folder
+    /// A symbolic link or a Finder alias, which MTP has no way to store.
+    case link
+  }
+
   public let parent: ItemID
   public let filename: String
-  public let isFolder: Bool
+  public let kind: Kind
 
-  public init(parent: ItemID, filename: String, isFolder: Bool) {
+  public init(parent: ItemID, filename: String, kind: Kind) {
     self.parent = parent
     self.filename = filename
-    self.isFolder = isFolder
+    self.kind = kind
   }
 
   /// Throws `.noSuchItem` when the parent is not a Ferry item, such as the trash.
@@ -47,9 +57,15 @@ public struct ItemTemplate: Sendable, Equatable {
     guard let parent = ItemID(item.parentItemIdentifier) else {
       throw NSFileProviderError(.noSuchItem)
     }
-    self.init(
-      parent: parent, filename: item.filename,
-      isFolder: item.contentType?.conforms(to: .folder) == true)
+    self.init(parent: parent, filename: item.filename, kind: Self.kind(of: item))
+  }
+
+  /// A link is checked first: an alias is a file with contents.
+  private static func kind(of item: any NSFileProviderItem) -> Kind {
+    let type = item.contentType ?? .data
+    let isLink = type.conforms(to: .symbolicLink) || type.conforms(to: .aliasFile)
+    if isLink || (item.symlinkTargetPath ?? nil) != nil { return .link }
+    return type.conforms(to: .directory) ? .folder : .file
   }
 }
 

@@ -35,7 +35,12 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   public var contentType: UTType {
     switch entry.item.kind {
     case .folder:
-      return .folder
+      // A folder named like a package (`Notes.rtfd`, `Ferry.app`) is one, as on a Mac volume.
+      let ext = (filename as NSString).pathExtension
+      guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .package),
+        type.isDeclared
+      else { return .folder }
+      return type
     case .file:
       let ext = (filename as NSString).pathExtension
       guard !ext.isEmpty else { return .data }

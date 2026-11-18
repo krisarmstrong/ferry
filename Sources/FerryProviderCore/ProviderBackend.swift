@@ -64,14 +64,21 @@ public actor ProviderBackend {
     return (url, ProviderItem(item))
   }
 
-  /// Makes a folder, or uploads `contents` as a file. Symbolic links and aliases come with no
-  /// contents, and MTP cannot store them.
+  /// Makes a folder (a package too: FileProvider then creates its contents inside it), or
+  /// uploads `contents` as a file. Symbolic links and aliases have nothing MTP can store, so
+  /// they fail with `.cannotSynchronize`, which FileProvider takes as final until the item
+  /// changes on the Mac, with a message saying why.
   public func create(_ template: ItemTemplate, contents: URL?) async throws -> ProviderItem {
     let request = AgentRequest.create(
       domain: domain, parent: template.parent, name: template.filename,
-      isFolder: template.isFolder)
-    if template.isFolder {
+      isFolder: template.kind == .folder)
+    switch template.kind {
+    case .link:
+      throw Self.linkRefused
+    case .folder:
       return ProviderItem(try await entry(request))
+    case .file:
+      break
     }
     guard let contents else { throw CocoaError(.featureUnsupported) }
     let handle = try FileHandle(forReadingFrom: contents)
@@ -220,6 +227,12 @@ public actor ProviderBackend {
       throw ErrorMapping.fileProviderError(error)
     }
   }
+
+  static let linkRefused = NSFileProviderError(
+    .cannotSynchronize,
+    userInfo: [
+      NSLocalizedDescriptionKey: "Symbolic links and aliases can’t be copied to the device."
+    ])
 
   private static func unexpected(_ response: AgentResponse) -> any Error {
     log.error("unexpected response from agent: \(String(describing: response), privacy: .private)")
