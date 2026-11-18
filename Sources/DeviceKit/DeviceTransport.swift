@@ -10,8 +10,8 @@ public protocol DeviceTransport: Sendable {
   /// Opens a device the most recent `scan()` reported in `devices`. A device this process
   /// already holds is `.deviceBusy`.
   func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession
-  /// Leaves the held device `id` alone after its session closes: scans report it in
-  /// `notSharing` without touching it until it is unplugged or `unpark(_:)` is called.
+  /// Leaves the held device `id` alone after its session closes: scans report it in `ejected`
+  /// without touching it until it is unplugged or `unpark(_:)` is called.
   func park(_ id: DeviceID) async
   /// Lets the next scan try `id` again: a device reported busy, or one parked.
   func unpark(_ id: DeviceID) async

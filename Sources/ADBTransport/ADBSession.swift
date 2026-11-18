@@ -31,16 +31,25 @@ public actor ADBSession: DeviceSession {
   /// The device's own spelling of each name, by folder (see `ADBSession+Names.swift`).
   var rawNames: [[UInt8]: [String: String]] = [:]
   private var disconnected = false
+  /// Tells the transport the device is free again; runs once, when the session ends.
+  private var onRelease: (@Sendable () async -> Void)?
 
   public init(
     host: ADBHost, serial: String, info: DeviceInfo, features: Set<String>,
-    partials: PartialRegistry = PartialRegistry()
+    partials: PartialRegistry = PartialRegistry(),
+    onRelease: @escaping @Sendable () async -> Void = {}
   ) {
     self.host = host
     self.serial = serial
     self.info = info
     self.features = features
     self.partials = partials
+    self.onRelease = onRelease
+  }
+
+  isolated deinit {
+    // Dropped without `close()`.
+    if let onRelease { Task { await onRelease() } }
   }
 
   /// `.copy` stands for the device's own `cp`; there is no partial read over sync.
@@ -60,12 +69,14 @@ public actor ADBSession: DeviceSession {
     await gate.run { () async in
       disconnected = true
       await dropSync()
+      await released()
     }
   }
 
   // MARK: Plumbing
 
-  /// Runs `body` as one gated operation. A `.deviceDisconnected` from it ends the session.
+  /// Runs `body` as one gated operation. A `.deviceDisconnected` from it ends the session and
+  /// releases the device, so the transport can open it afresh once it is back.
   func operation<T>(_ body: () async throws(TransportError) -> T)
     async throws(TransportError) -> T
   {
@@ -77,6 +88,7 @@ public actor ADBSession: DeviceSession {
         if error == .deviceDisconnected {
           disconnected = true
           await dropSync()
+          await released()
         }
         throw error
       }
@@ -105,6 +117,12 @@ public actor ADBSession: DeviceSession {
         throw error
       }
     }
+  }
+
+  private func released() async {
+    guard let onRelease else { return }
+    self.onRelease = nil
+    await onRelease()
   }
 
   private func dropSync() async {

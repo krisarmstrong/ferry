@@ -13,7 +13,11 @@ extension FakeAndroid {
   }
 
   private func handle(_ peer: Peer, serial: String) async throws {
-    let first = try await peer.request()
+    try await handle(peer, serial: serial, first: try await peer.request())
+  }
+
+  /// Serves a connection for `serial` whose first request has already been read.
+  func handle(_ peer: Peer, serial: String, first: String) async throws {
     let gone = state.withLock { $0.gone }
     if first == "host-serial:\(serial):features" {
       if gone {

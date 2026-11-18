@@ -36,7 +36,7 @@ extension FakeAndroid {
     }
     let allowed: [String: Set<Character>] = [
       "mv": ["f", "i", "v", "n"], "rm": ["f", "i", "R", "r"], "mkdir": ["v", "p"],
-      "df": ["H", "P", "k", "h", "a"],
+      "df": ["H", "P", "k", "h", "a"], "getprop": [],
     ]
     guard let flags = allowed[program] else {
       return ShellResult(status: 127, stderr: "/system/bin/sh: \(program): not found\n")
@@ -60,12 +60,19 @@ extension FakeAndroid {
       }
     }
     return state.withLock { [operands, options] state in
-      switch program {
-      case "mv": Self.mv(operands, noClobber: options.contains("n"), in: &state)
-      case "rm": Self.rm(operands, recursive: !options.isDisjoint(with: ["r", "R"]), in: &state)
-      case "mkdir": Self.mkdir(operands, in: &state)
-      default: Self.df(operands, in: state)
-      }
+      Self.run(program, options, operands, in: &state)
+    }
+  }
+
+  private static func run(
+    _ program: String, _ options: Set<Character>, _ operands: [String], in state: inout State
+  ) -> ShellResult {
+    switch program {
+    case "mv": mv(operands, noClobber: options.contains("n"), in: &state)
+    case "rm": rm(operands, recursive: !options.isDisjoint(with: ["r", "R"]), in: &state)
+    case "mkdir": mkdir(operands, in: &state)
+    case "getprop": ShellResult(stdout: (state.properties[operands.first ?? ""] ?? "") + "\n")
+    default: df(operands, in: state)
     }
   }
 

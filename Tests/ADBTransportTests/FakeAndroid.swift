@@ -51,6 +51,8 @@ final class FakeAndroid: Sendable {
     /// Bytes of DATA a SEND or RECV carries before the device drops off.
     var dropAfterBytes: (id: String, bytes: Int)?
     var sendFailure: String?
+    /// What `getprop <name>` prints.
+    var properties: [String: String] = [:]
     var peers: [ADBStream] = []
     var clock: Int64 = 1_700_000_000
   }

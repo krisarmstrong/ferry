@@ -1,0 +1,113 @@
+import DeviceKit
+import Foundation
+import Testing
+
+@testable import ADBTransport
+
+struct ADBTransportScanTests {
+  typealias Fixture = TransportFixture
+
+  @Test func usbAndWiFiOfOneDeviceAreOneDeviceWithBothRoutes() async throws {
+    let android = Fixture.android(serial: Fixture.linkRunnerSerial)
+    let hub = try await Fixture.hub([
+      .init(Fixture.linkRunnerSerial, model: "LinkRunner_G2", device: android),
+      .init(Fixture.linkRunnerWiFi, model: "LinkRunner_G2", device: android),
+    ])
+    let transport = Fixture.transport(port: hub.port)
+    let scan = try await transport.scan()
+    #expect(scan.devices == [Fixture.linkRunnerInfo])
+    #expect(scan.notSharing.isEmpty && scan.busy.isEmpty && scan.ejected.isEmpty)
+    #expect(
+      await transport.routes(for: Fixture.linkRunner)
+        == ADBRoutes(usb: Fixture.linkRunnerSerial, wireless: [Fixture.linkRunnerWiFi]))
+    #expect(await transport.status == .available)
+
+    // USB is preferred while it is there.
+    let usb = try #require(try await transport.open(Fixture.linkRunner) as? ADBSession)
+    #expect(await usb.serial == Fixture.linkRunnerSerial)
+    await usb.close()
+
+    // The cable is pulled: the same device, over Wi-Fi.
+    hub.set([.init(Fixture.linkRunnerWiFi, device: android)])
+    #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
+    #expect(
+      await transport.routes(for: Fixture.linkRunner)
+        == ADBRoutes(usb: nil, wireless: [Fixture.linkRunnerWiFi]))
+    let wifi = try #require(try await transport.open(Fixture.linkRunner) as? ADBSession)
+    #expect(await wifi.serial == Fixture.linkRunnerWiFi)
+    #expect(try await wifi.storages().map(\.id.key) == ["internal"])
+    await wifi.close()
+
+    // Each adb serial was asked for its ro.serialno once, however many scans.
+    _ = try await transport.scan()
+    #expect(Fixture.lookups(of: "ro.serialno", on: android) == 2)
+    await hub.kill()
+  }
+
+  @Test func unauthorizedIsNotSharingByItsAdbSerialAndOfflineIsLeftOut() async throws {
+    let hub = try await Fixture.hub([
+      .init("abc", "unauthorized", device: nil),
+      .init("def", "offline", device: nil),
+      .init("192.0.2.31:5555", "unauthorized", device: nil),
+      .init("ghi", "recovery", device: nil),
+    ])
+    let transport = Fixture.transport(port: hub.port)
+    let scan = try await transport.scan()
+    #expect(scan.devices.isEmpty)
+    #expect(scan.notSharing.map(\.id.serial) == ["192.0.2.31:5555", "abc"])
+    await hub.kill()
+  }
+
+  @Test func anUnauthorizedRouteOfAUsableDeviceIsNotListedTwice() async throws {
+    let android = Fixture.android(serial: Fixture.linkRunnerSerial)
+    let hub = try await Fixture.hub([
+      .init(Fixture.linkRunnerSerial, "unauthorized", device: nil),
+      .init(Fixture.linkRunnerWiFi, device: android),
+    ])
+    let transport = Fixture.transport(port: hub.port)
+    let scan = try await transport.scan()
+    #expect(scan.devices == [Fixture.linkRunnerInfo])
+    #expect(scan.notSharing.isEmpty)
+    await hub.kill()
+  }
+
+  @Test func anAddressReusedByAnotherDeviceIsAskedAgain() async throws {
+    let first = Fixture.android(serial: "fedcba9876543210", model: "EtherScope nXG")
+    let second = Fixture.android(serial: "1122334455667788", model: "CyberScope")
+    let hub = try await Fixture.hub([.init(Fixture.linkRunnerWiFi, device: first)])
+    let transport = Fixture.transport(port: hub.port)
+    #expect(try await transport.scan().devices.map(\.id.serial) == ["fedcba9876543210"])
+    hub.set([])
+    #expect(try await transport.scan().devices.isEmpty)
+    hub.set([.init(Fixture.linkRunnerWiFi, device: second)])
+    #expect(try await transport.scan().devices.map(\.id.serial) == ["1122334455667788"])
+    await hub.kill()
+  }
+
+  @Test func aDeviceWithoutASerialIsLeftOutAndAskedAgainNextScan() async throws {
+    let android = Fixture.android(serial: "")
+    let hub = try await Fixture.hub([.init("emulator-5554", device: android)])
+    let transport = Fixture.transport(port: hub.port)
+    #expect(try await transport.scan().devices.isEmpty)
+    android.state.withLock { $0.properties["ro.serialno"] = "EMULATOR35X1" }
+    #expect(try await transport.scan().devices.map(\.id.serial) == ["EMULATOR35X1"])
+    await hub.kill()
+  }
+
+  @Test func adbNotInstalledIsAnEmptyScanAndNotInstalled() async throws {
+    let closed = try ClosedPort()
+    let transport = Fixture.transport(port: closed.port, locator: ADBHostTests.noAdb)
+    let scan = try await transport.scan()
+    #expect(scan == DeviceScan(devices: []))
+    #expect(await transport.status == .notInstalled)
+    withExtendedLifetime(closed) {}
+  }
+
+  @Test func installedWithNoServerIsServerDown() async throws {
+    let closed = try ClosedPort()
+    let transport = Fixture.transport(port: closed.port)
+    #expect(try await transport.scan() == DeviceScan(devices: []))
+    #expect(await transport.status == .serverDown)
+    withExtendedLifetime(closed) {}
+  }
+}
