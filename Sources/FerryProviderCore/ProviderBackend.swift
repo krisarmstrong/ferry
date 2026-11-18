@@ -91,6 +91,33 @@ public actor ProviderBackend {
     return ProviderItem(try await entry(request, file: handle, progress: progress))
   }
 
+  /// For a create FileProvider marks `.mayAlreadyExist` (an import after its state was lost, or
+  /// a merge): the device's item of that name in the parent, if it is the same item: a folder
+  /// for a folder, or a file of the same size and modification time (to the second, all MTP
+  /// keeps). `nil` when none matches; the caller then creates the item, or, with no contents to
+  /// send, reports that it has none.
+  public func existing(matching template: ItemTemplate) async throws -> ProviderItem? {
+    let response = try await send(.list(domain: domain, folder: template.parent))
+    guard case .entries(let entries) = response else { throw Self.unexpected(response) }
+    let name = template.filename.precomposedStringWithCanonicalMapping
+    guard let entry = entries.first(where: { $0.item.path.name == name }) else { return nil }
+    switch (template.kind, entry.item.kind) {
+    case (.folder, .folder):
+      return ProviderItem(entry)
+    case (.file, .file):
+      guard let size = template.size, let modified = template.modified, size == entry.item.size,
+        Self.seconds(modified) == Self.seconds(entry.item.modified)
+      else { return nil }
+      return ProviderItem(entry)
+    default:
+      return nil
+    }
+  }
+
+  private static func seconds(_ date: Date) -> Int64 {
+    Int64(clamping: Int(exactly: date.timeIntervalSince1970.rounded(.down)) ?? 0)
+  }
+
   /// Applies the changed fields in order: parent (move), then filename (rename), then contents.
   /// New contents carry `base`, the version they were made from, and `onConflict` says what the
   /// agent does if the device's file has moved on from it.

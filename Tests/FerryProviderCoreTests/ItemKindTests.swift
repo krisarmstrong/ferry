@@ -141,3 +141,47 @@ struct FileProgressOverflowTests {
     #expect(progress.completedUnitCount == Int64.max)
   }
 }
+
+/// A create FileProvider marks "may already exist" matches the device's own copy instead of
+/// colliding with it.
+struct MayAlreadyExistTests {
+  @Test func theSameFileIsMatched() async throws {
+    let modified = Date(timeIntervalSince1970: 1_700_000_000)
+    let agent = FakeAgent([try file("/a.txt", size: 5, modified: modified)])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let template = ItemTemplate(
+      parent: .root, filename: "a.txt", kind: .file, size: 5,
+      modified: modified.addingTimeInterval(0.4))
+
+    let match = try await backend.existing(matching: template)
+
+    #expect(match?.itemIdentifier == (try await agent.identifier(try path("/a.txt"))))
+  }
+
+  @Test(arguments: [(UInt64(6), 0.0), (5, 1.0)])
+  func aDifferentFileIsNotMatched(size: UInt64, shift: Double) async throws {
+    let modified = Date(timeIntervalSince1970: 1_700_000_000)
+    let agent = FakeAgent([try file("/a.txt", size: 5, modified: modified)])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let template = ItemTemplate(
+      parent: .root, filename: "a.txt", kind: .file, size: size,
+      modified: modified.addingTimeInterval(shift))
+
+    #expect(try await backend.existing(matching: template) == nil)
+  }
+
+  @Test func aFolderMatchesAFolderOfTheSameName() async throws {
+    let agent = FakeAgent([try folder("/DCIM")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+
+    let match = try await backend.existing(
+      matching: ItemTemplate(parent: .root, filename: "DCIM", kind: .folder))
+
+    #expect(match?.itemIdentifier == (try await agent.identifier(try path("/DCIM"))))
+    #expect(
+      try await backend.existing(
+        matching: ItemTemplate(
+          parent: .root, filename: "DCIM", kind: .file, size: 0, modified: epoch))
+        == nil)
+  }
+}

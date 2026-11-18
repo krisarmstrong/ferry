@@ -45,11 +45,19 @@ public struct ItemTemplate: Sendable, Equatable {
   public let parent: ItemID
   public let filename: String
   public let kind: Kind
+  /// The file's size and modification date on the Mac, when FileProvider gives them: what tells
+  /// a file being imported again from the device's own copy.
+  public let size: UInt64?
+  public let modified: Date?
 
-  public init(parent: ItemID, filename: String, kind: Kind) {
+  public init(
+    parent: ItemID, filename: String, kind: Kind, size: UInt64? = nil, modified: Date? = nil
+  ) {
     self.parent = parent
     self.filename = filename
     self.kind = kind
+    self.size = size
+    self.modified = modified
   }
 
   /// Throws `.noSuchItem` when the parent is not a Ferry item, such as the trash.
@@ -57,7 +65,10 @@ public struct ItemTemplate: Sendable, Equatable {
     guard let parent = ItemID(item.parentItemIdentifier) else {
       throw NSFileProviderError(.noSuchItem)
     }
-    self.init(parent: parent, filename: item.filename, kind: Self.kind(of: item))
+    self.init(
+      parent: parent, filename: item.filename, kind: Self.kind(of: item),
+      size: (item.documentSize ?? nil).map(\.uint64Value),
+      modified: item.contentModificationDate ?? nil)
   }
 
   /// A link is checked first: an alias is a file with contents.
