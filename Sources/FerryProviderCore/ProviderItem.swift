@@ -65,7 +65,10 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   }
 
   /// MTP has no content hash, so contents are versioned by size and modification date; metadata
-  /// by the parent's identifier and the name. Both are fixed bytes, stable across launches.
+  /// by the parent's identifier, the name and the capabilities. Both are fixed bytes, stable
+  /// across launches. FileProvider keeps an item's metadata until its version changes, so a
+  /// Ferry that changes capabilities must change the version too, or items already known keep
+  /// the old ones.
   public var itemVersion: NSFileProviderItemVersion {
     let item = entry.item
     var content = Data()
@@ -73,8 +76,10 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
     withUnsafeBytes(of: item.modified.timeIntervalSince1970.bitPattern.bigEndian) {
       content.append(contentsOf: $0)
     }
-    // Neither an identifier nor a name contains "/", so the two cannot run together.
-    let metadata = Data(SHA256.hash(data: Data("\(entry.parent.rawValue)/\(filename)".utf8)))
+    // Neither an identifier nor a name contains "/", so the fields cannot run together.
+    let metadata = Data(
+      SHA256.hash(
+        data: Data("\(entry.parent.rawValue)/\(filename)/\(capabilities.rawValue)".utf8)))
     return NSFileProviderItemVersion(contentVersion: content, metadataVersion: metadata)
   }
 }
