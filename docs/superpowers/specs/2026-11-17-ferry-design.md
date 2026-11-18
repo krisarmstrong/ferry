@@ -174,9 +174,12 @@ strings; capabilities such as "supports move" are queried, not assumed).
 
 ### Change detection
 
-MTP has no reliable change events. v1: re-enumerate on folder open and on the
-menu "Refresh"; after its own writes the agent signals the working set. No
-polling loops.
+Replicated FileProvider honours signals only on the working set. The agent keeps a per-domain
+change log (anchored, in memory, bounded) fed by its own mutations and by listing diffs, and
+signals the working set; the extension's working-set enumerator reports changes since an
+anchor. An anchor from an earlier agent process is reported expired, so the system
+re-enumerates. Phone-side changes surface when a folder is listed again (menu "Refresh"
+re-lists known folders). No polling loops.
 
 ## Item identity (amended 2026-11-17)
 
@@ -191,7 +194,9 @@ must not contain file names. Therefore:
   per-domain table identifier ↔ storage-relative path, persisted in the agent's own
   Application Support (not the app-group container, which the sandboxed extension can write).
 - Rename and move update the table for the item and its subtree; delete and listings that
-  drop a child prune it. A change made on the phone (outside Ferry) appears as a new item.
+  drop a child prune it. An item replaced on the phone by one of a different kind (file ↔ folder)
+  gets a new identifier; a file replaced by a file of the same name keeps its identifier and
+  shows as a content change (its size/date version changes).
 - FerryIPC speaks identifiers, not paths; the root is `NSFileProviderItemIdentifier.rootContainer`.
 
 ## Testing and quality bar

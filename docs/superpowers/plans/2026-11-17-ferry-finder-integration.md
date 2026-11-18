@@ -406,7 +406,8 @@ public struct ItemTemplate: Sendable { public let parent: ItemID; public let fil
 Rules:
 - IDs are random (UUID strings), never derived from names.
 - The table persists across agent restarts, so Finder's cached items keep their identity.
-- Signals use the parent folder's ID.
+- Signals target the working set only (replicated extensions ignore other containers); the
+  agent's change log feeds the working-set enumerator via `.changes(domain:since:)` (fix round 1).
 
 - [ ] **Step 1: Write failing tests:**
   - `idsAreStableAcrossRenameAndMove`
