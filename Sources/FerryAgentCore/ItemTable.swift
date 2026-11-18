@@ -57,7 +57,7 @@ actor ItemTable {
     } catch CocoaError.fileReadNoSuchFile {
       return
     } catch {
-      log.error("listing item tables failed: \(error, privacy: .public)")
+      log.error("listing item tables failed: \(error, privacy: .private)")
       return
     }
     for file in files where file.pathExtension == "json" {
@@ -153,7 +153,7 @@ actor ItemTable {
         at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
       try JSONEncoder().encode(stored).write(to: file, options: .atomic)
     } catch {
-      log.error("saving item table failed: \(error, privacy: .public)")
+      log.error("saving item table failed: \(error, privacy: .private)")
     }
   }
 
@@ -164,7 +164,7 @@ actor ItemTable {
     } catch CocoaError.fileReadNoSuchFile {
       return ([:], [:])
     } catch {
-      log.error("reading item table failed: \(error, privacy: .public)")
+      log.error("reading item table failed: \(error, privacy: .private)")
       return ([:], [:])
     }
     do {
@@ -180,7 +180,7 @@ actor ItemTable {
       }
       return (paths, ids)
     } catch {
-      log.error("item table is unreadable, starting empty: \(error, privacy: .public)")
+      log.error("item table is unreadable, starting empty: \(error, privacy: .private)")
       return ([:], [:])
     }
   }
@@ -191,7 +191,7 @@ actor ItemTable {
     } catch CocoaError.fileNoSuchFile {
       return
     } catch {
-      log.error("deleting item table failed: \(error, privacy: .public)")
+      log.error("deleting item table failed: \(error, privacy: .private)")
     }
   }
 }

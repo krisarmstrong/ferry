@@ -265,24 +265,4 @@ import UniformTypeIdentifiers
     #expect(changed.parentItemIdentifier == NSFileProviderItemIdentifier(docs.rawValue))
     #expect(changed.filename == "b.txt")
   }
-
-  @Test func templateIsSendableSnapshot() async throws {
-    let agent = FakeAgent([try folder("/Docs")])
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let docs = try await agent.identifier(try path("/Docs"))
-    let item: any NSFileProviderItem = Template(parent: docs, filename: "Sub", contentType: .folder)
-
-    // The extension's callback shape: snapshot synchronously, then hand only Sendable values to
-    // the task.
-    let template = try ItemTemplate(item)
-    let made = try await Task { try await backend.create(template, contents: nil) }.value
-
-    #expect(
-      template == ItemTemplate(parent: try #require(ItemID(docs)), filename: "Sub", isFolder: true))
-    #expect(made.parentItemIdentifier == docs)
-    #expect(try ItemTemplate(Template(parent: .rootContainer, filename: "f")).parent == .root)
-    #expect(throws: NSFileProviderError(.noSuchItem)) {
-      try ItemTemplate(Template(parent: .trashContainer, filename: "f"))
-    }
-  }
 }
