@@ -83,6 +83,10 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// The changes to the domain's items since `since`, an anchor from an earlier `.changes`
   /// response; `nil` asks only for the current anchor. Feeds FileProvider's working set.
   case changes(domain: String, since: Data?)
+  /// One page of every item the agent has reported in the domain, root excluded, in a stable
+  /// order: the working set FileProvider enumerates after it drops its cache. `page` is the
+  /// `next` of the previous `.page`, or `nil` for the first.
+  case workingSet(domain: String, page: Int?)
 }
 
 public enum AgentResponse: Codable, Sendable, Equatable {
@@ -93,6 +97,8 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   /// from next. `expired` means `since` cannot be answered (it predates the agent process or the
   /// agent's window), so the lists are empty and the client must enumerate everything again.
   case changes(anchor: Data, updated: [ProviderEntry], deleted: [ItemID], expired: Bool)
+  /// Answers `.workingSet`. `next` is `nil` on the last page.
+  case page(entries: [ProviderEntry], next: Int?)
   case done
   case failure(TransportError)
 }

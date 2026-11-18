@@ -6,6 +6,13 @@ import os
 
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ItemTable")
 
+/// An item's kind, size and date as the device last reported them.
+private struct ReportedItem: Codable, Equatable {
+  let kind: ItemKind
+  let size: UInt64
+  let modified: Date
+}
+
 /// One domain's item identifiers, the storage paths they stand for, and the recent changes to
 /// them.
 ///
@@ -26,23 +33,26 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// `gate` orders the operations that resolve an identifier, change the device and then update
 /// the table, so none of them sees the table and the device disagree (see `AgentService`).
 actor ItemTable {
-  /// What the table knows about one item. The metadata is `nil` for an item known only as the
-  /// parent of one reported.
+  /// What the table knows about one item. `reported` is `nil` for an item known only as the
+  /// parent of one the agent reported.
   private struct Record: Codable, Equatable {
     var path: RemotePath
-    var kind: ItemKind?
-    var size: UInt64?
-    var modified: Date?
+    var reported: ReportedItem?
 
     init(path: RemotePath, item: RemoteItem? = nil) {
       self.path = path
-      kind = item?.kind
-      size = item?.size
-      modified = item?.modified
+      reported = item.map { ReportedItem(kind: $0.kind, size: $0.size, modified: $0.modified) }
     }
 
     func describes(_ item: RemoteItem) -> Bool {
-      kind == item.kind && size == item.size && modified == item.modified
+      reported == ReportedItem(kind: item.kind, size: item.size, modified: item.modified)
+    }
+
+    /// The item as last reported, at its current path.
+    var item: RemoteItem? {
+      reported.map {
+        RemoteItem(path: path, kind: $0.kind, size: $0.size, modified: $0.modified)
+      }
     }
   }
 
@@ -177,6 +187,19 @@ actor ItemTable {
     return children.map(observe)
   }
 
+  /// The items from `offset` on, at most `size`, ordered by identifier, with the offset of the
+  /// next page if there is one. Only items the agent reported are in it, not the root or a
+  /// folder known only as some item's parent.
+  func workingSet(from offset: Int, size: Int) -> (entries: [ProviderEntry], next: Int?) {
+    defer { save() }
+    let reported = records.compactMap { id, record in record.item.map { (id, $0) } }
+      .sorted { $0.0.rawValue < $1.0.rawValue }
+    guard offset < reported.count else { return ([], nil) }
+    let end = min(offset + size, reported.count)
+    let entries = reported[offset..<end].map { entry($1, id: $0) }
+    return (entries, end < reported.count ? end : nil)
+  }
+
   /// The changes recorded after `anchor`; see `ChangeLog`.
   func changes(since anchor: Data?) -> ChangeLog.Since {
     changeLog.changes(since: anchor)
@@ -196,7 +219,7 @@ actor ItemTable {
     let id: ItemID
     if let known = ids[item.path], let record = records[known] {
       if record.describes(item) { return entry(item, id: known) }
-      if let kind = record.kind, kind != item.kind {
+      if let kind = record.reported?.kind, kind != item.kind {
         forget(subtree(of: item.path))
         id = assign(Record(path: item.path, item: item))
       } else {

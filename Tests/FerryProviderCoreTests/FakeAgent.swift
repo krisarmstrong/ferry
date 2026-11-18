@@ -171,6 +171,8 @@ actor FakeAgent: AgentSending {
       return .done
     case .changes(_, let since):
       return changeReply(since)
+    case .workingSet(_, let page):
+      return try workingSetPage(page)
     case .status, .recheck, .eject, .removeAllDomains:
       throw .unsupported("\(request)")
     }
@@ -185,6 +187,18 @@ actor FakeAgent: AgentSending {
       entries.append(try entry(item, id: id(for: item.path)))
     }
     return entries
+  }
+
+  /// Pages of two, ordered by identifier, like the agent's pages of 500.
+  private func workingSetPage(_ page: Int?) throws(TransportError) -> AgentResponse {
+    let known = paths.filter { $0.key != .root }.sorted { $0.key.rawValue < $1.key.rawValue }
+    let start = page ?? 0
+    let end = min(start + 2, known.count)
+    var entries: [ProviderEntry] = []
+    for (id, path) in known[start..<end] {
+      entries.append(try entry(try existing(path), id: id))
+    }
+    return .page(entries: entries, next: end < known.count ? end : nil)
   }
 
   private func path(_ id: ItemID) throws(TransportError) -> RemotePath {

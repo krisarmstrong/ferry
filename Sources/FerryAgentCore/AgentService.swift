@@ -49,7 +49,7 @@ public actor AgentService: AgentHandling {
     case .fetch, .replaceContents: true
     case .create(_, _, _, let isFolder): !isFolder
     case .status, .recheck, .eject, .removeAllDomains, .item, .list, .rename, .move, .delete,
-      .changes:
+      .changes, .workingSet:
       false
     }
   }
@@ -95,6 +95,13 @@ public actor AgentService: AgentHandling {
       return .changes(
         anchor: changes.anchor, updated: changes.updated, deleted: changes.deleted,
         expired: changes.expired)
+    case (.workingSet(let domain, let page), _):
+      let offset = page ?? 0
+      guard offset >= 0 else { throw .io("bad request") }
+      let (entries, next) = try await gated(domain) { route in
+        await route.items.workingSet(from: offset, size: Self.workingSetPageSize)
+      }
+      return .page(entries: entries, next: next)
     case (.fetch, nil), (.replaceContents, nil):
       throw .io("bad request")
     }
@@ -251,6 +258,7 @@ public actor AgentService: AgentHandling {
   }
 
   private static let ignoreProgress: ProgressHandler = { _, _ in true }
+  static let workingSetPageSize = 500
 }
 
 extension DomainController.Route {

@@ -57,7 +57,10 @@ import UniformTypeIdentifiers
     for id in junk {
       await #expect(throws: NSFileProviderError(.noSuchItem)) { try await backend.item(id) }
     }
-    #expect(try await backend.children(of: .workingSet).isEmpty)
+    // The working set is not a folder; it has an enumeration of its own.
+    await #expect(throws: NSFileProviderError(.noSuchItem)) {
+      try await backend.children(of: .workingSet)
+    }
   }
 
   @Test func fetchReturnsFileInDir() async throws {
@@ -264,25 +267,5 @@ import UniformTypeIdentifiers
     #expect(changed.itemIdentifier == id)
     #expect(changed.parentItemIdentifier == NSFileProviderItemIdentifier(docs.rawValue))
     #expect(changed.filename == "b.txt")
-  }
-
-  @Test func workingSetChangesComeFromTheAgent() async throws {
-    let agent = FakeAgent()
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let changed = ProviderEntry(id: .random(), parent: .root, item: try file("/a.txt"))
-    let gone = ItemID.random()
-    await agent.set(changes: [changed], deleted: [gone])
-
-    let anchor = try await backend.currentAnchor()
-    let changes = try await backend.changes(since: anchor)
-
-    #expect(anchor.rawValue == Data([1]))
-    #expect(changes.anchor.rawValue == Data([2]))
-    #expect(changes.updated.map(\.entry) == [changed])
-    #expect(changes.deleted == [NSFileProviderItemIdentifier(gone)])
-    #expect(try await backend.children(of: .workingSet).isEmpty)
-    await #expect(throws: NSFileProviderError(.syncAnchorExpired)) {
-      try await backend.changes(since: NSFileProviderSyncAnchor(rawValue: Data([7])))
-    }
   }
 }

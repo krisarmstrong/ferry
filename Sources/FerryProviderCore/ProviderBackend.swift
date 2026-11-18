@@ -33,10 +33,8 @@ public actor ProviderBackend {
     ProviderItem(try await entry(.item(domain: domain, id: try Self.itemID(id))))
   }
 
-  /// The working set enumerates no items of its own: it is fed by `changes(since:)`, which
-  /// reports every item the agent has seen change.
+  /// The items in a folder. The working set is not a folder: enumerate it with `workingSet(from:)`.
   public func children(of id: NSFileProviderItemIdentifier) async throws -> [ProviderItem] {
-    if id == .workingSet { return [] }
     let response = try await send(.list(domain: domain, folder: try Self.itemID(id)))
     guard case .entries(let entries) = response else { throw Self.unexpected(response) }
     return entries.map(ProviderItem.init)
@@ -116,6 +114,17 @@ public actor ProviderBackend {
     return ProviderItem(try await entry(.item(domain: domain, id: itemID)))
   }
 
+  /// One page of the working set: every item the agent has reported in the domain, root
+  /// excluded. The working-set enumerator pages through it in `enumerateItems`, from FileProvider's
+  /// initial page until `next` is `nil`, and follows changes after that with `currentAnchor()` and
+  /// `changes(since:)`. FileProvider re-enumerates it after an expired anchor, so it must hold
+  /// every item FileProvider has, or FileProvider would take the missing ones as deleted.
+  public func workingSet(from page: NSFileProviderPage) async throws -> ProviderPage {
+    let response = try await send(.workingSet(domain: domain, page: try Self.offset(of: page)))
+    guard case .page(let entries, let next) = response else { throw Self.unexpected(response) }
+    return ProviderPage(items: entries.map(ProviderItem.init), next: next.map(Self.page))
+  }
+
   /// The anchor the working set's changes start from now.
   public func currentAnchor() async throws -> NSFileProviderSyncAnchor {
     try await changes(from: nil).anchor
@@ -182,6 +191,24 @@ public actor ProviderBackend {
 
   // MARK: Local mapping
 
+  /// A page after the first is the agent's offset as 8 big-endian bytes. Anything else from
+  /// FileProvider than an initial page or one of these is expired.
+  private static func offset(of page: NSFileProviderPage) throws -> Int? {
+    let initial = [
+      NSFileProviderPage.initialPageSortedByName as Data,
+      NSFileProviderPage.initialPageSortedByDate as Data,
+    ]
+    if initial.contains(page.rawValue) { return nil }
+    guard page.rawValue.count == 8 else { throw NSFileProviderError(.pageExpired) }
+    let offset = page.rawValue.reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+    guard let value = Int(exactly: offset) else { throw NSFileProviderError(.pageExpired) }
+    return value
+  }
+
+  private static func page(_ offset: Int) -> NSFileProviderPage {
+    withUnsafeBytes(of: UInt64(offset).bigEndian) { NSFileProviderPage(rawValue: Data($0)) }
+  }
+
   /// The trash, the working set and anything else the agent did not assign name no item.
   private static func itemID(_ id: NSFileProviderItemIdentifier) throws -> ItemID {
     guard let itemID = ItemID(id) else { throw NSFileProviderError(.noSuchItem) }
@@ -211,4 +238,11 @@ public struct ProviderChanges: Sendable {
   public let anchor: NSFileProviderSyncAnchor
   public let updated: [ProviderItem]
   public let deleted: [NSFileProviderItemIdentifier]
+}
+
+/// One page of the working set.
+public struct ProviderPage: Sendable {
+  public let items: [ProviderItem]
+  /// `nil` on the last page.
+  public let next: NSFileProviderPage?
 }

@@ -50,6 +50,21 @@ private struct Domain {
     return ChangeLog.Since(anchor: next, updated: updated, deleted: deleted, expired: false)
   }
 
+  /// Every page of the working set.
+  func workingSet() async throws -> (entries: [ProviderEntry], pages: Int) {
+    var entries: [ProviderEntry] = []
+    var page: Int?
+    var pages = 0
+    repeat {
+      guard case .page(let found, let next) = await send(.workingSet(domain: name, page: page))
+      else { throw TransportError.io("no page") }
+      entries += found
+      page = next
+      pages += 1
+    } while page != nil
+    return (entries, pages)
+  }
+
   func signalCount() async -> Int {
     await harness.manager.calls.count { $0 == .signal(name) }
   }
@@ -137,5 +152,30 @@ struct AgentChangeTests {
     #expect(renamed.id == docs.id)
     #expect(moved.item.path == (try path("/Papers/a.txt")))
     #expect(moved.parent == docs.id)
+  }
+
+  @Test func workingSetListsEveryKnownItemAcrossPages() async throws {
+    let names = (0...AgentService.workingSetPageSize).map { "/f\($0).txt" }
+    let domain = try await Domain(seeding: names + ["/Docs/a.txt", "/x"])
+    defer { domain.harness.finish() }
+    #expect(try await domain.workingSet().entries.isEmpty)
+    let top = try await domain.list()
+    let docs = try #require(top.first { $0.item.path.name == "Docs" })
+    let nested = try await domain.list(docs.id)
+    let doomed = try #require(top.first { $0.item.path.name == "f0.txt" })
+    let reshaped = try #require(top.first { $0.item.path.name == "x" })
+
+    #expect(await domain.send(.delete(domain: domain.name, id: doomed.id)) == .done)
+    try await domain.device.delete(path("/x"), in: domain.storage)
+    _ = try await domain.device.makeFolder(path("/x"), in: domain.storage)
+    let relisted = try await domain.list()
+    let (set, pages) = try await domain.workingSet()
+
+    #expect(pages == 2)
+    #expect(set.count == Set(set.map(\.id)).count)
+    #expect(Set(set.map(\.id)) == Set((relisted + nested).map(\.id)))
+    #expect(!set.contains { $0.id == .root || $0.id == doomed.id || $0.id == reshaped.id })
+    #expect(
+      await domain.send(.workingSet(domain: domain.name, page: -1)) == .failure(.io("bad request")))
   }
 }

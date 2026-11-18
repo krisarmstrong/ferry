@@ -226,4 +226,24 @@ struct ItemTableTests {
     _ = await table.listed(.root, children: [try file("/a")])
     #expect(FileManager.default.fileExists(atPath: saved.path))
   }
+
+  @Test func workingSetPagesReportedItemsOnly() async throws {
+    let table = ItemTable(domain: tableDomain, store: store())
+    let listed = await table.listed(
+      .root, children: [try file("/a"), try file("/b"), try folder("/C")])
+    _ = await table.id(for: try path("/known-only-by-path"))
+
+    let first = await table.workingSet(from: 0, size: 2)
+    let second = await table.workingSet(from: try #require(first.next), size: 2)
+
+    #expect(first.entries.count == 2)
+    #expect(second.next == nil)
+    #expect(Set((first.entries + second.entries).map(\.id)) == Set(listed.map(\.id)))
+    #expect(
+      first.entries + second.entries
+        == (first.entries + second.entries).sorted {
+          $0.id.rawValue < $1.id.rawValue
+        })
+    #expect(await table.workingSet(from: 3, size: 2).entries.isEmpty)
+  }
 }
