@@ -11,6 +11,8 @@ public protocol SystemServicing {
   func setOpensAtLogin(_ enabled: Bool) throws
   func unregisterAgent() async throws
   func open(_ url: URL)
+  /// Shows the items in Finder.
+  func reveal(_ urls: [URL])
   func quit()
 }
 
@@ -53,6 +55,10 @@ public final class SystemServices: SystemServicing {
 
   public func open(_ url: URL) {
     NSWorkspace.shared.open(url)
+  }
+
+  public func reveal(_ urls: [URL]) {
+    NSWorkspace.shared.activateFileViewerSelecting(urls)
   }
 
   public func quit() {

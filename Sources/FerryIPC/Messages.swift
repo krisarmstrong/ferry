@@ -99,6 +99,9 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   case changes(anchor: Data, updated: [ProviderEntry], deleted: [ItemID], expired: Bool)
   /// Answers `.workingSet`. `next` is `nil` on the last page.
   case page(entries: [ProviderEntry], next: Data?)
+  /// Answers `.eject` and `.removeAllDomains`: where the system saved changes the removed
+  /// domains had not sent to the device yet, if any.
+  case removed(preserved: [URL])
   case done
   case failure(TransportError)
 }

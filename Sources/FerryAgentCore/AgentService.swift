@@ -65,11 +65,9 @@ public actor AgentService: AgentHandling {
       await hub.recheck(id)
       return .done
     case (.eject(let id), _):
-      await domains.eject(id)
-      return .done
+      return .removed(preserved: await domains.eject(id))
     case (.removeAllDomains, _):
-      try await domains.removeAll()
-      return .done
+      return .removed(preserved: try await domains.removeAll())
     case (.item(let domain, let id), _):
       return .entry(try await item(id, in: domain))
     case (.list(let domain, let folder), _):

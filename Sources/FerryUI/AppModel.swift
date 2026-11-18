@@ -33,6 +33,9 @@ import os
   /// The last failed action, shown until the next one succeeds. It can carry device-supplied
   /// detail, so it is shown verbatim, never parsed as Markdown.
   public private(set) var actionError: String?
+  /// Where the system saved changes an eject removed before they reached the device. Shown until
+  /// the next action.
+  public private(set) var preservedChanges: [URL] = []
   public private(set) var opensAtLogin: Bool
 
   /// The steps the guide shows; `nil` shows the model picker.
@@ -80,7 +83,7 @@ import os
         agent = .unreachable
       }
     } catch {
-      Self.log.error("status request failed: \(String(describing: error), privacy: .public)")
+      Self.log.error("status request failed: \(String(describing: error), privacy: .private)")
       agent = .unreachable
     }
   }
@@ -131,6 +134,10 @@ import os
     await perform(.eject(id))
   }
 
+  public func revealPreservedChanges() {
+    services.reveal(preservedChanges)
+  }
+
   /// Asks the agent to open a device again, after the app holding it quits.
   public func recheck(_ id: DeviceID) async {
     await perform(.recheck(id))
@@ -155,19 +162,25 @@ import os
   /// Removes Ferry's locations from Finder, unregisters the agent and the login item, and
   /// quits. Stops if the locations or the agent remain, so the user can try again rather than
   /// being left with locations no agent serves. Once the agent is gone a retry could only fail,
-  /// so a login item that will not unregister is logged and Ferry quits anyway.
+  /// so a login item that will not unregister is logged and Ferry quits anyway. Changes the
+  /// locations had not sent to a device are shown in Finder, since the menu goes away.
   public func removeFerry() async {
+    let preserved: [URL]
     do {
-      guard case .done = try await client.send(.removeAllDomains, file: nil) else {
+      guard case .removed(let saved) = try await client.send(.removeAllDomains, file: nil) else {
         throw TransportError.io("agent kept its locations")
       }
       try await services.unregisterAgent()
+      preserved = saved
     } catch {
-      Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .public)")
+      Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .private)")
       actionError = String(
         localized: LocalizedStringResource(
           "Could not remove Ferry. Make sure Ferry is running, then try again.", bundle: .module))
       return
+    }
+    if !preserved.isEmpty {
+      services.reveal(preserved)
     }
     if services.opensAtLogin {
       do {
@@ -180,10 +193,14 @@ import os
   }
 
   private func perform(_ request: AgentRequest) async {
+    preservedChanges = []
     do {
       switch try await client.send(request, file: nil) {
       case .done:
         actionError = nil
+      case .removed(let preserved):
+        actionError = nil
+        preservedChanges = preserved
       case .failure(let error):
         actionError = DevicePresentation.message(for: error)
       default:

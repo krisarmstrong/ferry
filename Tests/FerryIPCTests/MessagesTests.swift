@@ -91,6 +91,7 @@ private func tag(_ response: AgentResponse) -> Int {
   case .failure: 4
   case .changes: 5
   case .page: 6
+  case .removed: 7
   }
 }
 
@@ -118,6 +119,7 @@ private func responses() throws -> [AgentResponse] {
   all.append(.changes(anchor: Data([9]), updated: [item], deleted: [.random()], expired: false))
   all.append(.changes(anchor: Data(), updated: [], deleted: [], expired: true))
   all += [.page(entries: [item, root], next: Data([7])), .page(entries: [], next: nil)]
+  all += [.removed(preserved: []), .removed(preserved: [URL(filePath: "/tmp/Ferry unsent")])]
   return all
 }
 
@@ -140,7 +142,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyResponseRoundTripsJSON() throws {
-  #expect(Set(try responses().map(tag)) == Set(0...6))
+  #expect(Set(try responses().map(tag)) == Set(0...7))
   for response in try responses() {
     #expect(try roundTrip(response) == response)
   }

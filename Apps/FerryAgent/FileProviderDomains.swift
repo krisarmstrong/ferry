@@ -57,12 +57,30 @@ struct FileProviderDomains: DomainManaging {
     try await manager(identifier).reconnect()
   }
 
-  func remove(_ identifier: String) async throws {
-    try await NSFileProviderManager.remove(try await domain(identifier))
+  /// `.preserveDirtyUserData`: changes not yet uploaded are moved aside rather than discarded.
+  func remove(_ identifier: String) async throws -> URL? {
+    try await NSFileProviderManager.remove(
+      try await domain(identifier), mode: .preserveDirtyUserData)
   }
 
-  func removeAll() async throws {
-    try await NSFileProviderManager.removeAllDomains()
+  /// Removes each domain as `remove` does. Tries every one, then throws the first failure.
+  func removeAll() async throws -> [URL] {
+    var preserved: [URL] = []
+    var failure: (any Error)?
+    for domain in try await NSFileProviderManager.domains() {
+      do {
+        let location = try await NSFileProviderManager.remove(
+          domain, mode: .preserveDirtyUserData)
+        preserved += location.map { [$0] } ?? []
+      } catch {
+        log.error(
+          "removing \(domain.identifier.rawValue, privacy: .private) failed: \(error, privacy: .private)"
+        )
+        failure = failure ?? error
+      }
+    }
+    if let failure { throw failure }
+    return preserved
   }
 
   func signal(_ identifier: String) async {

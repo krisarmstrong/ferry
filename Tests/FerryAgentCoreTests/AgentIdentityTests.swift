@@ -173,7 +173,8 @@ struct AgentIdentityTests {
     _ = await harness.manager.waitForCalls(3)
     #expect(try await harness.id(path("/a.txt"), in: domain) == id)
 
-    #expect(await harness.service.handle(.eject(device.info.id), file: nil) == .done)
+    #expect(
+      await harness.service.handle(.eject(device.info.id), file: nil) == .removed(preserved: []))
     #expect(
       !FileManager.default.fileExists(
         atPath: ItemTable.file(for: domain, in: harness.store).path))
@@ -191,7 +192,7 @@ struct AgentIdentityTests {
     _ = await harness.manager.waitForCalls(1)
     _ = try await harness.id(path("/a.txt"), in: domainID(device))
 
-    #expect(await harness.service.handle(.removeAllDomains, file: nil) == .done)
+    #expect(await harness.service.handle(.removeAllDomains, file: nil) == .removed(preserved: []))
 
     let left = (try? FileManager.default.contentsOfDirectory(atPath: store.path)) ?? []
     #expect(left.isEmpty)

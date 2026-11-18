@@ -122,6 +122,9 @@
     "Remove Ferry…" : {
 
     },
+    "Reveal in Finder" : {
+
+    },
     "Settings…" : {
 
     },
@@ -162,6 +165,9 @@
 
     },
     "Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked." : {
+
+    },
+    "Unsent changes were saved to %@" : {
 
     },
     "Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched. You can then move Ferry to the Trash." : {

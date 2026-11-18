@@ -11,8 +11,11 @@ public protocol DomainManaging: Sendable {
   func add(_ spec: DomainSpec) async throws
   func disconnect(_ identifier: String) async throws
   func reconnect(_ identifier: String) async throws
-  func remove(_ identifier: String) async throws
-  func removeAll() async throws
+  /// Removes the domain, keeping changes not yet sent to the device, and returns where they were
+  /// saved, if there were any.
+  func remove(_ identifier: String) async throws -> URL?
+  /// Removes every Ferry domain the same way, and returns where unsent changes were saved.
+  func removeAll() async throws -> [URL]
   /// Tells the system the domain's working set changed. A replicated FileProvider extension
   /// ignores signals for any other container; it then asks the agent for `.changes`.
   func signal(_ identifier: String) async
@@ -115,21 +118,22 @@ public actor DomainController {
     }
   }
 
-  /// Removes the device's domains, then closes its session. The device stays listed as not
-  /// sharing files until it is unplugged. A transfer in progress on the device finishes before
-  /// the close, since the session runs its operations one at a time; the close is awaited outside
-  /// the operation queue, so other devices' domains keep updating meanwhile.
-  func eject(_ id: DeviceID) async {
-    await serially { await self.removeDomains(of: id) }
+  /// Removes the device's domains, then closes its session, and returns where unsent changes
+  /// were saved. The device stays listed as not sharing files until it is unplugged. A transfer
+  /// in progress on the device finishes before the close, since the session runs its operations
+  /// one at a time; the close is awaited outside the operation queue, so other devices' domains
+  /// keep updating meanwhile.
+  func eject(_ id: DeviceID) async -> [URL] {
+    let preserved = await serially { await self.removeDomains(of: id) }
     await hub.eject(id)
     ejecting.remove(id)
+    return preserved
   }
 
-  /// Removes every Ferry domain, including ones this process never added.
-  func removeAll() async throws(TransportError) {
-    if let failure = await serially({ await self.removeEveryDomain() }) {
-      throw failure
-    }
+  /// Removes every Ferry domain, including ones this process never added, and returns where
+  /// unsent changes were saved.
+  func removeAll() async throws(TransportError) -> [URL] {
+    try await serially({ await self.removeEveryDomain() }).get()
   }
 
   /// What a request on `domain` runs against. Waits until the domains from before this process
@@ -323,26 +327,42 @@ public actor DomainController {
   private func hasConnectedDomain(_ device: DeviceID) -> Bool {
     domains.values.contains { $0.connected && $0.storage?.device == device }
   }
+}
 
-  private func removeDomains(of id: DeviceID) async {
+// MARK: Removing
+
+extension DomainController {
+  private func removeDomains(of id: DeviceID) async -> [URL] {
     ejecting.insert(id)
     links[id] = nil
     let identifiers = domains.filter { $0.value.storage?.device == id }.keys.sorted()
     for identifier in identifiers {
       domains[identifier] = nil
     }
+    var preserved: [URL] = []
     for identifier in identifiers {
       await discardTable(of: identifier)
-      do {
-        try await manager.remove(identifier)
-      } catch {
-        log.error(
-          "removing domain \(identifier, privacy: .private) failed: \(error, privacy: .public)")
+      if let location = await remove(identifier) { preserved.append(location) }
+    }
+    return preserved
+  }
+
+  /// Removes one domain, keeping its unsent changes; a failure is logged.
+  private func remove(_ identifier: String) async -> URL? {
+    do {
+      let preserved = try await manager.remove(identifier)
+      if let preserved {
+        log.info("unsent changes of a removed domain saved to \(preserved.path, privacy: .private)")
       }
+      return preserved
+    } catch {
+      log.error(
+        "removing domain \(identifier, privacy: .private) failed: \(error, privacy: .private)")
+      return nil
     }
   }
 
-  private func removeEveryDomain() async -> TransportError? {
+  private func removeEveryDomain() async -> Result<[URL], TransportError> {
     retired = true
     domains = [:]
     links = [:]
@@ -352,11 +372,10 @@ public actor DomainController {
     tables = [:]
     ItemTable.discardAll(in: itemStore)
     do {
-      try await manager.removeAll()
-      return nil
+      return .success(try await manager.removeAll())
     } catch {
-      log.error("removing all domains failed: \(error, privacy: .public)")
-      return .io("could not remove domains")
+      log.error("removing all domains failed: \(error, privacy: .private)")
+      return .failure(.io("could not remove domains"))
     }
   }
 }

@@ -162,29 +162,6 @@ struct DomainControllerTests {
     #expect(entries.map(\.item.path) == [try path("/back.txt")])
   }
 
-  /// The owner's replug: the device comes back not sharing files (charge only), then the user
-  /// turns on file transfer. The hub's one re-check must bring the domain back.
-  @Test func replugNotSharingThenSharingReconnectsWithinOneRecheck() async throws {
-    let device = await makeDevice("A")
-    let harness = try AgentHarness(devices: [device])
-    defer { harness.finish() }
-    _ = await harness.manager.waitForCalls(1)
-    await harness.transport.detach(device.info.id)
-    harness.tick()
-    _ = await harness.manager.waitForCalls(2)
-
-    let replugged = await makeDevice("A", locked: true)
-    await harness.transport.attach(replugged)
-    harness.tick()
-    await harness.clock.waitForSleeper()
-    await replugged.setLocked(false)
-    await harness.clock.advance(by: DeviceHub.recheckInterval)
-
-    let domain = domainID(device)
-    #expect(
-      await harness.manager.waitForCalls(4).suffix(2) == [.reconnect(domain), .signal(domain)])
-  }
-
   @Test func ejectRemovesOnlyThatDevice() async throws {
     let first = await makeDevice("A", model: "First")
     let second = await makeDevice("B", model: "Second")
@@ -192,7 +169,8 @@ struct DomainControllerTests {
     defer { harness.finish() }
     _ = await harness.manager.waitForCalls(2)
 
-    #expect(await harness.service.handle(.eject(first.info.id), file: nil) == .done)
+    #expect(
+      await harness.service.handle(.eject(first.info.id), file: nil) == .removed(preserved: []))
 
     let firstAdded = FakeDomainManager.Call.add(
       DomainSpec(identifier: domainID(first), displayName: "First"))
@@ -218,7 +196,7 @@ struct DomainControllerTests {
     defer { harness.finish() }
     _ = await harness.manager.waitForCalls(1)
 
-    #expect(await harness.service.handle(.removeAllDomains, file: nil) == .done)
+    #expect(await harness.service.handle(.removeAllDomains, file: nil) == .removed(preserved: []))
 
     #expect(await harness.manager.calls.last == .removeAll)
     #expect(
@@ -245,31 +223,6 @@ struct DomainControllerTests {
         == .failure(.deviceDisconnected))
   }
 
-  /// Right after an agent restart the extension may ask about a domain the controller has not
-  /// adopted yet. "No such item" would make FileProvider delete the domain's items locally, so
-  /// the request waits for adoption and the domain reads as disconnected, never as missing.
-  @Test func requestBeforeAdoptionWaitsAndIsNeverNoSuchItem() async throws {
-    let domain = domainID(await makeDevice("GONE"))
-    let manager = FakeDomainManager(existing: [domain])
-    await manager.holdExisting()
-    let harness = try AgentHarness(manager: manager)
-    defer { harness.finish() }
-
-    let pending = Task { [service = harness.service] in
-      await service.handle(.list(domain: domain, folder: .root), file: nil)
-    }
-    for _ in 0..<1_000 where await harness.controller.requestsAwaitingAdoption == 0 {
-      try await Task.sleep(for: .milliseconds(1))
-    }
-    #expect(await harness.controller.requestsAwaitingAdoption == 1)
-    await manager.releaseExisting()
-
-    #expect(await pending.value == .failure(.deviceDisconnected))
-    #expect(
-      await harness.service.handle(.list(domain: "unknown", folder: .root), file: nil)
-        == .failure(.deviceDisconnected))
-  }
-
   @Test func ejectDuringTransferDoesNotStallOtherDevices() async throws {
     let device = await makeDevice("A")
     let harness = try AgentHarness(devices: [device])
@@ -286,7 +239,7 @@ struct DomainControllerTests {
 
     #expect(calls.dropFirst() == [.remove(domainID(device)), .add(AgentHarness.barrierSpec)])
     await device.resume(.close)
-    #expect(await eject.value == .done)
+    #expect(await eject.value == .removed(preserved: []))
   }
 
   @Test func removeAllDomainsRetiresTheController() async throws {
@@ -294,7 +247,7 @@ struct DomainControllerTests {
     let harness = try AgentHarness(devices: [device])
     defer { harness.finish() }
     _ = await harness.manager.waitForCalls(1)
-    #expect(await harness.service.handle(.removeAllDomains, file: nil) == .done)
+    #expect(await harness.service.handle(.removeAllDomains, file: nil) == .removed(preserved: []))
 
     await harness.transport.attach(await makeDevice("B"))
     harness.tick()

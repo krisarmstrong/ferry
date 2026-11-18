@@ -49,5 +49,6 @@ private final class PreviewServices: SystemServicing {
   func setOpensAtLogin(_ enabled: Bool) { opensAtLogin = enabled }
   func unregisterAgent() {}
   func open(_ url: URL) {}
+  func reveal(_ urls: [URL]) {}
   func quit() {}
 }

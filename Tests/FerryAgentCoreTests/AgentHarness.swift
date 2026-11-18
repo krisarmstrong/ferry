@@ -22,6 +22,8 @@ actor FakeDomainManager: DomainManaging {
   private var existingHeld = false
   private var existingWaiter: CheckedContinuation<Void, Never>?
   private var userEnabled = false
+  /// Where removing each domain saves its unsent changes.
+  private var preserved: [String: URL] = [:]
   private var waiters: [Int: (count: Int, continuation: CheckedContinuation<Void, Never>)] = [:]
   private var nextWaiter = 0
 
@@ -33,8 +35,14 @@ actor FakeDomainManager: DomainManaging {
   func add(_ spec: DomainSpec) async throws { record(.add(spec)) }
   func disconnect(_ identifier: String) async throws { record(.disconnect(identifier)) }
   func reconnect(_ identifier: String) async throws { record(.reconnect(identifier)) }
-  func remove(_ identifier: String) async throws { record(.remove(identifier)) }
-  func removeAll() async throws { record(.removeAll) }
+  func remove(_ identifier: String) async throws -> URL? {
+    record(.remove(identifier))
+    return preserved[identifier]
+  }
+  func removeAll() async throws -> [URL] {
+    record(.removeAll)
+    return preserved.keys.sorted().compactMap { preserved[$0] }
+  }
   func signal(_ identifier: String) async {
     record(.signal(identifier))
   }
@@ -59,6 +67,11 @@ actor FakeDomainManager: DomainManaging {
 
   func setUserEnabled(_ enabled: Bool) {
     userEnabled = enabled
+  }
+
+  /// Removing `identifier` saves unsent changes to `location`.
+  func preserve(_ identifier: String, at location: URL) {
+    preserved[identifier] = location
   }
 
   /// Returns every call so far, once there are at least `count` or the test is cancelled, as

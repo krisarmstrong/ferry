@@ -21,7 +21,8 @@ final class CallLog: Sendable {
 private final class FakeClient: AgentSending {
   let log: CallLog
   private let status = Mutex<AgentResponse>(.status(devices: [], providerEnabled: true))
-  private let removeResult = Mutex<AgentResponse>(.done)
+  private let removeResult = Mutex<AgentResponse>(.removed(preserved: []))
+  private let ejectResult = Mutex<AgentResponse>(.removed(preserved: []))
 
   init(log: CallLog) {
     self.log = log
@@ -35,6 +36,12 @@ private final class FakeClient: AgentSending {
     removeResult.withLock { $0 = .failure(.deviceDisconnected) }
   }
 
+  /// The agent kept unsent changes of the removed domains in `preserved`.
+  func preserve(_ preserved: [URL]) {
+    removeResult.withLock { $0 = .removed(preserved: preserved) }
+    ejectResult.withLock { $0 = .removed(preserved: preserved) }
+  }
+
   func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
     -> AgentResponse
   {
@@ -44,7 +51,7 @@ private final class FakeClient: AgentSending {
       return status.withLock { $0 }
     case .eject(let id):
       log.record("eject \(id.serial)")
-      return .done
+      return ejectResult.withLock { $0 }
     case .recheck(let id):
       log.record("recheck \(id.serial)")
       return .done
@@ -88,6 +95,10 @@ private final class FakeServices: SystemServicing {
 
   func open(_ url: URL) {
     log.record("open \(url.absoluteString)")
+  }
+
+  func reveal(_ urls: [URL]) {
+    log.record("reveal \(urls.map(\.path).joined(separator: ","))")
   }
 
   func quit() {
@@ -222,6 +233,42 @@ struct AppModelTests {
     await model.removeFerry()
     #expect(log.all == ["removeAllDomains"])
     #expect(model.actionError != nil)
+  }
+
+  static let preserved = URL(
+    filePath: "/Users/me/Library/Unsent Ferry Changes", directoryHint: .isDirectory)
+
+  @Test func ejectShowsWhereUnsentChangesWereSaved() async {
+    let client = FakeClient(log: log)
+    client.preserve([Self.preserved])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+
+    await model.eject(DeviceID(serial: "A1"))
+
+    #expect(model.preservedChanges == [Self.preserved])
+    #expect(model.actionError == nil)
+    model.revealPreservedChanges()
+    #expect(log.all.last == "reveal \(Self.preserved.path)")
+  }
+
+  @Test func ejectWithNothingUnsentShowsNoMessage() async {
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    await model.eject(DeviceID(serial: "A1"))
+    #expect(model.preservedChanges.isEmpty)
+  }
+
+  /// Ferry quits right after Remove Ferry, so a menu message would never be seen: the saved
+  /// changes are shown in Finder instead.
+  @Test func removeFerryRevealsSavedChangesBeforeQuitting() async {
+    let client = FakeClient(log: log)
+    client.preserve([Self.preserved])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.removeFerry()
+    #expect(
+      log.all == [
+        "removeAllDomains", "unregisterAgent", "reveal \(Self.preserved.path)",
+        "opensAtLogin false", "quit",
+      ])
   }
 
   @Test func deviceTextIsEscaped() {
