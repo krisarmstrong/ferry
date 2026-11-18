@@ -19,9 +19,10 @@ extension MTPSession {
     progress: ProgressHandler
   ) async throws(TransportError) -> Downloaded {
     try await operation { () throws(TransportError) in
+      let raw = try await raw(storage)
+      var entry = try await entry(path, storage: raw)
       var attempt = 1
       while true {
-        let entry = try await entry(path, storage: raw(storage))
         guard !entry.isFolder else { throw .notFound(path) }
         do throws(TransportError) {
           return try await downloadOnce(
@@ -31,8 +32,13 @@ extension MTPSession {
             throw .downloadSizeMismatch(listed: listed, received: received)
           }
           Self.log.info("download cut short (\(received) of \(listed) bytes); trying again")
-          attempt += 1
+          entry = try await freshEntry(path, storage: raw)
+        } catch {
+          // The cached object may be one the device has since replaced: download the new one.
+          guard attempt < Self.downloadAttempts else { throw error }
+          entry = try await relisted(path, after: error, on: entry, storage: raw)
         }
+        attempt += 1
       }
     }
   }

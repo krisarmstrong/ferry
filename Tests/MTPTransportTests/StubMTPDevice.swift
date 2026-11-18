@@ -57,6 +57,10 @@ actor StubMTPDevice: MTPDeviceOperations {
   private(set) var downloadCount = 0
   /// Folder listings the session asked for.
   private(set) var listCount = 0
+  /// Set by `cacheObjectInfo()`: like libmtp, `metadata` answers from the object info first
+  /// loaded for an ID, even after the device dropped or changed the object.
+  private var objectInfoCached = false
+  private var loadedInfo: [UInt32: MTPEntry] = [:]
   /// The next download writes half the object, then throws this.
   private var downloadFailure: TransportError?
   /// Names the device stores differently from what it was sent, as a FAT card or 7-bit
@@ -92,6 +96,11 @@ actor StubMTPDevice: MTPDeviceOperations {
   /// Deletes an object as an app on the device would, with no call from the session.
   func removeObject(_ id: UInt32) {
     objects[id] = nil
+  }
+
+  /// Makes `metadata` answer as libmtp does: from the object info it loaded first.
+  func cacheObjectInfo() {
+    objectInfoCached = true
   }
 
   /// Moves an object as an app on the device would, keeping its ID.
@@ -186,8 +195,12 @@ actor StubMTPDevice: MTPDeviceOperations {
     record()
     listCount += 1
     try requireOpen()
-    return objects.filter { $0.value.parent == parent }.map { entry($0.key, $0.value) }
+    let listed = objects.filter { $0.value.parent == parent }.map { entry($0.key, $0.value) }
       .sorted { $0.objectID < $1.objectID }
+    for entry in listed where loadedInfo[entry.objectID] == nil {
+      loadedInfo[entry.objectID] = entry
+    }
+    return objectInfoCached ? listed.map { loadedInfo[$0.objectID] ?? $0 } : listed
   }
 
   func download(objectID: UInt32, to file: URL, progress: ProgressHandler)
@@ -269,7 +282,11 @@ actor StubMTPDevice: MTPDeviceOperations {
   }
 
   func metadata(objectID: UInt32) throws(TransportError) -> MTPEntry {
-    entry(objectID, try object(objectID))
+    if objectInfoCached, let loaded = loadedInfo[objectID] {
+      record()
+      return loaded
+    }
+    return entry(objectID, try object(objectID))
   }
 
   func close() {

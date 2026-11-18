@@ -113,16 +113,22 @@ actor MTPSession: DeviceSession {
     return raw
   }
 
-  /// The object at `path`, which must not be the root, as the device has it now. A cached
-  /// listing can name an object the device has since changed, replaced (a new object ID under
-  /// the same name), moved, renamed or dropped, and an operation on one item must act on what
-  /// the device has. So the object a cached listing names is read again by its ID, one device
-  /// call, and used, with its current size and date, if it still has that name, kind and
-  /// folder; anything else, or no cached listing, lists the parent again. An operation on one
-  /// item thus never lists a large folder again just to find it.
+  /// The object at `path`, which must not be the root, resolved from the cached listing of its
+  /// folder when there is one, so an operation on one item never lists a large folder again
+  /// just to find it. The object is read again by its ID and used, with the size and date that
+  /// read gives, while it keeps its name, kind and folder; anything else lists the parent again.
+  ///
+  /// libmtp answers that read from the object info it loaded first, without asking the device,
+  /// so it cannot see an object the device has since dropped or replaced. An operation that then
+  /// fails on the object lists the folder again to tell what happened (see `relisted`).
   func entry(_ path: RemotePath, storage: UInt32) async throws(TransportError) -> MTPEntry {
-    guard let parent = path.parent else { throw .notFound(path) }
     if let current = try await cachedAndConfirmed(path, storage: storage) { return current }
+    return try await freshEntry(path, storage: storage)
+  }
+
+  /// The object at `path` with its folder listed again first.
+  func freshEntry(_ path: RemotePath, storage: UInt32) async throws(TransportError) -> MTPEntry {
+    guard let parent = path.parent else { throw .notFound(path) }
     await resolver.invalidate(parent, storage: storage)
     guard let entry = try await resolver.entry(at: path, storage: storage) else {
       throw .notFound(path)
@@ -149,6 +155,25 @@ actor MTPSession: DeviceSession {
       current.name.precomposedStringWithCanonicalMapping == path.name
       && current.isFolder == cached.isFolder && current.parent == cached.parent
     return same ? current : nil
+  }
+
+  /// The object at `path` with its folder listed again, after an operation on `stale`, the object
+  /// the cache named, failed with `error`. If `path` now names another object or none, the device
+  /// dropped or replaced `stale` since it was listed: `.notFound(path)` when `path` is gone, or
+  /// the object now there. If it is still `stale`, the failure was real and `error` stands.
+  func relisted(
+    _ path: RemotePath, after error: TransportError, on stale: MTPEntry, storage: UInt32
+  )
+    async throws(TransportError) -> MTPEntry
+  {
+    guard error != .deviceDisconnected, error != .cancelled, let parent = path.parent else {
+      throw error
+    }
+    await resolver.invalidate(parent, storage: storage)
+    guard let current = try await resolver.entry(at: path, storage: storage),
+      current.objectID != stale.objectID
+    else { throw error }
+    return current
   }
 
   /// The ID of the folder at `path` and its children, listed fresh from the device since the
@@ -332,18 +357,18 @@ extension MTPSession {
   }
 
   /// Once the object is gone, only it leaves the cached listing of its folder, so deleting many
-  /// items from one folder lists it once. A failure drops the whole listing: part of a folder
-  /// may be gone.
+  /// items from one folder lists it once. A failure lists the folder again: an object the device
+  /// dropped is `.notFound`, and one it replaced since is not the item to delete, so it stays and
+  /// is `.notFound` too.
   func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError) {
     try await operation { () throws(TransportError) in
-      guard let parent = path.parent else { throw .notFound(path) }
       let raw = try await raw(storage)
       let entry = try await entry(path, storage: raw)
       do throws(TransportError) {
         try await deleteTree(entry, at: path, depth: 0, storage: raw)
       } catch {
-        await resolver.invalidate(parent, storage: raw)
-        throw error
+        _ = try await relisted(path, after: error, on: entry, storage: raw)
+        throw .notFound(path)
       }
       await resolver.removed(entry.objectID, at: path, storage: raw)
     }

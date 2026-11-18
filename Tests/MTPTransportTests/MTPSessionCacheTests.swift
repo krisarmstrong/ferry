@@ -60,6 +60,60 @@ struct MTPSessionCacheTests {
   }
 }
 
+/// libmtp keeps the object info it loaded for an ID and never reads it again, so confirming a
+/// cached object by its ID cannot see that the device dropped or replaced it. The operation on it
+/// then fails, and the session lists the folder again to tell what happened.
+struct MTPSessionStaleObjectInfoTests {
+  private let storage = SessionFixture.storage
+
+  private func listedThenReplaced() async throws -> (StubMTPDevice, MTPSession) {
+    let device = SessionFixture.makeDevice()
+    await device.cacheObjectInfo()
+    let old = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
+    let session = MTPSession(device: device)
+    _ = try await session.list(.root, in: storage)
+    await device.removeObject(old)
+    await device.addFile(
+      "a.txt", parent: SessionFixture.root, data: Data("replaced on the unit".utf8))
+    return (device, session)
+  }
+
+  @Test func deletingAFileTheDeviceDroppedIsNotFound() async throws {
+    let device = SessionFixture.makeDevice()
+    await device.cacheObjectInfo()
+    let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("a".utf8))
+    let session = MTPSession(device: device)
+    _ = try await session.list(.root, in: storage)
+    await device.removeObject(id)
+
+    await #expect(throws: TransportError.notFound(try SessionFixture.path("/a.txt"))) {
+      try await session.delete(SessionFixture.path("/a.txt"), in: storage)
+    }
+  }
+
+  /// The object now at the path is not the one the delete was for: it stays.
+  @Test func deletingAFileTheDeviceReplacedKeepsTheNewOne() async throws {
+    let (device, session) = try await listedThenReplaced()
+
+    await #expect(throws: TransportError.notFound(try SessionFixture.path("/a.txt"))) {
+      try await session.delete(SessionFixture.path("/a.txt"), in: storage)
+    }
+    #expect(await device.children(of: SessionFixture.root) == ["a.txt"])
+  }
+
+  @Test func downloadingAFileTheDeviceReplacedGetsTheNewOne() async throws {
+    let (_, session) = try await listedThenReplaced()
+    let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: target) }
+
+    try await session.download(
+      SessionFixture.path("/a.txt"), in: storage, to: target, replacing: true,
+      progress: SessionFixture.noProgress)
+
+    #expect(try Data(contentsOf: target) == Data("replaced on the unit".utf8))
+  }
+}
+
 /// Deleting a folder empties it child by child, at most `RemotePath.maxTreeDepth` levels down,
 /// so a device that reports a loop cannot recurse without end.
 struct MTPSessionDeleteTreeTests {
