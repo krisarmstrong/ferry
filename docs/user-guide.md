@@ -270,7 +270,9 @@ on the Mac but a folder on the device, so Ferry does not copy it. Control-click 
 ### An app or script from the device does not open at once
 
 Files copied from a device are marked as downloaded, like files from the internet, so macOS
-checks an app or script with Gatekeeper before it first opens, and may ask you to confirm.
+checks an app or script with Gatekeeper before it first opens, and may ask you to confirm. A
+folder on the device named like an app or a document package (`Tool.app`, `Notes.rtfd`) shows
+in Finder as one, and is marked the same way.
 
 ## Privacy
 

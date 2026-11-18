@@ -234,7 +234,7 @@
         {
           "title": "An app or script from the device does not open at once",
           "paragraphs": [
-            "Files copied from a device are marked as downloaded, so macOS checks an app or script with Gatekeeper before it first opens, as it does for one from the internet."
+            "Files copied from a device, and folders on it named like an app or a document package, are marked as downloaded, so macOS checks an app or script with Gatekeeper before it first opens, as it does for one from the internet."
           ]
         }
       ]

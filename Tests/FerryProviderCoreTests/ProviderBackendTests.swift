@@ -222,11 +222,11 @@ import UniformTypeIdentifiers
     let item = ProviderItem(
       ProviderEntry(id: .random(), parent: parent, item: try file("/a.txt", size: 1)))
     let withCapabilities = Data(
+      SHA256.hash(data: Data("\(parent.rawValue)/a.txt/\(item.capabilities.rawValue)/5".utf8)))
+    // Revision 5: folders named like packages gained the quarantine, so known items refresh.
+    let revisionFour = Data(
       SHA256.hash(data: Data("\(parent.rawValue)/a.txt/\(item.capabilities.rawValue)/4".utf8)))
-    // Revision 4: package folders became plain folders, so known items must refresh.
-    let revisionThree = Data(
-      SHA256.hash(data: Data("\(parent.rawValue)/a.txt/\(item.capabilities.rawValue)/3".utf8)))
-    #expect(item.itemVersion.metadataVersion != revisionThree)
+    #expect(item.itemVersion.metadataVersion != revisionFour)
     let withoutCapabilities = Data(SHA256.hash(data: Data("\(parent.rawValue)/a.txt".utf8)))
 
     #expect(item.itemVersion.metadataVersion == withCapabilities)

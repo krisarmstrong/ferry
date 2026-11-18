@@ -91,7 +91,10 @@ mode: it enumerates over MTP but publishes no storage (seen on the LinkRunner-10
   folder is a package by its type or, since `cp -R` sends a plain folder first,
   by its name. On the device every folder is presented as a plain folder
   (content type `public.folder`), whatever its name, and its children are
-  ordinary items.
+  ordinary items. macOS still types a folder on disk by its extension, so
+  Finder shows `X.app` or `X.rtfd` as an app or a document: such a folder
+  (extension conforming to `com.apple.package`) carries `com.apple.quarantine`
+  like a file from the device, so Gatekeeper checks it (round 8b ruling).
 
 ## Anti-goals (failure even if it "works")
 

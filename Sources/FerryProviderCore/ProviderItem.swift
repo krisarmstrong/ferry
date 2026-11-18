@@ -51,14 +51,27 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
 
   public var contentModificationDate: Date? { entry.item.modified }
 
-  /// Every file from the device carries `com.apple.quarantine` as a downloaded file does, so
+  /// Every file from the device, and every folder macOS takes for a package by its name (see
+  /// `isPackageNamed`), carries `com.apple.quarantine` as a downloaded file does, so
   /// Gatekeeper checks an app or script from a USB device before it first runs. FileProvider
   /// writes an item's syncable extended attributes onto the file on disk; the extension's
   /// Info.plist declares this one syncable. A marker set on the fetched file itself does not
   /// reach the disk: FileProvider takes only its contents.
   public var extendedAttributes: [String: Data] {
-    guard entry.item.kind == .file else { return [:] }
+    guard entry.item.kind == .file || isPackageNamed else { return [:] }
     return [Self.quarantineAttribute: quarantine]
+  }
+
+  /// A folder whose name's extension is a package type (`Ferry.app`, `Notes.rtfd`). Ferry
+  /// presents it as a plain folder, but macOS types a folder on disk by its extension, so Finder
+  /// still shows it as a document or an app; the quarantine makes Gatekeeper check such an app
+  /// as a download.
+  private var isPackageNamed: Bool {
+    let ext = (filename as NSString).pathExtension
+    guard entry.item.kind == .folder, !ext.isEmpty,
+      let type = UTType(filenameExtension: ext, conformingTo: .directory)
+    else { return false }
+    return type.isDeclared && type.conforms(to: .package)
   }
 
   static let quarantineAttribute = "com.apple.quarantine"
@@ -91,9 +104,9 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// Ferry that changes capabilities must change the version too, or items already known keep
   /// the old ones.
   /// Bumped when Ferry changes what an item's metadata holds (2: the quarantine attribute on
-  /// files; 3: on packages too; 4: every folder a plain folder, none quarantined), so items
-  /// FileProvider already knows pick it up.
-  static let metadataRevision = 4
+  /// files; 3: on packages too; 4: every folder a plain folder, none quarantined; 5: folders
+  /// named like packages quarantined), so items FileProvider already knows pick it up.
+  static let metadataRevision = 5
 
   public var itemVersion: NSFileProviderItemVersion {
     let content = ContentVersion(entry.item).encoded

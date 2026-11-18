@@ -185,7 +185,7 @@
     "File transfer is off or the device is locked. Choose **Transfer files** on the device, then **Refresh**." : {
       "extractionState" : "manual"
     },
-    "Files copied from a device are marked as downloaded, so macOS checks an app or script with Gatekeeper before it first opens, as it does for one from the internet." : {
+    "Files copied from a device, and folders on it named like an app or a document package, are marked as downloaded, so macOS checks an app or script with Gatekeeper before it first opens, as it does for one from the internet." : {
       "extractionState" : "manual"
     },
     "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it." : {

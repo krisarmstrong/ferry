@@ -99,20 +99,21 @@ struct ItemKindTests {
     #expect(await agent.requests.isEmpty)
   }
 
-  /// Whatever its name, a device folder is a plain folder: Finder lists what is in it, never
-  /// offers it as a document to open or as code to launch, and it carries no quarantine.
+  /// Whatever its name, Ferry presents a device folder as a plain folder.
   @Test(arguments: [
     "Notes.rtfd", "Talk.key", "Ferry.app", "x.bundle", "x.plugin", "x.appex",
     "x.systemextension", "x.kext", "x.scptd", "x.pkg", "com.foo.app", "DCIM", "report.txt",
   ])
   func aDeviceFolderIsAlwaysAPlainFolder(name: String) throws {
-    let item = ProviderItem(
-      ProviderEntry(
-        id: .random(), parent: .root,
-        item: RemoteItem(path: try path("/" + name), kind: .folder, size: 0, modified: epoch)))
-    #expect(item.contentType == .folder)
-    #expect(item.extendedAttributes.isEmpty)
+    #expect(try deviceFolder(name).contentType == .folder)
   }
+}
+
+private func deviceFolder(_ name: String) throws -> ProviderItem {
+  ProviderItem(
+    ProviderEntry(
+      id: .random(), parent: .root,
+      item: RemoteItem(path: try path("/" + name), kind: .folder, size: 0, modified: epoch)))
 }
 
 /// Contents from a USB device are untrusted downloads: Gatekeeper checks an app or script from
@@ -132,10 +133,19 @@ struct QuarantineTests {
     #expect(String(bytes: value, encoding: .utf8) == "0083;6553f100;Ferry;\(id.rawValue)")
   }
 
-  @Test func aFolderCarriesNone() throws {
-    let item = ProviderItem(
-      ProviderEntry(id: .random(), parent: .root, item: try folder("/DCIM")))
-    #expect(item.extendedAttributes.isEmpty)
+  /// macOS types a folder by its name's extension whatever Ferry presents, so a device folder
+  /// named like a package shows in Finder as a document or an app. It is quarantined too, so
+  /// Gatekeeper checks such an app as a download.
+  @Test(arguments: ["Ferry.app", "Notes.rtfd", "Talk.key", "x.plugin", "x.appex"])
+  func aFolderNamedLikeAPackageCarriesTheQuarantine(name: String) throws {
+    let item = try deviceFolder(name)
+    let value = try #require(item.extendedAttributes["com.apple.quarantine"])
+    #expect(String(bytes: value, encoding: .utf8)?.hasPrefix("0083;") == true)
+  }
+
+  @Test(arguments: ["DCIM", "report.txt", "Android", "x.unknownext"])
+  func aPlainFolderCarriesNone(name: String) throws {
+    #expect(try deviceFolder(name).extendedAttributes.isEmpty)
   }
 }
 
