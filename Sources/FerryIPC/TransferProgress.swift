@@ -45,10 +45,13 @@ public struct ActiveTransfer: Codable, Sendable, Equatable {
     self.total = total
   }
 
-  /// Whole percent done, 0 until the total is known.
+  /// Whole percent done, 0 until the total is known, 0...100 whatever the device reports. The
+  /// product is taken at double width, so a device-reported size near `UInt64.max` cannot
+  /// overflow it.
   public var percent: Int {
     guard total > 0 else { return 0 }
-    return Int(min(completed, total) * 100 / total)
+    let product = min(completed, total).multipliedFullWidth(by: 100)
+    return Int(total.dividingFullWidth(product).quotient)
   }
 }
 

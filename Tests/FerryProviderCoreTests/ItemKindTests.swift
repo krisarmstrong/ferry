@@ -131,3 +131,13 @@ struct FileProgressTests {
     #expect(progress.fileOperationKind == .downloading)
   }
 }
+
+struct FileProgressOverflowTests {
+  /// A device-reported size past `Int64.max` clamps rather than traps.
+  @Test func hugeSizesClamp() {
+    let (progress, update) = FileProgress.make(.uploading)
+    update(UInt64.max, UInt64.max)
+    #expect(progress.totalUnitCount == Int64.max)
+    #expect(progress.completedUnitCount == Int64.max)
+  }
+}
