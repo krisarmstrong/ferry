@@ -34,6 +34,10 @@ private func tag(_ request: AgentRequest) -> Int {
   case .forgetWireless: 20
   case .confirmWireless: 21
   case .ignoreWireless: 22
+  case .installAPK: 23
+  case .screenshot: 24
+  case .startRecording: 25
+  case .stopRecording: 26
   }
 }
 
@@ -64,6 +68,10 @@ private func requests() -> [AgentRequest] {
   all += [
     .confirmWireless(UnconfirmedAddress(address: address, id: device, name: "EtherScope nXG")),
     .ignoreWireless(address),
+  ]
+  all += [
+    .installAPK(device, name: "Ferry Test.apk"), .screenshot(device), .startRecording(device),
+    .stopRecording(device),
   ]
   return all
 }
@@ -126,6 +134,8 @@ private func tag(_ response: AgentResponse) -> Int {
   case .removed: 7
   case .keptOnDevice: 8
   case .wireless: 9
+  case .saved: 10
+  case .toolFailed: 11
   }
 }
 
@@ -168,7 +178,28 @@ private func responses() throws -> [AgentResponse] {
   all.append(.changes(anchor: Data(), updated: [], deleted: [], expired: true))
   all += [.page(entries: [item, root], next: Data([7])), .page(entries: [], next: nil)]
   all += [.removed(preserved: []), .removed(preserved: [URL(filePath: "/tmp/Ferry unsent")])]
-  return all + (try wirelessResponses())
+  return all + (try wirelessResponses()) + toolResponses()
+}
+
+private func toolResponses() -> [AgentResponse] {
+  var all: [AgentResponse] = [
+    .saved(URL(filePath: "/Users/someone/Desktop/Screenshot LinkRunner 2026-11-18 at 17.09.27.png"))
+  ]
+  for failure: ToolFailure in [
+    .notOverADB, .notAnAPK, .apkTooLarge, .installFailed("INSTALL_FAILED_OLDER_SDK"),
+    .alreadyRecording, .notRecording, .noImage, .recordingFailed("no encoder"), .cannotSave,
+  ] {
+    all.append(.toolFailed(failure))
+  }
+  all.append(
+    .status(
+      StatusReport(
+        devices: [], provider: .enabled,
+        recordings: [
+          ActiveRecording(
+            device: device, started: Date(timeIntervalSince1970: 1_763_503_767), stopping: true)
+        ])))
+  return all
 }
 
 private func wirelessResponses() throws -> [AgentResponse] {
@@ -198,7 +229,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...22))
+  #expect(Set(requests().map(tag)) == Set(0...26))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
@@ -212,7 +243,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyResponseRoundTripsJSON() throws {
-  #expect(Set(try responses().map(tag)) == Set(0...9))
+  #expect(Set(try responses().map(tag)) == Set(0...11))
   for response in try responses() {
     #expect(try roundTrip(response) == response)
   }
@@ -261,6 +292,17 @@ func invalidWirelessRequestsReplyBadRequest(valid: String, invalid: String) asyn
     .enableWireless(device), .forgetWireless(device),
     .confirmWireless(UnconfirmedAddress(address: address, id: device, name: "EtherScope nXG")),
     .ignoreWireless(address),
+  ] {
+    #expect(ClientRole.app.allows(request))
+    #expect(!ClientRole.provider.allows(request))
+  }
+}
+
+/// The tools install apps on and record the screens of the user's devices: the app's alone.
+@Test func toolRequestsAreTheAppsAlone() {
+  for request: AgentRequest in [
+    .installAPK(device, name: "a.apk"), .screenshot(device), .startRecording(device),
+    .stopRecording(device),
   ] {
     #expect(ClientRole.app.allows(request))
     #expect(!ClientRole.provider.allows(request))

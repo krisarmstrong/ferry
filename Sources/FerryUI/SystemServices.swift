@@ -1,5 +1,6 @@
 import AppKit
 import ServiceManagement
+import UniformTypeIdentifiers
 import os
 
 /// Whether macOS lets Ferry's helper (the agent) run.
@@ -30,6 +31,8 @@ public protocol SystemServicing {
   func quit()
   /// Puts `text` on the pasteboard.
   func copy(_ text: String)
+  /// Asks the user for an `.apk`; `nil` if they cancel.
+  func chooseAPK() async -> URL?
 }
 
 /// `SMAppService`, `NSWorkspace` and `NSApplication`.
@@ -106,6 +109,18 @@ public final class SystemServices: SystemServicing {
   public func copy(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
+  }
+
+  public func chooseAPK() async -> URL? {
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [UTType(filenameExtension: "apk") ?? .data]
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = false
+    panel.message = String(
+      localized: LocalizedStringResource(
+        "Choose an Android app (.apk) to install.", bundle: .module))
+    NSApp.activate()
+    return panel.runModal() == .OK ? panel.url : nil
   }
 
   private nonisolated static func describe(_ status: SMAppService.Status) -> String {

@@ -51,10 +51,20 @@ import os
   public var wirelessForm = WirelessForm.address
   /// The last failed action, shown until the next one succeeds. It can carry device-supplied
   /// detail, so it is shown verbatim, never parsed as Markdown.
-  public private(set) var actionError: String?
+  public internal(set) var actionError: String?
+  /// Screen recordings running, as of the last status.
+  public private(set) var recordings: [ActiveRecording] = []
+  /// Apps being installed from this menu, by device: the file's name and how much has reached
+  /// the device.
+  public internal(set) var installs: [DeviceID: AppInstall] = [:]
+  /// Recordings this menu asked for, by when, until the agent answers: shown before the status
+  /// lists them.
+  var requestedRecordings: [DeviceID: Date] = [:]
+  /// What the last tool request said when it succeeded without a file to show.
+  public internal(set) var toolMessage: String?
   /// Where the system saved changes an eject removed before they reached the device. Shown until
   /// the next action.
-  public private(set) var preservedChanges: [URL] = []
+  public internal(set) var preservedChanges: [URL] = []
   /// Read from the system once launched (see `launch()`); `false` until then.
   public private(set) var opensAtLogin = false
   /// The login item change being applied, and how many have been requested.
@@ -293,6 +303,7 @@ import os
 
   func perform(_ request: AgentRequest) async {
     if request != .recheckADB { preservedChanges = [] }
+    toolMessage = nil
     do {
       switch try await client.send(request, file: nil) {
       case .done:
@@ -322,6 +333,7 @@ import os
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered
     unconfirmed = report.unconfirmed
+    recordings = report.recordings
     agent = .running
     // The agent replaced a domain on its own and the system kept its unsent changes: shown as an
     // eject's are.

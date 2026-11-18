@@ -7,8 +7,13 @@ public struct ADBRoutes: Sendable, Equatable {
   public let usb: String?
   public let wireless: [String]
 
+  public init(usb: String?, wireless: [String]) {
+    self.usb = usb
+    self.wireless = wireless
+  }
+
   /// The route a session uses: USB while the cable is in.
-  var preferred: String? { usb ?? wireless.first }
+  public var preferred: String? { usb ?? wireless.first }
 
   var serials: Set<String> { Set(wireless + [usb].compactMap { $0 }) }
 }
@@ -140,6 +145,9 @@ public actor ADBTransport: DeviceTransport {
 
   /// Where the adb server reaches `id`, as of the most recent scan.
   public func routes(for id: DeviceID) -> ADBRoutes? { routes[id] }
+
+  /// The tools (APK install, screenshot, screen recording) over this transport's server.
+  public nonisolated var deviceTools: ADBDeviceTools { ADBDeviceTools(host: host) }
 
   public func scan() async throws(TransportError) -> DeviceScan {
     try await scans.run { () async throws(TransportError) -> DeviceScan in

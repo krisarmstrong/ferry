@@ -35,12 +35,26 @@ extension FakeAndroid {
     try await peer.okay()
     let service = try await peer.request()
     try await peer.okay()
+    state.withLock { $0.tools.services.append(service) }
+    try await serve(service, peer)
+  }
+
+  /// Runs the service a connection started.
+  private func serve(_ service: String, _ peer: Peer) async throws {
     if service == "sync:" {
       try await sync(peer)
+    } else if service.hasPrefix("exec:") {
+      try await exec(String(service.dropFirst("exec:".count)), peer)
+    } else if service.hasPrefix("shell:") {
+      try await legacyShell(String(service.dropFirst("shell:".count)), peer)
     } else if service.hasPrefix("shell,v2,raw:") {
       // The client closes stdin first.
       _ = try await peer.stream.read(exactly: 5)
       let command = String(service.dropFirst("shell,v2,raw:".count))
+      if Self.words(command)?.first == "sh" {
+        try await record(command, peer, legacyToken: nil)
+        return
+      }
       let program = command.split(separator: " ").first.map(String.init) ?? ""
       if state.withLock({ $0.hangingPrograms.contains(program) }) {
         // Answers nothing until the client gives up and closes.

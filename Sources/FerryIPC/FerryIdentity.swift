@@ -74,7 +74,8 @@ public enum ClientRole: Sendable, CaseIterable {
   public func allows(_ request: AgentRequest) -> Bool {
     switch request {
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
-      .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless:
+      .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
+      .installAPK, .screenshot, .startRecording, .stopRecording:
       self == .app
     case .item, .list, .fetch, .create, .rename, .move, .replaceContents, .delete, .changes,
       .workingSet:

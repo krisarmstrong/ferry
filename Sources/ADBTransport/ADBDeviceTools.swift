@@ -1,0 +1,398 @@
+import DeviceKit
+import Foundation
+import os
+
+/// What `pm install` said.
+public enum APKInstallResult: Sendable, Equatable {
+  case installed
+  /// The code pm printed (`INSTALL_FAILED_…`, `INSTALL_PARSE_FAILED_…`), or its first line when it
+  /// printed no code, at most 200 characters.
+  case failed(String)
+}
+
+/// The tools a device on USB debugging offers beyond files: installing an app, a screenshot and a
+/// screen recording. Each runs on its own connections, beside any session, and every command is
+/// built by `ADBShell.command`.
+///
+/// Files Ferry puts on the device for a tool (the APK it installs, the recording before it is
+/// pulled) are removed in every outcome, from a task of their own so a cancelled caller still
+/// cleans up. A device that has gone cannot be cleaned; that is logged.
+public struct ADBDeviceTools: Sendable {
+  static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBTools")
+
+  /// Where adbd's shell user may write and pm may read.
+  static let apkFolder = "/data/local/tmp"
+  /// Shared storage, which `screenrecord` can write and the sync service can read.
+  static let recordingFolder = "/sdcard/Download"
+  /// `screenrecord`'s own ceiling, which Ferry keeps.
+  public static let recordingLimit = Duration.seconds(180)
+  /// Runs `screenrecord` as the process whose pid it prints first, so a later `kill -2` stops
+  /// that process and nothing else. The path is `$1`, passed as its own quoted argument.
+  static let recordScript = "echo $$; exec screenrecord --time-limit 180 \"$1\""
+  /// A 4K screen's PNG is tens of megabytes; nothing a device honestly sends is larger.
+  static let defaultCaptureLimit = 128 << 20
+
+  let host: ADBHost
+  private let answerLimit: Duration
+  private let captureLimit: Int
+
+  public init(host: ADBHost) {
+    self.init(host: host, answerLimit: .seconds(10), captureLimit: Self.defaultCaptureLimit)
+  }
+
+  init(host: ADBHost, answerLimit: Duration, captureLimit: Int) {
+    self.host = host
+    self.answerLimit = answerLimit
+    self.captureLimit = captureLimit
+  }
+
+  // MARK: Installing
+
+  /// Pushes `file` (from its current offset) to a new temporary path on the device, installs it
+  /// with `pm install -r`, then removes the copy, whatever happened.
+  public func installAPK(
+    _ file: FileHandle, serial: String, progress: ProgressHandler
+  ) async throws(ADBError) -> APKInstallResult {
+    let path = "\(Self.apkFolder)/ferry-\(UUID().uuidString).apk"
+    let outcome: Result<APKInstallResult, ADBError>
+    do throws(ADBError) {
+      try await push(file, to: path, serial: serial, progress: progress)
+      let result = try await host.run(
+        serial: serial, command: try ADBShell.command("pm", ["install", "-r", path]))
+      outcome = .success(Self.installResult(result))
+    } catch {
+      outcome = .failure(error)
+    }
+    await remove(path, on: serial)
+    return try outcome.get()
+  }
+
+  private func push(
+    _ file: FileHandle, to path: String, serial: String, progress: ProgressHandler
+  ) async throws(ADBError) {
+    let features = try await host.features(serial)
+    let sync = ADBSync(stream: try await host.connect(serial, service: "sync:"), features: features)
+    do throws(ADBError) {
+      try await sync.send(file, to: path, mode: 0o100644, mtime: Date(), progress: progress)
+    } catch {
+      await sync.quit()
+      throw error
+    }
+    await sync.quit()
+  }
+
+  /// Reads pm's answer. Android 8's pm can exit 0 on a failure and print it on either stream, so
+  /// only a `Success` line counts, and a `Failure [CODE…]` is looked for in both.
+  static func installResult(_ result: ADBShellResult) -> APKInstallResult {
+    let lines =
+      (Self.text(result.stdout) + "\n" + Self.text(result.stderr))
+      .split(whereSeparator: \.isNewline)
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+    if lines.contains("Success") { return .installed }
+    for line in lines {
+      guard let open = line.range(of: "Failure ["), let close = line.lastIndex(of: "]"),
+        open.upperBound <= close
+      else { continue }
+      let reason = line[open.upperBound..<close]
+      let code = reason.prefix { $0 != ":" && $0 != " " }
+      if Self.isCode(code) { return .failed(String(code)) }
+    }
+    return .failed(String((lines.first ?? "pm printed nothing").prefix(200)))
+  }
+
+  /// What a device printed, as text; empty if it is not UTF-8.
+  static func text(_ data: Data) -> String {
+    String(bytes: data, encoding: .utf8) ?? ""
+  }
+
+  /// An upper-case identifier such as `INSTALL_FAILED_OLDER_SDK`.
+  private static func isCode(_ text: Substring) -> Bool {
+    (1...80).contains(text.count) && text.first?.isLetter == true
+      && text.unicodeScalars.allSatisfy {
+        ("A"..."Z").contains($0) || ("0"..."9").contains($0) || $0 == "_"
+      }
+  }
+
+  // MARK: Screenshot
+
+  /// The screen as `screencap -p` writes it (a PNG), streamed with no file on the device.
+  public func screenshot(serial: String) async throws(ADBError) -> Data {
+    let stream = try await host.connect(
+      serial, service: "exec:" + (try ADBShell.command("screencap", ["-p"])))
+    defer { stream.cancel() }
+    var image = Data()
+    while let chunk = try await stream.readSome(upTo: 64 * 1024) {
+      guard image.count + chunk.count <= captureLimit else {
+        throw .protocolViolation("screenshot exceeds \(captureLimit) bytes")
+      }
+      image.append(chunk)
+    }
+    return image
+  }
+
+  // MARK: Recording
+
+  /// Starts `screenrecord` into a new hidden file in the device's Download folder and returns
+  /// once it has printed its pid. The recording runs until `interrupt()`, its time limit, or the
+  /// connection closing.
+  public func startRecording(serial: String) async throws(ADBError) -> ADBScreenRecording {
+    let path = "\(Self.recordingFolder)/.ferry-rec-\(UUID().uuidString).mp4"
+    let command = try ADBShell.command("sh", ["-c", Self.recordScript, "sh", path])
+    let output: ShellOutput
+    if try await host.features(serial).contains("shell_v2") {
+      let stream = try await host.connect(serial, service: "shell,v2,raw:" + command)
+      // Nothing is typed in; screenrecord never reads stdin.
+      try? await stream.write(Data([4]) + ADBWire.le32(0))
+      output = ShellOutput(stream: stream, token: nil)
+    } else {
+      let token = ADBShell.newToken()
+      let stream = try await host.connect(
+        serial, service: "shell:" + ADBShell.legacyWrapper(command, token: token))
+      output = ShellOutput(stream: stream, token: token)
+    }
+    let recording = ADBScreenRecording(
+      serial: serial, devicePath: path, output: output, tools: self)
+    do throws(ADBError) {
+      try await recording.readPID(within: answerLimit)
+      return recording
+    } catch {
+      output.stream.cancel()
+      await remove(path, on: serial)
+      throw error
+    }
+  }
+
+  // MARK: Plumbing
+
+  /// `rm -f path`, run to the end even when the caller was cancelled, bounded in time.
+  func remove(_ path: String, on serial: String) async {
+    await runDetached(on: serial, "rm", ["-f", path], what: "removing \(path)")
+  }
+
+  /// Runs a short command on a task of its own, so a cancelled caller cannot stop it, and logs
+  /// what went wrong; nothing is thrown.
+  func runDetached(on serial: String, _ program: String, _ args: [String], what: String) async {
+    let host = host
+    let limit = answerLimit
+    let result = await Task {
+      do throws(ADBError) {
+        let command = try ADBShell.command(program, args)
+        return Result<ADBShellResult, ADBError>.success(
+          try await ADBTransport.within(limit) { () async throws(ADBError) in
+            try await host.run(serial: serial, command: command)
+          })
+      } catch {
+        return .failure(error)
+      }
+    }.value
+    switch result {
+    case .success(let output) where output.status == 0:
+      return
+    case .success(let output):
+      let detail = Self.text(output.stdout + output.stderr)
+      Self.log.error(
+        "\(what, privacy: .private): status \(output.status) \(detail, privacy: .private)")
+    case .failure(let error):
+      Self.log.error(
+        "\(what, privacy: .private) failed: \(String(describing: error), privacy: .public)")
+    }
+  }
+}
+
+/// A `screenrecord` running on the device, from `ADBDeviceTools.startRecording`.
+///
+/// `finished()` follows the process until it exits; `interrupt()` sends it SIGINT, which makes
+/// `screenrecord` finish the file and exit; `pull(into:)` then copies the file and `discard()`
+/// removes it from the device.
+public actor ADBScreenRecording {
+  /// How the process ended, as far as the connection could tell.
+  public enum End: Sendable, Equatable {
+    /// It exited. `status` is `nil` when the connection did not carry it; `detail` is its first
+    /// line of error output, at most 200 characters.
+    case exited(status: Int32?, detail: String)
+    /// The connection failed first (the device or the server went away).
+    case lost(ADBError)
+  }
+
+  public nonisolated let devicePath: String
+  let serial: String
+  private let output: ShellOutput
+  private let tools: ADBDeviceTools
+  private(set) var pid: String?
+  private var end: End?
+
+  init(serial: String, devicePath: String, output: ShellOutput, tools: ADBDeviceTools) {
+    self.serial = serial
+    self.devicePath = devicePath
+    self.output = output
+    self.tools = tools
+  }
+
+  /// Reads the pid the script prints first: digits only, or the recording is refused.
+  func readPID(within limit: Duration) async throws(ADBError) {
+    let output = output
+    let line = try await ADBTransport.within(limit) { () async throws(ADBError) in
+      try await output.firstLine()
+    }
+    guard let line, (1...10).contains(line.count), line.allSatisfy(\.isASCII),
+      line.allSatisfy(\.isNumber)
+    else {
+      throw .failed(
+        "screenrecord did not start: \(line.map { String($0.prefix(200)) } ?? output.detail)")
+    }
+    pid = line
+  }
+
+  /// Waits for the process to exit. Safe to call more than once; later calls return the same.
+  public func finished() async -> End {
+    if let end { return end }
+    let result: End
+    do throws(ADBError) {
+      let status = try await output.waitForExit()
+      result = .exited(status: status, detail: output.detail)
+    } catch {
+      result = .lost(error)
+    }
+    output.stream.cancel()
+    end = result
+    return result
+  }
+
+  /// Sends SIGINT to the recording, unless it has already exited (its pid may then be another
+  /// process's).
+  public func interrupt() async throws(ADBError) {
+    guard end == nil, let pid else { return }
+    let result = try await tools.host.run(
+      serial: serial, command: try ADBShell.command("kill", ["-2", pid]))
+    guard result.status == 0 || end != nil else {
+      throw .failed(
+        "kill failed: "
+          + ADBDeviceTools.text(Data((result.stdout + result.stderr).prefix(200))))
+    }
+  }
+
+  /// Closes the connection, for a process that does not stop: adbd hangs it up.
+  public func abandon() {
+    output.stream.cancel()
+  }
+
+  /// Copies the recording into `file` and returns its size.
+  public func pull(into file: FileHandle, progress: ProgressHandler) async throws(ADBError)
+    -> UInt64
+  {
+    let features = try await tools.host.features(serial)
+    let sync = ADBSync(
+      stream: try await tools.host.connect(serial, service: "sync:"), features: features)
+    do throws(ADBError) {
+      let size = try await sync.receive(devicePath, to: file, progress: progress)
+      await sync.quit()
+      return size
+    } catch {
+      await sync.quit()
+      throw error
+    }
+  }
+
+  /// Removes the recording from the device; best effort, and logged when it fails.
+  public func discard() async {
+    await tools.remove(devicePath, on: serial)
+  }
+}
+
+/// A shell command's output as it arrives, over `shell,v2` (framed, with an exit packet) or the
+/// legacy `shell:` service (raw, with the wrapper's status line at the end).
+final class ShellOutput: Sendable {
+  let stream: ADBStream
+  /// The legacy wrapper's token; `nil` over `shell,v2`.
+  let token: String?
+  private let state = OSAllocatedUnfairLock(initialState: Buffers())
+
+  private struct Buffers {
+    var stdout = Data()
+    var stderr = Data()
+  }
+
+  /// Kept from each stream; a recording prints little, and only the start is shown.
+  private static let keep = 64 * 1024
+
+  init(stream: ADBStream, token: String?) {
+    self.stream = stream
+    self.token = token
+  }
+
+  /// The first line of stdout, without its line ending; `nil` if the command ended before
+  /// printing one.
+  func firstLine() async throws(ADBError) -> String? {
+    var exited = false
+    while true {
+      let line: String? = state.withLock { buffers in
+        guard let newline = buffers.stdout.firstIndex(of: UInt8(ascii: "\n")) else { return nil }
+        var text = ADBDeviceTools.text(Data(buffers.stdout[..<newline]))
+        if text.hasSuffix("\r") { text.removeLast() }
+        buffers.stdout.removeSubrange(...newline)
+        return text
+      }
+      if let line { return line }
+      if exited { return nil }
+      exited = try await readMore() != nil
+    }
+  }
+
+  /// Reads until the command exits, and returns its status (`nil` when the legacy trailer is
+  /// missing).
+  func waitForExit() async throws(ADBError) -> Int32? {
+    while true {
+      if let status = try await readMore() { return status }
+    }
+  }
+
+  /// The first line of what the command printed besides its pid: stderr over `shell,v2`, the
+  /// merged output over the legacy service.
+  var detail: String {
+    state.withLock { buffers in
+      var text = ADBDeviceTools.text(buffers.stderr.isEmpty ? buffers.stdout : buffers.stderr)
+      if let token, let trailer = text.range(of: "\n" + token) {
+        text = String(text[..<trailer.lowerBound])
+      }
+      let first = text.split(whereSeparator: \.isNewline).first { !$0.allSatisfy(\.isWhitespace) }
+      return first.map { String($0.prefix(200)) } ?? ""
+    }
+  }
+
+  /// Reads the next piece of output. Returns the exit status once the command has exited:
+  /// from the exit packet, or from the legacy trailer when the connection closes.
+  private func readMore() async throws(ADBError) -> Int32?? {
+    if let token {
+      guard let chunk = try await stream.readSome(upTo: 64 * 1024) else {
+        let all = state.withLock { $0.stdout }
+        return .some(try? ADBShell.parseLegacy(all, token: token).status)
+      }
+      append(chunk, stderr: false)
+      return nil
+    }
+    let header = try await stream.read(exactly: 5)
+    let length = Int(ADBWire.u32(header.suffix(4)))
+    guard length <= 64 * 1024 else { throw .protocolViolation("shell packet of \(length) bytes") }
+    let body = try await stream.read(exactly: length)
+    switch header[header.startIndex] {
+    case 1: append(body, stderr: false)
+    case 2: append(body, stderr: true)
+    case 3:
+      guard let code = body.first else { throw .protocolViolation("empty exit packet") }
+      return .some(Int32(code))
+    default: break
+    }
+    return nil
+  }
+
+  private func append(_ data: Data, stderr: Bool) {
+    state.withLock { buffers in
+      if stderr {
+        if buffers.stderr.count < Self.keep { buffers.stderr.append(data.prefix(Self.keep)) }
+      } else if buffers.stdout.count < Self.keep {
+        buffers.stdout.append(data.prefix(Self.keep))
+      }
+    }
+  }
+}

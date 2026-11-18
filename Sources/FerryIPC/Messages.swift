@@ -149,12 +149,15 @@ public struct StatusReport: Codable, Sendable, Equatable {
   public let remembered: [RememberedDevice]
   /// New addresses for known devices, waiting for the user to confirm them.
   public let unconfirmed: [UnconfirmedAddress]
+  /// Screen recordings running now.
+  public let recordings: [ActiveRecording]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
     awaitingAuthorization: [String] = [], adbStatus: ADBStatus? = nil,
     awaitingUSBDebugging: [DeviceID] = [], preservedChanges: [URL] = [],
-    remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = []
+    remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
+    recordings: [ActiveRecording] = []
   ) {
     self.devices = devices
     self.provider = provider
@@ -165,6 +168,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.preservedChanges = preservedChanges
     self.remembered = remembered
     self.unconfirmed = unconfirmed
+    self.recordings = recordings
   }
 }
 
@@ -199,6 +203,17 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   case confirmWireless(UnconfirmedAddress)
   /// The user says it is not. Answered with `.done`.
   case ignoreWireless(WirelessEndpoint)
+  /// Installs the readable `.apk` sent with the request on a device served over ADB, replacing
+  /// any installed version. `name` is the file's name, shown with the transfer's progress.
+  /// Answered with `.done` once installed.
+  case installAPK(DeviceID, name: String)
+  /// Saves a screenshot where macOS saves its own. Answered with `.saved`.
+  case screenshot(DeviceID)
+  /// Records the device's screen, for up to three minutes. Answered with `.saved` once the
+  /// recording has ended (Stop, or the time limit) and is saved where macOS saves screenshots.
+  case startRecording(DeviceID)
+  /// Stops a recording. Answered with `.done`; the `.startRecording` request answers with the file.
+  case stopRecording(DeviceID)
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
   /// device reach Finder.
   case refresh(DeviceID)
@@ -249,6 +264,9 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   /// domains had not sent to the device yet, if any.
   case removed(preserved: [URL])
   case wireless(WirelessOutcome)
+  /// Where the agent saved a screenshot or a recording, on this Mac.
+  case saved(URL)
+  case toolFailed(ToolFailure)
   case done
   case failure(TransportError)
 }

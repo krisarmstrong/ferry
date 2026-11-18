@@ -36,7 +36,7 @@ extension FakeAndroid {
     }
     let allowed: [String: Set<Character>] = [
       "mv": ["f", "i", "v", "n"], "rm": ["f", "i", "R", "r"], "mkdir": ["v", "p"],
-      "df": ["H", "P", "k", "h", "a"], "getprop": [], "ip": ["4"],
+      "df": ["H", "P", "k", "h", "a"], "getprop": [], "ip": ["4"], "pm": ["r"], "kill": ["2"],
     ]
     guard let flags = allowed[program] else {
       return ShellResult(status: 127, stderr: "/system/bin/sh: \(program): not found\n")
@@ -69,7 +69,12 @@ extension FakeAndroid {
   ) -> ShellResult {
     switch program {
     case "mv": mv(operands, noClobber: options.contains("n"), in: &state)
-    case "rm": rm(operands, recursive: !options.isDisjoint(with: ["r", "R"]), in: &state)
+    case "rm":
+      rm(
+        operands, recursive: !options.isDisjoint(with: ["r", "R"]), force: options.contains("f"),
+        in: &state)
+    case "pm": pm(operands, in: &state)
+    case "kill": kill(operands, in: &state)
     case "mkdir": mkdir(operands, in: &state)
     case "getprop": ShellResult(stdout: (state.properties[operands.first ?? ""] ?? "") + "\n")
     case "ip" where options == ["4"] && operands == ["addr"]: ShellResult(stdout: state.addresses)
@@ -171,13 +176,13 @@ extension FakeAndroid {
     return nil
   }
 
-  private static func rm(_ operands: [String], recursive: Bool, in state: inout State)
-    -> ShellResult
-  {
+  private static func rm(
+    _ operands: [String], recursive: Bool, force: Bool, in state: inout State
+  ) -> ShellResult {
     var result = ShellResult()
     for operand in operands {
       guard let path = state.resolve(FakeAndroid.bytes(operand)) else {
-        result.fail("rm: \(operand): \(noEntry)")
+        if !force { result.fail("rm: \(operand): \(noEntry)") }
         continue
       }
       if case .folder = state.nodes[path], !recursive {

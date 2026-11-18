@@ -59,6 +59,7 @@ final class FakeAndroid: Sendable {
     var addresses = ""
     var peers: [ADBStream] = []
     var clock: Int64 = 1_700_000_000
+    var tools = Tools()
   }
 
   let state = OSAllocatedUnfairLock(initialState: State())

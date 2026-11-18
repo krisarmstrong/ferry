@@ -55,9 +55,18 @@ Task {
   await domains.run()
 }
 
+// APK install, screenshots and screen recordings, for devices the hub serves over ADB, by the
+// route their session uses.
+let tools = ADBTools(
+  device: adb.deviceTools,
+  target: { id in
+    ADBTools.target(for: id, devices: await hub.devices(), routes: await adb.routes(for: id))
+  })
+
 // The listener holds its delegate weakly; both live for the whole process.
 let delegate = AgentListenerDelegate(
-  handler: AgentService(hub: hub, domains: domains, wireless: wireless), identity: identity)
+  handler: AgentService(hub: hub, domains: domains, wireless: wireless, tools: tools),
+  identity: identity)
 let listener = NSXPCListener(machServiceName: identity.machServiceName)
 listener.delegate = delegate
 listener.resume()

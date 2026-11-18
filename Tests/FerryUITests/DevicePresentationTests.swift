@@ -1,4 +1,5 @@
 import DeviceKit
+import FerryIPC
 import Foundation
 import Testing
 
@@ -100,5 +101,66 @@ struct DevicePresentationTests {
       DevicePresentation.waitingLine(for: "192.0.2.31:5555")
         == "Waiting for you to allow this Mac on 192.0.2.31:5555")
     #expect(!DevicePresentation.waitingLine(for: "a\u{202E}b:5555").contains("\u{202E}"))
+  }
+}
+
+struct ToolPresentationTests {
+  private static func attached(_ state: DeviceState, _ method: ConnectionMethod) -> AttachedDevice {
+    AttachedDevice(
+      info: DeviceInfo(id: DeviceID(serial: "A"), manufacturer: "NetAlly", model: "LinkRunner"),
+      state: state, method: method)
+  }
+
+  @Test(arguments: [
+    (ConnectionMethod.usbADB, true), (.wifiADB, true), (.usbFileTransfer, false),
+  ])
+  func toolsAreOfferedOverADBOnly(method: ConnectionMethod, offered: Bool) {
+    #expect(DevicePresentation.offersTools(Self.attached(.ready([]), method)) == offered)
+    #expect(!DevicePresentation.offersTools(Self.attached(.ejected, method)))
+    #expect(!DevicePresentation.offersTools(Self.attached(.notSharingFiles, method)))
+  }
+
+  @Test(arguments: [
+    ("/tmp/a.apk", true), ("/tmp/A.APK", true), ("/tmp/a.apk.zip", false), ("/tmp/apk", false),
+  ])
+  func onlyAnAPKIsOffered(path: String, offered: Bool) {
+    #expect(DevicePresentation.isAPK(URL(filePath: path)) == offered)
+  }
+
+  @Test(arguments: [
+    ("INSTALL_FAILED_OLDER_SDK", "The app needs a newer version of Android."),
+    ("INSTALL_FAILED_INSUFFICIENT_STORAGE", "The device doesn't have enough space for the app."),
+    (
+      "INSTALL_PARSE_FAILED_NO_CERTIFICATES",
+      "The app couldn't be read by the device. It may be damaged or unsigned."
+    ),
+    // Unknown: the code itself.
+    ("INSTALL_FAILED_SOMETHING_NEW", "Couldn't install the app: INSTALL_FAILED_SOMETHING_NEW"),
+    // pm's own words, escaped.
+    ("Error: \u{202E}evil", "Couldn't install the app: Error: \\u{202E}evil"),
+  ])
+  func pmsRefusalsReadPlainly(reason: String, message: String) {
+    #expect(DevicePresentation.message(for: .installFailed(reason)) == message)
+  }
+
+  @Test func everyToolFailureHasAMessage() {
+    for failure: ToolFailure in [
+      .notOverADB, .notAnAPK, .apkTooLarge, .installFailed("X"), .alreadyRecording, .notRecording,
+      .noImage, .recordingFailed(""), .recordingFailed("no encoder"), .cannotSave,
+    ] {
+      #expect(!DevicePresentation.message(for: failure).isEmpty)
+    }
+    #expect(
+      DevicePresentation.message(for: .recordingFailed("bad\u{1B}[2J"))
+        == "The device didn't record its screen: bad\\u{1B}[2J")
+  }
+
+  @Test func installProgressReadsAsCopyingThenInstalling() {
+    #expect(
+      DevicePresentation.installingLine(AppInstall(name: "a.apk", percent: 42))
+        == "Copying “a.apk” to the device · 42%")
+    #expect(
+      DevicePresentation.installingLine(AppInstall(name: "a.apk", percent: 100))
+        == "Installing “a.apk”…")
   }
 }

@@ -65,4 +65,5 @@ private final class PreviewServices: SystemServicing {
   func reveal(_ urls: [URL]) {}
   func quit() {}
   func copy(_ text: String) {}
+  func chooseAPK() async -> URL? { nil }
 }
