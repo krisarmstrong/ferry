@@ -20,6 +20,8 @@ actor MTPSession: DeviceSession {
   nonisolated let info: DeviceInfo
   nonisolated let partials: PartialRegistry
   let device: any MTPDeviceOperations
+  /// Where a move on a device without MoveObject keeps its local copy (see `copyThenDelete`).
+  let scratch: URL
   private let resolver: PathResolver
   private let gate = OperationGate()
   /// Raw storage ID by `StorageID.key`, refreshed by `refreshStorages()`.
@@ -29,12 +31,13 @@ actor MTPSession: DeviceSession {
   private var onRelease: (@Sendable () async -> Void)?
 
   init(
-    device: any MTPDeviceOperations, partials: PartialRegistry = PartialRegistry(),
+    device: any MTPDeviceOperations, scratch: URL, partials: PartialRegistry = PartialRegistry(),
     onRelease: @escaping @Sendable () async -> Void = {}
   ) {
     self.info = device.info
     self.partials = partials
     self.device = device
+    self.scratch = scratch
     self.onRelease = onRelease
     self.resolver = PathResolver { storage, parent throws(TransportError) in
       try await device.list(storage: storage, parent: parent)
@@ -114,13 +117,15 @@ actor MTPSession: DeviceSession {
   }
 
   /// The object at `path`, which must not be the root, resolved from the cached listing of its
-  /// folder when there is one, so an operation on one item never lists a large folder again
-  /// just to find it. The object is read again by its ID and used, with the size and date that
-  /// read gives, while it keeps its name, kind and folder; anything else lists the parent again.
+  /// folder when there is one, for a download: it changes nothing on the device, so a stale
+  /// answer costs a retry, not data. The object is read again by its ID and used while it keeps
+  /// its name, kind and folder; anything else lists the parent again.
   ///
   /// libmtp answers that read from the object info it loaded first, without asking the device,
-  /// so it cannot see an object the device has since dropped or replaced. An operation that then
-  /// fails on the object lists the folder again to tell what happened (see `relisted`).
+  /// so it cannot see an object the device has since dropped or replaced. Only a listing, which
+  /// reads the folder's object IDs from the device, can: so everything that changes the device,
+  /// or decides whether to, resolves with `freshEntry`, and a download that fails lists again
+  /// (see `relisted`).
   func entry(_ path: RemotePath, storage: UInt32) async throws(TransportError) -> MTPEntry {
     if let current = try await cachedAndConfirmed(path, storage: storage) { return current }
     return try await freshEntry(path, storage: storage)
@@ -295,7 +300,8 @@ extension MTPSession {
       guard path != .root else {
         return RemoteItem(path: .root, kind: .folder, size: 0, modified: .distantPast)
       }
-      return Self.item(try await entry(path, storage: raw(storage)), at: path)
+      // Fresh: a save's or a delete's base check reads it to decide whether to change the file.
+      return Self.item(try await freshEntry(path, storage: raw(storage)), at: path)
     }
   }
 }
@@ -356,19 +362,18 @@ extension MTPSession {
     }
   }
 
-  /// Once the object is gone, only it leaves the cached listing of its folder, so deleting many
-  /// items from one folder lists it once. A failure lists the folder again: an object the device
-  /// dropped is `.notFound`, and one it replaced since is not the item to delete, so it stays and
-  /// is `.notFound` too.
+  /// Deletes the object the folder, listed fresh, has at `path`. Once it is gone only it leaves
+  /// that listing, which stays cached for downloads; a failure drops the listing.
   func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError) {
     try await operation { () throws(TransportError) in
+      guard let parent = path.parent else { throw .notFound(path) }
       let raw = try await raw(storage)
-      let entry = try await entry(path, storage: raw)
+      let entry = try await freshEntry(path, storage: raw)
       do throws(TransportError) {
         try await deleteTree(entry, at: path, depth: 0, storage: raw)
       } catch {
-        _ = try await relisted(path, after: error, on: entry, storage: raw)
-        throw .notFound(path)
+        await resolver.invalidate(parent, storage: raw)
+        throw error
       }
       await resolver.removed(entry.objectID, at: path, storage: raw)
     }

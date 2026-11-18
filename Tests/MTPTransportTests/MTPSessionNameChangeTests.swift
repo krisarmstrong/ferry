@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -9,7 +10,7 @@ struct MTPSessionNameChangeTests {
   @Test func uploadStoredUnderAnotherNameIsRemovedAndReported() async throws {
     let device = SessionFixture.makeDevice()
     await device.storeName("Report.txt", as: "REPORT.TXT")
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let file = try SessionFixture.localFile(Data("x".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
 
@@ -28,7 +29,7 @@ struct MTPSessionNameChangeTests {
     let device = SessionFixture.makeDevice()
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("x".utf8))
     await device.storeName("b.txt", as: "b (1).txt")
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     await #expect(
       throws: TransportError.nameChangedByDevice(requested: "b.txt", actual: "b (1).txt")
@@ -45,7 +46,7 @@ struct MTPSessionNameChangeTests {
   @Test func makeFolderStoredUnderAnotherNameIsReported() async throws {
     let device = SessionFixture.makeDevice()
     await device.storeName("Caf\u{00E9}", as: "Caf_")
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     await #expect(
       throws: TransportError.nameChangedByDevice(requested: "Caf\u{00E9}", actual: "Caf_")

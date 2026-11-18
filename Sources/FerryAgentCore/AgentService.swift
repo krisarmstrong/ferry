@@ -339,26 +339,31 @@ extension AgentService {
     defer { FileTransfer.remove(scratch) }
     return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
+      // The file the save was checked against, which the write then requires to be there still.
+      var checked: RemoteItem?
       if let base {
+        let current = try await route.session.item(at: path, in: route.storage)
         // As FileProvider holds it: at the size a download delivered (see `delete`).
+        let entry = await route.items.observed(current)
+        if entry.item.kind == .file, ContentVersion(entry.item) != base {
+          return try await ConflictCopy.keepDevice(entry, onConflict, mac: scratch, on: route)
+        }
+        checked = current
+      }
+      let item: RemoteItem
+      do throws(TransportError) {
+        item = try await transfers.track(
+          Self.transfer(path, .toDevice, on: route), report: progress
+        ) { handler throws(TransportError) in
+          try await route.writer.write(
+            from: scratch, to: path, in: route.storage, replacing: true, expecting: checked,
+            progress: handler)
+        }
+      } catch .changedOnDevice {
+        // The device replaced the file between the check and the write.
         let entry = await route.items.observed(
           try await route.session.item(at: path, in: route.storage))
-        if entry.item.kind == .file, ContentVersion(entry.item) != base {
-          switch onConflict {
-          case .fail:
-            throw .changedOnDevice(path)
-          case .keepBoth:
-            _ = await route.items.created(
-              try await ConflictCopy.upload(scratch, beside: path, route))
-            return .keptOnDevice(entry)
-          }
-        }
-      }
-      let item = try await transfers.track(
-        Self.transfer(path, .toDevice, on: route), report: progress
-      ) { handler throws(TransportError) in
-        try await route.writer.write(
-          from: scratch, to: path, in: route.storage, replacing: true, progress: handler)
+        return try await ConflictCopy.keepDevice(entry, onConflict, mac: scratch, on: route)
       }
       return .entry(await route.items.changed(item, id: id))
     }

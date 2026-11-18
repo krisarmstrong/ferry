@@ -14,7 +14,7 @@ struct MTPSessionFreshResolutionTests {
   @Test func downloadAfterTheFileGrewOnTheDeviceGetsTheWholeFile() async throws {
     let device = SessionFixture.makeDevice()
     let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     _ = try await session.list(.root, in: storage)
     let grown = Data("hello, world, grown on the phone".utf8)
     await device.replaceData(of: id, with: grown)
@@ -28,22 +28,10 @@ struct MTPSessionFreshResolutionTests {
     #expect(try Data(contentsOf: target) == grown)
   }
 
-  @Test func itemAfterTheFileGrewOnTheDeviceReportsTheNewSize() async throws {
-    let device = SessionFixture.makeDevice()
-    let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
-    let session = MTPSession(device: device)
-    _ = try await session.list(.root, in: storage)
-    await device.replaceData(of: id, with: Data("grown!".utf8))
-
-    let item = try await session.item(at: SessionFixture.path("/a.txt"), in: storage)
-
-    #expect(item.size == 6)
-  }
-
   @Test func deleteAfterTheDeviceRecreatedTheFileDeletesTheNewObject() async throws {
     let device = SessionFixture.makeDevice()
     let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     _ = try await session.list(.root, in: storage)
     await device.removeObject(id)
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("new".utf8))
@@ -57,7 +45,7 @@ struct MTPSessionFreshResolutionTests {
     let device = SessionFixture.makeDevice()
     let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     let folder = await device.addFolder("Docs", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     _ = try await session.list(.root, in: storage)
     await device.removeObject(id)
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("new".utf8))
@@ -75,7 +63,7 @@ struct MTPSessionFreshResolutionTests {
     let device = SessionFixture.makeDevice()
     let id = await device.addFile("global.o", parent: SessionFixture.root, data: Data(count: 40))
     await device.reportSize(32, for: id)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: target) }
 
@@ -92,7 +80,7 @@ struct MTPSessionFreshResolutionTests {
     let device = SessionFixture.makeDevice()
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     await device.cutShortNextDownloads(1)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: target) }
 
@@ -109,7 +97,7 @@ struct MTPSessionFreshResolutionTests {
     let device = SessionFixture.makeDevice()
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     await device.limitDownloads(to: 2)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
 
     await #expect(throws: TransportError.downloadSizeMismatch(listed: 5, received: 2)) {

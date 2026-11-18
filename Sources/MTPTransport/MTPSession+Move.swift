@@ -10,7 +10,7 @@ extension MTPSession {
     try await operation { () throws(TransportError) in
       let (parent, name) = try Self.split(path)
       let raw = try await raw(storage)
-      let source = try await entry(path, storage: raw)
+      let source = try await freshEntry(path, storage: raw)
       let canMove = await device.capabilities().contains(.move)
       if !canMove, source.isFolder { throw .unsupported("move") }
       let destination = try await folder(toFolder, storage: raw)
@@ -46,8 +46,7 @@ extension MTPSession {
   private func copyThenDelete(
     _ source: MTPEntry, from parent: RemotePath, to placement: Placement, storage: UInt32
   ) async throws(TransportError) -> RemoteItem {
-    let local = FileManager.default.temporaryDirectory
-      .appendingPathComponent(LocalFile.moveScratchPrefix + UUID().uuidString)
+    let local = scratch.appendingPathComponent(LocalFile.moveScratchPrefix + UUID().uuidString)
     try LocalFile.requireSpace(source.size, at: local.deletingLastPathComponent())
     defer { try? FileManager.default.removeItem(at: local) }
     try await device.download(objectID: source.objectID, to: local) { _, _ in true }
@@ -87,7 +86,7 @@ extension MTPSession {
   private func discard(_ name: String, in folder: RemotePath, storage: UInt32) async {
     do {
       let path = try folder.appending(name)
-      let entry = try await entry(path, storage: storage)
+      let entry = try await freshEntry(path, storage: storage)
       try await mutating([folder], storage: storage) { () throws(TransportError) in
         try await device.delete(objectID: entry.objectID)
       }

@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -10,7 +11,7 @@ struct MTPSessionWriteTests {
   @Test func uploadToExistingNameThrowsWithoutUploading() async throws {
     let device = SessionFixture.makeDevice()
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let file = try SessionFixture.localFile(Data("new".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
 
@@ -25,7 +26,7 @@ struct MTPSessionWriteTests {
   @Test func uploadReturnsDeviceReportedSize() async throws {
     let device = SessionFixture.makeDevice()
     await device.limitUploads(to: 2)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let file = try SessionFixture.localFile(Data("hello".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
 
@@ -41,7 +42,7 @@ struct MTPSessionWriteTests {
     let device = SessionFixture.makeDevice()
     await device.addFolder("A", parent: SessionFixture.root)
     await device.addFile("b.txt", parent: SessionFixture.root, data: Data())
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     await #expect(throws: TransportError.alreadyExists(try SessionFixture.path("/A"))) {
       _ = try await session.makeFolder(SessionFixture.path("/A"), in: SessionFixture.storage)
@@ -55,7 +56,7 @@ struct MTPSessionWriteTests {
 
   @Test func namesSentToDeviceAreNFC() async throws {
     let device = SessionFixture.makeDevice()
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let nfd = "Cafe\u{0301}"
     let nfc = "Caf\u{00E9}"
     let file = try SessionFixture.localFile(Data("x".utf8))
@@ -75,7 +76,7 @@ struct MTPSessionWriteTests {
 
   @Test func listSeesEveryMutation() async throws {
     let device = SessionFixture.makeDevice()
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let file = try SessionFixture.localFile(Data("x".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
     func names(_ folder: String = "/") async throws -> [String] {
@@ -108,7 +109,7 @@ struct MTPSessionWriteTests {
     let device = SessionFixture.makeDevice()
     let folder = await device.addFolder("A", parent: SessionFixture.root)
     await device.addFile("f.txt", parent: folder, data: Data("x".utf8))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     _ = try await session.item(at: SessionFixture.path("/A/f.txt"), in: SessionFixture.storage)
     _ = try await session.rename(SessionFixture.path("/A"), to: "B", in: SessionFixture.storage)
@@ -125,7 +126,7 @@ struct MTPSessionWriteTests {
   @Test func failedUploadLeavesTargetDeletable() async throws {
     let device = SessionFixture.makeDevice()
     await device.failNextUpload(with: .deviceBusy)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let file = try SessionFixture.localFile(Data("x".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
     let path = try SessionFixture.path("/a.txt")
@@ -148,7 +149,7 @@ struct MTPSessionWriteTests {
     let fileC = await device.addFile("c.txt", parent: folderB, data: Data())
     let fileD = await device.addFile("d.txt", parent: folderA, data: Data())
     await device.addFile("keep.txt", parent: SessionFixture.root, data: Data())
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     try await session.delete(SessionFixture.path("/A"), in: SessionFixture.storage)
     #expect(
@@ -162,7 +163,7 @@ struct MTPSessionWriteTests {
     let device = SessionFixture.makeDevice(capabilities: [.move])
     let file = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("x".utf8))
     let dest = await device.addFolder("B", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     let item = try await session.move(
       SessionFixture.path("/a.txt"), toFolder: SessionFixture.path("/B"), in: SessionFixture.storage
@@ -176,7 +177,7 @@ struct MTPSessionWriteTests {
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data())
     let dest = await device.addFolder("B", parent: SessionFixture.root)
     await device.addFile("a.txt", parent: dest, data: Data())
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     await #expect(throws: TransportError.alreadyExists(try SessionFixture.path("/B/a.txt"))) {
       _ = try await session.move(
@@ -191,7 +192,7 @@ struct MTPSessionWriteTests {
     let source = await device.addFile(
       "a.txt", parent: SessionFixture.root, data: Data("payload".utf8))
     let dest = await device.addFolder("B", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     let item = try await session.move(
       SessionFixture.path("/a.txt"), toFolder: SessionFixture.path("/B"), in: SessionFixture.storage
@@ -220,7 +221,7 @@ struct MTPSessionWriteTests {
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("payload".utf8))
     let dest = await device.addFolder("B", parent: SessionFixture.root)
     await device.limitUploads(to: 3)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     await #expect(throws: TransportError.sizeMismatch(expected: 7, actual: 3)) {
       _ = try await session.move(
@@ -236,7 +237,7 @@ struct MTPSessionWriteTests {
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("payload".utf8))
     let dest = await device.addFolder("B", parent: SessionFixture.root)
     await device.failNextUpload(with: .deviceBusy)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     await #expect(throws: TransportError.deviceBusy) {
       _ = try await session.move(
@@ -251,7 +252,7 @@ struct MTPSessionWriteTests {
     let device = SessionFixture.makeDevice(capabilities: [])
     await device.addFolder("A", parent: SessionFixture.root)
     await device.addFolder("B", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     await #expect(throws: TransportError.unsupported("move")) {
       _ = try await session.move(

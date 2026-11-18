@@ -1,4 +1,5 @@
 import DeviceKit
+import Foundation
 
 /// `DeviceTransport` over libmtp for Android phones and other MTP devices.
 ///
@@ -37,7 +38,10 @@ public struct MTPTransport: DeviceTransport {
 
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {
     let (device, location) = try await Self.registry.open(id)
-    return MTPSession(device: device) { await Self.registry.release(location) }
+    // The agent sweeps a move's leftover copies from the temporary directory at start.
+    return MTPSession(device: device, scratch: FileManager.default.temporaryDirectory) {
+      await Self.registry.release(location)
+    }
   }
 
   public func park(_ id: DeviceID) async {

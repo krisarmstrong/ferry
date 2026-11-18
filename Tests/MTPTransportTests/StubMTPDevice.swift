@@ -3,7 +3,11 @@ import Foundation
 
 @testable import MTPTransport
 
-/// An in-memory MTP device that, like the real thing, knows only object IDs. It refuses to
+/// An in-memory MTP device that, like the real thing, knows only object IDs. Like libmtp, it
+/// keeps the object info it first loads for an ID (from a listing or a metadata read) and
+/// answers from it until the session itself renames, moves or deletes the object: a change an
+/// app makes on the device to an object it keeps (`replaceData`, `moveObject`)
+/// is not seen, though a listing does see objects added and removed. It refuses to
 /// delete a non-empty folder and records every mutating call, so tests can see what a session
 /// sent and in which order. Uploads suspend partway, so a session that lets two operations
 /// interleave shows up as an overlapping device call.
@@ -57,9 +61,7 @@ actor StubMTPDevice: MTPDeviceOperations {
   private(set) var downloadCount = 0
   /// Folder listings the session asked for.
   private(set) var listCount = 0
-  /// Set by `cacheObjectInfo()`: like libmtp, `metadata` answers from the object info first
-  /// loaded for an ID, even after the device dropped or changed the object.
-  private var objectInfoCached = false
+  /// The object info loaded for each ID, as libmtp's object cache holds it.
   private var loadedInfo: [UInt32: MTPEntry] = [:]
   /// The next download writes half the object, then throws this.
   private var downloadFailure: TransportError?
@@ -98,19 +100,9 @@ actor StubMTPDevice: MTPDeviceOperations {
     objects[id] = nil
   }
 
-  /// Makes `metadata` answer as libmtp does: from the object info it loaded first.
-  func cacheObjectInfo() {
-    objectInfoCached = true
-  }
-
   /// Moves an object as an app on the device would, keeping its ID.
   func moveObject(_ id: UInt32, to parent: UInt32) {
     objects[id]?.parent = parent
-  }
-
-  /// Renames an object as an app on the device would, keeping its ID.
-  func renameObject(_ id: UInt32, to name: String) {
-    objects[id]?.name = name
   }
 
   func limitUploads(to bytes: Int) {
@@ -174,6 +166,11 @@ actor StubMTPDevice: MTPDeviceOperations {
     }
   }
 
+  /// The ID of the object called `name`, wherever it is.
+  func objectID(named name: String) -> UInt32? {
+    objects.first { $0.value.name == name }?.key
+  }
+
   func children(of parent: UInt32) -> [String] {
     objects.filter { $0.value.parent == parent }.map(\.value.name).sorted()
   }
@@ -197,10 +194,7 @@ actor StubMTPDevice: MTPDeviceOperations {
     try requireOpen()
     let listed = objects.filter { $0.value.parent == parent }.map { entry($0.key, $0.value) }
       .sorted { $0.objectID < $1.objectID }
-    for entry in listed where loadedInfo[entry.objectID] == nil {
-      loadedInfo[entry.objectID] = entry
-    }
-    return objectInfoCached ? listed.map { loadedInfo[$0.objectID] ?? $0 } : listed
+    return listed.map(loaded)
   }
 
   func download(objectID: UInt32, to file: URL, progress: ProgressHandler)
@@ -264,12 +258,14 @@ actor StubMTPDevice: MTPDeviceOperations {
     _ = try object(objectID)
     calls.append(.rename(objectID, name: name))
     objects[objectID]?.name = storedNames[name] ?? name
+    reload(objectID)
   }
 
   func move(objectID: UInt32, storage: UInt32, newParent: UInt32) throws(TransportError) {
     _ = try object(objectID)
     calls.append(.move(objectID, parent: newParent))
     objects[objectID]?.parent = newParent
+    reload(objectID)
   }
 
   func delete(objectID: UInt32) throws(TransportError) {
@@ -279,14 +275,15 @@ actor StubMTPDevice: MTPDeviceOperations {
     }
     calls.append(.delete(objectID))
     objects[objectID] = nil
+    loadedInfo[objectID] = nil
   }
 
   func metadata(objectID: UInt32) throws(TransportError) -> MTPEntry {
-    if objectInfoCached, let loaded = loadedInfo[objectID] {
+    if let info = loadedInfo[objectID] {
       record()
-      return loaded
+      return info
     }
-    return entry(objectID, try object(objectID))
+    return loaded(entry(objectID, try object(objectID)))
   }
 
   func close() {
@@ -295,6 +292,18 @@ actor StubMTPDevice: MTPDeviceOperations {
   }
 
   // MARK: Helpers
+
+  /// `entry` as libmtp's cache has it: the info first loaded for its ID.
+  private func loaded(_ entry: MTPEntry) -> MTPEntry {
+    if let info = loadedInfo[entry.objectID] { return info }
+    loadedInfo[entry.objectID] = entry
+    return entry
+  }
+
+  /// libmtp refreshes its cache for an object the session itself changed.
+  private func reload(_ id: UInt32) {
+    if let object = objects[id] { loadedInfo[id] = entry(id, object) }
+  }
 
   private func insert(_ object: Object) -> UInt32 {
     nextID += 1

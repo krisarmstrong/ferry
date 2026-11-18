@@ -9,20 +9,20 @@ struct MTPSessionTests {
   // MARK: Storages
 
   @Test func storagesReturnsDeviceStorages() async throws {
-    let session = MTPSession(device: SessionFixture.makeDevice())
+    let session = MTPSession(device: SessionFixture.makeDevice(), scratch: TestScratch.root)
     #expect(try await session.storages().map(\.id) == [SessionFixture.storage])
   }
 
   @Test func storageIsFoundByKeyWithoutCallingStoragesFirst() async throws {
     let device = SessionFixture.makeDevice()
     await device.addFolder("DCIM", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let items = try await session.list(.root, in: SessionFixture.storage)
     #expect(items.map(\.path) == [try SessionFixture.path("/DCIM")])
   }
 
   @Test func storageIsNotFoundByRawID() async throws {
-    let session = MTPSession(device: SessionFixture.makeDevice())
+    let session = MTPSession(device: SessionFixture.makeDevice(), scratch: TestScratch.root)
     let byRawID = StorageID(device: SessionFixture.deviceID, key: String(SessionFixture.rawStorage))
     await #expect(throws: TransportError.storageNotFound(byRawID.key)) {
       _ = try await session.list(.root, in: byRawID)
@@ -30,7 +30,7 @@ struct MTPSessionTests {
   }
 
   @Test func storageOfAnotherDeviceIsNotFound() async throws {
-    let session = MTPSession(device: SessionFixture.makeDevice())
+    let session = MTPSession(device: SessionFixture.makeDevice(), scratch: TestScratch.root)
     let other = StorageID(device: DeviceID(serial: "OTHER"), key: SessionFixture.storage.key)
     await #expect(throws: TransportError.storageNotFound(other.key)) {
       _ = try await session.list(.root, in: other)
@@ -45,7 +45,7 @@ struct MTPSessionTests {
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("abc".utf8))
     await device.addFile("", parent: SessionFixture.root, data: Data())
     await device.addFile("..", parent: SessionFixture.root, data: Data())
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     let items = try await session.list(.root, in: SessionFixture.storage)
     let folder = RemoteItem(
@@ -59,7 +59,7 @@ struct MTPSessionTests {
   /// MTP has no change events, so a listing is the moment to re-read the device.
   @Test func listSeesChangesMadeOnThePhone() async throws {
     let device = SessionFixture.makeDevice()
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     #expect(try await session.list(.root, in: SessionFixture.storage).isEmpty)
 
     await device.addFile("new.jpg", parent: SessionFixture.root, data: Data())
@@ -71,7 +71,7 @@ struct MTPSessionTests {
     let device = SessionFixture.makeDevice()
     let dcim = await device.addFolder("DCIM", parent: SessionFixture.root)
     await device.addFile("a.jpg", parent: dcim, data: Data(count: 1234))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     let file = try await session.item(
       at: SessionFixture.path("/DCIM/a.jpg"), in: SessionFixture.storage)
@@ -91,7 +91,7 @@ struct MTPSessionTests {
   @Test func downloadWritesContents() async throws {
     let device = SessionFixture.makeDevice()
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let target = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: target) }
 
@@ -105,7 +105,7 @@ struct MTPSessionTests {
     let device = SessionFixture.makeDevice()
     await device.addFolder("DCIM", parent: SessionFixture.root)
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data())
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let missing = try SessionFixture.path("/DCIM/missing.jpg")
     let file = try SessionFixture.localFile(Data("x".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
@@ -152,7 +152,7 @@ struct MTPSessionTests {
 
   @Test func closeClosesDevice() async throws {
     let device = SessionFixture.makeDevice()
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     await session.close()
     #expect(await device.closed)
     await #expect(throws: TransportError.deviceDisconnected) {

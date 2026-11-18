@@ -1,4 +1,5 @@
 import DeviceKit
+import FerryIPC
 import Foundation
 
 /// The copy the agent keeps of the Mac's contents when they were made from a version of the file
@@ -32,4 +33,20 @@ enum ConflictCopy {
   }
 
   private static let maxAttempts = 99
+
+  /// The device's file `entry` is newer than the save: it stays. With `.keepBoth` the Mac's
+  /// contents in `mac` go up beside it as a conflict copy; with `.fail` nothing is written.
+  static func keepDevice(
+    _ entry: ProviderEntry, _ onConflict: ConflictPolicy, mac: URL,
+    on route: DomainController.Route
+  ) async throws(TransportError) -> AgentResponse {
+    switch onConflict {
+    case .fail:
+      throw .changedOnDevice(entry.item.path)
+    case .keepBoth:
+      _ = await route.items.created(
+        try await ConflictCopy.upload(mac, beside: entry.item.path, route))
+      return .keptOnDevice(entry)
+    }
+  }
 }

@@ -61,9 +61,12 @@ public struct SafeWriter: Sendable {
 
   /// Upload `file` to `path`. If `replacing`, an existing file at `path`, or one whose name
   /// differs only in case, is replaced; otherwise `.alreadyExists`. A folder is never replaced.
+  /// `expecting` is the file the caller checked before deciding to replace it: if the device
+  /// now has another at `path` (another kind, size or date, or none), it is `.changedOnDevice`
+  /// and nothing is written.
   public func write(
     from file: URL, to path: RemotePath, in storage: StorageID, replacing: Bool,
-    progress: ProgressHandler
+    expecting: RemoteItem? = nil, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
     guard let parent = path.parent, let name = path.name else {
       throw .invalidName(path.description)
@@ -80,6 +83,9 @@ public struct SafeWriter: Sendable {
     // Read once, before the upload. `commit` sets aside whatever sits at that path when the
     // upload ends: an item swapped in during the upload is not detected.
     let existing = try await existing(path, in: storage)
+    if let expecting, existing != expecting {
+      throw .changedOnDevice(path)
+    }
     if let existing, existing.kind == .folder || !replacing {
       throw .alreadyExists(existing.path)
     }

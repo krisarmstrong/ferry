@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -18,7 +19,7 @@ struct MTPSessionGateTests {
 
   @Test func concurrentOperationsAreSerialized() async throws {
     let device = SessionFixture.makeDevice()
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let file = try SessionFixture.localFile(Data("x".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
 
@@ -70,7 +71,7 @@ struct MTPSessionGateTests {
   @Test func existenceCheckSeesPhoneSideAddition() async throws {
     let device = SessionFixture.makeDevice()
     let folder = await device.addFolder("DCIM", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let file = try SessionFixture.localFile(Data("x".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
 
@@ -111,7 +112,7 @@ struct MTPSessionGateTests {
     let device = SessionFixture.makeDevice(capabilities: [])
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     await device.addFolder("dst", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let writer = SafeWriter(session: session)
     let folder = try SessionFixture.path("/dst")
 
@@ -149,7 +150,7 @@ struct MTPSessionGateTests {
     await device.addFile("leaf", parent: sub, data: Data("1".utf8))
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("2".utf8))
     await device.addFolder("dst", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     try await session.delete(SessionFixture.path("/tree"), in: SessionFixture.storage)
     _ = try await session.move(
@@ -161,7 +162,7 @@ struct MTPSessionGateTests {
 
   @Test func disconnectReleasesHandleAndFailsFast() async throws {
     let device = SessionFixture.makeDevice()
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let file = try SessionFixture.localFile(Data("x".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
 
@@ -186,7 +187,9 @@ struct MTPSessionGateTests {
 
   @Test func closeReleasesTheDeviceOnce() async {
     let releases = Log<Int>()
-    let session = MTPSession(device: SessionFixture.makeDevice()) { await releases.append(1) }
+    let session = MTPSession(device: SessionFixture.makeDevice(), scratch: TestScratch.root) {
+      await releases.append(1)
+    }
 
     await session.close()
     await session.close()
@@ -197,7 +200,7 @@ struct MTPSessionGateTests {
   @Test func disconnectReleasesTheDeviceOnce() async {
     let device = SessionFixture.makeDevice()
     let releases = Log<Int>()
-    let session = MTPSession(device: device) { await releases.append(1) }
+    let session = MTPSession(device: device, scratch: TestScratch.root) { await releases.append(1) }
 
     await device.unplug()
     _ = try? await session.storages()

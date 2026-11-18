@@ -5,39 +5,63 @@ import Testing
 
 @testable import MTPTransport
 
-/// An operation on one item resolves it from the cached listing of its folder and confirms it
-/// with one call for that object, so deleting many files from a large folder lists the folder
-/// once, not once per file. The device is listed again only when the cache cannot answer.
+/// libmtp keeps the object info it first loads for an ID, so only a listing (which reads the
+/// folder's object IDs from the device) can tell that the device dropped, replaced or moved an
+/// object. Every operation that changes the device, and every read that feeds a decision about
+/// a change (`item(at:)`), lists the item's folder fresh and acts on the object found there. A
+/// download, which changes nothing on the device, resolves from the cached listing and lists
+/// again only if that fails. (The stub keeps object info as libmtp does.)
 struct MTPSessionCacheTests {
   private let storage = SessionFixture.storage
 
-  @Test func deletingManyFilesFromALargeFolderListsItOnce() async throws {
+  /// `/Big` holding `count` one-byte files, listed once, and the listings that took.
+  private func bigFolder(_ count: Int) async throws -> (StubMTPDevice, MTPSession) {
     let device = SessionFixture.makeDevice()
     let folder = await device.addFolder("Big", parent: SessionFixture.root)
-    for index in 0..<1_000 {
+    for index in 0..<count {
       await device.addFile("f\(index).txt", parent: folder, data: Data("x".utf8))
     }
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     _ = try await session.list(SessionFixture.path("/Big"), in: storage)
+    return (device, session)
+  }
+
+  @Test func downloadingManyFilesFromALargeFolderListsItNoMoreTimes() async throws {
+    let (device, session) = try await bigFolder(1_000)
     let listed = await device.listCount
+    let folder = try TestScratch.folder("downloads")
+    defer { try? FileManager.default.removeItem(at: folder) }
 
     for index in 0..<100 {
-      let file = try SessionFixture.path("/Big/f\(index).txt")
-      // As the agent deletes: reads the item, then deletes it.
-      _ = try await session.item(at: file, in: storage)
-      try await session.delete(file, in: storage)
+      try await session.download(
+        SessionFixture.path("/Big/f\(index).txt"), in: storage,
+        to: folder.appending(path: "f\(index)"), replacing: false,
+        progress: SessionFixture.noProgress)
     }
 
     let relisted = await device.listCount - listed
     #expect(relisted == 0, "listed the folder \(relisted) more times")
-    #expect(await device.children(of: folder).count == 900)
   }
 
-  @Test func anObjectMovedToAnotherFolderIsNotActedOnFromTheCache() async throws {
+  /// Correctness over speed: each delete lists the folder once, to act on what is there now.
+  @Test func eachDeleteListsTheFolderOnce() async throws {
+    let (device, session) = try await bigFolder(100)
+    let listed = await device.listCount
+
+    for index in 0..<10 {
+      try await session.delete(SessionFixture.path("/Big/f\(index).txt"), in: storage)
+    }
+
+    #expect(await device.listCount - listed == 10)
+    #expect(
+      await device.children(of: try #require(await device.objectID(named: "Big"))).count == 90)
+  }
+
+  @Test func aFileTheDeviceMovedElsewhereIsNotDeletedThere() async throws {
     let device = SessionFixture.makeDevice()
     let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("a".utf8))
     let other = await device.addFolder("Other", parent: SessionFixture.root)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     _ = try await session.list(.root, in: storage)
     await device.moveObject(id, to: other)
 
@@ -47,30 +71,30 @@ struct MTPSessionCacheTests {
     #expect(await device.children(of: other) == ["a.txt"])
   }
 
-  @Test func anObjectRenamedOnTheDeviceIsNotActedOnFromTheCache() async throws {
+  /// Android's MTP server gives a file an app renamed a new object ID: to libmtp it is one
+  /// object gone and another added.
+  @Test func aFileTheDeviceRenamedIsNotDeletedUnderItsNewName() async throws {
     let device = SessionFixture.makeDevice()
     let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("a".utf8))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     _ = try await session.list(.root, in: storage)
-    await device.renameObject(id, to: "b.txt")
+    await device.removeObject(id)
+    await device.addFile("b.txt", parent: SessionFixture.root, data: Data("a".utf8))
 
     await #expect(throws: TransportError.notFound(try SessionFixture.path("/a.txt"))) {
-      _ = try await session.item(at: SessionFixture.path("/a.txt"), in: storage)
+      try await session.delete(SessionFixture.path("/a.txt"), in: storage)
     }
+    #expect(await device.children(of: SessionFixture.root) == ["b.txt"])
   }
 }
 
-/// libmtp keeps the object info it loaded for an ID and never reads it again, so confirming a
-/// cached object by its ID cannot see that the device dropped or replaced it. The operation on it
-/// then fails, and the session lists the folder again to tell what happened.
 struct MTPSessionStaleObjectInfoTests {
   private let storage = SessionFixture.storage
 
   private func listedThenReplaced() async throws -> (StubMTPDevice, MTPSession) {
     let device = SessionFixture.makeDevice()
-    await device.cacheObjectInfo()
     let old = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     _ = try await session.list(.root, in: storage)
     await device.removeObject(old)
     await device.addFile(
@@ -78,27 +102,48 @@ struct MTPSessionStaleObjectInfoTests {
     return (device, session)
   }
 
+  /// What a save's or a delete's base check reads: the object the device has now.
+  @Test func anItemTheDeviceReplacedIsReadAsTheNewObject() async throws {
+    let (_, session) = try await listedThenReplaced()
+
+    let item = try await session.item(at: SessionFixture.path("/a.txt"), in: storage)
+
+    #expect(item.size == UInt64("replaced on the unit".utf8.count))
+  }
+
+  /// The save checked the old file; the device replaced it before the write: nothing is
+  /// overwritten.
+  @Test func aWriteExpectingTheOldFileKeepsTheDevicesNewOne() async throws {
+    let device = SessionFixture.makeDevice()
+    await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    let checked = try await session.item(at: SessionFixture.path("/a.txt"), in: storage)
+    let old = try #require(await device.objectID(named: "a.txt"))
+    await device.removeObject(old)
+    await device.addFile(
+      "a.txt", parent: SessionFixture.root, data: Data("replaced on the unit".utf8))
+    let local = try SessionFixture.localFile(Data("mac edit".utf8))
+    defer { try? FileManager.default.removeItem(at: local) }
+
+    await #expect(throws: TransportError.changedOnDevice(try SessionFixture.path("/a.txt"))) {
+      _ = try await SafeWriter(session: session).write(
+        from: local, to: SessionFixture.path("/a.txt"), in: storage, replacing: true,
+        expecting: checked, progress: SessionFixture.noProgress)
+    }
+    let left = await device.objects.values.map { String(bytes: $0.data, encoding: .utf8) }
+    #expect(left == ["replaced on the unit"])
+  }
+
   @Test func deletingAFileTheDeviceDroppedIsNotFound() async throws {
     let device = SessionFixture.makeDevice()
-    await device.cacheObjectInfo()
     let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("a".utf8))
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     _ = try await session.list(.root, in: storage)
     await device.removeObject(id)
 
     await #expect(throws: TransportError.notFound(try SessionFixture.path("/a.txt"))) {
       try await session.delete(SessionFixture.path("/a.txt"), in: storage)
     }
-  }
-
-  /// The object now at the path is not the one the delete was for: it stays.
-  @Test func deletingAFileTheDeviceReplacedKeepsTheNewOne() async throws {
-    let (device, session) = try await listedThenReplaced()
-
-    await #expect(throws: TransportError.notFound(try SessionFixture.path("/a.txt"))) {
-      try await session.delete(SessionFixture.path("/a.txt"), in: storage)
-    }
-    #expect(await device.children(of: SessionFixture.root) == ["a.txt"])
   }
 
   @Test func downloadingAFileTheDeviceReplacedGetsTheNewOne() async throws {
@@ -130,7 +175,7 @@ struct MTPSessionDeleteTreeTests {
 
   @Test func aTreeAsDeepAsFerryWalksIsDeleted() async throws {
     let device = await deepTree(RemotePath.maxTreeDepth)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
 
     try await session.delete(SessionFixture.path("/d1"), in: SessionFixture.storage)
 
@@ -139,7 +184,7 @@ struct MTPSessionDeleteTreeTests {
 
   @Test func aDeeperTreeIsRefusedWithAClearError() async throws {
     let device = await deepTree(RemotePath.maxTreeDepth + 1)
-    let session = MTPSession(device: device)
+    let session = MTPSession(device: device, scratch: TestScratch.root)
     let top = try SessionFixture.path("/d1")
 
     await #expect(throws: TransportError.folderTooDeep(top)) {

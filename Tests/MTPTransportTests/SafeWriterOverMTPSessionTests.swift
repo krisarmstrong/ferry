@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -15,9 +16,10 @@ struct SafeWriterOverMTPSessionTests {
   ) async throws -> RemoteItem {
     let file = try SessionFixture.localFile(data)
     defer { try? FileManager.default.removeItem(at: file) }
-    return try await SafeWriter(session: MTPSession(device: device)).write(
-      from: file, to: SessionFixture.path(path), in: storage, replacing: replacing,
-      progress: SessionFixture.noProgress)
+    return try await SafeWriter(session: MTPSession(device: device, scratch: TestScratch.root))
+      .write(
+        from: file, to: SessionFixture.path(path), in: storage, replacing: replacing,
+        progress: SessionFixture.noProgress)
   }
 
   func contents(of name: String, on device: StubMTPDevice) async -> Data? {

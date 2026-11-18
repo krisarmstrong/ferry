@@ -24,7 +24,7 @@ struct MTPSessionDownloadTests {
     let device = SessionFixture.makeDevice()
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     await configure(device)
-    return MTPSession(device: device)
+    return MTPSession(device: device, scratch: TestScratch.root)
   }
 
   func download(_ session: MTPSession, replacing: Bool = false) async throws {
