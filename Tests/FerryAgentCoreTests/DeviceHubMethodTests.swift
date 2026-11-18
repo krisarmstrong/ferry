@@ -129,13 +129,13 @@ struct DeviceHubMethodTests {
 
     await harness.adb.attach(adbDevice)
     harness.tick()
-    while await !harness.hub.isSwapping(id) { await Task.yield() }
+    while await !harness.hub.isSwapping(id), !Task.isCancelled { await Task.yield() }
     let waiting = Task { [hub = harness.hub, id] in
       let later = try await hub.lease(id)
       await hub.release(later)
       return later.session.info
     }
-    while await harness.hub.requestsAwaitingSwap == 0 { await Task.yield() }
+    while await harness.hub.requestsAwaitingSwap == 0, !Task.isCancelled { await Task.yield() }
     #expect(await harness.hub.devices() == [ready(mtpDevice, .usbFileTransfer)])
 
     await harness.hub.release(lease)
@@ -152,7 +152,7 @@ struct DeviceHubMethodTests {
     let lease = try await harness.hub.lease(id)
     await harness.adb.attach(adbDevice)
     harness.tick()
-    while await !harness.hub.isSwapping(id) { await Task.yield() }
+    while await !harness.hub.isSwapping(id), !Task.isCancelled { await Task.yield() }
 
     await harness.hub.release(lease)
     await harness.hub.eject(id)
@@ -202,5 +202,43 @@ struct DeviceHubMethodTests {
 
     #expect(await harness.next() == .detached(id))
     #expect(await mtpDevice.closeCount == 1)
+  }
+
+  /// ADB answers but cannot read its storages yet (locked, or `df` it cannot read): the device
+  /// stays on the MTP session that works, rather than going dark on the way to ADB.
+  @Test func anADBSessionThatIsNotReadyDoesNotReplaceMTP() async throws {
+    var harness = MethodHarness(mtp: [mtpDevice])
+    defer { harness.finish() }
+    #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
+    await adbDevice.setLocked(true)
+
+    await harness.adb.attach(adbDevice)
+    harness.tick()
+    while await harness.adb.openCount(of: id) == 0, !Task.isCancelled { await Task.yield() }
+    while await harness.hub.isSwapping(id), !Task.isCancelled { await Task.yield() }
+
+    #expect(await harness.hub.devices() == [ready(mtpDevice, .usbFileTransfer)])
+    #expect(try await harness.hub.session(for: id).info == mtpDevice.info)
+    #expect(await !adbDevice.isOpen)
+    #expect(await mtpDevice.closeCount == 0)
+  }
+
+  /// Ejecting waits for requests on the device to finish before parking it: parking releases the
+  /// MTP handle a scan kept, which resets the unit under the session serving the copy.
+  @Test func ejectWaitsForRequestsBeforeParking() async throws {
+    var harness = MethodHarness(mtp: [mtpDevice], adb: [adbDevice])
+    defer { harness.finish() }
+    #expect(await harness.next() == .attached(ready(mtpDevice, .usbADB)))
+    let lease = try await harness.hub.lease(id)
+
+    let eject = Task { [hub = harness.hub, id] in await hub.eject(id) }
+    while await harness.hub.ejectsAwaitingRequests == 0, !Task.isCancelled { await Task.yield() }
+    #expect(await !harness.mtp.isParked(id))
+    #expect(await !harness.adb.isParked(id))
+
+    await harness.hub.release(lease)
+    await eject.value
+    #expect(await harness.adb.isParked(id))
+    #expect(await !adbDevice.isOpen)
   }
 }

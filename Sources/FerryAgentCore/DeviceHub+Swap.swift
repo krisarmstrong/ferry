@@ -26,13 +26,27 @@ extension DeviceHub {
     let id = lease.device
     let remaining = leases[id, default: 1] - 1
     leases[id] = remaining > 0 ? remaining : nil
-    if remaining <= 0 { drainWaiters.removeValue(forKey: id)?.resume() }
+    if remaining <= 0 {
+      for waiter in drainWaiters.removeValue(forKey: id) ?? [] {
+        waiter.resume()
+      }
+    }
   }
 
   /// Requests waiting for a swap to finish.
   var requestsAwaitingSwap: Int { swapWaiters.values.map(\.count).reduce(0, +) }
 
   func isSwapping(_ id: DeviceID) -> Bool { swapping.contains(id) }
+
+  /// Swaps and ejects waiting for a device's requests to finish.
+  var ejectsAwaitingRequests: Int { drainWaiters.values.map(\.count).reduce(0, +) }
+
+  /// Returns once no lease on `id` is out.
+  func requestsFinished(_ id: DeviceID) async {
+    while leases[id, default: 0] > 0 {
+      await withCheckedContinuation { drainWaiters[id, default: []].append($0) }
+    }
+  }
 
   /// Returns once no swap of `id` is under way.
   func swapFinished(_ id: DeviceID) async {
@@ -58,9 +72,7 @@ extension DeviceHub {
 
   private func swap(_ id: DeviceID, to method: ConnectionMethod) async {
     defer { endSwap(id) }
-    if leases[id, default: 0] > 0 {
-      await withCheckedContinuation { drainWaiters[id] = $0 }
-    }
+    await requestsFinished(id)
     // Nothing else touches the entry while it swaps: probes, ejects and scans of it wait.
     guard let entry = entries[id], case .held(let old) = entry.holding, entry.method != method
     else { return }
@@ -85,8 +97,16 @@ extension DeviceHub {
       return
     }
     let reading = await Self.read(session)
+    // Leaving a working MTP session for one that cannot read its storages would take the
+    // device's domains offline: the move happens only once the new session is ready.
+    let usable: Bool
     switch reading {
-    case .state(let state) where !state.isFailure:
+    case .state(.ready): usable = true
+    case .state(let state): usable = !state.isFailure && kept[id] == nil
+    case .gone: usable = false
+    }
+    switch reading {
+    case .state(let state) where usable:
       store(entry.info, state, .held(session), method: method)
     case .state, .gone:
       await session.close()

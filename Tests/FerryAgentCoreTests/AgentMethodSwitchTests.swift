@@ -140,7 +140,9 @@ struct AgentMethodSwitchTests {
     await setup.mtpDevice.onNextUpload {
       await adb.attach(adbDevice)
       harness.tick()
-      while await !harness.hub.isSwapping(adbDevice.info.id) { await Task.yield() }
+      while await !harness.hub.isSwapping(adbDevice.info.id), !Task.isCancelled {
+        await Task.yield()
+      }
     }
 
     let reply = await harness.service.handle(

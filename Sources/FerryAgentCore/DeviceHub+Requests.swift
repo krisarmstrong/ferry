@@ -21,9 +21,14 @@ extension DeviceHub {
     await recheckHeld(id)
   }
 
-  /// Closes the device's session. It stays listed as `.ejected` until it is unplugged or mounted
-  /// again: the transport is told to leave it alone first, so no scan opens it meanwhile.
+  /// Closes the device's session once the requests on it have finished. It stays listed as
+  /// `.ejected` until it is unplugged or mounted again: the transport is told to leave it alone
+  /// first, so no scan opens it meanwhile.
   public func eject(_ id: DeviceID) async {
+    await swapFinished(id)
+    // Parking can release an MTP handle a scan kept, which resets the unit: requests on the
+    // device finish first, as they did when only the close followed them.
+    await requestsFinished(id)
     await swapFinished(id)
     guard case .held = entries[id]?.holding else { return }
     ejected.insert(id)

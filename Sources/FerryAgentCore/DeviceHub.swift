@@ -97,8 +97,8 @@ public actor DeviceHub {
   var kept: [DeviceID: any DeviceSession] = [:]
   /// Leases handed out and not yet released, by device.
   var leases: [DeviceID: Int] = [:]
-  /// Each swap waiting for its device's leases to be released.
-  var drainWaiters: [DeviceID: CheckedContinuation<Void, Never>] = [:]
+  /// Swaps and ejects waiting for their device's leases to be released.
+  var drainWaiters: [DeviceID: [CheckedContinuation<Void, Never>]] = [:]
   /// Devices whose session is being replaced.
   var swapping: Set<DeviceID> = []
   /// Leases and ejects waiting for a swap to finish, by device.
