@@ -27,10 +27,16 @@ public actor AgentService: AgentHandling {
   private let hub: DeviceHub
   private let domains: DomainController
   let transfers = TransferBoard()
+  /// Where the agent keeps its scratch copies of clients' files (see `FileTransfer`).
+  private let scratchFolder: URL
 
-  public init(hub: DeviceHub, domains: DomainController) {
+  public init(
+    hub: DeviceHub, domains: DomainController,
+    scratch: URL = FileManager.default.temporaryDirectory
+  ) {
     self.hub = hub
     self.domains = domains
+    scratchFolder = scratch
   }
 
   public func handle(
@@ -281,7 +287,7 @@ extension AgentService {
     progress: @escaping TransferProgressHandler
   ) async throws(TransportError) -> ProviderEntry {
     try FileTransfer.requireRegular(target)
-    let scratch = FileTransfer.scratchURL()
+    let scratch = FileTransfer.scratchURL(in: scratchFolder)
     defer { FileTransfer.remove(scratch) }
     let entry = try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
@@ -303,7 +309,7 @@ extension AgentService {
     progress: @escaping TransferProgressHandler
   ) async throws(TransportError) -> ProviderEntry {
     let name = try Self.creatable(name)
-    let scratch = try await FileTransfer.copyIn(source)
+    let scratch = try await FileTransfer.copyIn(source, into: scratchFolder)
     defer { FileTransfer.remove(scratch) }
     return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: parent).appending(name)
@@ -329,7 +335,7 @@ extension AgentService {
     progress: @escaping TransferProgressHandler
   ) async throws(TransportError) -> AgentResponse {
     let (id, base, onConflict) = (replacement.id, replacement.base, replacement.onConflict)
-    let scratch = try await FileTransfer.copyIn(source)
+    let scratch = try await FileTransfer.copyIn(source, into: scratchFolder)
     defer { FileTransfer.remove(scratch) }
     return try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)

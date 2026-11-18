@@ -171,7 +171,8 @@ struct AgentHarness {
     scratch = TestScratch.root.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
-    service = AgentService(hub: hub, domains: controller)
+    // The agent's scratch copies go under the test scratch folder, so its size guard covers them.
+    service = AgentService(hub: hub, domains: controller, scratch: scratch)
     runner = Task { [controller] in await controller.run() }
   }
 

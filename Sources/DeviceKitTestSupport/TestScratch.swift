@@ -2,7 +2,9 @@ import Foundation
 
 /// Temporary files for tests: every one under a single folder for the test process, which is
 /// removed when the process exits (and, if it crashed, by the next test process), and watched so
-/// that no test can put more than `limit` bytes of real data on disk.
+/// that the tests cannot keep more than `limit` bytes of real data in it. The guard covers only
+/// what is written under `root`: tests point every scratch location there, the agent's included
+/// (see `AgentHarness`).
 ///
 /// Tests that need a huge file make it sparse (`FileHandle.truncate(atOffset:)`), which takes no
 /// space. A test that starts copying such a file for real stops the whole test process at

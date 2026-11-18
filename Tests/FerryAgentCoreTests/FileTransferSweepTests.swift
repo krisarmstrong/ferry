@@ -1,5 +1,6 @@
 import DeviceKit
 import DeviceKitTestSupport
+import FerryIPC
 import Foundation
 import Testing
 
@@ -66,5 +67,31 @@ struct TestScratchTests {
     try Data(count: 2 << 20).write(to: folder.appending(path: "real.bin"))
     #expect(TestScratch.allocatedBytes(at: folder) >= 2 << 20)
     #expect(TestScratch.root.path.hasPrefix(FileManager.default.temporaryDirectory.path))
+  }
+}
+
+/// The agent copies a client's file through a scratch file in the folder it was given, which
+/// the tests point at the test scratch folder, so the tests' size guard covers it too.
+@Suite(.timeLimit(.minutes(1)))
+struct AgentScratchTests {
+  @Test func transferFilesAreMadeInTheAgentsScratchFolder() async throws {
+    let device = await makeDevice("A")
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    // A file where the scratch folder should be: making a transfer file there fails.
+    let notAFolder = try harness.file("not-a-folder", "")
+    let service = AgentService(hub: harness.hub, domains: harness.controller, scratch: notAFolder)
+
+    let reply = await service.handle(
+      .create(domain: domainID(device), parent: .root, name: "a.txt", isFolder: false),
+      file: try harness.readable("a.txt", "a"))
+
+    guard case .failure(.io(let message)) = reply else {
+      Issue.record("expected the transfer file to fail, got \(reply)")
+      return
+    }
+    #expect(message.contains("cannot create transfer file"))
+    #expect(await device.contents(of: try path("/a.txt"), in: storageID(device)) == nil)
   }
 }

@@ -13,9 +13,8 @@ public enum FileTransfer {
 
   private static let scratchPrefix = "ferry-transfer-"
 
-  /// A new path in `folder`, by default the agent's own temporary directory, with nothing there
-  /// yet.
-  static func scratchURL(in folder: URL = FileManager.default.temporaryDirectory) -> URL {
+  /// A new path in `folder`, the agent's scratch folder, with nothing there yet.
+  static func scratchURL(in folder: URL) -> URL {
     folder.appending(path: scratchPrefix + UUID().uuidString)
   }
 
@@ -50,9 +49,9 @@ public enum FileTransfer {
 
   /// Copies all of `source`, a regular file, into a new scratch file in `folder` and returns its
   /// URL.
-  @concurrent static func copyIn(
-    _ source: Int32, into folder: URL = FileManager.default.temporaryDirectory
-  ) async throws(TransportError) -> URL {
+  @concurrent static func copyIn(_ source: Int32, into folder: URL)
+    async throws(TransportError) -> URL
+  {
     try requireRegular(source)
     var info = stat()
     guard fstat(source, &info) == 0 else { throw .io("cannot inspect file: \(errorText())") }
