@@ -20,53 +20,76 @@ public actor ADBStream {
     guard let port = NWEndpoint.Port(rawValue: port) else {
       throw .protocolViolation("port 0 is not connectable")
     }
-    let connection = NWConnection(host: .ipv4(.loopback), port: port, using: .tcp)
-    let states = AsyncStream<NWConnection.State> { continuation in
-      connection.stateUpdateHandler = { continuation.yield($0) }
-    }
-    let failure = await withTaskCancellationHandler {
-      connection.start(queue: .global())
-      return await settle(states, timeout: timeout)
-    } onCancel: {
+    let deadline = ContinuousClock.now + timeout
+    while true {
+      let connection = NWConnection(host: .ipv4(.loopback), port: port, using: .tcp)
+      let states = AsyncStream<NWConnection.State> { continuation in
+        connection.stateUpdateHandler = { continuation.yield($0) }
+      }
+      let outcome = await withTaskCancellationHandler {
+        connection.start(queue: .global())
+        return await settle(states, until: deadline)
+      } onCancel: {
+        connection.cancel()
+      }
+      if outcome == .ready {
+        connection.stateUpdateHandler = nil
+        return ADBStream(connection: connection)
+      }
       connection.cancel()
+      if case .failed(let error) = outcome { throw error }
+      // Stalled: a new connection gets a new local port, where retrying this one would not.
+      guard ContinuousClock.now + retryDelay < deadline else { throw timedOut }
+      guard (try? await Task.sleep(for: retryDelay)) != nil else { throw .cancelled }
     }
-    if let failure {
-      connection.cancel()
-      throw failure
-    }
-    connection.stateUpdateHandler = nil
-    return ADBStream(connection: connection)
   }
 
-  /// Follows a connection's states until it is ready (`nil`) or has failed. Only a refusal means
-  /// no server: Network.framework also waits out transient conditions (an interface coming up),
-  /// which may yet connect, so any other wait runs on until `timeout`.
-  static func settle(_ states: AsyncStream<NWConnection.State>, timeout: Duration) async
-    -> ADBError?
+  static let retryDelay = Duration.milliseconds(50)
+  static let timedOut = ADBError.failed("the adb server did not answer in time")
+
+  enum Settled: Equatable {
+    case ready
+    /// Waiting for a reason other than a refusal, which may pass on another attempt.
+    case stalled
+    case failed(ADBError)
+  }
+
+  /// Follows a connection's states until it is ready, has failed, or stalls. Only a refusal
+  /// means no server. Any other wait may pass, but Network.framework retries a waiting
+  /// connection only when the network path changes, which loopback never does, and with the
+  /// same local port: a clash there (EADDRINUSE, a loaded machine's many short connections)
+  /// would wait forever. So the caller starts over with a new connection.
+  static func settle(
+    _ states: AsyncStream<NWConnection.State>, until deadline: ContinuousClock.Instant
+  )
+    async -> Settled
   {
-    await withTaskGroup(of: ADBError?.self) { group in
+    await withTaskGroup(of: Settled.self) { group in
       group.addTask {
         for await state in states {
           switch state {
           case .ready:
-            return nil
+            return .ready
           case .waiting(let error), .failed(let error):
-            if case .posix(.ECONNREFUSED) = error { return .serverUnavailable }
-            if case .failed = state { return .failed("connecting to the adb server: \(error)") }
+            if case .posix(.ECONNREFUSED) = error { return .failed(.serverUnavailable) }
+            if case .failed = state {
+              return .failed(.failed("connecting to the adb server: \(error)"))
+            }
             log.debug("waiting for the adb server: \(String(describing: error), privacy: .public)")
+            return .stalled
           case .cancelled:
-            return .cancelled
+            return .failed(.cancelled)
           default:
             continue
           }
         }
-        return .cancelled
+        return .failed(.cancelled)
       }
       group.addTask {
-        guard (try? await Task.sleep(for: timeout)) != nil else { return .cancelled }
-        return .failed("the adb server did not answer in time")
+        guard (try? await Task.sleep(until: deadline)) != nil else { return .failed(.cancelled) }
+        return .failed(timedOut)
       }
-      let first = await group.next() ?? .cancelled
+      let first = await group.next() ?? .failed(.cancelled)
       group.cancelAll()
       return first
     }
