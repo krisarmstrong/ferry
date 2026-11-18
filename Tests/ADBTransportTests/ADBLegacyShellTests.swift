@@ -29,6 +29,12 @@ struct ADBLegacyShellTests {
     Example(command: #"printf 'x\n123'"#, status: 0, stdout: "x\n123"),
     Example(command: #"printf 'x\n123\n'; false"#, status: 1, stdout: "x\n123\n"),
     Example(command: "echo hi; (exit 9)", status: 9, stdout: "hi\n"),
+    // A leading "(" must not turn the wrapper into an arithmetic command; a trailing comment
+    // must not swallow the closing parenthesis.
+    Example(command: "(exit 2)", status: 2, stdout: ""),
+    Example(command: "(echo in; exit 4)", status: 4, stdout: "in\n"),
+    Example(command: "false # trailing comment", status: 1, stdout: ""),
+    Example(command: "echo kept # trailing comment", status: 0, stdout: "kept\n"),
     Example(
       command: #"printf 'ferry-token-1 7\nmore'"#, status: 0, stdout: "ferry-token-1 7\nmore"),
     Example(

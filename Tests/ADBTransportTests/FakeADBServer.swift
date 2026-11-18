@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import os
 
 @testable import ADBTransport
 
@@ -31,7 +32,13 @@ final class FakeADBServer: Sendable {
     func close() async { await stream.close() }
   }
 
+  private struct Lifecycle {
+    var cancelled = false
+    var waiters: [CheckedContinuation<Void, Never>] = []
+  }
+
   private let listener: NWListener
+  private let lifecycle = OSAllocatedUnfairLock(initialState: Lifecycle())
   let port: UInt16
 
   /// Listens on `port`, or on a free one. `script` runs once per connection; errors in it end
@@ -44,7 +51,17 @@ final class FakeADBServer: Sendable {
     parameters.requiredLocalEndpoint = .hostPort(
       host: .ipv4(.loopback), port: port.flatMap(NWEndpoint.Port.init(rawValue:)) ?? .any)
     let listener = try NWListener(using: parameters)
+    // `.ready` has been seen to precede the listening socket accepting connections: a client
+    // that connected at once was refused. One probe connection, swallowed here, proves it is.
+    let probes = OSAllocatedUnfairLock(initialState: 1)
     listener.newConnectionHandler = { connection in
+      if probes.withLock({ remaining in
+        defer { remaining = max(remaining - 1, -1) }
+        return remaining > 0
+      }) {
+        connection.cancel()
+        return
+      }
       connection.start(queue: .global())
       let peer = Peer(stream: ADBStream(connection: connection))
       Task {
@@ -59,7 +76,12 @@ final class FakeADBServer: Sendable {
     for await state in states {
       switch state {
       case .ready:
-        return FakeADBServer(listener: listener, port: listener.port?.rawValue ?? 0)
+        let server = FakeADBServer(listener: listener, port: listener.port?.rawValue ?? 0)
+        listener.stateUpdateHandler = { [weak server] state in
+          if case .cancelled = state { server?.markCancelled() }
+        }
+        try await server.awaitAccepting(probes: probes)
+        return server
       case .failed(let error):
         throw error
       default:
@@ -74,16 +96,62 @@ final class FakeADBServer: Sendable {
     self.port = port
   }
 
+  /// Connects to the port until it accepts, and waits for the listener to see that probe.
+  private func awaitAccepting(probes: OSAllocatedUnfairLock<Int>) async throws {
+    let deadline = ContinuousClock.now + .seconds(5)
+    while ContinuousClock.now < deadline {
+      if Self.connects(to: port) {
+        while probes.withLock({ $0 }) > 0, ContinuousClock.now < deadline {
+          try await Task.sleep(for: .milliseconds(5))
+        }
+        return
+      }
+      try await Task.sleep(for: .milliseconds(5))
+    }
+    throw POSIXError(.ETIMEDOUT)
+  }
+
+  private static func connects(to port: UInt16) -> Bool {
+    let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+    guard descriptor >= 0 else { return false }
+    defer { close(descriptor) }
+    var address = sockaddr_in()
+    address.sin_family = sa_family_t(AF_INET)
+    address.sin_addr = in_addr(s_addr: UInt32(INADDR_LOOPBACK).bigEndian)
+    address.sin_port = port.bigEndian
+    return withUnsafePointer(to: &address) {
+      $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+        connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+      }
+    }
+  }
+
   func stop() { listener.cancel() }
 
   /// Cancels the listener and returns once its port is released, so a test can bind the same
-  /// port again at once instead of racing the asynchronous cancel.
+  /// port again at once instead of racing the asynchronous cancel. Safe after `stop()` and when
+  /// called twice: the cancelled state is recorded, not just observed once.
   func stopAndWait() async {
     await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-      listener.stateUpdateHandler = { state in
-        if case .cancelled = state { done.resume() }
+      let alreadyCancelled = lifecycle.withLock { state -> Bool in
+        if state.cancelled { return true }
+        state.waiters.append(done)
+        return false
       }
-      listener.cancel()
+      if alreadyCancelled {
+        done.resume()
+      } else {
+        listener.cancel()
+      }
     }
+  }
+
+  private func markCancelled() {
+    let waiters = lifecycle.withLock { state -> [CheckedContinuation<Void, Never>] in
+      state.cancelled = true
+      defer { state.waiters = [] }
+      return state.waiters
+    }
+    for waiter in waiters { waiter.resume() }
   }
 }

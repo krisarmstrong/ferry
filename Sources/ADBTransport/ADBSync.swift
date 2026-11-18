@@ -48,6 +48,7 @@ public actor ADBSync {
   private let entryLimit: Int
   private let gate = OperationGate()
   private var dead = false
+  private var active = false
 
   public init(stream: ADBStream, features: Set<String>) {
     self.init(stream: stream, features: features, entryLimit: Self.defaultEntryLimit)
@@ -60,12 +61,20 @@ public actor ADBSync {
     self.entryLimit = entryLimit
   }
 
+  /// Requests waiting for their turn behind the one in flight.
+  var queuedRequests: Int { get async { await gate.waiting } }
+
   /// Runs one request alone on the connection, and ends the connection if it fails.
   private func perform<T>(
     _ body: () async throws(ADBError) -> T
   ) async throws(ADBError) -> T {
     try await gate.run { () async throws(ADBError) -> T in
       guard !dead else { throw .connectionClosed }
+      // The gate cannot be cancelled while waiting, so a request queued in a cancelled task
+      // finds out here, before it writes anything: the connection is untouched.
+      if Task.isCancelled { throw .cancelled }
+      active = true
+      defer { active = false }
       do throws(ADBError) {
         return try await body()
       } catch {
@@ -110,12 +119,15 @@ public actor ADBSync {
     }
   }
 
+  /// Ends the connection. Idle, it says `QUIT` first. With a request in flight (possibly wedged
+  /// on a device that stopped answering) it cannot wait its turn, so it closes the socket under
+  /// the request, which then fails. Either way later calls throw `.connectionClosed`.
   public func quit() async {
+    let busy = active
+    dead = true
+    if busy { stream.cancel() }
     try? await gate.run { () async throws(ADBError) in
-      if !dead {
-        try? await stream.write(Data("QUIT".utf8) + ADBWire.le32(0))
-      }
-      dead = true
+      if !busy { try? await stream.write(Data("QUIT".utf8) + ADBWire.le32(0)) }
       await stream.close()
     }
   }
@@ -149,10 +161,18 @@ public actor ADBSync {
     guard !listV2, statV2 else { return entries }
     // LIST carries 32-bit sizes, so a regular file over 4 GB reads short; STA2 has the truth.
     let prefix = dir.hasSuffix("/") ? dir : dir + "/"
+    var unaddressable = 0
     for index in entries.indices where entries[index].stat.isRegular {
-      if let exact = try await statLocked(prefix + entries[index].name) {
-        entries[index].stat = exact
+      let path = prefix + entries[index].name
+      // adbd refuses a request this long, so the entry keeps its 32-bit LIST size.
+      guard path.utf8.count <= Self.requestLimit else {
+        unaddressable += 1
+        continue
       }
+      if let exact = try await statLocked(path) { entries[index].stat = exact }
+    }
+    if unaddressable > 0 {
+      Self.log.info("listing kept the 32-bit size of \(unaddressable) entries with paths too long")
     }
     return entries
   }

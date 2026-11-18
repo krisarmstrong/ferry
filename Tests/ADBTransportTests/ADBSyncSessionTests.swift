@@ -183,4 +183,72 @@ struct ADBSyncSessionTests {
   @Test func theDefaultEntryLimitIsAMillion() {
     #expect(ADBSync.defaultEntryLimit == 1_000_000)
   }
+
+  // MARK: cancellation and teardown
+
+  @Test func aQueuedRequestInACancelledTaskDoesNotRunAndTheConnectionSurvives() async throws {
+    let sawFirst = Box(false)
+    let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
+      let first = try await peer.syncPathRequest()
+      #expect(first.path == "/first")
+      await sawFirst.set(true)
+      try await Task.sleep(for: .milliseconds(300))
+      try await peer.raw(Peer.sta2(mode: 0o100600, size: 1, mtime: 1))
+      // The cancelled "/queued" request must never arrive: the next one is "/last".
+      let next = try await peer.syncPathRequest()
+      #expect(next.path == "/last")
+      try await peer.raw(Peer.sta2(mode: 0o100600, size: 3, mtime: 1))
+    }
+    defer { server.stop() }
+    let first = Task { try await sync.stat("/first") }
+    #expect(try await eventually { await sawFirst.value })
+    let queued = Task { try await sync.stat("/queued") }
+    #expect(try await eventually { await sync.queuedRequests == 1 })
+    queued.cancel()
+    #expect(try await first.value?.size == 1)
+    await #expect(throws: ADBError.cancelled) { _ = try await queued.value }
+    #expect(try await sync.stat("/last")?.size == 3)
+  }
+
+  @Test func quitReturnsAtOnceWhileARequestIsWedgedAndFailsIt() async throws {
+    let sawRequest = Box(false)
+    let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
+      _ = try await peer.syncPathRequest()
+      await sawRequest.set(true)
+      _ = try? await peer.stream.read(exactly: 1)
+    }
+    defer { server.stop() }
+    let wedged = Task { try await sync.stat("/never-answered") }
+    #expect(try await eventually { await sawRequest.value })
+    await sync.quit()
+    await #expect { _ = try await wedged.value } throws: { $0 is ADBError }
+    await #expect(throws: Self.closed) { _ = try await sync.stat("/x") }
+  }
+
+  // MARK: re-stat of long child paths
+
+  @Test func anOverlongChildPathKeepsItsListSizeInsteadOfFailingTheListing() async throws {
+    let truncated = UInt32(truncatingIfNeeded: 5 * 1024 * 1024 * 1024)
+    let directory = "/" + String(repeating: "d", count: 1000)
+    let longName = String(repeating: "n", count: 100)
+    let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
+      _ = try await peer.syncPathRequest()
+      try await peer.raw(
+        Peer.dent(name: longName, mode: 0o100600, size: 123, mtime: 5)
+          + Peer.dent(name: "short.bin", mode: 0o100600, size: truncated, mtime: 6)
+          + Peer.listDone(extended: false))
+      // Only the short name is re-statted.
+      let restat = try await peer.syncPathRequest()
+      #expect(restat.id == "STA2" && restat.path == directory + "/short.bin")
+      try await peer.raw(Peer.sta2(mode: 0o100600, size: 5 * 1024 * 1024 * 1024, mtime: 6))
+      let next = try await peer.syncHeader()
+      #expect(next.id == "QUIT")
+    }
+    defer { server.stop() }
+    let entries = try await sync.list(directory)
+    #expect(entries.map(\.name) == [longName, "short.bin"])
+    #expect(entries[0].stat.size == 123)
+    #expect(entries[1].stat.size == 5 * 1024 * 1024 * 1024)
+    await sync.quit()
+  }
 }

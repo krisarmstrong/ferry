@@ -1,6 +1,7 @@
 import DeviceKit
 import Foundation
 import Testing
+import os
 
 @testable import ADBTransport
 
@@ -35,17 +36,16 @@ struct ADBSyncTransferTests {
     defer { server.stop() }
     let (url, handle) = try scratchFile()
     defer { try? FileManager.default.removeItem(at: url) }
-    let ticks = Box<[[UInt64]]>([])
+    let ticks = OSAllocatedUnfairLock(initialState: [[UInt64]]())
     let written = try await sync.receive("/sdcard/a.bin", to: handle) { done, total in
-      Task { await ticks.set(await ticks.value + [[done, total]]) }
+      ticks.withLock { $0.append([done, total]) }
       return true
     }
     try handle.close()
     #expect(written == 150_000)
     #expect(try Data(contentsOf: url) == payload)
-    try await Task.sleep(for: .milliseconds(100))
     #expect(
-      Set(await ticks.value) == Set([[65_536, 150_000], [131_072, 150_000], [150_000, 150_000]]))
+      ticks.withLock { $0 } == [[65_536, 150_000], [131_072, 150_000], [150_000, 150_000]])
   }
 
   @Test func receiveFailureIsMapped() async throws {
@@ -135,20 +135,20 @@ struct ADBSyncTransferTests {
     let (url, handle) = try scratchFile(payload)
     defer { try? FileManager.default.removeItem(at: url) }
     try handle.seek(toOffset: 0)
-    let last = Box<[UInt64]>([])
+    let ticks = OSAllocatedUnfairLock(initialState: [[UInt64]]())
     try await sync.send(
       handle, to: "/sdcard/up.bin", mode: 0o100644,
       mtime: Date(timeIntervalSince1970: 1_700_000_000)
     ) { done, total in
-      Task { await last.set([done, total]) }
+      ticks.withLock { $0.append([done, total]) }
       return true
     }
     #expect(await target.value == "/sdcard/up.bin,33188")
     #expect(await chunks.value == [65_536, 65_536, 18_928])
     #expect(await received.value == payload)
     #expect(await doneMtime.value == 1_700_000_000)
-    try await Task.sleep(for: .milliseconds(100))
-    #expect(await last.value == [150_000, 150_000])
+    #expect(
+      ticks.withLock { $0 } == [[65_536, 150_000], [131_072, 150_000], [150_000, 150_000]])
   }
 
   @Test func sendFailureAfterDoneIsMapped() async throws {

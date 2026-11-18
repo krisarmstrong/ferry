@@ -239,6 +239,19 @@ struct ADBHostTests {
     withExtendedLifetime(closed) {}
   }
 
+  @Test func stopAndWaitReturnsForAnAlreadyStoppedListener() async throws {
+    let server = try await FakeADBServer.start { _ in }
+    server.stop()
+    let returned = Box(false)
+    let waiter = Task {
+      await server.stopAndWait()
+      await server.stopAndWait()
+      await returned.set(true)
+    }
+    defer { waiter.cancel() }
+    #expect(try await eventually { await returned.value })
+  }
+
   @Test func startServerWithoutAdbIsNotInstalled() async {
     await #expect(throws: ADBError.adbNotInstalled) {
       try await ADBHost(port: 1, locator: Self.noAdb).startServer()

@@ -25,11 +25,13 @@ public enum ADBShell {
 
   /// The legacy (`shell:`) service has no exit-status channel, so the command is wrapped to print
   /// `\n<token> <status>\n` after it. The command runs in a subshell, so an `exit` in it still
-  /// reaches the trailer, and `$?` is read before anything else runs. The token is fresh per
+  /// reaches the trailer, and `$?` is read before anything else runs. The space after `(` stops a
+  /// command that itself starts with `(` from reading as `((`, an arithmetic command in bash and
+  /// ksh; the newline before `)` stops a trailing `# comment` from swallowing it. The token is fresh per
   /// call, so neither the command's own output nor a connection that drops mid-output can pass
   /// for the trailer.
   static func legacyWrapper(_ command: String, token: String) -> String {
-    "(\(command)); printf '\\n%s %d\\n' '\(token)' $?"
+    "( \(command)\n); printf '\\n%s %d\\n' '\(token)' $?"
   }
 
   static func newToken() -> String { "ferry-" + UUID().uuidString }
