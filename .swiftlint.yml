@@ -15,3 +15,8 @@ cyclomatic_complexity:
 # swift-format puts the brace of a wrapped signature on its own line.
 opening_brace:
   ignore_multiline_function_signatures: true
+
+# swift-format owns trailing commas: it adds one to a multi-element multiline collection and
+# none to a single-element one, which no `trailing_comma` setting matches.
+disabled_rules:
+  - trailing_comma

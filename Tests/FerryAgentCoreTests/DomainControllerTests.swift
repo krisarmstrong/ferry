@@ -46,9 +46,11 @@ struct DomainControllerTests {
     let card = DomainSpec(identifier: domainID(device, cardKey), displayName: "Phone – SD card")
     #expect(await harness.manager.waitForCalls(2) == [.add(primary), .add(card)])
     #expect(
-      await harness.service.handle(.list(domain: domainID(device), folder: .root)) == .items([]))
+      await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
+        == .items([]))
     #expect(
-      await harness.service.handle(.list(domain: domainID(device, cardKey), folder: .root))
+      await harness.service.handle(
+        .list(domain: domainID(device, cardKey), folder: .root), file: nil)
         == .items([]))
   }
 
@@ -58,18 +60,19 @@ struct DomainControllerTests {
     defer { harness.finish() }
 
     #expect(await harness.barrier(after: 0) == [.add(AgentHarness.barrierSpec)])
-    guard case .status(let devices, let enabled) = await harness.service.handle(.status) else {
+    guard case .status(let devices, let enabled) = await harness.service.handle(.status, file: nil)
+    else {
       Issue.record("expected a status")
       return
     }
     #expect(devices.first { $0.id == device.info.id }?.state == .notSharingFiles)
     #expect(!enabled)
     #expect(
-      await harness.service.handle(.list(domain: domainID(device), folder: .root))
+      await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
         == .failure(.storageNotFound(domainID(device))))
 
     await harness.manager.setUserEnabled(true)
-    guard case .status(_, true) = await harness.service.handle(.status) else {
+    guard case .status(_, true) = await harness.service.handle(.status, file: nil) else {
       Issue.record("expected an enabled provider")
       return
     }
@@ -114,7 +117,7 @@ struct DomainControllerTests {
     _ = await harness.manager.waitForCalls(1)
     await device.suspendNext(.list)
     let pending = Task { [service = harness.service] in
-      await service.handle(.list(domain: domainID(device), folder: .root))
+      await service.handle(.list(domain: domainID(device), folder: .root), file: nil)
     }
     await device.waitUntilSuspended(.list)
 
@@ -125,7 +128,7 @@ struct DomainControllerTests {
 
     #expect(await pending.value == .failure(.deviceDisconnected))
     #expect(
-      await harness.service.handle(.list(domain: domainID(device), folder: .root))
+      await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
         == .failure(.deviceDisconnected))
   }
 
@@ -150,7 +153,7 @@ struct DomainControllerTests {
       await harness.barrier(after: 3) == [added, .disconnect(domain), .reconnect(domain), barrier])
     guard
       case .items(let items) = await harness.service.handle(
-        .list(domain: domainID(device), folder: .root))
+        .list(domain: domainID(device), folder: .root), file: nil)
     else {
       Issue.record("expected a listing")
       return
@@ -165,7 +168,7 @@ struct DomainControllerTests {
     defer { harness.finish() }
     _ = await harness.manager.waitForCalls(2)
 
-    #expect(await harness.service.handle(.eject(first.info.id)) == .done)
+    #expect(await harness.service.handle(.eject(first.info.id), file: nil) == .done)
 
     let firstAdded = FakeDomainManager.Call.add(
       DomainSpec(identifier: domainID(first), displayName: "First"))
@@ -178,10 +181,11 @@ struct DomainControllerTests {
     #expect(
       await harness.hub.devices().first { $0.id == first.info.id }?.state == .notSharingFiles)
     #expect(
-      await harness.service.handle(.list(domain: domainID(first), folder: .root))
+      await harness.service.handle(.list(domain: domainID(first), folder: .root), file: nil)
         == .failure(.storageNotFound(domainID(first))))
     #expect(
-      await harness.service.handle(.list(domain: domainID(second), folder: .root)) == .items([]))
+      await harness.service.handle(.list(domain: domainID(second), folder: .root), file: nil)
+        == .items([]))
   }
 
   @Test func removeAllDomainsForgetsEveryDomain() async throws {
@@ -190,11 +194,66 @@ struct DomainControllerTests {
     defer { harness.finish() }
     _ = await harness.manager.waitForCalls(1)
 
-    #expect(await harness.service.handle(.removeAllDomains) == .done)
+    #expect(await harness.service.handle(.removeAllDomains, file: nil) == .done)
 
     #expect(await harness.manager.calls.last == .removeAll)
     #expect(
-      await harness.service.handle(.list(domain: domainID(device), folder: .root))
+      await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
         == .failure(.storageNotFound(domainID(device))))
+  }
+
+  @Test func restartDisconnectsExistingDomainsAndReconnectsOnReady() async throws {
+    let device = await makeDevice("A")
+    let gone = "GONE|Internal|vol0"
+    let harness = try AgentHarness(devices: [device], existing: [domainID(device), gone])
+    defer { harness.finish() }
+
+    let domain = domainID(device)
+    let barrier = FakeDomainManager.Call.add(AgentHarness.barrierSpec)
+    #expect(
+      await harness.barrier(after: 3) == [
+        .disconnect(domain), .disconnect(gone), .reconnect(domain), barrier,
+      ])
+    #expect(
+      await harness.service.handle(.list(domain: domain, folder: .root), file: nil) == .items([]))
+    #expect(
+      await harness.service.handle(.list(domain: gone, folder: .root), file: nil)
+        == .failure(.deviceDisconnected))
+  }
+
+  @Test func ejectDuringTransferDoesNotStallOtherDevices() async throws {
+    let device = await makeDevice("A")
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    // The session's close waits behind a transfer, as MTPSession's gate makes it.
+    await device.suspendNext(.close)
+    let eject = Task { [service = harness.service, id = device.info.id] in
+      await service.handle(.eject(id), file: nil)
+    }
+    await device.waitUntilSuspended(.close)
+
+    let calls = await harness.barrier(after: 2)
+
+    #expect(calls.dropFirst() == [.remove(domainID(device)), .add(AgentHarness.barrierSpec)])
+    await device.resume(.close)
+    #expect(await eject.value == .done)
+  }
+
+  @Test func removeAllDomainsRetiresTheController() async throws {
+    let device = await makeDevice("A")
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    #expect(await harness.service.handle(.removeAllDomains, file: nil) == .done)
+
+    await harness.transport.attach(await makeDevice("B"))
+    harness.tick()
+    while await harness.controller.handledEvents < 2 {
+      try await Task.sleep(for: .milliseconds(1))
+    }
+
+    let added = DomainSpec(identifier: domainID(device), displayName: "Phone")
+    #expect(await harness.manager.calls == [.add(added), .removeAll])
   }
 }

@@ -13,13 +13,22 @@ private func listing() throws(TransportError) -> [RemoteItem] {
   ]
 }
 
-/// Answers `.list` with `listing()`; parks `.status` until the test releases it.
+/// Answers `.list` with `listing()`, writes `fetched` into the file sent with `.fetch`, and
+/// parks `.status` until the test releases it.
 private struct StubHandler: AgentHandling {
   let started: AsyncStream<Void>.Continuation
   let release: AsyncStream<Void>
 
-  func handle(_ request: AgentRequest) async -> AgentResponse {
+  func handle(_ request: AgentRequest, file: FileHandle?) async -> AgentResponse {
     switch request {
+    case .fetch:
+      guard let file else { return .failure(.io("no file")) }
+      do {
+        try file.write(contentsOf: fetched)
+        return .done
+      } catch {
+        return .failure(.io(error.localizedDescription))
+      }
     case .list:
       do {
         return .items(try listing())
@@ -88,11 +97,31 @@ private struct Harness {
   }
 }
 
+private let fetched = Data("fetched".utf8)
+
+@Test(.timeLimit(.minutes(1)))
+func fileDescriptorCrossesConnection() async throws {
+  let harness = Harness()
+  defer { harness.finish() }
+  let target = FileManager.default.temporaryDirectory.appending(
+    path: "ferry-ipc-\(UUID().uuidString)")
+  try Data().write(to: target)
+  defer { try? FileManager.default.removeItem(at: target) }
+  let handle = try FileHandle(forWritingTo: target)
+  defer { try? handle.close() }
+
+  let response = try await harness.client.send(
+    .fetch(domain: "d", path: try RemotePath("/a.jpg")), file: handle)
+
+  #expect(response == .done)
+  #expect(try Data(contentsOf: target) == fetched)
+}
+
 @Test(.timeLimit(.minutes(1)))
 func clientServerOverAnonymousListener() async throws {
   let harness = Harness()
   defer { harness.finish() }
-  let response = try await harness.client.send(.list(domain: "d", folder: .root))
+  let response = try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
   #expect(response == .items(try listing()))
 }
 
@@ -102,7 +131,7 @@ func connectionLossMapsToDisconnected() async throws {
   defer { harness.finish() }
   var started = harness.started.makeAsyncIterator()
   let client = harness.client
-  let call = Task { try await client.send(.status) }
+  let call = Task { try await client.send(.status, file: nil) }
   await started.next()
   harness.listener.invalidate()
   await #expect(throws: TransportError.deviceDisconnected) { try await call.value }
@@ -113,9 +142,9 @@ func reconnectsAfterConnectionIsInvalidated() async throws {
   let harness = Harness(refusals: 1)
   defer { harness.finish() }
   await #expect(throws: TransportError.deviceDisconnected) {
-    try await harness.client.send(.list(domain: "d", folder: .root))
+    try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
   }
-  let response = try await harness.client.send(.list(domain: "d", folder: .root))
+  let response = try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
   #expect(response == .items(try listing()))
 }
 
@@ -124,6 +153,6 @@ func unsignedPeerIsRejected() async throws {
   let harness = Harness(signedOnly: true)
   defer { harness.finish() }
   await #expect(throws: TransportError.deviceDisconnected) {
-    try await harness.client.send(.list(domain: "d", folder: .root))
+    try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
   }
 }

@@ -17,9 +17,15 @@ actor FakeDomainManager: DomainManaging {
   }
 
   private(set) var calls: [Call] = []
+  private let preexisting: [String]
   private var userEnabled = false
   private var waiters: [Int: (count: Int, continuation: CheckedContinuation<Void, Never>)] = [:]
   private var nextWaiter = 0
+
+  /// `existing` are the domains the system already has, as after an agent restart.
+  init(existing: [String] = []) {
+    preexisting = existing
+  }
 
   func add(_ spec: DomainSpec) async throws { record(.add(spec)) }
   func disconnect(_ identifier: String) async throws { record(.disconnect(identifier)) }
@@ -30,6 +36,7 @@ actor FakeDomainManager: DomainManaging {
     record(.signal(identifier, folder))
   }
   func isUserEnabled() async -> Bool { userEnabled }
+  func existing() async throws -> [String] { preexisting }
 
   func setUserEnabled(_ enabled: Bool) {
     userEnabled = enabled
@@ -78,7 +85,7 @@ func makeDevice(
   let storages = keys.map { key in
     StorageInfo(
       id: StorageID(device: id, key: key), description: String(key.prefix { $0 != "|" }),
-      capacity: 1_000_000, free: 900_000)
+      capacity: 1 << 30, free: 1 << 29)
   }
   let device = FakeDevice(
     info: DeviceInfo(id: id, manufacturer: "Fake", model: model), storages: storages)
@@ -99,27 +106,28 @@ func path(_ string: String) throws -> RemotePath {
 }
 
 /// A hub, domain controller and request service over a fake transport, with USB ticks under the
-/// test's control and a temporary directory standing in for the app-group container.
+/// test's control and a temporary directory for the files a client would send.
 struct AgentHarness {
   let transport: FakeTransport
-  let manager = FakeDomainManager()
+  let manager: FakeDomainManager
   let hub: DeviceHub
   let controller: DomainController
   let service: AgentService
-  let container: URL
+  let scratch: URL
   private let ticks: AsyncStream<Void>.Continuation
   private let runner: Task<Void, Never>
 
-  init(devices: [FakeDevice] = []) throws {
+  init(devices: [FakeDevice] = [], existing: [String] = []) throws {
+    manager = FakeDomainManager(existing: existing)
     transport = FakeTransport(devices: devices)
     let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
     self.ticks = ticks
     hub = DeviceHub(transport: transport, arrivals: arrivals, clock: ManualClock())
     controller = DomainController(hub: hub, manager: manager)
-    container = FileManager.default.temporaryDirectory.appending(
+    scratch = FileManager.default.temporaryDirectory.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
-    service = AgentService(hub: hub, domains: controller, allowedRoot: container)
+    try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+    service = AgentService(hub: hub, domains: controller)
     runner = Task { [controller] in await controller.run() }
   }
 
@@ -139,16 +147,30 @@ struct AgentHarness {
   static let barrierSpec = DomainSpec(
     identifier: "ZZBARRIER|\(internalKey)", displayName: "Barrier")
 
-  /// Writes `contents` to a new file in the container.
-  func source(_ name: String, _ contents: String) throws -> URL {
-    let url = container.appending(path: name)
+  /// Writes `contents` to a new file in the scratch folder.
+  func file(_ name: String, _ contents: String) throws -> URL {
+    let url = scratch.appending(path: name)
     try Data(contents.utf8).write(to: url)
     return url
+  }
+
+  /// A file holding `contents`, open for reading with its offset at the end, so a reader that
+  /// trusted the offset would read nothing.
+  func readable(_ name: String, _ contents: String) throws -> FileHandle {
+    let handle = try FileHandle(forReadingFrom: file(name, contents))
+    try handle.seekToEnd()
+    return handle
+  }
+
+  /// A file holding `contents`, open for writing.
+  func writable(_ name: String, _ contents: String) throws -> (URL, FileHandle) {
+    let url = try file(name, contents)
+    return (url, try FileHandle(forWritingTo: url))
   }
 
   func finish() {
     ticks.finish()
     runner.cancel()
-    try? FileManager.default.removeItem(at: container)
+    try? FileManager.default.removeItem(at: scratch)
   }
 }

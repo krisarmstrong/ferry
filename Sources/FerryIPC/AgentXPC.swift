@@ -3,14 +3,17 @@ import Foundation
 import os
 
 /// The agent's XPC interface. Requests and replies are JSON-encoded `AgentRequest` and
-/// `AgentResponse`, so the wire format is ordinary `Codable` rather than `NSSecureCoding`.
+/// `AgentResponse`, so the wire format is ordinary `Codable` rather than `NSSecureCoding`. A
+/// request that moves file contents also carries an open file, which XPC passes as a descriptor.
 @objc public protocol AgentXPC {
-  func send(_ request: Data, reply: @escaping @Sendable (Data) -> Void)
+  func send(_ request: Data, file: FileHandle?, reply: @escaping @Sendable (Data) -> Void)
 }
 
 /// Serves agent requests from the app and the FileProvider extension.
 public protocol AgentHandling: Sendable {
-  func handle(_ request: AgentRequest) async -> AgentResponse
+  /// `file` is the descriptor sent with the request, if any: readable for `create` and
+  /// `replaceContents`, writable for `fetch`.
+  func handle(_ request: AgentRequest, file: FileHandle?) async -> AgentResponse
 }
 
 /// Accepts connections on the agent's listener and routes their requests to a handler.
@@ -66,7 +69,7 @@ final class AgentService: NSObject, AgentXPC, Sendable {
     self.handler = handler
   }
 
-  func send(_ request: Data, reply: @escaping @Sendable (Data) -> Void) {
+  func send(_ request: Data, file: FileHandle?, reply: @escaping @Sendable (Data) -> Void) {
     let decoded: AgentRequest
     do {
       decoded = try JSONDecoder().decode(AgentRequest.self, from: request)
@@ -76,7 +79,7 @@ final class AgentService: NSObject, AgentXPC, Sendable {
       return
     }
     Task {
-      reply(Self.encode(await handler.handle(decoded)))
+      reply(Self.encode(await handler.handle(decoded, file: file)))
     }
   }
 

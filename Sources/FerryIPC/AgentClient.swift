@@ -4,7 +4,10 @@ import os
 
 /// Sends requests to the agent. A protocol so the extension's logic can run against a fake.
 public protocol AgentSending: Sendable {
-  func send(_ request: AgentRequest) async throws(TransportError) -> AgentResponse
+  /// `file` is sent as a descriptor: readable for `create` and `replaceContents`, writable for
+  /// `fetch`, and `nil` for every other request.
+  func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
+    -> AgentResponse
 }
 
 /// An XPC client of the agent.
@@ -33,7 +36,9 @@ public actor AgentClient: AgentSending {
     target = .endpoint(endpoint)
   }
 
-  public func send(_ request: AgentRequest) async throws(TransportError) -> AgentResponse {
+  public func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
+    -> AgentResponse
+  {
     let data: Data
     do {
       data = try JSONEncoder().encode(request)
@@ -47,7 +52,7 @@ public actor AgentClient: AgentSending {
         failed(TransportError.io("agent proxy has the wrong interface"))
         return
       }
-      proxy.send(data, reply: reply)
+      proxy.send(data, file: file, reply: reply)
     }
     let replyData: Data
     switch reply {

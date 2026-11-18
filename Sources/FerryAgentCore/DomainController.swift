@@ -16,6 +16,9 @@ public protocol DomainManaging: Sendable {
   /// Whether the user has enabled Ferry's domains. New domains start disabled and only the user
   /// can enable them, so `false` is a normal state.
   func isUserEnabled() async -> Bool
+  /// The identifiers of the Ferry domains the system has, including ones from before this
+  /// process started.
+  func existing() async throws -> [String]
 }
 
 /// Keeps one FileProvider domain per storage of each ready device, and maps a domain back to
@@ -24,6 +27,10 @@ public protocol DomainManaging: Sendable {
 /// A domain is added the first time its storage is ready. When the device leaves (unplugged,
 /// locked, not sharing files, failed) its domains are disconnected, never removed, so a replug
 /// reconnects the same domain. Only `eject` and `removeAll` remove domains.
+///
+/// At start, every domain the system already has (from before an agent restart) is disconnected
+/// until its device is ready again. After `removeAll` the controller adds nothing more, so Remove
+/// Ferry leaves no domain behind however long the agent takes to stop.
 public actor DomainController {
   /// What a request on a domain runs against.
   struct Route: Sendable {
@@ -34,8 +41,9 @@ public actor DomainController {
   }
 
   private struct Domain {
-    var spec: DomainSpec
-    let storage: StorageID
+    /// `nil` for a domain found at start, until its device is ready and names it.
+    var spec: DomainSpec?
+    var storage: StorageID?
     var connected: Bool
   }
 
@@ -51,6 +59,13 @@ public actor DomainController {
   private var links: [DeviceID: Link] = [:]
   /// The operation most recently queued; the next one waits for it.
   private var tail: Task<Void, Never>?
+  /// Devices whose eject is closing their session. Their domains are gone and must not come
+  /// back from a device list read before the hub marked them ejected.
+  private var ejecting: Set<DeviceID> = []
+  /// Set by `removeAll`: no domain is added, reconnected or disconnected afterwards.
+  private var retired = false
+  /// Hub events handled so far.
+  private(set) var handledEvents = 0
 
   public init(hub: DeviceHub, manager: any DomainManaging) {
     self.hub = hub
@@ -60,16 +75,21 @@ public actor DomainController {
   /// Follows the hub until the calling task is cancelled. Call it once: it is the only consumer
   /// of the hub's events.
   public func run() async {
+    await serially { await self.adoptExisting() }
     for await event in hub.events {
       await serially { await self.handle(event) }
+      handledEvents += 1
     }
   }
 
   /// Removes the device's domains, then closes its session. The device stays listed as not
-  /// sharing files until it is unplugged. A transfer in progress on the device finishes first,
-  /// since the session runs its operations one at a time.
+  /// sharing files until it is unplugged. A transfer in progress on the device finishes before
+  /// the close, since the session runs its operations one at a time; the close is awaited outside
+  /// the operation queue, so other devices' domains keep updating meanwhile.
   func eject(_ id: DeviceID) async {
     await serially { await self.removeDomains(of: id) }
+    await hub.eject(id)
+    ejecting.remove(id)
   }
 
   /// Removes every Ferry domain, including ones this process never added.
@@ -81,10 +101,10 @@ public actor DomainController {
 
   func route(_ domain: String) throws(TransportError) -> Route {
     guard let entry = domains[domain] else { throw .storageNotFound(domain) }
-    guard entry.connected, let link = links[entry.storage.device] else {
+    guard entry.connected, let storage = entry.storage, let link = links[storage.device] else {
       throw .deviceDisconnected
     }
-    return Route(storage: entry.storage, session: link.session, writer: link.writer)
+    return Route(storage: storage, session: link.session, writer: link.writer)
   }
 
   func signal(_ domain: String, folder: RemotePath) async {
@@ -110,7 +130,27 @@ public actor DomainController {
     return await current.value
   }
 
+  /// Records the system's domains as disconnected, so a ready device reconnects its domain
+  /// rather than adding it again, and an absent device's domain does not look live.
+  private func adoptExisting() async {
+    let identifiers: [String]
+    do {
+      identifiers = try await manager.existing()
+    } catch {
+      log.error("listing existing domains failed: \(error, privacy: .public)")
+      return
+    }
+    let adopted = identifiers.filter { domains[$0] == nil }.sorted()
+    for identifier in adopted {
+      domains[identifier] = Domain(spec: nil, storage: nil, connected: true)
+    }
+    for identifier in adopted {
+      await disconnect(identifier)
+    }
+  }
+
   private func handle(_ event: HubEvent) async {
+    guard !retired else { return }
     // A device that left is disconnected here even if it is back by the time the list is read,
     // so its old session is never kept for the new one.
     switch event {
@@ -129,14 +169,14 @@ public actor DomainController {
     for (identifier, domain) in domains where domain.connected && !live.contains(identifier) {
       await disconnect(identifier)
     }
-    for (spec, storage) in wanted {
+    for (spec, storage) in wanted where !ejecting.contains(storage.device) {
       await connect(spec, storage)
     }
   }
 
   private func connect(_ spec: DomainSpec, _ storage: StorageID) async {
     let identifier = spec.identifier
-    guard let existing = domains[identifier] else {
+    guard var existing = domains[identifier] else {
       guard await link(for: storage.device) != nil else { return }
       domains[identifier] = Domain(spec: spec, storage: storage, connected: true)
       do {
@@ -147,6 +187,12 @@ public actor DomainController {
         domains[identifier] = nil
       }
       return
+    }
+    if existing.storage == nil {
+      // Found at start: its device is ready now, so it takes this spec without a rename.
+      existing.storage = storage
+      existing.spec = spec
+      domains[identifier] = existing
     }
     if !existing.connected {
       guard await link(for: storage.device) != nil else { return }
@@ -191,7 +237,7 @@ public actor DomainController {
 
   private func disconnectDomains(of id: DeviceID) async {
     links[id] = nil
-    let connected = domains.filter { $0.value.connected && $0.value.storage.device == id }
+    let connected = domains.filter { $0.value.connected && $0.value.storage?.device == id }
     for identifier in connected.keys.sorted() {
       await disconnect(identifier)
     }
@@ -200,8 +246,7 @@ public actor DomainController {
   private func disconnect(_ identifier: String) async {
     guard let domain = domains[identifier], domain.connected else { return }
     domains[identifier]?.connected = false
-    let device = domain.storage.device
-    if !domains.values.contains(where: { $0.connected && $0.storage.device == device }) {
+    if let device = domain.storage?.device, !hasConnectedDomain(device) {
       links[device] = nil
     }
     do {
@@ -212,9 +257,14 @@ public actor DomainController {
     }
   }
 
+  private func hasConnectedDomain(_ device: DeviceID) -> Bool {
+    domains.values.contains { $0.connected && $0.storage?.device == device }
+  }
+
   private func removeDomains(of id: DeviceID) async {
+    ejecting.insert(id)
     links[id] = nil
-    let identifiers = domains.filter { $0.value.storage.device == id }.keys.sorted()
+    let identifiers = domains.filter { $0.value.storage?.device == id }.keys.sorted()
     for identifier in identifiers {
       domains[identifier] = nil
     }
@@ -226,10 +276,10 @@ public actor DomainController {
           "removing domain \(identifier, privacy: .private) failed: \(error, privacy: .public)")
       }
     }
-    await hub.eject(id)
   }
 
   private func removeEveryDomain() async -> TransportError? {
+    retired = true
     domains = [:]
     links = [:]
     do {

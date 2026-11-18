@@ -3,10 +3,10 @@ import Foundation
 
 /// A request from the app or the FileProvider extension to the agent, sent as JSON.
 ///
-/// It arrives from a sandboxed process the agent does not control. The listener admits only
-/// Ferry-signed peers, but `fetch`, `create` and `replaceContents` still carry file URLs the
-/// peer chose: the agent must check they lie inside the app-group container before touching
-/// them. `RemotePath` rejects `..` and empty components when decoded.
+/// It arrives from a sandboxed process the agent does not control. File contents never travel as
+/// paths: `fetch`, `create` (of a file) and `replaceContents` come with an open file descriptor,
+/// so the agent never opens a file the peer named. `RemotePath` rejects `..` and empty
+/// components when decoded.
 public enum AgentRequest: Codable, Sendable, Equatable {
   /// Answered with `.status(devices:providerEnabled:)`.
   case status
@@ -15,14 +15,14 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   case removeAllDomains
   case item(domain: String, path: RemotePath)
   case list(domain: String, folder: RemotePath)
-  /// Downloads `path` to `to`, a file URL inside the app-group container.
-  case fetch(domain: String, path: RemotePath, to: URL)
-  /// Uploads `from`, a file URL inside the app-group container, or makes a folder.
-  case create(domain: String, path: RemotePath, from: URL?, isFolder: Bool)
+  /// Downloads `path` into the writable file sent with the request.
+  case fetch(domain: String, path: RemotePath)
+  /// Uploads the readable file sent with the request, or makes a folder (sent with no file).
+  case create(domain: String, path: RemotePath, isFolder: Bool)
   case rename(domain: String, path: RemotePath, to: String)
   case move(domain: String, path: RemotePath, toFolder: RemotePath)
-  /// Replaces the file at `path` with `from`, a file URL inside the app-group container.
-  case replaceContents(domain: String, path: RemotePath, from: URL)
+  /// Replaces the file at `path` with the readable file sent with the request.
+  case replaceContents(domain: String, path: RemotePath)
   case delete(domain: String, path: RemotePath)
 }
 

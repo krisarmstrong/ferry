@@ -14,6 +14,7 @@ private struct Paths {
   let bad: RemotePath
   let renamed: RemotePath
   let upload: RemotePath
+  let partial: RemotePath
   let moved: RemotePath
   let movedFile: RemotePath
 
@@ -24,6 +25,7 @@ private struct Paths {
     bad = try RemotePath("/Docs/bad.txt")
     renamed = try RemotePath("/Docs/renamed.txt")
     upload = try RemotePath("/Docs/up.txt")
+    partial = try RemotePath("/Docs/\(SafeWriter.partialPrefix)mine")
     moved = try RemotePath("/Moved")
     movedFile = try RemotePath("/Moved/renamed.txt")
   }
@@ -57,66 +59,152 @@ struct AgentServiceTests {
   @Test func writeGoesThroughSafeWriterAndSignals() async throws {
     let paths = try Paths()
     let setup = try await ready()
-    let harness = setup.harness
-    let device = setup.device
-    let domain = setup.domain
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
     defer { harness.finish() }
-    let source = try harness.source("new.txt", "hello")
 
+    let hello = try harness.readable("new.txt", "hello")
     let created = await harness.service.handle(
-      .create(domain: domain, path: paths.new, from: source, isFolder: false))
+      .create(domain: domain, path: paths.new, isFolder: false), file: hello)
 
     guard case .item(let item) = created else {
       Issue.record("expected an item, got \(created)")
       return
     }
     #expect(item.path == paths.new)
-    #expect(await device.contents(of: paths.new, in: storageID(device)) == Data("hello".utf8))
     #expect(await signals(harness) == [.signal(domain, paths.docs)])
 
     // A direct upload would leave the truncated file under its real name; SafeWriter uploads to a
     // partial and deletes it.
     await device.failUpload(afterBytes: 2, with: .io("boom"))
+    let doomed = try harness.readable("bad.txt", "hello")
     let failed = await harness.service.handle(
-      .create(domain: domain, path: paths.bad, from: source, isFolder: false))
+      .create(domain: domain, path: paths.bad, isFolder: false), file: doomed)
     #expect(failed == .failure(.io("boom")))
     let kept = [paths.docs, paths.new, paths.old]
     #expect(await device.allPaths(in: storageID(device)) == kept)
     #expect(await signals(harness).count == 1)
+  }
 
-    // Replacing contents goes through the same writer.
-    let replacement = try harness.source("replacement.txt", "newer")
+  @Test func createAndReplaceReadTheWholeDescriptor() async throws {
+    let paths = try Paths()
+    let setup = try await ready()
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
+    defer { harness.finish() }
+    let storage = storageID(device)
+
+    let hello = try harness.readable("new.txt", "hello")
+    let newer = try harness.readable("replacement.txt", "newer contents")
+    let created = await harness.service.handle(
+      .create(domain: domain, path: paths.new, isFolder: false), file: hello)
     let replaced = await harness.service.handle(
-      .replaceContents(domain: domain, path: paths.old, from: replacement))
-    guard case .item = replaced else {
-      Issue.record("expected an item, got \(replaced)")
+      .replaceContents(domain: domain, path: paths.old), file: newer)
+
+    guard case .item = created, case .item = replaced else {
+      Issue.record("expected items, got \(created) and \(replaced)")
       return
     }
-    #expect(await device.contents(of: paths.old, in: storageID(device)) == Data("newer".utf8))
-    #expect(await device.allPaths(in: storageID(device)).count == 3)
+    #expect(await device.contents(of: paths.new, in: storage) == Data("hello".utf8))
+    #expect(await device.contents(of: paths.old, in: storage) == Data("newer contents".utf8))
+  }
+
+  @Test func fetchWritesExactBytesThroughDescriptor() async throws {
+    let paths = try Paths()
+    let setup = try await ready()
+    let (harness, domain) = (setup.harness, setup.domain)
+    defer { harness.finish() }
+    let (target, handle) = try harness.writable("fetched.txt", "stale and longer contents")
+
+    #expect(
+      await harness.service.handle(.fetch(domain: domain, path: paths.old), file: handle) == .done)
+
+    #expect(try Data(contentsOf: target) == Data("old".utf8))
+  }
+
+  /// Larger than the copy's chunk, and not a multiple of it, in both directions.
+  @Test func filesLargerThanOneChunkCopyIntact() async throws {
+    let paths = try Paths()
+    let setup = try await ready()
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
+    defer { harness.finish() }
+    let contents = Data((0..<(5 << 19) + 17).map { UInt8(truncatingIfNeeded: $0 &* 31) })
+    let source = harness.scratch.appending(path: "large.bin")
+    try contents.write(to: source)
+    let upload = AgentRequest.create(domain: domain, path: paths.new, isFolder: false)
+    let reader = try FileHandle(forReadingFrom: source)
+
+    guard case .item = await harness.service.handle(upload, file: reader) else {
+      Issue.record("upload failed")
+      return
+    }
+    #expect(await device.contents(of: paths.new, in: storageID(device)) == contents)
+
+    let (target, handle) = try harness.writable("large-copy.bin", "")
+    let fetch = AgentRequest.fetch(domain: domain, path: paths.new)
+    #expect(await harness.service.handle(fetch, file: handle) == .done)
+    #expect(try Data(contentsOf: target) == contents)
+  }
+
+  @Test func nonRegularDescriptorsAreRejected() async throws {
+    let paths = try Paths()
+    let setup = try await ready()
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
+    defer { harness.finish() }
+    let pipe = Pipe()
+    // Foundation will not open a folder for reading, but a client could send one's descriptor.
+    let folderDescriptor = open(harness.scratch.path, O_RDONLY)
+    try #require(folderDescriptor >= 0)
+    let folder = FileHandle(fileDescriptor: folderDescriptor, closeOnDealloc: true)
+    let rejected = AgentResponse.failure(.io("not a regular file"))
+
+    let fetch = AgentRequest.fetch(domain: domain, path: paths.old)
+    #expect(await harness.service.handle(fetch, file: pipe.fileHandleForWriting) == rejected)
+    let create = AgentRequest.create(domain: domain, path: paths.new, isFolder: false)
+    #expect(await harness.service.handle(create, file: pipe.fileHandleForReading) == rejected)
+    let replace = AgentRequest.replaceContents(domain: domain, path: paths.old)
+    #expect(await harness.service.handle(replace, file: folder) == rejected)
+
+    #expect(await device.allPaths(in: storageID(device)) == [paths.docs, paths.old])
+  }
+
+  @Test func missingOrUnexpectedDescriptorFails() async throws {
+    let paths = try Paths()
+    let setup = try await ready()
+    let (harness, domain) = (setup.harness, setup.domain)
+    defer { harness.finish() }
+    let bad = AgentResponse.failure(.io("bad request"))
+    let service = harness.service
+
+    let file = AgentRequest.create(domain: domain, path: paths.new, isFolder: false)
+    #expect(await service.handle(file, file: nil) == bad)
+    #expect(await service.handle(.fetch(domain: domain, path: paths.old), file: nil) == bad)
+    #expect(
+      await service.handle(.replaceContents(domain: domain, path: paths.old), file: nil) == bad)
+    let stray = try harness.readable("x.txt", "x")
+    let folder = AgentRequest.create(domain: domain, path: paths.moved, isFolder: true)
+    #expect(await service.handle(folder, file: stray) == bad)
+    #expect(await service.handle(.status, file: stray) == bad)
   }
 
   @Test func mutationsSignalEveryAffectedParent() async throws {
     let paths = try Paths()
     let setup = try await ready()
-    let harness = setup.harness
-    let device = setup.device
-    let domain = setup.domain
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
     defer { harness.finish() }
     let service = harness.service
 
+    let folder = AgentRequest.create(domain: domain, path: paths.moved, isFolder: true)
+    let rename = AgentRequest.rename(domain: domain, path: paths.old, to: "renamed.txt")
+    let move = AgentRequest.move(domain: domain, path: paths.renamed, toFolder: paths.moved)
     guard
-      case .item = await service.handle(
-        .create(domain: domain, path: paths.moved, from: nil, isFolder: true)),
-      case .item = await service.handle(
-        .rename(domain: domain, path: paths.old, to: "renamed.txt")),
-      case .item = await service.handle(
-        .move(domain: domain, path: paths.renamed, toFolder: paths.moved))
+      case .item = await service.handle(folder, file: nil),
+      case .item = await service.handle(rename, file: nil),
+      case .item = await service.handle(move, file: nil)
     else {
       Issue.record("a mutation failed")
       return
     }
-    #expect(await service.handle(.delete(domain: domain, path: paths.movedFile)) == .done)
+    #expect(
+      await service.handle(.delete(domain: domain, path: paths.movedFile), file: nil) == .done)
 
     let root = FakeDomainManager.Call.signal(domain, .root)
     let docs = FakeDomainManager.Call.signal(domain, paths.docs)
@@ -126,21 +214,6 @@ struct AgentServiceTests {
     #expect(await device.allPaths(in: storageID(device)) == [paths.docs, paths.moved])
   }
 
-  @Test func fetchReplacesTheGivenFile() async throws {
-    let paths = try Paths()
-    let setup = try await ready()
-    let harness = setup.harness
-    let domain = setup.domain
-    defer { harness.finish() }
-    let target = try harness.source("fetched.txt", "stale contents")
-
-    #expect(
-      await harness.service.handle(.fetch(domain: domain, path: paths.old, to: target))
-        == .done)
-
-    #expect(try Data(contentsOf: target) == Data("old".utf8))
-  }
-
   @Test func unknownDomainFails() async throws {
     let paths = try Paths()
     let setup = try await ready()
@@ -148,74 +221,40 @@ struct AgentServiceTests {
     defer { harness.finish() }
 
     #expect(
-      await harness.service.handle(.list(domain: "nope", folder: .root))
+      await harness.service.handle(.list(domain: "nope", folder: .root), file: nil)
         == .failure(.storageNotFound("nope")))
     #expect(
-      await harness.service.handle(.item(domain: "nope", path: paths.docs))
+      await harness.service.handle(.item(domain: "nope", path: paths.docs), file: nil)
         == .failure(.storageNotFound("nope")))
   }
 
-  @Test(arguments: ["a/b", "..", ".", "", "x\0y"])
+  @Test(arguments: ["a/b", "..", ".", "", "x\0y", SafeWriter.partialPrefix + "x"])
   func renameRejectsInvalidNames(_ name: String) async throws {
     let paths = try Paths()
     let setup = try await ready()
-    let harness = setup.harness
-    let device = setup.device
-    let domain = setup.domain
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
     defer { harness.finish() }
 
-    #expect(
-      await harness.service.handle(.rename(domain: domain, path: paths.old, to: name))
-        == .failure(.invalidName(name)))
+    let rename = AgentRequest.rename(domain: domain, path: paths.old, to: name)
+    #expect(await harness.service.handle(rename, file: nil) == .failure(.invalidName(name)))
     #expect(await device.contents(of: paths.old, in: storageID(device)) != nil)
   }
 
-  @Test func fileURLsMustLieInsideContainer() async throws {
+  /// A listing deletes anything named like a partial that no writer holds, so the agent must
+  /// never create one under a client's name.
+  @Test func createRejectsPartialNames() async throws {
     let paths = try Paths()
     let setup = try await ready()
-    let harness = setup.harness
-    let domain = setup.domain
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
     defer { harness.finish() }
-    let outside = FileManager.default.temporaryDirectory.appending(
-      path: "ferry-outside-\(UUID().uuidString)", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: outside) }
-    let secret = outside.appending(path: "secret.txt")
-    try Data("secret".utf8).write(to: secret)
-    let fileLink = harness.container.appending(path: "file-link")
-    try FileManager.default.createSymbolicLink(at: fileLink, withDestinationURL: secret)
-    let folderLink = harness.container.appending(path: "folder-link")
-    try FileManager.default.createSymbolicLink(at: folderLink, withDestinationURL: outside)
-    let rejected = TransportError.io("url outside container")
-    let remote = paths.old
+    let invalid = AgentResponse.failure(.invalidName(paths.partial.description))
 
-    let throughFolderLink = folderLink.appending(path: "new.txt")
-    let planted = outside.appending(path: "planted.txt")
-    let dangling = harness.container.appending(path: "dangling")
-    try FileManager.default.createSymbolicLink(at: dangling, withDestinationURL: planted)
-    let dotDot = URL(fileURLWithPath: harness.container.path + "/../escape.txt")
-    let siblingPrefix = URL(fileURLWithPath: harness.container.path + "-evil/new.txt")
-    let remoteURL = try #require(URL(string: "https://example.com/new.txt"))
-    let links = [fileLink, throughFolderLink, dangling]
-    let escapes = links + [dotDot, siblingPrefix, harness.container, remoteURL]
-    for url in escapes {
-      #expect(
-        await harness.service.handle(.fetch(domain: domain, path: remote, to: url))
-          == .failure(rejected), "fetch to \(url)")
-      #expect(
-        await harness.service.handle(
-          .create(domain: domain, path: paths.upload, from: url, isFolder: false))
-          == .failure(rejected), "create from \(url)")
-      #expect(
-        await harness.service.handle(.replaceContents(domain: domain, path: remote, from: url))
-          == .failure(rejected), "replace from \(url)")
-    }
-    #expect(try Data(contentsOf: secret) == Data("secret".utf8))
-    #expect(!FileManager.default.fileExists(atPath: planted.path))
+    let folder = AgentRequest.create(domain: domain, path: paths.partial, isFolder: true)
+    #expect(await harness.service.handle(folder, file: nil) == invalid)
+    let contents = try harness.readable("p.txt", "p")
+    let file = AgentRequest.create(domain: domain, path: paths.partial, isFolder: false)
+    #expect(await harness.service.handle(file, file: contents) == invalid)
 
-    // A destination that does not exist yet, under the temporary directory's /var symlink.
-    let fresh = harness.container.appending(path: "fresh.txt")
-    #expect(await harness.service.handle(.fetch(domain: domain, path: remote, to: fresh)) == .done)
-    #expect(try Data(contentsOf: fresh) == Data("old".utf8))
+    #expect(await device.allPaths(in: storageID(device)) == [paths.docs, paths.old])
   }
 }
