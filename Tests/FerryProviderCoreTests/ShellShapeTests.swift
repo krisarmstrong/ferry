@@ -51,4 +51,17 @@ struct ShellShapeTests {
     #expect(renamed.itemIdentifier == id)
     #expect(renamed.filename == "b.txt")
   }
+
+  // FileProvider aborts the extension on an item with an empty filename.
+  @Test func rootItemHasNonEmptyFilename() async throws {
+    let agent = FakeAgent([try folder("/DCIM")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+
+    let root = try await backend.item(.rootContainer)
+    #expect(root.itemIdentifier == .rootContainer)
+    #expect(!root.filename.isEmpty)
+    for child in try await backend.children(of: .rootContainer) {
+      #expect(!child.filename.isEmpty)
+    }
+  }
 }

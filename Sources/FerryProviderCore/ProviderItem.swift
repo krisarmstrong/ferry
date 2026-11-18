@@ -19,8 +19,12 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// The root's parent is the root, as FileProvider expects.
   public var parentItemIdentifier: NSFileProviderItemIdentifier { .init(entry.parent) }
 
-  /// Empty for the root, whose name FileProvider takes from the domain.
-  public var filename: String { entry.item.path.name ?? "" }
+  /// Never empty: FileProvider aborts the extension on an item without a name. Only the root's
+  /// path has no last component, and Finder shows the domain's display name for the root, so its
+  /// fixed name is never seen.
+  public var filename: String { entry.item.path.name ?? Self.rootFilename }
+
+  static let rootFilename = "Device"
 
   public var contentType: UTType {
     switch entry.item.kind {

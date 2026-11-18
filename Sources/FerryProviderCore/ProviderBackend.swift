@@ -15,7 +15,9 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 ///
 /// FileProvider calls concurrently. The backend keeps no state between calls and adds no
 /// ordering: the agent serializes operations per device. Calls carry no timeout of their own;
-/// FileProvider times out and cancels its operations itself.
+/// FileProvider times out and cancels its operations itself. A cancelled call sends no further
+/// request and throws `CocoaError(.userCancelled)` as soon as the client returns; `AgentClient`
+/// returns at once, leaving the agent to finish the request it already has.
 ///
 /// File contents cross to the agent as open descriptors, never paths. Every error thrown is one
 /// FileProvider understands: transport failures go through `ErrorMapping`, local file errors are
@@ -169,6 +171,7 @@ public actor ProviderBackend {
   private func send(_ request: AgentRequest, file: FileHandle? = nil) async throws
     -> AgentResponse
   {
+    if Task.isCancelled { throw CocoaError(.userCancelled) }
     let response: AgentResponse
     do {
       response = try await client.send(request, file: file)

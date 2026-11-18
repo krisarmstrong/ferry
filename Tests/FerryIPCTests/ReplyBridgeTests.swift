@@ -33,3 +33,12 @@ private struct Lost: Error {}
     }
   }
 }
+
+@Test(.timeLimit(.minutes(1))) func cancellationReturnsWithoutAReply() async {
+  let call = Task {
+    await awaitReply { _, _ in }
+  }
+  call.cancel()
+  let result = await call.value
+  #expect(throws: CancellationError.self) { try result.get() }
+}

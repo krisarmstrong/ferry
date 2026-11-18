@@ -142,6 +142,21 @@ func connectionLossMapsToDisconnected() async throws {
 }
 
 @Test(.timeLimit(.minutes(1)))
+func cancelledCallReturnsPromptlyAndConnectionStaysUsable() async throws {
+  let harness = Harness()
+  defer { harness.finish() }
+  var started = harness.started.makeAsyncIterator()
+  let client = harness.client
+  let call = Task { try await client.send(.status, file: nil) }
+  await started.next()
+  call.cancel()
+  // The agent is still holding `.status`; the call does not wait for it.
+  await #expect(throws: TransportError.cancelled) { try await call.value }
+  let response = try await client.send(.list(domain: "d", folder: .root), file: nil)
+  #expect(response == .entries(try listing()))
+}
+
+@Test(.timeLimit(.minutes(1)))
 func reconnectsAfterConnectionIsInvalidated() async throws {
   let harness = Harness(refusals: 1)
   defer { harness.finish() }

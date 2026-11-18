@@ -60,11 +60,18 @@ actor FakeAgent: AgentSending {
   var pendingChanges: (updated: [ProviderEntry], deleted: [ItemID]) = ([], [])
   let changeAnchor = Data([1])
   let nextAnchor = Data([2])
+  /// Writes a partial download into the fetch target, then waits until the caller is cancelled
+  /// and throws `.cancelled`, as `AgentClient` does for a cancelled call. Yields to
+  /// `fetchStarted` once it is waiting.
+  var parkFetches = false
+  let fetchStarted: AsyncStream<Void>
+  private let fetchStartedContinuation: AsyncStream<Void>.Continuation
   /// Parks creates until this many have arrived, then answers them all.
   var parkCreatesUntil = 0
   private var parked: [CheckedContinuation<Void, Never>] = []
 
   init(_ seed: [RemoteItem] = [], contents: [RemotePath: Data] = [:]) {
+    (fetchStarted, fetchStartedContinuation) = AsyncStream.makeStream(of: Void.self)
     for item in seed {
       items[item.path] = item
       paths[.random()] = item.path
@@ -108,6 +115,10 @@ actor FakeAgent: AgentSending {
     }
   }
 
+  func parkFetchesUntilCancelled() {
+    parkFetches = true
+  }
+
   func park(until count: Int) {
     parkCreatesUntil = count
   }
@@ -118,6 +129,12 @@ actor FakeAgent: AgentSending {
     requests.append(request)
     if let thrown { throw thrown }
     if let failure { return .failure(failure) }
+    if case .fetch = request, parkFetches {
+      try? file?.write(contentsOf: Data("par".utf8))
+      fetchStartedContinuation.yield()
+      try? await Task.sleep(for: .seconds(3600))
+      throw .cancelled
+    }
     do {
       return try await perform(request, file: file)
     } catch {

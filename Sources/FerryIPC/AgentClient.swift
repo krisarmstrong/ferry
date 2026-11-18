@@ -15,6 +15,10 @@ public protocol AgentSending: Sendable {
 /// launchd may relaunch the agent at any time, so a lost connection is replaced on the next
 /// `send`. Calls in flight when it is lost throw `.deviceDisconnected`; the agent's own
 /// failures come back as `.failure` responses.
+///
+/// A cancelled call throws `.cancelled` at once. The agent is not told: it finishes the request,
+/// and its reply is dropped. A fetch it is still writing goes into the caller's descriptor,
+/// which the caller has closed and removed by then.
 public actor AgentClient: AgentSending {
   private enum Target {
     case machService(String)
@@ -45,6 +49,7 @@ public actor AgentClient: AgentSending {
     } catch {
       throw .io("cannot encode request: \(error.localizedDescription)")
     }
+    if Task.isCancelled { throw .cancelled }
     let connection = currentConnection()
     let reply = await awaitReply { reply, failed in
       guard let proxy = connection.remoteObjectProxyWithErrorHandler(failed) as? any AgentXPC
@@ -58,6 +63,8 @@ public actor AgentClient: AgentSending {
     switch reply {
     case .success(let data):
       replyData = data
+    case .failure(is CancellationError):
+      throw .cancelled
     case .failure(let error):
       // An interrupted connection stays usable: launchd relaunches the agent on the next
       // message. An invalid one never recovers, so the next send must open a fresh one.

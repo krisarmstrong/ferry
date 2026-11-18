@@ -13,6 +13,8 @@ private final class ResumeOnce: Sendable {
 }
 
 /// Runs `start` with a reply callback and an error callback and returns whichever fires first.
+/// If the calling task is cancelled first, it returns a `CancellationError` failure at once and
+/// ignores the late reply, so a caller is never held by a request it no longer wants.
 func awaitReply(
   isolation: isolated (any Actor)? = #isolation,
   _ start: (
@@ -20,14 +22,20 @@ func awaitReply(
     _ failed: @escaping @Sendable (any Error) -> Void
   ) -> Void
 ) async -> Result<Data, any Error> {
-  await withCheckedContinuation { continuation in
-    let once = ResumeOnce()
-    start(
-      { data in
-        if once.claim() { continuation.resume(returning: .success(data)) }
-      },
-      { error in
-        if once.claim() { continuation.resume(returning: .failure(error)) }
-      })
+  // An `AsyncStream` iterator ends when its task is cancelled, which a checked continuation
+  // cannot do.
+  let (results, continuation) = AsyncStream.makeStream(
+    of: Result<Data, any Error>.self, bufferingPolicy: .bufferingOldest(1))
+  let once = ResumeOnce()
+  start(
+    { data in
+      if once.claim() { continuation.yield(.success(data)) }
+    },
+    { error in
+      if once.claim() { continuation.yield(.failure(error)) }
+    })
+  for await result in results {
+    return result
   }
+  return .failure(CancellationError())
 }

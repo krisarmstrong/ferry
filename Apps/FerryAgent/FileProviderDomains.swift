@@ -8,16 +8,18 @@ private let log = Logger(
 /// The system's FileProvider domains for Ferry, through `NSFileProviderManager`.
 struct FileProviderDomains: DomainManaging {
   func add(_ spec: DomainSpec) async throws {
-    try await NSFileProviderManager.add(
-      NSFileProviderDomain(
-        identifier: NSFileProviderDomainIdentifier(spec.identifier),
-        displayName: spec.displayName))
+    let domain = NSFileProviderDomain(
+      identifier: NSFileProviderDomainIdentifier(spec.identifier), displayName: spec.displayName)
+    // MTP has no trash: a delete in Finder deletes on the device.
+    domain.supportsSyncingTrash = false
+    try await NSFileProviderManager.add(domain)
   }
 
   func disconnect(_ identifier: String) async throws {
     // Not `.temporary`: the domain stays disconnected until the agent sees its device again.
     try await manager(identifier).disconnect(
-      reason: String(localized: "The device is not connected."), options: [])
+      reason: String(localized: "Connect the device and choose Transfer files to see its files."),
+      options: [])
   }
 
   func reconnect(_ identifier: String) async throws {

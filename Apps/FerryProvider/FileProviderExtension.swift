@@ -1,14 +1,19 @@
 import FerryIPC
 import FerryProviderCore
 import FileProvider
+import os
+
+private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "Extension")
 
 /// The FileProvider extension for one domain. Every call goes to `ProviderBackend`, which
 /// forwards it to the agent; this class only snapshots FileProvider's arguments and completes
 /// its callbacks.
 final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
   private let backend: ProviderBackend
+  private let manager: NSFileProviderManager?
 
   required init(domain: NSFileProviderDomain) {
+    manager = NSFileProviderManager(for: domain)
     backend = ProviderBackend(
       domain: domain.identifier.rawValue,
       client: AgentClient(machServiceName: "X6JWYP43HG.io.github.krisarmstrong.ferry.agent"))
@@ -38,7 +43,7 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
     completionHandler: @escaping (URL?, NSFileProviderItem?, (any Error)?) -> Void
   ) -> Progress {
     let backend = backend
-    let directory = URL(filePath: NSTemporaryDirectory(), directoryHint: .isDirectory)
+    let directory = temporaryDirectory()
     return answer(
       { try await backend.fetch(itemIdentifier, into: directory) },
       then: { result in
@@ -122,6 +127,17 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
       })
   }
 
+  /// The domain's temporary directory, on the same volume as its files so FileProvider can move
+  /// a download into place; the sandbox's own when the domain has none.
+  private func temporaryDirectory() -> URL {
+    do {
+      if let url = try manager?.temporaryDirectoryURL() { return url }
+    } catch {
+      log.error("no temporary directory for the domain: \(error, privacy: .public)")
+    }
+    return URL(filePath: NSTemporaryDirectory(), directoryHint: .isDirectory)
+  }
+
   func enumerator(
     for containerItemIdentifier: NSFileProviderItemIdentifier, request: NSFileProviderRequest
   ) throws -> NSFileProviderEnumerator {
@@ -135,8 +151,8 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
 }
 
 /// Runs `work` in a task and hands its result to `complete` exactly once: the task is its only
-/// caller. Cancelling the returned progress cancels the task; work that stops on cancellation
-/// completes with `.userCancelled`.
+/// caller. Cancelling the returned progress cancels the task, and `ProviderBackend` then returns
+/// promptly with `.userCancelled`.
 private func answer<T: Sendable>(
   _ work: @escaping @Sendable () async throws -> T,
   then complete: @escaping (Result<T, any Error>) -> Void
@@ -148,11 +164,10 @@ private func answer<T: Sendable>(
     do {
       let value = try await work()
       result = .success(value)
-    } catch is CancellationError {
-      result = .failure(CocoaError(.userCancelled))
     } catch {
       result = .failure(error)
     }
+    progress.completedUnitCount = progress.totalUnitCount
     complete.value(result)
   }
   progress.cancellationHandler = { task.cancel() }
