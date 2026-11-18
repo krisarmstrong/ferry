@@ -30,13 +30,17 @@ import os
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
   public private(set) var providerEnabled = true
   public private(set) var agent = AgentState.checking
-  /// The last failed action, shown until the next one succeeds.
-  public private(set) var actionError: LocalizedStringResource?
+  /// The last failed action, shown until the next one succeeds. It can carry device-supplied
+  /// detail, so it is shown verbatim, never parsed as Markdown.
+  public private(set) var actionError: String?
   public private(set) var opensAtLogin: Bool
 
   /// The steps the guide shows; `nil` shows the model picker.
   public var guideFamily: DeviceFamily?
   public var isGuidePresented = false
+  /// Set with `isGuidePresented`, and cleared by the one view that brings the guide window
+  /// forward, so reopening the menu does not pull the guide in front of it again.
+  private(set) var guideOpenPending = false
 
   private let client: any AgentSending
   private let services: any SystemServicing
@@ -112,6 +116,13 @@ import os
   public func showGuide(for device: AttachedDevice?) {
     guideFamily = device.flatMap { GuideSteps.family(forModel: $0.info.model) }
     isGuidePresented = true
+    guideOpenPending = true
+  }
+
+  /// Whether the guide window should be brought forward now. True once per `showGuide`.
+  func takeGuideOpenRequest() -> Bool {
+    defer { guideOpenPending = false }
+    return guideOpenPending
   }
 
   public func eject(_ id: DeviceID) async {
@@ -135,29 +146,35 @@ import os
       actionError = nil
     } catch {
       Self.log.error("open at login: \(error, privacy: .public)")
-      actionError = LocalizedStringResource(
-        "Could not change Open at login.", bundle: .module)
+      actionError = String(
+        localized: LocalizedStringResource("Could not change Open at login.", bundle: .module))
     }
     opensAtLogin = services.opensAtLogin
   }
 
   /// Removes Ferry's locations from Finder, unregisters the agent and the login item, and
-  /// quits. Stops at the first failure, so the user can try again rather than being left with
-  /// locations no agent serves.
+  /// quits. Stops if the locations or the agent remain, so the user can try again rather than
+  /// being left with locations no agent serves. Once the agent is gone a retry could only fail,
+  /// so a login item that will not unregister is logged and Ferry quits anyway.
   public func removeFerry() async {
     do {
       guard case .done = try await client.send(.removeAllDomains, file: nil) else {
         throw TransportError.io("agent kept its locations")
       }
       try await services.unregisterAgent()
-      if services.opensAtLogin {
-        try services.setOpensAtLogin(false)
-      }
     } catch {
       Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .public)")
-      actionError = LocalizedStringResource(
-        "Could not remove Ferry. Make sure Ferry is running, then try again.", bundle: .module)
+      actionError = String(
+        localized: LocalizedStringResource(
+          "Could not remove Ferry. Make sure Ferry is running, then try again.", bundle: .module))
       return
+    }
+    if services.opensAtLogin {
+      do {
+        try services.setOpensAtLogin(false)
+      } catch {
+        Self.log.error("removing the login item failed: \(error, privacy: .public)")
+      }
     }
     services.quit()
   }

@@ -52,7 +52,7 @@ public enum GuideSteps {
           """, bundle: .module),
         LocalizedStringResource(
           """
-          On the unit, open **Settings** (bottom of the Home screen) → **Connected devices** → \
+          On the unit: **Settings** (bottom of the Home screen) → **Connected devices** → \
           **USB**.
           """, bundle: .module),
         LocalizedStringResource("Tap **Transfer files**.", bundle: .module),

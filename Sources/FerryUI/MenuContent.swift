@@ -39,7 +39,7 @@ public struct MenuContent: View {
           showGuide: { openGuide(for: device) })
       }
       if let error = model.actionError {
-        Text(error)
+        Text(verbatim: error)
           .font(.callout)
           .foregroundStyle(.red)
       }
@@ -74,19 +74,16 @@ public struct MenuContent: View {
     .padding(12)
     .frame(width: 320, alignment: .leading)
     .task { await model.watchWhileMenuOpen() }
-    .onChange(of: model.isGuidePresented, initial: true) { _, presented in
-      if presented { bringGuideForward() }
+    .onChange(of: model.guideOpenPending, initial: true) { _, _ in
+      if model.takeGuideOpenRequest() {
+        NSApp.activate()
+        openWindow(id: SetupGuide.windowID)
+      }
     }
   }
 
   private func openGuide(for device: AttachedDevice?) {
     model.showGuide(for: device)
-    bringGuideForward()
-  }
-
-  private func bringGuideForward() {
-    NSApp.activate()
-    openWindow(id: SetupGuide.windowID)
   }
 }
 
@@ -196,7 +193,7 @@ private struct DeviceRow: View {
       Text("Quit Image Capture or Android File Transfer, then try again.", bundle: .module)
         .foregroundStyle(.secondary)
     case .failed(let error):
-      Text(DevicePresentation.message(for: error))
+      Text(verbatim: DevicePresentation.message(for: error))
         .foregroundStyle(.secondary)
     }
   }

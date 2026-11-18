@@ -20,6 +20,7 @@ public struct SettingsView: View {
       LabeledContent {
         Button {
           model.showGuide(for: nil)
+          _ = model.takeGuideOpenRequest()
           openWindow(id: SetupGuide.windowID)
         } label: {
           Text("How to connect", bundle: .module)
@@ -35,7 +36,7 @@ public struct SettingsView: View {
         }
       } footer: {
         if let error = model.actionError {
-          Text(error)
+          Text(verbatim: error)
             .foregroundStyle(.red)
         }
       }

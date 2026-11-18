@@ -29,8 +29,13 @@ enum DevicePresentation {
     return String(localized: LocalizedStringResource("\(name) · \(free) free", bundle: .module))
   }
 
-  /// A short explanation of an agent error. Device-supplied detail is escaped.
-  static func message(for error: TransportError) -> LocalizedStringResource {
+  /// A short explanation of an agent error. Device-supplied detail is escaped, and the result
+  /// is shown verbatim so the detail is never parsed as Markdown.
+  static func message(for error: TransportError) -> String {
+    String(localized: resource(for: error))
+  }
+
+  private static func resource(for error: TransportError) -> LocalizedStringResource {
     switch error {
     case .deviceBusy:
       LocalizedStringResource(

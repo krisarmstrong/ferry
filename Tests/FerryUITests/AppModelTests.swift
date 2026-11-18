@@ -70,6 +70,7 @@ private struct UnreachableClient: AgentSending {
 private final class FakeServices: SystemServicing {
   let log: CallLog
   var opensAtLogin = true
+  var failLoginItem = false
 
   init(log: CallLog) {
     self.log = log
@@ -77,6 +78,7 @@ private final class FakeServices: SystemServicing {
 
   func setOpensAtLogin(_ enabled: Bool) throws {
     log.record("opensAtLogin \(enabled)")
+    if failLoginItem { throw CocoaError(.featureUnsupported) }
     opensAtLogin = enabled
   }
 
@@ -132,6 +134,8 @@ struct AppModelTests {
     await model.refresh()
     #expect(model.isGuidePresented)
     #expect(model.guideFamily == .netAllyAndroid8Board)
+    #expect(model.takeGuideOpenRequest())
+    #expect(!model.takeGuideOpenRequest())
     model.isGuidePresented = false
     await model.refresh()
     #expect(!model.isGuidePresented)
@@ -198,6 +202,14 @@ struct AppModelTests {
 
   @Test func removeFerryCallsRemoveAllThenUnregister() async {
     let services = FakeServices(log: log)
+    let model = AppModel(client: FakeClient(log: log), services: services)
+    await model.removeFerry()
+    #expect(log.all == ["removeAllDomains", "unregisterAgent", "opensAtLogin false", "quit"])
+  }
+
+  @Test func removeFerryQuitsWhenOnlyTheLoginItemRemains() async {
+    let services = FakeServices(log: log)
+    services.failLoginItem = true
     let model = AppModel(client: FakeClient(log: log), services: services)
     await model.removeFerry()
     #expect(log.all == ["removeAllDomains", "unregisterAgent", "opensAtLogin false", "quit"])
