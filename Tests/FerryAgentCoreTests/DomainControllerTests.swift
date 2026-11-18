@@ -150,7 +150,8 @@ struct DomainControllerTests {
     let added = FakeDomainManager.Call.add(DomainSpec(identifier: domain, displayName: "Phone"))
     let barrier = FakeDomainManager.Call.add(AgentHarness.barrierSpec)
     #expect(
-      await harness.barrier(after: 3) == [added, .disconnect(domain), .reconnect(domain), barrier])
+      await harness.barrier(after: 4)
+        == [added, .disconnect(domain), .reconnect(domain), .signal(domain), barrier])
     guard
       case .entries(let entries) = await harness.service.handle(
         .list(domain: domainID(device), folder: .root), file: nil)
@@ -211,8 +212,8 @@ struct DomainControllerTests {
     let domain = domainID(device)
     let barrier = FakeDomainManager.Call.add(AgentHarness.barrierSpec)
     #expect(
-      await harness.barrier(after: 3) == [
-        .disconnect(domain), .disconnect(gone), .reconnect(domain), barrier,
+      await harness.barrier(after: 4) == [
+        .disconnect(domain), .disconnect(gone), .reconnect(domain), .signal(domain), barrier,
       ])
     #expect(
       await harness.service.handle(.list(domain: domain, folder: .root), file: nil) == .entries([]))

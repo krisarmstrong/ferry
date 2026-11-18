@@ -247,6 +247,10 @@ public actor DomainController {
         domains[identifier]?.connected = false
         return
       }
+      // FileProvider asks for changes only when signalled. An anchor from before the disconnect
+      // may be stale (a new agent process expires every old anchor), and the device may have
+      // changed meanwhile, so it asks now and enumerates again if the anchor expired.
+      await manager.signal(identifier)
     }
     if existing.spec != spec {
       domains[identifier]?.spec = spec
