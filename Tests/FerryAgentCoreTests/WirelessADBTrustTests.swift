@@ -69,14 +69,17 @@ struct WirelessADBTrustTests {
     let wireless = WirelessADB(adb: adb, store: file, timing: Self.fast)
     _ = await wireless.connect(Self.impostor)
     _ = await wireless.connect(other)
-    #expect(await wireless.confirm(Self.impostor) == .connected)
+    let offers = await wireless.unconfirmed()
+    let impostorOffer = try #require(offers.first { $0.address == Self.impostor })
+    let otherOffer = try #require(offers.first { $0.address == other })
+    #expect(await wireless.confirm(impostorOffer) == .connected)
     await wireless.ignore(other)
     #expect(await wireless.unconfirmed().isEmpty)
     #expect(
       await wireless.remembered().first?.addresses == [
         Self.impostor, Self.endpoint("192.0.2.31:5555"),
       ])
-    #expect(await wireless.confirm(other) == .failed(.notRemembered))
+    #expect(await wireless.confirm(otherOffer) == .failed(.offerChanged))
   }
 
   /// A confirmed address must still answer as the device it was offered for.
@@ -88,8 +91,9 @@ struct WirelessADBTrustTests {
       adb: adb, store: WirelessADBTests.storeFile(), timing: Self.fast,
       known: { [Self.etherScope.id] })
     _ = await wireless.connect(Self.impostor)
+    let offer = try #require(await wireless.unconfirmed().first)
     await adb.set { $0.units[Self.impostor.argument] = .init(info: WirelessADBTests.linkRunner) }
-    #expect(await wireless.confirm(Self.impostor) == .failed(.otherDevice))
+    #expect(await wireless.confirm(offer) == .failed(.otherDevice))
     #expect(await wireless.remembered().isEmpty)
   }
 

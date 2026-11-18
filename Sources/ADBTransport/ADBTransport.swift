@@ -13,6 +13,10 @@ public struct ADBRoutes: Sendable, Equatable {
   var serials: Set<String> { Set(wireless + [usb].compactMap { $0 }) }
 }
 
+/// Whether a network route (`host:port`, or an mDNS name) may serve the device it answers as.
+/// The agent decides: an address it has not vouched for never serves a device Ferry knows.
+public typealias ADBNetworkPolicy = @Sendable (_ adbSerial: String, _ id: DeviceID) -> Bool
+
 /// `DeviceTransport` over the user's adb server, for Android devices with USB debugging on.
 ///
 /// The server lists devices by its own serial: the USB serial, or `host:port` over the network.
@@ -50,6 +54,7 @@ public actor ADBTransport: DeviceTransport {
   /// Scans take turns, so one never commits what it read over a later one's.
   private let scans = OperationGate()
   private let answerLimit: Duration
+  private let serving: ADBNetworkPolicy
   /// Each listed adb serial's device, read from its properties.
   private var named: [String: DeviceInfo] = [:]
   /// The routes of each usable device, as of the most recent scan.
@@ -80,8 +85,12 @@ public actor ADBTransport: DeviceTransport {
     var missingSince: ContinuousClock.Instant?
   }
 
-  public init(port: UInt16 = 5037, locator: ADBLocator = ADBLocator()) {
-    self.init(host: ADBHost(port: port, locator: locator), locator: locator)
+  /// `serving` decides which network routes serve their device; USB routes always do.
+  public init(
+    port: UInt16 = 5037, locator: ADBLocator = ADBLocator(),
+    serving: @escaping ADBNetworkPolicy = { _, _ in true }
+  ) {
+    self.init(host: ADBHost(port: port, locator: locator), locator: locator, serving: serving)
   }
 
   /// How long a parked device must be missing from adb's list to count as unplugged. A
@@ -111,9 +120,11 @@ public actor ADBTransport: DeviceTransport {
 
   init(
     host: ADBHost, locator: ADBLocator, answerLimit: Duration = defaultAnswerLimit,
+    serving: @escaping ADBNetworkPolicy = { _, _ in true },
     now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
   ) {
     self.host = host
+    self.serving = serving
     self.locator = locator
     self.answerLimit = answerLimit
     self.now = now
@@ -185,11 +196,14 @@ public actor ADBTransport: DeviceTransport {
     }
   }
 
-  /// The named devices among `usable`, one per `ro.serialno`, USB first for info and route.
+  /// The named devices among `usable`, one per `ro.serialno`, USB first for info and route. A
+  /// network route the policy refuses is left out.
   private func assemble(_ usable: [ADBDevice]) -> [DeviceID: Found] {
     var found: [DeviceID: Found] = [:]
     for device in usable {
-      guard let info = named[device.serial] else { continue }
+      guard let info = named[device.serial],
+        !device.isWireless || serving(device.serial, info.id)
+      else { continue }
       var entry = found[info.id] ?? Found(info: info)
       if device.isWireless {
         entry.wireless.append(device.serial)

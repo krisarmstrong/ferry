@@ -136,11 +136,13 @@ struct AppModelWirelessTests {
     #expect(await model.connect(address: "192.0.2.99") == true)
     #expect(model.unconfirmed == [offer])
     #expect(DevicePresentation.confirmQuestion(offer) == "Is 192.0.2.99:5555 your EtherScope nXG?")
-    await model.confirm(address)
+    await model.confirm(offer)
     await model.ignore(address)
     #expect(
       log.all == [
-        "connectAddress 192.0.2.99:5555", "status", "confirmWireless 192.0.2.99:5555", "status",
+        "connectAddress 192.0.2.99:5555", "status",
+        "confirmWireless 192.0.2.99:5555 fedcba9876543210 EtherScope nXG",
+        "status",
         "ignoreWireless 192.0.2.99:5555", "status",
       ])
   }

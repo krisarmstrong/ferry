@@ -47,9 +47,9 @@ extension AppModel {
     _ = await performWireless(.connectWireless(id))
   }
 
-  /// Use it: the address is the device it claims to be.
-  public func confirm(_ address: WirelessEndpoint) async {
-    _ = await performWireless(.confirmWireless(address))
+  /// Use it: the address is the device the menu showed, sent back as shown.
+  public func confirm(_ shown: UnconfirmedAddress) async {
+    _ = await performWireless(.confirmWireless(shown))
   }
 
   /// Ignore: it is not.

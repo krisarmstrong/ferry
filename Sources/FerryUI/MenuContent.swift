@@ -57,7 +57,7 @@ public struct MenuContent: View {
       }
       ForEach(model.unconfirmed, id: \.self) { offer in
         UnconfirmedRow(
-          offer: offer, confirm: { Task { await model.confirm(offer.address) } },
+          offer: offer, confirm: { Task { await model.confirm(offer) } },
           ignore: { Task { await model.ignore(offer.address) } })
       }
       ForEach(model.awaitingAuthorization, id: \.self) { address in

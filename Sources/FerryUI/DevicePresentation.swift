@@ -144,6 +144,14 @@ enum DevicePresentation {
       String(
         localized: LocalizedStringResource(
           "That address belongs to another device.", bundle: .module))
+    case .unidentified:
+      String(
+        localized: LocalizedStringResource(
+          "The device didn't say which device it is, so Ferry disconnected it.", bundle: .module))
+    case .offerChanged:
+      String(
+        localized: LocalizedStringResource(
+          "That address changed. Check the menu and try again.", bundle: .module))
     case .adb(let detail):
       String(
         localized: LocalizedStringResource(

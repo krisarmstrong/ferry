@@ -29,17 +29,19 @@ do {
 FileTransfer.sweep()
 
 // MTP and the user's adb server together: each device is served by the best method it offers.
-let adb = ADBTransport()
+// What the network may serve, as WirelessADB decides; ADBTransport asks it on every scan.
+let vouching = WirelessVouching()
+let adb = ADBTransport(serving: { vouching.serves($0, as: $1) })
 let hub = DeviceHub(
   transport: CompositeTransport(mtp: MTPTransport(), adb: adb),
-  arrivals: merged(USBWatcher.ticks(), adb.arrivals))
+  arrivals: merged(USBWatcher.ticks(), merged(adb.arrivals, vouching.changes)))
 let manager = FileProviderDomains()
 let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 // Devices on the network: connected when the user asks, remembered, and reconnected. A host
 // claiming the serial of a device the hub serves is not believed without the user.
 let wireless = WirelessADB(
   adb: ADBWireless(), store: wirelessStore,
-  known: { Set(await hub.devices().map(\.id)) })
+  known: { Set(await hub.devices().map(\.id)) }, vouching: vouching)
 Task { await wireless.run() }
 Task {
   await manager.conformExisting()

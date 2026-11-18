@@ -61,7 +61,10 @@ private func requests() -> [AgentRequest] {
   let address = WirelessEndpoint(parsing: "192.0.2.31")!
   all += [.connectAddress(address), .pair(address, code: PairingCode("482913")!)]
   all += [.connectWireless(device), .enableWireless(device), .forgetWireless(device)]
-  all += [.confirmWireless(address), .ignoreWireless(address)]
+  all += [
+    .confirmWireless(UnconfirmedAddress(address: address, id: device, name: "EtherScope nXG")),
+    .ignoreWireless(address),
+  ]
   return all
 }
 
@@ -175,7 +178,7 @@ private func wirelessResponses() throws -> [AgentResponse] {
   all.append(.wireless(.needsConfirmation(address)))
   for failure: WirelessFailure in [
     .adbUnavailable, .notOverUSB, .notRemembered, .noConnectService, .otherDevice,
-    .adb("failed to connect"),
+    .adb("failed to connect"), .unidentified, .offerChanged,
   ] {
     all.append(.wireless(.failed(failure)))
   }
@@ -255,7 +258,8 @@ func invalidWirelessRequestsReplyBadRequest(valid: String, invalid: String) asyn
   let code = try #require(PairingCode("482913"))
   for request: AgentRequest in [
     .connectAddress(address), .pair(address, code: code), .connectWireless(device),
-    .enableWireless(device), .forgetWireless(device), .confirmWireless(address),
+    .enableWireless(device), .forgetWireless(device),
+    .confirmWireless(UnconfirmedAddress(address: address, id: device, name: "EtherScope nXG")),
     .ignoreWireless(address),
   ] {
     #expect(ClientRole.app.allows(request))

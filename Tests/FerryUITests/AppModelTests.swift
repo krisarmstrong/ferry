@@ -99,8 +99,8 @@ final class FakeClient: AgentSending {
     case .forgetWireless(let id):
       log.record("forgetWireless \(id.serial)")
       return .done
-    case .confirmWireless(let address):
-      log.record("confirmWireless \(address.argument)")
+    case .confirmWireless(let offer):
+      log.record("confirmWireless \(offer.address.argument) \(offer.id.serial) \(offer.name)")
       return wirelessResult.withLock { $0 }
     case .ignoreWireless(let address):
       log.record("ignoreWireless \(address.argument)")

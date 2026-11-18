@@ -16,7 +16,7 @@ extension AgentService {
     case .pair(let address, let code): outcome = await wireless?.pair(address, code: code)
     case .connectWireless(let id): outcome = await wireless?.reconnect(id)
     case .enableWireless(let id): outcome = await wireless?.useOverWiFi(id)
-    case .confirmWireless(let address): outcome = await wireless?.confirm(address)
+    case .confirmWireless(let shown): outcome = await wireless?.confirm(shown)
     default: return nil
     }
     return .wireless(outcome ?? .failed(.adbUnavailable))

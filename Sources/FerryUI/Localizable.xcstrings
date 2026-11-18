@@ -499,7 +499,13 @@
     "That address belongs to another device." : {
 
     },
+    "That address changed. Check the menu and try again." : {
+
+    },
     "The device appears in Finder once it shares files." : {
+
+    },
+    "The device didn't say which device it is, so Ferry disconnected it." : {
 
     },
     "The device does not show up" : {

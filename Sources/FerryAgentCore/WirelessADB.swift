@@ -107,6 +107,12 @@ public actor WirelessADB {
     let epoch: UInt64
   }
 
+  /// What was true when a connect began: the devices Ferry knew, and the count of forgets.
+  struct Basis {
+    let known: Set<DeviceID>
+    let epoch: UInt64
+  }
+
   /// What a connect is for: how the address was learnt, and who it must be.
   struct Purpose {
     var learnt: Learnt
@@ -133,18 +139,29 @@ public actor WirelessADB {
   var forgotten: [DeviceID: UInt64] = [:]
   /// The devices Ferry serves now, by any method.
   let known: @Sendable () async -> Set<DeviceID>
+  /// What the hub may serve over the network, kept in step with `entries`.
+  let vouching: WirelessVouching
+  /// The reconnects started at agent start or when adb's server came back, if still running.
+  var reconnecting: Task<Void, Never>?
+  /// How many startup reconnects run at once.
+  static let reconnectLimit = 4
 
   /// `known` lists the devices Ferry serves now (the hub's), so a network host claiming one of
-  /// their serials is not believed without the user.
+  /// their serials is not believed without the user. `vouching` is shared with the
+  /// `ADBTransport` that serves network routes.
   public init(
     adb: any WirelessADBControl, store: URL, timing: Timing = Timing(),
-    known: @escaping @Sendable () async -> Set<DeviceID> = { [] }
+    known: @escaping @Sendable () async -> Set<DeviceID> = { [] },
+    vouching: WirelessVouching = WirelessVouching()
   ) {
     self.adb = adb
     file = store
     self.timing = timing
     self.known = known
-    entries = WirelessStore.load(store)
+    self.vouching = vouching
+    let entries = WirelessStore.load(store)
+    self.entries = entries
+    vouching.remember(entries)
   }
 
   /// `wireless.json` beside the agent's item tables.
@@ -224,16 +241,16 @@ public actor WirelessADB {
     }
   }
 
-  /// The user says `address` is the device it claimed to be: it is connected, must answer as
-  /// that device again, and joins its entry.
-  public func confirm(_ address: WirelessEndpoint) async -> WirelessOutcome {
+  /// The user says the address is the device the menu showed: the offer must still be exactly
+  /// that (address, device and name), and the address must answer as that device again before
+  /// it joins the entry.
+  public func confirm(_ shown: UnconfirmedAddress) async -> WirelessOutcome {
     await gate.run { () async -> WirelessOutcome in
-      guard let offer = unconfirmedAddresses.removeValue(forKey: address) else {
-        return .failed(.notRemembered)
-      }
+      guard unconfirmedAddresses[shown.address] == shown else { return .failed(.offerChanged) }
+      unconfirmedAddresses[shown.address] = nil
       return await attempt(
-        address, for: Purpose(learnt: .user, expected: offer.id, confirmed: true),
-        all: [address])
+        shown.address, for: Purpose(learnt: .user, expected: shown.id, confirmed: true),
+        all: [shown.address])
     }
   }
 
@@ -267,6 +284,8 @@ public actor WirelessADB {
           log.info("disconnecting failed: \(String(describing: error), privacy: .private)")
         }
       }
+      // Only once disconnected: the device is unknown to Ferry now, which a scan would serve.
+      for endpoint in revoked.keys { vouching.settle(endpoint.argument) }
     }
   }
 }

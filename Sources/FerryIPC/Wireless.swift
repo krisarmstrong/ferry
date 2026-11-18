@@ -55,6 +55,10 @@ public enum WirelessFailure: Codable, Sendable, Equatable {
   case noConnectService
   /// The address answers as another device, so it was disconnected again.
   case otherDevice
+  /// The device did not say who it is (no serial number), so it was disconnected.
+  case unidentified
+  /// The address no longer stands for the device the menu showed; the menu has the current offer.
+  case offerChanged
   /// adb's own words, one line.
   case adb(String)
 }

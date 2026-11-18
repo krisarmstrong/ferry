@@ -33,6 +33,16 @@ actor FakeWirelessADB: WirelessADBControl {
   var mdns: [ADBMDNSService] = []
   var pairOutcome = ADBPairOutcome.failed("not scripted")
   var serverUp = true
+  /// How long `connect` takes for an address, as an unreachable host does.
+  var connectDelay: [String: Duration] = [:]
+  /// Identity reads that fail, by adb serial.
+  var unreadable: Set<String> = []
+  /// adb serials whose device reports no serial number.
+  var nameless: Set<String> = []
+  /// Runs while the identity of an adb serial is read: what a scan would see then.
+  var whileIdentifying: (@Sendable (String) -> Void)?
+  private(set) var inFlight = 0
+  private(set) var maxInFlight = 0
   private let events: AsyncStream<ADBServerEvent>
   private let feed: AsyncStream<ADBServerEvent>.Continuation
 
@@ -66,6 +76,10 @@ actor FakeWirelessADB: WirelessADBControl {
   func connect(_ endpoint: WirelessEndpoint) async throws(ADBError) -> ADBConnectOutcome {
     try requireServer()
     calls.append(.connect(endpoint.argument))
+    inFlight += 1
+    maxInFlight = max(maxInFlight, inFlight)
+    if let delay = connectDelay[endpoint.argument] { try? await Task.sleep(for: delay) }
+    inFlight -= 1
     guard let unit = units[endpoint.argument] else {
       return .failed("failed to connect to '\(endpoint.argument)': Connection refused")
     }
@@ -100,6 +114,9 @@ actor FakeWirelessADB: WirelessADBControl {
 
   func device(at adbSerial: String) async throws(ADBError) -> DeviceInfo? {
     try requireServer()
+    whileIdentifying?(adbSerial)
+    if unreadable.contains(adbSerial) { throw .failed("getprop failed") }
+    if nameless.contains(adbSerial) { return nil }
     return (units[adbSerial] ?? usb[adbSerial])?.info
   }
 
