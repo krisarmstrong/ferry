@@ -73,8 +73,8 @@ mode: it enumerates over MTP but publishes no storage (seen on the LinkRunner-10
 
 ## Non-goals (v1)
 
-- ADB mode and Wi-Fi mode — **designed for, not built** (see Transports).
-- Finder badges / FinderSync extension.
+- Finder badges (the Finder Sync extension adds menu items only; see ADB).
+- A native ADB engine (future release; see ADB).
 - "Keep offline" pinning beyond what the system provides.
 - Auto-update (Sparkle), localisation beyond English (but strings go in a
   String Catalog from day one), Intel builds.
@@ -197,13 +197,56 @@ Ferry.app (SwiftUI menu-bar app, LSUIElement)
     `NSXPCInterface`, builder's call) shared by agent, app, extension.
   - A `FakeTransport` in DeviceKit's test support for unit tests.
 
-### Transports (ADB / Wi-Fi later)
+### Transports
 
-`DeviceTransport` is the seam. v1 ships `MTPTransport` only. Future
-`ADBTransport` (adb sync protocol; requires bundling or locating `adb`) and a
-Wi-Fi transport plug in behind the same protocol without touching the
-extension. The protocol must not leak MTP concepts (object IDs are opaque
-strings; capabilities such as "supports move" are queried, not assumed).
+`DeviceTransport` is the seam. Plan 2 shipped `MTPTransport`; Plan 2b adds ADB over USB
+and Wi-Fi behind the same protocol without touching the extension. The protocol does not leak
+MTP or ADB concepts (capabilities are queried, not assumed).
+
+### ADB (amended 2026-11-18, Plan 2b)
+
+**Engine (owner decision 2026-11-18).** Ferry talks to the standard adb server
+(`127.0.0.1:5037`, adb's host protocol) and never bundles Google's `adb` binary, whose licence
+does not allow it. Ferry finds an installed `adb` (Homebrew `android-platform-tools`,
+Android Studio's `~/Library/Android/sdk/platform-tools`, `$ANDROID_HOME`) only to start the
+server and to run `adb pair` / `adb connect`; everything else goes over the socket. When no
+`adb` is found, MTP keeps working and the menu and setup guide show the one-line install. A
+native Swift ADB engine (no install step) is a future-release row, not Plan 2b.
+
+**One device, one Finder location, best method wins.** The agent sees a device through MTP, ADB
+over USB, or ADB over Wi-Fi, and keys it by its serial (`ro.serialno` for ADB, the USB serial
+for MTP: the same string on Android) so the Finder location and item identities stay the same
+whichever method serves it. Preference: ADB over USB, then ADB over Wi-Fi, then MTP. MTP is
+never removed: it is the fallback whenever USB debugging is off, unauthorised, or `adb` is not
+installed. Switching method mid-session is a session replacement in the hub, not a new domain.
+
+**Storages.** ADB exposes the same user storages MTP does, not the whole filesystem: internal
+shared storage (`/storage/emulated/0`) and each removable volume (`/storage/<UUID>`). Storage
+keys become method-neutral (`internal`, `volume:<UUID>`), and MTP storages map onto them; where
+an MTP storage cannot be matched it keeps its MTP key and is served by MTP only.
+
+**Protocol rules.** File I/O uses the sync service (`STAT`/`LIST`/`RECV`/`SEND`, with
+`stat_v2`/`ls_v2` 64-bit variants when the device advertises them; on Android 8, where
+`ls_v2` is absent, listing sizes come from `STA2`). Rename, move, folder creation and delete
+run as shell commands with arguments quoted by Ferry, never interpolated; results are checked
+with exit status (`shell_v2`) or an explicit status echo. The same `SafeWriter`, expecting
+checks and conflict rules as MTP apply.
+
+**Method shown.** The menu names each device's method ("USB · ADB", "Wi-Fi · ADB",
+"USB · File transfer") and, for MTP, how to get ADB.
+
+**Wireless.** Android 11+: pair with the pairing code (`adb pair`) and connect via mDNS
+discovery. Android 8–10: switch a USB-connected device to TCP (`tcpip 5555`) and connect by
+address. Ferry remembers paired devices and reconnects when they are seen; it never scans
+networks.
+
+**Tools (ADB only).** Screenshot, screen recording, APK install (top priority), logcat viewer,
+shell (opened in Terminal), port forwarding, device info. Screenshots and recordings save where
+macOS saves its own screenshots.
+
+**Finder Sync.** A Finder Sync extension adds "Send to <device>" for Mac files (into the
+device's Download folder) and "Install on <device>" for `.apk` files, plus a toolbar button.
+It talks only to the agent.
 
 ### Change detection
 
