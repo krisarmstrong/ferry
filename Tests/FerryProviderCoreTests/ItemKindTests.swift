@@ -99,6 +99,29 @@ struct ItemKindTests {
     #expect(try FileManager.default.contentsOfDirectory(atPath: fetchDir.path).count == 1)
   }
 
+  /// A code bundle deeper than the budget is refused, with the description Finder shows.
+  @Test func aBundlePastTheBudgetIsRefused() async throws {
+    let agent = FakeAgent()
+    let backend = ProviderBackend(
+      domain: domain, client: agent,
+      treeBudget: TreeBudget(maxDepth: 0, maxEntries: 100, maxBytes: 1 << 20))
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let bundle = try localPackage("rtf", in: dir, named: "Plugin.bundle")
+
+    do {
+      _ = try await backend.create(
+        try ItemTemplate(
+          Template(parent: .rootContainer, filename: "Plugin.bundle", contentType: .bundle)),
+        contents: bundle)
+      Issue.record("the bundle was copied")
+    } catch {
+      let error = error as NSError
+      #expect(error.domain == NSCocoaErrorDomain)
+      #expect(error.code == CocoaError.Code.fileReadTooLarge.rawValue)
+    }
+  }
+
   /// A code bundle (shown as a folder, see `ProviderItem.contentType`) comes with its folder as
   /// the contents: everything in it goes to the device, links aside.
   @Test func aBundlesContentsAreCopiedIntoItsFolder() async throws {

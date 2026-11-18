@@ -44,6 +44,10 @@ public enum ErrorMapping {
       return CocoaError(.userCancelled)
     case .macDiskFull:
       return CocoaError(.fileWriteOutOfSpace)
+    case .packageTooLarge:
+      return described(
+        .fileReadTooLarge,
+        "This package is too large or too deep to copy between the device and this Mac.")
     // The upload landed under another name. Saying both lets the user find it.
     case .nameChangedByDevice(let requested, let actual):
       return described(

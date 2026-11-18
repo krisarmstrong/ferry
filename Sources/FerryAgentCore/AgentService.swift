@@ -28,9 +28,13 @@ public actor AgentService: AgentHandling {
   private let domains: DomainController
   let transfers = TransferBoard()
 
-  public init(hub: DeviceHub, domains: DomainController) {
+  /// How much of a document package on the device a fetch will download.
+  let packageBudget: TreeBudget
+
+  public init(hub: DeviceHub, domains: DomainController, packageBudget: TreeBudget = .standard) {
     self.hub = hub
     self.domains = domains
+    self.packageBudget = packageBudget
   }
 
   public func handle(
@@ -293,7 +297,9 @@ extension AgentService {
     try FileTransfer.requireRegular(target)
     let scratch = FileTransfer.scratchURL()
     defer { FileTransfer.remove(scratch) }
-    if let package = try await packageFetch(id, in: domain, into: target) { return package }
+    if let package = try await packageFetch(id, in: domain, into: target, progress: progress) {
+      return package
+    }
     let entry = try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
       let downloaded = try await transfers.track(

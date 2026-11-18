@@ -22,10 +22,13 @@ public enum PackageArchive {
 
   /// Writes the folders and regular files under `root`, depth first in name order, into
   /// `handle` from its current offset.
-  public static func write(tree root: URL, to handle: FileHandle) throws(TransportError) {
+  public static func write(
+    tree root: URL, to handle: FileHandle, budget: TreeBudget = .standard
+  ) throws(TransportError) {
+    var usage = TreeBudget.Usage(budget)
     do {
       try handle.write(contentsOf: magic)
-      try writeEntries(of: root, prefix: "", to: handle)
+      try writeEntries(of: root, prefix: "", depth: 1, usage: &usage, to: handle)
       try handle.write(contentsOf: Data([Kind.end.rawValue]))
     } catch let error as TransportError {
       throw error
@@ -36,21 +39,38 @@ public enum PackageArchive {
 
   /// Reads an archive from `handle`, from its current offset, into a new folder at
   /// `destination`.
-  public static func extract(from handle: FileHandle, to destination: URL)
-    throws(TransportError)
-  {
+  /// A tree past `budget` is `.packageTooLarge`. Whatever fails, nothing is left at
+  /// `destination`.
+  public static func extract(
+    from handle: FileHandle, to destination: URL, budget: TreeBudget = .standard
+  ) throws(TransportError) {
+    do throws(TransportError) {
+      try extractEntries(from: handle, to: destination, budget: budget)
+    } catch {
+      try? FileManager.default.removeItem(at: destination)
+      throw error
+    }
+  }
+
+  private static func extractEntries(
+    from handle: FileHandle, to destination: URL, budget: TreeBudget
+  ) throws(TransportError) {
+    var usage = TreeBudget.Usage(budget)
     do {
       try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
       guard try handle.read(upToCount: magic.count) == magic else { throw bad("not a package") }
       for _ in 0..<maxEntries {
         guard let kind = Kind(rawValue: try byte(handle)) else { throw bad("unknown record") }
         if kind == .end { return }
-        let target = try validatedTarget(try path(handle), under: destination)
+        let (target, depth) = try validatedTarget(try path(handle), under: destination)
         switch kind {
         case .folder:
+          try usage.add(depth: depth)
           try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
         case .file:
-          try copyFile(from: handle, size: try integer(handle, bytes: 8), to: target)
+          let size = try integer(handle, bytes: 8)
+          try usage.add(depth: depth, size: size)
+          try copyFile(from: handle, size: size, to: target)
         case .end:
           return
         }
@@ -65,7 +85,10 @@ public enum PackageArchive {
 
   // MARK: Writing
 
-  private static func writeEntries(of folder: URL, prefix: String, to handle: FileHandle) throws {
+  private static func writeEntries(
+    of folder: URL, prefix: String, depth: Int, usage: inout TreeBudget.Usage,
+    to handle: FileHandle
+  ) throws {
     let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
     let children = try FileManager.default.contentsOfDirectory(
       at: folder, includingPropertiesForKeys: keys
@@ -75,9 +98,12 @@ public enum PackageArchive {
       guard values.isSymbolicLink != true else { continue }
       let path = prefix + child.lastPathComponent
       if values.isDirectory == true {
+        try usage.add(depth: depth)
         try record(.folder, path, to: handle)
-        try writeEntries(of: child, prefix: path + "/", to: handle)
+        try writeEntries(
+          of: child, prefix: path + "/", depth: depth + 1, usage: &usage, to: handle)
       } else if values.isRegularFile == true {
+        try usage.add(depth: depth, size: try LocalFile.regularFileSize(child))
         try record(.file, path, to: handle)
         try writeFile(child, to: handle)
       }
@@ -133,8 +159,11 @@ public enum PackageArchive {
     return path
   }
 
-  /// `path` under `destination`, if it is relative and made of ordinary names only.
-  private static func validatedTarget(_ path: String, under destination: URL) throws -> URL {
+  /// `path` under `destination`, if it is relative and made of ordinary names only, and how
+  /// many names deep it is.
+  private static func validatedTarget(_ path: String, under destination: URL) throws -> (
+    URL, Int
+  ) {
     let components = path.split(separator: "/", omittingEmptySubsequences: false)
     var target = destination
     for component in components {
@@ -144,7 +173,7 @@ public enum PackageArchive {
       else { throw bad("bad path") }
       target = target.appending(path: name)
     }
-    return target
+    return (target, components.count)
   }
 
   private static func copyFile(from handle: FileHandle, size: UInt64, to url: URL) throws {

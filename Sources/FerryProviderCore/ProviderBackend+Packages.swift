@@ -104,6 +104,44 @@ extension ProviderBackend {
   }
 }
 
+// MARK: Budget
+
+extension ProviderBackend {
+  /// Walks the local tree at `local` before any of it is sent, and refuses one deeper, with more
+  /// entries or more bytes than `budget` allows, with the description Finder shows.
+  static func requireWithinBudget(_ local: URL, _ budget: TreeBudget) throws {
+    var usage = TreeBudget.Usage(budget)
+    do throws(TransportError) {
+      try measure(local, depth: 1, usage: &usage)
+    } catch {
+      throw ErrorMapping.fileProviderError(error)
+    }
+  }
+
+  private static func measure(_ folder: URL, depth: Int, usage: inout TreeBudget.Usage)
+    throws(TransportError)
+  {
+    let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
+    let children: [URL]
+    do {
+      children = try FileManager.default.contentsOfDirectory(
+        at: folder, includingPropertiesForKeys: keys)
+    } catch {
+      throw .io("reading \(folder.lastPathComponent) failed: \(error.localizedDescription)")
+    }
+    for child in children {
+      let values = try? child.resourceValues(forKeys: Set(keys))
+      guard values?.isSymbolicLink != true else { continue }
+      if values?.isDirectory == true {
+        try usage.add(depth: depth)
+        try measure(child, depth: depth + 1, usage: &usage)
+      } else if values?.isRegularFile == true {
+        try usage.add(depth: depth, size: try LocalFile.regularFileSize(child))
+      }
+    }
+  }
+}
+
 // MARK: Document packages
 
 extension ProviderBackend {
@@ -119,7 +157,7 @@ extension ProviderBackend {
     let writer = try FileHandle(forWritingTo: archive)
     do throws(TransportError) {
       defer { try? writer.close() }
-      try PackageArchive.write(tree: folder, to: writer)
+      try PackageArchive.write(tree: folder, to: writer, budget: treeBudget)
     } catch {
       throw ErrorMapping.fileProviderError(error)
     }

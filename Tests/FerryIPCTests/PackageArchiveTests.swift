@@ -75,3 +75,58 @@ struct PackageArchiveTests {
     #expect(Packages.isPackageOrInside(try RemotePath("/Docs/Notes.rtfd")))
   }
 }
+
+/// A tree past the budget is refused on either side, and a refused extraction leaves nothing.
+struct PackageArchiveBudgetTests {
+  /// `depth` nested folders, each holding a `size`-byte file.
+  private func tree(depth: Int, size: Int, in folder: URL) throws -> URL {
+    let root = folder.appending(path: "Deep.rtfd")
+    var current = root
+    for level in 0..<depth {
+      current = current.appending(path: "level\(level)")
+      try FileManager.default.createDirectory(at: current, withIntermediateDirectories: true)
+      try Data(count: size).write(to: current.appending(path: "file"))
+    }
+    return root
+  }
+
+  private func written(_ root: URL, budget: TreeBudget, in folder: URL) throws -> URL {
+    let archive = folder.appending(path: "archive-\(UUID().uuidString)")
+    #expect(FileManager.default.createFile(atPath: archive.path, contents: nil))
+    let writer = try FileHandle(forWritingTo: archive)
+    defer { try? writer.close() }
+    try PackageArchive.write(tree: root, to: writer, budget: budget)
+    return archive
+  }
+
+  @Test(arguments: [
+    TreeBudget(maxDepth: 2, maxEntries: 100, maxBytes: 1 << 20),
+    TreeBudget(maxDepth: 32, maxEntries: 5, maxBytes: 1 << 20),
+    TreeBudget(maxDepth: 32, maxEntries: 100, maxBytes: 10),
+  ])
+  func writingPastTheBudgetIsRefused(budget: TreeBudget) throws {
+    let folder = try TestScratch.folder("budget")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let root = try tree(depth: 4, size: 4, in: folder)
+
+    #expect(throws: TransportError.packageTooLarge) {
+      _ = try written(root, budget: budget, in: folder)
+    }
+  }
+
+  @Test func extractingPastTheBudgetIsRefusedAndLeavesNothing() throws {
+    let folder = try TestScratch.folder("budget")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let archive = try written(
+      try tree(depth: 4, size: 4, in: folder), budget: .standard, in: folder)
+    let reader = try FileHandle(forReadingFrom: archive)
+    defer { try? reader.close() }
+    let out = folder.appending(path: "out")
+
+    #expect(throws: TransportError.packageTooLarge) {
+      try PackageArchive.extract(
+        from: reader, to: out, budget: TreeBudget(maxDepth: 2, maxEntries: 100, maxBytes: 1 << 20))
+    }
+    #expect(!FileManager.default.fileExists(atPath: out.path))
+  }
+}

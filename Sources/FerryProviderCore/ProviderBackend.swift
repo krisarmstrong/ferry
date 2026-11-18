@@ -26,9 +26,13 @@ public actor ProviderBackend {
   let domain: String
   private let client: any AgentSending
 
-  public init(domain: String, client: any AgentSending) {
+  /// How much of a code bundle's tree is copied file by file (see `uploadTree`).
+  let treeBudget: TreeBudget
+
+  public init(domain: String, client: any AgentSending, treeBudget: TreeBudget = .standard) {
     self.domain = domain
     self.client = client
+    self.treeBudget = treeBudget
   }
 
   public func item(_ id: NSFileProviderItemIdentifier) async throws -> ProviderItem {
@@ -86,9 +90,10 @@ public actor ProviderBackend {
           contents,
           as: .createPackage(domain: domain, parent: template.parent, name: template.filename)))
     case .folder:
-      let folder = try await entry(request)
       // FileProvider hands over a code bundle as one item, its folder as `contents`; a plain
       // folder comes with none, its children each created on their own.
+      if let contents { try Self.requireWithinBudget(contents, treeBudget) }
+      let folder = try await entry(request)
       if let contents { try await uploadTree(contents, into: folder.id) }
       return ProviderItem(folder)
     case .file:
@@ -163,6 +168,7 @@ public actor ProviderBackend {
         contents, as: .replacePackage(domain: domain, id: itemID))
     } else if changed.contains(.contents), let contents, template.kind == .folder {
       // A package edited on the Mac: its folder is the new contents.
+      try Self.requireWithinBudget(contents, treeBudget)
       try await syncTree(contents, into: itemID)
       latest = try await entry(.item(domain: domain, id: itemID))
     } else if changed.contains(.contents), let contents {

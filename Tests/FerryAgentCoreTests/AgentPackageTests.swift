@@ -182,3 +182,34 @@ struct AgentPackageTests {
         == Data("old".utf8))
   }
 }
+
+/// A package on the device past the budget (too deep, too many entries, too many bytes) is
+/// refused rather than downloaded, and leaves nothing behind.
+@Suite(.timeLimit(.minutes(1)))
+struct AgentPackageBudgetTests {
+  @Test(arguments: [
+    TreeBudget(maxDepth: 2, maxEntries: 100, maxBytes: 1 << 20),
+    TreeBudget(maxDepth: 32, maxEntries: 3, maxBytes: 1 << 20),
+    TreeBudget(maxDepth: 32, maxEntries: 100, maxBytes: 5),
+  ])
+  func aPackagePastTheBudgetIsNotFetched(budget: TreeBudget) async throws {
+    let device = await makeDevice("A")
+    let storage = storageID(device)
+    for file in ["/Deep.rtfd/a/f", "/Deep.rtfd/a/b/f", "/Deep.rtfd/a/b/c/f"] {
+      try await device.seed(try path(file), in: storage, contents: Data("four".utf8))
+    }
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    let service = AgentService(hub: harness.hub, domains: harness.controller, packageBudget: budget)
+    let domain = domainID(device)
+    let (target, handle) = try harness.writable("fetched", "")
+
+    let reply = await service.handle(
+      .fetch(domain: domain, id: try await harness.id(try path("/Deep.rtfd"), in: domain)),
+      file: handle)
+
+    #expect(reply == .failure(.packageTooLarge))
+    #expect(try Data(contentsOf: target).isEmpty)
+  }
+}
