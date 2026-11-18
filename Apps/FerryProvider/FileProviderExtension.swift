@@ -144,7 +144,10 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
     if containerItemIdentifier == .workingSet {
       return Enumerator(container: .workingSet, backend: backend)
     }
-    // The trash and anything else the agent did not assign.
+    if containerItemIdentifier == .trashContainer {
+      return EmptyTrashEnumerator()
+    }
+    // Anything else the agent did not assign.
     guard ItemID(containerItemIdentifier) != nil else { throw NSFileProviderError(.noSuchItem) }
     return Enumerator(container: .folder(containerItemIdentifier), backend: backend)
   }
