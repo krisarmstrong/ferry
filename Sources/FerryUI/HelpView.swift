@@ -6,23 +6,41 @@ public struct HelpView: View {
   public static let windowID = "help"
   public static let windowTitle = Text("Ferry Help", bundle: .module)
 
-  @SceneStorage("help.section") private var selection = "getting-started"
+  /// The section last shown, kept across launches though the window itself is not restored.
+  @AppStorage("help.section") private var selection = "getting-started"
   @State private var query = ""
   private let model: AppModel
-  private let content: HelpContent
+  private let content: HelpContent?
 
   public init(model: AppModel) {
     self.init(model: model, content: .bundled)
   }
 
-  init(model: AppModel, content: HelpContent) {
+  init(model: AppModel, content: HelpContent?) {
     self.model = model
     self.content = content
   }
 
   public var body: some View {
+    if let content {
+      sectionsView(content)
+    } else {
+      ContentUnavailableView {
+        Label {
+          Text("Help isn't available", bundle: .module)
+        } icon: {
+          Image(systemName: "questionmark.circle")
+        }
+      } description: {
+        Text("Ferry's help could not be loaded. Reinstalling Ferry restores it.", bundle: .module)
+      }
+      .frame(minWidth: 640, minHeight: 420)
+    }
+  }
+
+  private func sectionsView(_ content: HelpContent) -> some View {
     let sections = content.sections(matching: query)
-    NavigationSplitView {
+    return NavigationSplitView {
       List(sections, selection: selectedID) { section in
         Label {
           Text(HelpText.resource(section.title))
@@ -125,7 +143,7 @@ private struct HelpBodyView: View {
 }
 
 #Preview("Troubleshooting") {
-  if let section = HelpContent.bundled.sections.first(where: { $0.id == "troubleshooting" }) {
+  if let section = HelpContent.bundled?.sections.first(where: { $0.id == "troubleshooting" }) {
     HelpSectionDetail(section: section, model: .preview([]))
       .frame(width: 460, height: 560)
   }

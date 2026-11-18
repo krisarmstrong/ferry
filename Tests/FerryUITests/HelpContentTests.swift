@@ -5,7 +5,8 @@ import Testing
 @testable import FerryUI
 
 struct HelpContentTests {
-  private static let help = HelpContent.bundled
+  private static let help =
+    HelpContent.bundled ?? HelpContent(version: 0, title: "", sections: [])
 
   private static func section(_ id: String) throws -> HelpSection {
     try #require(help.sections.first { $0.id == id })
@@ -16,6 +17,7 @@ struct HelpContentTests {
   }
 
   @Test func bundledHelpDecodes() {
+    #expect(HelpContent.bundled != nil)
     #expect(Self.help.version == 1)
     #expect(Self.help.sections.first?.id == "getting-started")
     #expect(Set(Self.help.sections.map(\.id)).count == Self.help.sections.count)
@@ -105,5 +107,15 @@ struct HelpContentTests {
 
   @Test func searchWithNoMatchIsEmpty() {
     #expect(Self.help.sections(matching: "zzqx").isEmpty)
+  }
+
+  /// A missing or broken help.json must not stop Ferry: the Help window says help is not
+  /// available instead.
+  @Test func missingOrBrokenHelpLoadsNothing() throws {
+    #expect(HelpContent.load(nil) == nil)
+    let broken = FileManager.default.temporaryDirectory.appending(path: "help-\(UUID()).json")
+    try Data("{".utf8).write(to: broken)
+    defer { try? FileManager.default.removeItem(at: broken) }
+    #expect(HelpContent.load(broken) == nil)
   }
 }

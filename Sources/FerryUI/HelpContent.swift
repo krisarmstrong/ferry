@@ -1,27 +1,36 @@
 import Foundation
+import os
+
+private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "Help")
 
 /// Ferry's in-app help, decoded from `help.json` (see `Design/Help/README.md` for the schema).
 ///
 /// Every string in the file is a key in `Localizable.xcstrings`, looked up when shown, so the
 /// help translates with the rest of the app. The connection steps use the same keys as
 /// `GuideSteps`.
-struct HelpContent: Decodable, Sendable {
+struct HelpContent: Decodable, Sendable, Equatable {
   let version: Int
   let title: String
   let sections: [HelpSection]
 
-  /// The help that ships in the bundle. It is static and checked by the tests, so a file that
-  /// does not load is a build defect.
-  static let bundled: HelpContent = {
-    guard let url = Bundle.module.url(forResource: "help", withExtension: "json") else {
-      preconditionFailure("help.json is missing from the FerryUI bundle")
+  /// The help that ships in the bundle, or `nil` if it is missing or does not decode. The tests
+  /// check it, so that is a build defect, logged as a fault; the Help window then says help is
+  /// not available rather than stopping Ferry.
+  static let bundled: HelpContent? = load(
+    Bundle.module.url(forResource: "help", withExtension: "json"))
+
+  static func load(_ url: URL?) -> HelpContent? {
+    guard let url else {
+      log.fault("help.json is missing from the FerryUI bundle")
+      return nil
     }
     do {
       return try JSONDecoder().decode(HelpContent.self, from: Data(contentsOf: url))
     } catch {
-      preconditionFailure("help.json does not decode: \(error)")
+      log.fault("help.json does not load: \(error, privacy: .public)")
+      return nil
     }
-  }()
+  }
 
   /// The sections that mention `query` in their title or any of their text, ignoring case,
   /// diacritics and Markdown. Every section for an empty query.

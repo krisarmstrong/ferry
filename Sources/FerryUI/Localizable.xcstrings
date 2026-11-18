@@ -125,6 +125,9 @@
     "Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon." : {
       "extractionState" : "manual"
     },
+    "Ferry's help could not be loaded. Reinstalling Ferry restores it." : {
+
+    },
     "Ferry's helper is not responding" : {
       "extractionState" : "manual"
     },
@@ -151,6 +154,9 @@
     },
     "Help" : {
       "extractionState" : "manual"
+    },
+    "Help isn't available" : {
+
     },
     "How to connect" : {
 

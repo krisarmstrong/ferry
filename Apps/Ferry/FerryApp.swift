@@ -35,12 +35,12 @@ struct FerryApp: App {
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
 
-    // Unlike the setup guide, the help window keeps state restoration, so it can reopen on
-    // the section the reader last chose.
+    // Not restored at launch, like the setup guide; HelpView remembers the last section itself.
     Window(HelpView.windowTitle, id: HelpView.windowID) {
       HelpView(model: model)
     }
     .defaultLaunchBehavior(.suppressed)
+    .restorationBehavior(.disabled)
 
     Settings {
       SettingsView(model: model)
