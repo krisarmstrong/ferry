@@ -18,6 +18,7 @@ import UniformTypeIdentifiers
     #expect(!root.capabilities.contains(.allowsRenaming))
     #expect(!root.capabilities.contains(.allowsReparenting))
     #expect(!root.capabilities.contains(.allowsDeleting))
+    #expect(root.capabilities.contains(ProviderItem.allowsEvicting))
   }
 
   @Test func childrenBuildItemsWithIdentifiers() async throws {
@@ -36,6 +37,7 @@ import UniformTypeIdentifiers
     #expect(top[0].contentType == .folder)
     #expect(top[0].capabilities.contains(.allowsAddingSubItems))
     #expect(top[1].capabilities.contains(.allowsDeleting))
+    #expect(top.allSatisfy { $0.capabilities.contains(ProviderItem.allowsEvicting) })
 
     let nested = try await backend.children(of: dcim)
     #expect(nested.map(\.itemIdentifier) == [try await agent.identifier(try path("/DCIM/a.jpg"))])

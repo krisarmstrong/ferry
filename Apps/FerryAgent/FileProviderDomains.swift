@@ -8,11 +8,42 @@ private let log = Logger(
 /// The system's FileProvider domains for Ferry, through `NSFileProviderManager`.
 struct FileProviderDomains: DomainManaging {
   func add(_ spec: DomainSpec) async throws {
-    let domain = NSFileProviderDomain(
-      identifier: NSFileProviderDomainIdentifier(spec.identifier), displayName: spec.displayName)
-    // MTP has no trash: a delete in Finder deletes on the device.
+    try await NSFileProviderManager.add(
+      Self.configured(
+        NSFileProviderDomainIdentifier(spec.identifier), displayName: spec.displayName))
+  }
+
+  /// Adds every existing domain again whose settings differ from `configured`, such as one
+  /// added by an earlier Ferry. An add with an existing identifier updates the domain in place,
+  /// so its items, enablement and the agent's item table all stay.
+  func conformExisting() async {
+    let domains: [NSFileProviderDomain]
+    do {
+      domains = try await NSFileProviderManager.domains()
+    } catch {
+      log.error("listing domains failed: \(error, privacy: .public)")
+      return
+    }
+    for domain in domains where domain.supportsSyncingTrash {
+      do {
+        try await NSFileProviderManager.add(
+          Self.configured(domain.identifier, displayName: domain.displayName))
+        log.info("updated settings of \(domain.identifier.rawValue, privacy: .private)")
+      } catch {
+        log.error(
+          "updating \(domain.identifier.rawValue, privacy: .private) failed: \(error, privacy: .public)"
+        )
+      }
+    }
+  }
+
+  private static func configured(
+    _ identifier: NSFileProviderDomainIdentifier, displayName: String
+  ) -> NSFileProviderDomain {
+    let domain = NSFileProviderDomain(identifier: identifier, displayName: displayName)
+    // MTP has no trash: Finder offers Delete Immediately, which deletes on the device.
     domain.supportsSyncingTrash = false
-    try await NSFileProviderManager.add(domain)
+    return domain
   }
 
   func disconnect(_ identifier: String) async throws {

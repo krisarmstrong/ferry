@@ -26,6 +26,12 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
 
   static let rootFilename = "Device"
 
+  /// `.allowsEvicting`, which the SDK marks deprecated in favour of `contentPolicy`. macOS 27
+  /// still requires it: without it, eviction fails with `NSFileProviderError.nonEvictable`
+  /// (-2008, "the item has not been assigned the evictable capability") even under the default
+  /// lazy content policy. Spelled by value so the deprecation does not warn on every build.
+  public static let allowsEvicting = NSFileProviderItemCapabilities(rawValue: 1 << 6)
+
   public var contentType: UTType {
     switch entry.item.kind {
     case .folder:
@@ -45,8 +51,13 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
 
   /// On a folder, `.allowsReading` and `.allowsWriting` are `.allowsContentEnumerating` and
   /// `.allowsAddingSubItems`: the SDK defines them as the same bits.
+  ///
+  /// Every item is evictable, so Finder offers Remove Download and the system can reclaim space:
+  /// the device keeps the contents.
   public var capabilities: NSFileProviderItemCapabilities {
-    var capabilities: NSFileProviderItemCapabilities = [.allowsReading, .allowsWriting]
+    var capabilities: NSFileProviderItemCapabilities = [
+      .allowsReading, .allowsWriting, Self.allowsEvicting,
+    ]
     if entry.id != .root {
       capabilities.formUnion([.allowsRenaming, .allowsReparenting, .allowsDeleting])
     }

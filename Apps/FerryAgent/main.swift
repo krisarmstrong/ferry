@@ -18,8 +18,12 @@ do {
 }
 
 let hub = DeviceHub(transport: MTPTransport(), arrivals: USBWatcher.ticks())
-let domains = DomainController(hub: hub, manager: FileProviderDomains(), itemStore: itemStore)
-Task { await domains.run() }
+let manager = FileProviderDomains()
+let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
+Task {
+  await manager.conformExisting()
+  await domains.run()
+}
 
 // The listener holds its delegate weakly; both live for the whole process.
 let delegate = AgentListenerDelegate(handler: AgentService(hub: hub, domains: domains))
