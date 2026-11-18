@@ -294,4 +294,22 @@ struct MTPSessionCheckedDeleteTests {
 
     #expect(await device.objects.isEmpty)
   }
+
+  /// An item whose name Ferry cannot use was never shown: a checked delete keeps its folder; an
+  /// unchecked one takes it with the folder.
+  @Test func aFolderHoldingAnUnusableNameIsKeptByACheckedDelete() async throws {
+    let device = SessionFixture.makeDevice()
+    let folder = await device.addFolder("F", parent: SessionFixture.root)
+    await device.addFile("bad/name", parent: folder, data: Data("x".utf8))
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    let checked = [try await session.item(at: path("/F"), in: storage)]
+
+    await #expect(throws: TransportError.directoryNotEmpty(try path("/F"))) {
+      try await session.delete(path("/F"), in: storage, expecting: checked)
+    }
+    #expect(await device.children(of: folder) == ["bad/name"])
+
+    try await session.delete(path("/F"), in: storage)
+    #expect(await device.objects.isEmpty)
+  }
 }
