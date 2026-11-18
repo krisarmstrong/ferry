@@ -123,16 +123,23 @@ public actor DeviceHub {
     }
   }
 
-  /// Re-reads a held device's storages, for instance after file transfer was turned on. A device
-  /// the hub does not hold (busy, failed, not sharing) is offered to the transport again and the
-  /// bus scanned.
+  /// The user's Try Again: re-reads a held device's storages, for instance after file transfer
+  /// was turned on. A device the hub does not hold (busy, failed, not sharing, ejected) is
+  /// offered to the transport again and the bus scanned.
   public func recheck(_ id: DeviceID) async {
     guard let entry = entries[id] else { return }
-    guard case .held(let session) = entry.holding else {
+    guard case .held = entry.holding else {
       await transport.unpark(id)
       await reconcile()
       return
     }
+    await recheckHeld(id)
+  }
+
+  /// Re-reads a held device's storages. The hub's own probes and polls use this, never
+  /// `recheck`, so a device ejected while they run is never offered to the transport again.
+  private func recheckHeld(_ id: DeviceID) async {
+    guard let entry = entries[id], case .held(let session) = entry.holding else { return }
     let reading = await Self.read(session)
     guard let current = entries[id], current.generation == entry.generation else { return }
     switch reading {
@@ -246,7 +253,7 @@ public actor DeviceHub {
   private func probe(_ id: DeviceID) {
     guard probing.insert(id).inserted else { return }
     Task { [weak self] in
-      await self?.recheck(id)
+      await self?.recheckHeld(id)
       await self?.probed(id)
     }
   }
@@ -291,11 +298,12 @@ public actor DeviceHub {
     updatePolling()
   }
 
+  /// Held devices not sharing files, in serial order.
   private var waitingIDs: [DeviceID] {
     entries.values.compactMap { entry in
       guard case .held = entry.holding, entry.state == .notSharingFiles else { return nil }
       return entry.info.id
-    }
+    }.sorted { $0.serial < $1.serial }
   }
 
   private func updatePolling() {
@@ -320,7 +328,7 @@ public actor DeviceHub {
 
   private func recheckWaiting() async {
     for id in waitingIDs {
-      await recheck(id)
+      await recheckHeld(id)
     }
   }
 }

@@ -294,55 +294,6 @@ struct DeviceHubTests {
     #expect(await harness.hub.devices().first { $0.id == device.info.id } == ejected)
   }
 
-  @Test func ejectParksTheDeviceInTheTransport() async {
-    let device = await makeDevice("A")
-    var harness = Harness(devices: [device])
-    defer { harness.finish() }
-    #expect(await harness.next() == .attached(ready(device)))
-
-    await harness.hub.eject(device.info.id)
-
-    #expect(await harness.transport.isParked(device.info.id))
-  }
-
-  /// With file transfer off, Android drops its MTP interface; the transport still recognises it
-  /// on USB, and the hub lists it as not sharing files without opening anything.
-  @Test func deviceWithoutFileTransferIsNotSharing() async {
-    let info = DeviceInfo(
-      id: DeviceID(serial: "usb-0-3"), manufacturer: "freescale", model: "LinkRunner-100G")
-    var harness = Harness()
-    defer { harness.finish() }
-    await harness.transport.attachWithoutFileTransfer(info)
-    harness.tick()
-
-    #expect(await harness.next() == .attached(AttachedDevice(info: info, state: .notSharingFiles)))
-    #expect(await harness.clock.sleepCount == 0)
-
-    await harness.transport.detach(info.id)
-    let device = await makeDevice("A")
-    await harness.transport.attach(device)
-    harness.tick()
-    #expect(await harness.next() == .detached(info.id))
-    #expect(await harness.next() == .attached(ready(device)))
-  }
-
-  /// Try Again on a busy device asks the transport to try it again, then scans.
-  @Test func recheckOfBusyDeviceUnparksAndScans() async {
-    let device = await makeDevice("A")
-    var harness = Harness()
-    defer { harness.finish() }
-    await harness.transport.failNextOpen(of: device.info.id, with: .deviceBusy)
-    await harness.transport.attach(device)
-    harness.tick()
-    #expect(await harness.next() == .attached(AttachedDevice(info: device.info, state: .busy)))
-    await harness.transport.park(device.info.id)
-
-    await harness.hub.recheck(device.info.id)
-
-    #expect(await !harness.transport.isParked(device.info.id))
-    #expect(await harness.next() == .changed(ready(device)))
-  }
-
   @Test func noPollingWhenNothingWaits() async {
     let device = await makeDevice("A")
     let locked = await makeDevice("L", locked: true)
@@ -372,5 +323,77 @@ extension HubEvent {
   fileprivate func isAttached(serial: String) -> Bool {
     if case .attached(let device) = self { return device.id.serial == serial }
     return false
+  }
+}
+
+extension DeviceHubTests {
+  @Test func ejectParksTheDeviceInTheTransport() async {
+    let device = await makeDevice("A")
+    var harness = Harness(devices: [device])
+    defer { harness.finish() }
+    #expect(await harness.next() == .attached(ready(device)))
+    await harness.hub.eject(device.info.id)
+    #expect(await harness.transport.isParked(device.info.id))
+  }
+
+  /// File transfer off: the transport sees the device on USB only, and nothing is opened.
+  @Test func deviceWithoutFileTransferIsNotSharing() async {
+    let info = DeviceInfo(
+      id: DeviceID(serial: "usb-0-3"), manufacturer: "freescale", model: "LinkRunner-100G")
+    var harness = Harness()
+    defer { harness.finish() }
+    await harness.transport.attachWithoutFileTransfer(info)
+    harness.tick()
+
+    #expect(await harness.next() == .attached(AttachedDevice(info: info, state: .notSharingFiles)))
+    #expect(await harness.clock.sleepCount == 0)
+
+    await harness.transport.detach(info.id)
+    let device = await makeDevice("A")
+    await harness.transport.attach(device)
+    harness.tick()
+    #expect(await harness.next() == .detached(info.id))
+    #expect(await harness.next() == .attached(ready(device)))
+  }
+
+  @Test func recheckOfBusyDeviceUnparksAndScans() async {
+    let device = await makeDevice("A")
+    var harness = Harness()
+    defer { harness.finish() }
+    await harness.transport.failNextOpen(of: device.info.id, with: .deviceBusy)
+    await harness.transport.attach(device)
+    harness.tick()
+    #expect(await harness.next() == .attached(AttachedDevice(info: device.info, state: .busy)))
+    await harness.transport.park(device.info.id)
+
+    await harness.hub.recheck(device.info.id)
+
+    #expect(await !harness.transport.isParked(device.info.id))
+    #expect(await harness.next() == .changed(ready(device)))
+  }
+
+  /// The hub's own re-check of waiting devices must not offer an ejected one to the transport
+  /// again, even when the eject lands while the poll is under way.
+  @Test func pollDoesNotUnparkADeviceEjectedMeanwhile() async {
+    let first = await makeDevice("A", locked: true)
+    let second = await makeDevice("B", locked: true)
+    var harness = Harness(devices: [first, second])
+    defer { harness.finish() }
+    _ = await harness.next()
+    _ = await harness.next()
+    await harness.clock.waitForSleeper()
+
+    await first.suspendNext(.storages)
+    await harness.clock.advance(by: .seconds(2))
+    await first.waitUntilSuspended(.storages)
+    await harness.hub.eject(second.info.id)
+    await first.resume(.storages)
+    await harness.clock.waitForSleeper()
+    harness.tick()
+    let barrier = await harness.barrier()
+
+    #expect(barrier?.isAttached(serial: "BARRIER") == true)
+    #expect(await harness.transport.isParked(second.info.id))
+    #expect(await harness.transport.openCount(of: second.info.id) == 1)
   }
 }
