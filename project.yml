@@ -31,6 +31,10 @@ targets:
     platform: macOS
     sources:
       - path: Apps/Ferry
+      # The app icon, an Icon Composer bundle that actool compiles to Ferry.icns and Assets.car.
+      - path: Design/Icon/Ferry.icon
+        type: file
+        buildPhase: resources
       # The agent's launchd plist, where SMAppService.agent(plistName:) looks for it.
       - path: Apps/FerryAgent/io.github.krisarmstrong.ferry.agent.plist
         buildPhase:
@@ -43,6 +47,7 @@ targets:
         PRODUCT_NAME: Ferry
         INFOPLIST_FILE: Apps/Ferry/Info.plist
         CODE_SIGN_ENTITLEMENTS: Apps/Ferry/Ferry.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: Ferry
     dependencies:
       - package: Ferry
         product: FerryUI

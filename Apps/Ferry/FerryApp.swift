@@ -20,8 +20,11 @@ struct FerryApp: App {
   }
 
   var body: some Scene {
-    MenuBarExtra("Ferry", systemImage: "externaldrive.connected.to.line.below") {
+    MenuBarExtra {
       MenuContent(model: model)
+    } label: {
+      Image("MenuBarGlyph")
+        .accessibilityLabel(Text("Ferry"))
     }
     .menuBarExtraStyle(.window)
 
