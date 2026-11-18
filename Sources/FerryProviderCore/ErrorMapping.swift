@@ -62,9 +62,12 @@ public enum ErrorMapping {
         .featureUnsupported,
         "“\(path.name ?? path.description)” holds folders nested more than "
           + "\(RemotePath.maxTreeDepth) deep, which Ferry does not delete.")
-    // No Cocoa code describes it: the one the FileProvider headers name for such errors.
+    // No Cocoa code describes it: the one the FileProvider headers name for such errors, with
+    // the error itself underneath, as they ask.
     case .io(let message):
-      return described(.xpcConnectionReplyInvalid, message)
+      return CocoaError(
+        .xpcConnectionReplyInvalid,
+        userInfo: [NSLocalizedDescriptionKey: message, NSUnderlyingErrorKey: error])
     }
   }
 

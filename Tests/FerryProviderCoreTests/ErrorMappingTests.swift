@@ -45,6 +45,17 @@ struct ErrorMappingTests {
     }
   }
 
+  /// The FileProvider headers ask for the error no code represents as the underlying error of
+  /// the `NSXPCConnectionReplyInvalid` Cocoa error.
+  @Test func anIOFailureCarriesItselfAsTheUnderlyingError() {
+    let failure = TransportError.io("pipe broke")
+    let mapped = ErrorMapping.fileProviderError(failure) as NSError
+
+    #expect(mapped.code == CocoaError.Code.xpcConnectionReplyInvalid.rawValue)
+    #expect(mapped.localizedDescription == "pipe broke")
+    #expect(mapped.userInfo[NSUnderlyingErrorKey] as? TransportError == failure)
+  }
+
   /// The last guard before an error reaches FileProvider: errors from elsewhere (POSIX, a
   /// custom domain) become Cocoa errors that keep their description and the original.
   @Test func anyOtherErrorBecomesACocoaError() {
