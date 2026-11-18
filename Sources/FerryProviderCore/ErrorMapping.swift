@@ -13,15 +13,18 @@ public enum ErrorMapping {
   /// No `default`: a new `TransportError` case must be given a mapping here.
   public static func fileProviderError(_ error: TransportError) -> any Error {
     switch error {
-    // The device or its storage went away, or another app holds it: it may come back.
-    case .noDeviceConnected, .noStorage, .deviceBusy, .deviceDisconnected:
+    // The device or its storage went away, or another app holds it: it may come back. A storage
+    // gone from a device still attached (an SD card taken out) is the whole domain, never one
+    // missing item: "no such item" would make FileProvider delete the domain's items locally.
+    // The agent disconnects that domain.
+    case .noDeviceConnected, .noStorage, .deviceBusy, .deviceDisconnected, .storageNotFound:
       return NSFileProviderError(.serverUnreachable)
     // The phone is locked or not set to share files, which the user fixes on the phone.
     case .deviceLocked:
       return NSFileProviderError(.notAuthenticated)
-    // The item, or the storage a write was aimed at (an SD card taken out), is gone. An unknown
-    // or not yet adopted domain is never this: the agent reports it as `.deviceDisconnected`.
-    case .notFound, .unknownItem, .storageNotFound:
+    // The item is gone. An unknown or not yet adopted domain is never this: the agent reports it
+    // as `.deviceDisconnected`.
+    case .notFound, .unknownItem:
       return NSFileProviderError(.noSuchItem)
     case .alreadyExists:
       return NSFileProviderError(.filenameCollision)

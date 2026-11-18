@@ -302,3 +302,29 @@ struct AgentServiceTests {
     #expect(await device.allPaths(in: storageID(device)) == [paths.docs, paths.old])
   }
 }
+
+/// A card taken out of a device that stays plugged in: the card's domain is unreachable, not
+/// empty, so FileProvider keeps its items, and the agent disconnects it.
+@Suite(.timeLimit(.minutes(1)))
+struct AgentServiceStorageGoneTests {
+  @Test func aRemovedCardDisconnectsItsDomainRatherThanLosingItems() async throws {
+    let device = await makeDevice("A", keys: [internalKey, cardKey])
+    let card = storageID(device, cardKey)
+    try await device.seed(try path("/DCIM/a.jpg"), in: card, contents: Data("jpg".utf8))
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    let cardDomain = domainID(device, cardKey)
+    _ = await harness.manager.waitForCalls(2)
+
+    await device.removeStorage(card)
+    let reply = await harness.service.handle(.list(domain: cardDomain, folder: .root), file: nil)
+
+    guard case .failure(let error) = reply else {
+      Issue.record("expected a failure, got \(reply)")
+      return
+    }
+    #expect(error == .storageNotFound(card.key))
+    let after = await harness.manager.waitForCalls(3)
+    #expect(after.contains(.disconnect(cardDomain)))
+  }
+}

@@ -42,10 +42,12 @@ struct ErrorMappingTests {
   /// No `default`: a new `TransportError` case must be given an expectation here.
   private func expected(_ error: TransportError) -> Expected {
     switch error {
-    case .noDeviceConnected, .noStorage, .deviceBusy, .deviceDisconnected:
+    // A storage that went away while its device stays attached (an SD card taken out) is the
+    // domain's whole storage, never one missing item.
+    case .noDeviceConnected, .noStorage, .deviceBusy, .deviceDisconnected, .storageNotFound:
       .fileProvider(.serverUnreachable)
     case .deviceLocked: .fileProvider(.notAuthenticated)
-    case .notFound, .unknownItem, .storageNotFound: .fileProvider(.noSuchItem)
+    case .notFound, .unknownItem: .fileProvider(.noSuchItem)
     case .alreadyExists: .fileProvider(.filenameCollision)
     case .insufficientSpace, .fileTooLargeForStorage: .fileProvider(.insufficientQuota)
     case .invalidName: .cocoa(.fileWriteInvalidFileName)

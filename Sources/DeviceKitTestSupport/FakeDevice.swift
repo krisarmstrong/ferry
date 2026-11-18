@@ -25,7 +25,7 @@ public actor FakeDevice: DeviceSession {
 
   public nonisolated let info: DeviceInfo
   public nonisolated let partials = PartialRegistry()
-  let storageInfos: [StorageInfo]
+  var storageInfos: [StorageInfo]
   let deviceCapabilities: DeviceCapabilities
   var tree: [StorageID: [RemotePath: Node]]
   private var locked = false
@@ -288,6 +288,12 @@ public actor FakeDevice: DeviceSession {
 // MARK: Test controls
 
 extension FakeDevice {
+  /// Takes a storage away, as removing an SD card does: the device stays attached.
+  public func removeStorage(_ id: StorageID) {
+    storageInfos.removeAll { $0.id == id }
+    tree[id] = nil
+  }
+
   /// Creates missing parent folders and replaces an existing file at `path`.
   public func seed(_ path: RemotePath, in storage: StorageID, contents: Data)
     throws(TransportError)

@@ -259,6 +259,11 @@ public actor AgentService: AgentHandling {
     if changed {
       await domains.signal(domain)
     }
+    if case .failure(.storageNotFound) = result {
+      // The device is still attached but the storage is gone (an SD card taken out). Its
+      // storages are read again, so the domain disconnects rather than looking empty.
+      await hub.recheck(route.storage.device)
+    }
     return try result.get()
   }
 
