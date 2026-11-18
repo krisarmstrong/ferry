@@ -33,7 +33,8 @@ public actor FakeDevice: DeviceSession {
   private var suspensions: [SuspendableCall: Suspension] = [:]
   private var uploadFailure: (afterBytes: UInt64, error: TransportError)?
   private var uploadTruncation: UInt64?
-  private var renameFailure: TransportError?
+  private var renameFailure: (skipping: Int, error: TransportError)?
+  private var deleteFailure: TransportError?
   private var listFailure: TransportError?
   private var storagesFailure: TransportError?
 
@@ -155,8 +156,12 @@ public actor FakeDevice: DeviceSession {
   {
     let nodes = try nodes(in: storage)
     if let failure = renameFailure {
-      renameFailure = nil
-      throw failure
+      if failure.skipping > 0 {
+        renameFailure = (failure.skipping - 1, failure.error)
+      } else {
+        renameFailure = nil
+        throw failure.error
+      }
     }
     guard let parent = path.parent else { throw .invalidName(path.description) }
     guard nodes[path] != nil else { throw .notFound(path) }
@@ -176,6 +181,10 @@ public actor FakeDevice: DeviceSession {
 
   public func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError) {
     var nodes = try nodes(in: storage)
+    if let failure = deleteFailure {
+      deleteFailure = nil
+      throw failure
+    }
     guard nodes[path] != nil else { throw .notFound(path) }
     for key in nodes.keys where Self.isSame(key, orInside: path) {
       nodes[key] = nil
@@ -351,9 +360,14 @@ extension FakeDevice {
     uploadTruncation = bytes
   }
 
-  /// The next rename throws `error`. `nil` clears a pending failure.
-  public func failRename(with error: TransportError?) {
-    renameFailure = error
+  /// The rename after the next `skipping` ones throws `error`. `nil` clears a pending failure.
+  public func failRename(with error: TransportError?, skipping: Int = 0) {
+    renameFailure = error.map { (skipping, $0) }
+  }
+
+  /// The next delete throws `error`.
+  public func failNextDelete(with error: TransportError) {
+    deleteFailure = error
   }
 
   /// The next `storages()` throws `error`.

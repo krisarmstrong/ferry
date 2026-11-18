@@ -263,7 +263,10 @@ struct AgentServiceTests {
         == .failure(.deviceDisconnected))
   }
 
-  @Test(arguments: ["a/b", "..", ".", "", "x\0y", SafeWriter.partialPrefix + "x"])
+  @Test(
+    arguments: [
+      "a/b", "..", ".", "", "x\0y", SafeWriter.partialPrefix + "x", SafeWriter.backupPrefix + "x",
+    ])
   func renameRejectsInvalidNames(_ name: String) async throws {
     let paths = try Paths()
     let setup = try await ready()
@@ -277,7 +280,11 @@ struct AgentServiceTests {
 
   /// A listing deletes anything named like a partial that no writer holds, so the agent must
   /// never create one under a client's name.
-  @Test(arguments: ["a/b", "..", ".", "", "x\0y", SafeWriter.partialPrefix + "mine"])
+  @Test(
+    arguments: [
+      "a/b", "..", ".", "", "x\0y", SafeWriter.partialPrefix + "mine",
+      SafeWriter.backupPrefix + "mine",
+    ])
   func createRejectsInvalidNames(_ name: String) async throws {
     let paths = try Paths()
     let setup = try await ready()

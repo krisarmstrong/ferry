@@ -143,7 +143,7 @@ struct SafeWriterTests {
     #expect(await device.allPaths(in: storageID).isEmpty)
   }
 
-  @Test func replacingDeletesOldThenRenames() async throws {
+  @Test func replacingSwapsInTheNewFileThenDropsTheOld() async throws {
     let device = makeDevice()
     let writer = SafeWriter(session: device)
     let path = try RemotePath("/a.txt")

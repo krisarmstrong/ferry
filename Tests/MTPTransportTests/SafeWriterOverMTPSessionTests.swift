@@ -44,14 +44,24 @@ struct SafeWriterOverMTPSessionTests {
     #expect(await contents(of: "a.txt", on: device) == Data("new".utf8))
   }
 
-  @Test func replacingDeletesTheOldFileOnlyAfterTheUpload() async throws {
+  /// Upload, set the old file aside, rename the new one into place, then delete the old one.
+  @Test func replacingDeletesTheOldFileOnlyOnceTheNewOneIsInPlace() async throws {
     let device = SessionFixture.makeDevice()
     let old = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
     _ = try await write(Data("new".utf8), to: "/a.txt", on: device, replacing: true)
 
     let calls = await device.calls
-    #expect(calls.count == 3)
-    #expect(calls.dropFirst().first == .delete(old))
+    #expect(calls.count == 4)
+    guard case .rename(old, let backup) = calls[1] else {
+      Issue.record("expected the old file set aside second, got \(calls)")
+      return
+    }
+    #expect(SafeWriter.isBackup(backup))
+    guard case .rename(_, "a.txt") = calls[2] else {
+      Issue.record("expected the new file renamed into place third, got \(calls)")
+      return
+    }
+    #expect(calls[3] == .delete(old))
     #expect(await device.children(of: SessionFixture.root) == ["a.txt"])
     #expect(await contents(of: "a.txt", on: device) == Data("new".utf8))
   }

@@ -259,12 +259,12 @@ public actor AgentService: AgentHandling {
     return try result.get()
   }
 
-  /// A name a client may give an item: one path component, never a partial's. A listing deletes
-  /// any item named like a partial that no writer holds, so the agent never creates one under a
+  /// A name a client may give an item: one path component, never a partial's or a backup's. A
+  /// listing hides those and deletes abandoned ones, so the agent never creates one under a
   /// client's name.
   private static func creatable(_ name: String) throws(TransportError) -> String {
     guard let validated = try RemotePath.root.appending(name).name,
-      !SafeWriter.isPartial(validated)
+      !SafeWriter.isPartial(validated), !SafeWriter.isBackup(validated)
     else { throw .invalidName(name) }
     return validated
   }
