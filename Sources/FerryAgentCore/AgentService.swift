@@ -64,10 +64,9 @@ public actor AgentService: AgentHandling {
     case (.create(let domain, let parent, let name, _), nil):
       return .entry(try await makeFolder(name, in: parent, of: domain))
     case (.replaceContents(let domain, let id, let base, let onConflict), let file?):
-      return .entry(
-        try await replace(
-          Replacement(id: id, base: base, onConflict: onConflict), with: file, in: domain,
-          progress: progress))
+      return try await replace(
+        Replacement(id: id, base: base, onConflict: onConflict), with: file, in: domain,
+        progress: progress)
     case (.rename(let domain, let id, let name), _):
       return .entry(try await rename(id, to: name, in: domain))
     case (.move(let domain, let id, let folder), _):
@@ -319,12 +318,13 @@ extension AgentService {
   ///
   /// If the device's file is no longer at `base` (an app on the device, or the user at the
   /// unit, changed it since the Mac read it), the device's file is kept: with `.keepBoth` the
-  /// Mac's contents go up beside it as a conflict copy and the device's item is returned, so
-  /// FileProvider fetches the device's contents; with `.fail` nothing is written.
+  /// Mac's contents go up beside it as a conflict copy and the device's item is answered as
+  /// `.keptOnDevice`, so FileProvider fetches the device's contents; with `.fail` nothing is
+  /// written.
   fileprivate func replace(
     _ replacement: Replacement, with source: Int32, in domain: String,
     progress: @escaping TransferProgressHandler
-  ) async throws(TransportError) -> ProviderEntry {
+  ) async throws(TransportError) -> AgentResponse {
     let (id, base, onConflict) = (replacement.id, replacement.base, replacement.onConflict)
     let scratch = try await FileTransfer.copyIn(source)
     defer { FileTransfer.remove(scratch) }
@@ -341,7 +341,7 @@ extension AgentService {
           case .keepBoth:
             _ = await route.items.created(
               try await ConflictCopy.upload(scratch, beside: path, route))
-            return entry
+            return .keptOnDevice(entry)
           }
         }
       }
@@ -351,7 +351,7 @@ extension AgentService {
         try await route.writer.write(
           from: scratch, to: path, in: route.storage, replacing: true, progress: handler)
       }
-      return await route.items.changed(item, id: id)
+      return .entry(await route.items.changed(item, id: id))
     }
   }
 }

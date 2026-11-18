@@ -38,6 +38,9 @@ actor FakeAgent: AgentSending {
   var thrown: TransportError?
   /// Reported, half then all of it, as a fetch's progress.
   var progressTotal: UInt64?
+  /// The next `.replaceContents` keeps the device's file, as the agent does when the device
+  /// changed it since the save's base.
+  var keepDeviceVersion = false
   /// Answered to the next `.delete` instead of performing it.
   var deleteFailure: TransportError?
   /// Written into the fetch target before failing, as a download cut short would.
@@ -144,6 +147,10 @@ actor FakeAgent: AgentSending {
       return .entry(try entry(relocate(source, to: moved, id: id), id: id))
     case .replaceContents(_, let id, _, _):
       let old = try existing(try path(id))
+      if keepDeviceVersion {
+        keepDeviceVersion = false
+        return .keptOnDevice(try entry(old, id: id))
+      }
       let data = (try? file?.readToEnd()) ?? Data()
       let item = RemoteItem(
         path: old.path, kind: .file, size: UInt64(data.count),
@@ -312,6 +319,10 @@ extension FakeAgent {
 
   func set(progressTotal: UInt64) {
     self.progressTotal = progressTotal
+  }
+
+  func keepDeviceVersionOnNextSave() {
+    keepDeviceVersion = true
   }
 
   func set(deleteFailure: TransportError) {

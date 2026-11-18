@@ -120,12 +120,13 @@ public actor ProviderBackend {
   /// agent does if the device's file has moved on from it.
   /// The item is read first when its parent or name may change, so a field reported as changed
   /// that names what the item already has sends nothing. The item keeps `id` throughout: a
-  /// different identifier would tell FileProvider to merge the item into another.
+  /// different identifier would tell FileProvider to merge the item into another. When the
+  /// agent kept the device's newer file instead, FileProvider is told to fetch it.
   public func modify(
     _ id: NSFileProviderItemIdentifier, to template: ItemTemplate, changed: ItemChanges,
     contents: URL?, base: ContentVersion? = nil, onConflict: ConflictPolicy = .keepBoth,
     progress: TransferProgressHandler? = nil
-  ) async throws -> ProviderItem {
+  ) async throws -> SyncedItem {
     let itemID = try Self.itemID(id)
     var latest: ProviderEntry?
 
@@ -149,12 +150,21 @@ public actor ProviderBackend {
     if changed.contains(.contents), let contents {
       let handle = try FileHandle(forReadingFrom: contents)
       defer { try? handle.close() }
-      latest = try await entry(
+      let response = try await send(
         .replaceContents(domain: domain, id: itemID, base: base, onConflict: onConflict),
         file: handle, progress: progress)
+      switch response {
+      case .entry(let entry):
+        latest = entry
+      case .keptOnDevice(let entry):
+        return SyncedItem(ProviderItem(entry), shouldFetchContent: true)
+      default:
+        throw Self.unexpected(response)
+      }
     }
-    if let latest { return ProviderItem(latest) }
-    return ProviderItem(try await entry(.item(domain: domain, id: itemID)))
+    if let latest { return SyncedItem(ProviderItem(latest), shouldFetchContent: false) }
+    return SyncedItem(
+      ProviderItem(try await entry(.item(domain: domain, id: itemID))), shouldFetchContent: false)
   }
 
   /// One page of the working set: every item the agent has reported in the domain, root
@@ -314,6 +324,18 @@ public actor ProviderBackend {
       throw ErrorMapping.forFileProvider(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO))
     }
     return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+  }
+}
+
+/// An item as the agent left it after a create or modify. `shouldFetchContent` says its contents
+/// are not the ones FileProvider sent, so FileProvider must fetch them.
+public struct SyncedItem: Sendable {
+  public let item: ProviderItem
+  public let shouldFetchContent: Bool
+
+  public init(_ item: ProviderItem, shouldFetchContent: Bool) {
+    self.item = item
+    self.shouldFetchContent = shouldFetchContent
   }
 }
 

@@ -33,7 +33,7 @@ struct ShellShapeTests {
   private func shellModify(
     _ backend: ProviderBackend, _ item: any NSFileProviderItem, _ fields: NSFileProviderItemFields,
     _ url: URL?
-  ) throws -> Task<ProviderItem, any Error> {
+  ) throws -> Task<SyncedItem, any Error> {
     let id = item.itemIdentifier
     let template = try ItemTemplate(item)
     let changes = ItemChanges(fields)
@@ -46,7 +46,7 @@ struct ShellShapeTests {
     let id = try await agent.identifier(try path("/a.txt"))
     let item = Template(id: id.rawValue, parent: .rootContainer, filename: "b.txt")
 
-    let renamed = try await shellModify(backend, item, [.filename], nil).value
+    let renamed = try await shellModify(backend, item, [.filename], nil).value.item
 
     #expect(renamed.itemIdentifier == id)
     #expect(renamed.filename == "b.txt")

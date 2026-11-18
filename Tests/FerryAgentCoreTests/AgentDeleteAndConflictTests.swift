@@ -155,8 +155,9 @@ struct AgentDeleteAndConflictTests {
       .replaceContents(domain: setup.domain, id: file, base: base, onConflict: .keepBoth),
       file: mac)
 
-    guard case .entry(let entry) = reply else {
-      Issue.record("expected the device's item, got \(reply)")
+    // The device's item, flagged as kept: FileProvider must fetch it, not keep the Mac's bytes.
+    guard case .keptOnDevice(let entry) = reply else {
+      Issue.record("expected the device's item, kept, got \(reply)")
       return
     }
     #expect(entry.id == file)
@@ -184,8 +185,8 @@ struct AgentDeleteAndConflictTests {
       .replaceContents(domain: setup.domain, id: file, base: base, onConflict: .keepBoth),
       file: try setup.harness.readable("mac.txt", "mac"))
 
-    guard case .entry = reply else {
-      Issue.record("expected the device's item, got \(reply)")
+    guard case .keptOnDevice = reply else {
+      Issue.record("expected the device's item, kept, got \(reply)")
       return
     }
     #expect(
@@ -240,7 +241,7 @@ struct AgentDeleteAndConflictTests {
 
   /// A device whose metadata is stale lists `global.o` as 32 bytes and sends 40. FileProvider
   /// holds the version of the 40 bytes it received, and sends that as the base.
-  private func fetchedStale() async throws -> (Setup, ItemID, ContentVersion) {
+  private func fetchedStale() async throws -> (Setup, ProviderEntry) {
     let setup = try await setup([])
     let file = try path("/Docs/global.o")
     try await setup.device.seed(file, in: setup.storage, contents: Data(count: 40))
@@ -251,12 +252,13 @@ struct AgentDeleteAndConflictTests {
       case .entry(let entry) = await setup.send(.fetch(domain: setup.domain, id: id), file: handle)
     else { throw TransportError.unknownItem }
     #expect(entry.item.size == 40)
-    return (setup, id, ContentVersion(entry.item))
+    return (setup, entry)
   }
 
   @Test func deletingAFileWithAStaleListedSizeAtItsFetchedVersionDeletesIt() async throws {
-    let (setup, id, base) = try await fetchedStale()
+    let (setup, fetched) = try await fetchedStale()
     defer { setup.harness.finish() }
+    let (id, base) = (fetched.id, ContentVersion(fetched.item))
 
     let reply = await setup.send(
       .delete(domain: setup.domain, id: id, base: base, recursive: false))
@@ -266,8 +268,9 @@ struct AgentDeleteAndConflictTests {
   }
 
   @Test func savingAFileWithAStaleListedSizeAtItsFetchedVersionIsNoConflict() async throws {
-    let (setup, id, base) = try await fetchedStale()
+    let (setup, fetched) = try await fetchedStale()
     defer { setup.harness.finish() }
+    let (id, base) = (fetched.id, ContentVersion(fetched.item))
 
     let reply = await setup.send(
       .replaceContents(domain: setup.domain, id: id, base: base, onConflict: .keepBoth),

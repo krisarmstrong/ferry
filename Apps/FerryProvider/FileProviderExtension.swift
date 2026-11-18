@@ -126,7 +126,8 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
       },
       then: { result in
         switch result {
-        case .success(let item): completionHandler(item, [], false, nil)
+        case .success(let synced):
+          completionHandler(synced.item, [], synced.shouldFetchContent, nil)
         case .failure(let error): completionHandler(nil, [], false, error)
         }
       })

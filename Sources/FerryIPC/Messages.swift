@@ -181,6 +181,10 @@ public enum AgentRequest: Codable, Sendable, Equatable {
 public enum AgentResponse: Codable, Sendable, Equatable {
   case status(StatusReport)
   case entry(ProviderEntry)
+  /// Answers a `.replaceContents` with `.keepBoth` whose base the device's file no longer has:
+  /// the device's item, kept as it is, with the Mac's contents beside it as a conflict copy. Its
+  /// contents are not the ones sent, so the client must fetch them.
+  case keptOnDevice(ProviderEntry)
   case entries([ProviderEntry])
   /// Answers `.changes`: each changed item's latest state, the items gone, and the anchor to ask
   /// from next. `expired` means `since` cannot be answered (it predates the agent process or the

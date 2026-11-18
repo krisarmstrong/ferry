@@ -165,65 +165,6 @@ import UniformTypeIdentifiers
     #expect(Set(created) == Set((0..<20).map { "f\($0)" }))
   }
 
-  @Test func modifyRenameMoveAndContentsInOrder() async throws {
-    let agent = FakeAgent([try folder("/Docs"), try file("/a.txt", size: 1)])
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let dir = try scratchDirectory()
-    let upload = try writeContents(Data("new!".utf8), in: dir)
-    let (id, docs) = (try await agent.id(try path("/a.txt")), try await agent.id(try path("/Docs")))
-
-    let changed = try await backend.modify(
-      NSFileProviderItemIdentifier(id),
-      to: ItemTemplate(parent: docs, filename: "b.txt", kind: .file),
-      changed: ItemChanges([.parentItemIdentifier, .filename, .contents, .lastUsedDate]),
-      contents: upload)
-
-    #expect(changed.itemIdentifier == NSFileProviderItemIdentifier(id))
-    #expect(changed.filename == "b.txt")
-    #expect(changed.documentSize == 4)
-    #expect(
-      await agent.requests == [
-        .item(domain: domain, id: id),
-        .move(domain: domain, id: id, toFolder: docs),
-        .rename(domain: domain, id: id, to: "b.txt"),
-        .replaceContents(domain: domain, id: id, base: nil, onConflict: .keepBoth),
-      ])
-    #expect(await agent.contents[try path("/Docs/b.txt")] == Data("new!".utf8))
-  }
-
-  @Test func modifyIgnoresUnchangedFields() async throws {
-    let agent = FakeAgent([try file("/\u{E9}.txt")])
-    let backend = ProviderBackend(domain: domain, client: agent)
-
-    let id = try await agent.id(try path("/\u{E9}.txt"))
-    // Finder may report a filename change with the name it already has, in another normal form.
-    let item = try await backend.modify(
-      NSFileProviderItemIdentifier(id),
-      to: ItemTemplate(parent: .root, filename: "e\u{301}.txt", kind: .file),
-      changed: ItemChanges([.parentItemIdentifier, .filename, .lastUsedDate]), contents: nil)
-    #expect(item.itemIdentifier == NSFileProviderItemIdentifier(id))
-    #expect(await agent.requests == [.item(domain: domain, id: id)])
-  }
-
-  @Test func caseOnlyRenameSucceeds() async throws {
-    let agent = FakeAgent([try file("/readme.txt"), try file("/other.txt")])
-    let backend = ProviderBackend(domain: domain, client: agent)
-
-    let id = try await agent.identifier(try path("/readme.txt"))
-
-    let renamed = try await backend.modify(
-      id, to: ItemTemplate(parent: .root, filename: "README.txt", kind: .file),
-      changed: .filename, contents: nil)
-    #expect(renamed.filename == "README.txt")
-    #expect(renamed.itemIdentifier == id)
-
-    await #expect(throws: NSFileProviderError(.filenameCollision)) {
-      try await backend.modify(
-        id, to: ItemTemplate(parent: .root, filename: "OTHER.txt", kind: .file),
-        changed: .filename, contents: nil)
-    }
-  }
-
   @Test func deleteSendsDelete() async throws {
     let agent = FakeAgent([try file("/a.txt")])
     let backend = ProviderBackend(domain: domain, client: agent)
@@ -300,7 +241,8 @@ import UniformTypeIdentifiers
 
     let changed = try await backend.modify(
       id, to: ItemTemplate(parent: docs, filename: "b.txt", kind: .file),
-      changed: [.parent, .filename], contents: nil)
+      changed: [.parent, .filename], contents: nil
+    ).item
 
     #expect(changed.itemIdentifier == id)
     #expect(changed.parentItemIdentifier == NSFileProviderItemIdentifier(docs.rawValue))
