@@ -158,4 +158,59 @@ struct AgentRecursiveDeleteTests {
     #expect(try await setup.known("/Reports/late.txt"))
     #expect(try await setup.onDevice("/Reports/r1.txt"))
   }
+
+  /// A folder Finder showed empty gains an item before the delete: only its own level is listed
+  /// again, and the item is recorded.
+  @Test func anItemAddedDuringANonRecursiveDeleteIsRecorded() async throws {
+    let setup = try await setup([("/Reports/old.txt", "old")])
+    defer { setup.harness.finish() }
+    try await setup.show(["/Reports"])
+    _ = await setup.send(
+      .delete(
+        domain: setup.domain, id: try await setup.id("/Reports/old.txt"), base: nil,
+        recursive: false))
+    let (device, storage) = (setup.device, setup.storage)
+    await device.onNextDelete {
+      try? await device.seed(
+        try path("/Reports/late.txt"), in: storage, contents: Data("late".utf8))
+    }
+
+    let reply = await setup.send(
+      .delete(
+        domain: setup.domain, id: try await setup.id("/Reports"), base: nil, recursive: false))
+
+    #expect(reply == .failure(.directoryNotEmpty(try path("/Reports"))))
+    #expect(try await setup.known("/Reports/late.txt"))
+  }
+
+  /// Past the walk's depth limit the delete is refused, and what the walk found unseen before
+  /// that is still recorded.
+  @Test func aTooDeepTreeStillRecordsWhatItFoundUnseen() async throws {
+    let deep = (1...(RemotePath.maxTreeDepth + 1)).map { "d\($0)" }
+    let file = "/" + (deep + ["leaf.txt"]).joined(separator: "/")
+    let setup = try await setup([(file, "leaf")])
+    defer { setup.harness.finish() }
+    let folders = deep.indices.map { "/" + deep[...$0].joined(separator: "/") }
+    try await setup.show(["/"] + folders)
+    try await setup.device.seed(
+      try path("/d1/unseen.txt"), in: setup.storage, contents: Data("new".utf8))
+
+    let reply = await setup.send(
+      .delete(domain: setup.domain, id: try await setup.id("/d1"), base: nil, recursive: true))
+
+    #expect(reply == .failure(.directoryNotEmpty(try path("/d1"))))
+    #expect(try await setup.known("/d1/unseen.txt"))
+  }
+
+  /// The kind `changeable` has to read from the device is kept, so the next change does not ask
+  /// again.
+  @Test func aKindReadFromTheDeviceIsRecorded() async throws {
+    let setup = try await setup([("/Docs/report.rtfd", "a file")])
+    defer { setup.harness.finish() }
+    let route = try await setup.harness.controller.route(setup.domain)
+
+    _ = try await route.changeable(try await setup.id("/Docs/report.rtfd"))
+
+    #expect(await route.items.kind(at: try path("/Docs/report.rtfd")) == .file)
+  }
 }

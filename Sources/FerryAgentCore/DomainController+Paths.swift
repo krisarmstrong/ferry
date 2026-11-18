@@ -17,7 +17,10 @@ extension DomainController.Route {
     let path = try await path(of: id)
     // The table may know the item only by its identifier: the device says what it is.
     var kind = await items.kind(at: path)
-    if kind == nil { kind = try await session.item(at: path, in: storage).kind }
+    if kind == nil {
+      // Recorded, so the next change of it does not ask the device again.
+      kind = await items.observed(try await session.item(at: path, in: storage)).item.kind
+    }
     let isFolder = kind == .folder
     if path.isInPackageFolder(isFolder: isFolder) { throw .readOnly(path) }
     return path

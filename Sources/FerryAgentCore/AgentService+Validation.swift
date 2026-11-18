@@ -11,8 +11,9 @@ extension AgentService {
   /// item not reported as it is is recorded now, so FileProvider, which puts the folder back on
   /// that error, shows it there. A tree with an item more than `RemotePath.maxTreeDepth` levels
   /// below `folder`, or more than `deleteWalkLimit` items, is refused the same way, unwalked
-  /// past that point. The listings also reap abandoned partials. Returns every item walked, as
-  /// the device listed it: what the delete may remove.
+  /// past that point; what it found unseen until then is still recorded. The listings also reap
+  /// abandoned partials. Returns every item walked, as the device listed it: what the delete may
+  /// remove.
   static func requireSeen(_ folder: RemotePath, on route: DomainController.Route)
     async throws(TransportError) -> [RemoteItem]
   {
@@ -25,6 +26,7 @@ extension AgentService {
         seen.append(child)
         walked += 1
         guard walked <= deleteWalkLimit, depth <= RemotePath.maxTreeDepth else {
+          await record(unseen, on: route)
           throw .directoryNotEmpty(folder)
         }
         if await !route.items.reportedAsIs(child) { unseen.append(child) }
@@ -32,11 +34,34 @@ extension AgentService {
       }
     }
     guard !unseen.isEmpty else { return seen }
-    // Parents first, so each item's parent has its identifier when it is recorded.
+    await record(unseen, on: route)
+    throw .directoryNotEmpty(folder)
+  }
+
+  /// After the device refused a delete as `.directoryNotEmpty` (something arrived after the
+  /// check), records what is new. A folder deleted on its own was checked one level deep, so
+  /// only that level is listed again.
+  static func recordArrivals(
+    in folder: RemotePath, recursive: Bool, on route: DomainController.Route
+  )
+    async throws(TransportError)
+  {
+    if recursive {
+      _ = try await requireSeen(folder, on: route)
+      return
+    }
+    for item in try await route.writer.visibleList(folder, in: route.storage)
+    where await !route.items.reportedAsIs(item) {
+      _ = await route.items.observed(item)
+    }
+  }
+
+  /// Records items FileProvider has not seen as they are, parents first, so each item's parent
+  /// has its identifier when it is recorded.
+  private static func record(_ unseen: [RemoteItem], on route: DomainController.Route) async {
     for item in unseen.sorted(by: { $0.path.components.count < $1.path.components.count }) {
       _ = await route.items.observed(item)
     }
-    throw .directoryNotEmpty(folder)
   }
 
   static let deleteWalkLimit = 100_000

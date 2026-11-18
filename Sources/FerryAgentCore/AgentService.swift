@@ -242,8 +242,7 @@ public actor AgentService: AgentHandling {
         _ = await route.items.observed(try await route.session.item(at: path, in: route.storage))
         throw .changedOnDevice(path)
       } catch .directoryNotEmpty {
-        // Something arrived after the walk: walked again, so what is new is recorded.
-        _ = try await Self.requireSeen(path, on: route)
+        try await Self.recordArrivals(in: path, recursive: recursive, on: route)
         throw .directoryNotEmpty(path)
       }
       await route.items.removed(path)
