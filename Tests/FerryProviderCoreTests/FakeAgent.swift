@@ -190,7 +190,7 @@ actor FakeAgent: AgentSending {
       return changeReply(since)
     case .workingSet(_, let page):
       return try workingSetPage(page)
-    case .status, .recheck, .eject, .removeAllDomains:
+    case .status, .recheck, .refresh, .eject, .removeAllDomains:
       throw .unsupported("\(request)")
     }
   }

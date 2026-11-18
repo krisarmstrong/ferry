@@ -25,13 +25,15 @@ private func tag(_ request: AgentRequest) -> Int {
   case .delete: 11
   case .changes: 12
   case .workingSet: 13
+  case .refresh: 14
   }
 }
 
 private func requests() -> [AgentRequest] {
   let photo = ItemID.random()
   let camera = ItemID.random()
-  var all: [AgentRequest] = [.status, .recheck(device), .eject(device), .removeAllDomains]
+  var all: [AgentRequest] = [.status, .recheck(device), .refresh(device), .eject(device)]
+  all.append(.removeAllDomains)
   all += [.item(domain: domain, id: photo), .list(domain: domain, folder: .root)]
   all.append(.fetch(domain: domain, id: photo))
   all.append(.create(domain: domain, parent: camera, name: "photo.jpg", isFolder: false))
@@ -128,7 +130,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...13))
+  #expect(Set(requests().map(tag)) == Set(0...14))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }

@@ -48,8 +48,8 @@ public actor AgentService: AgentHandling {
     switch request {
     case .fetch, .replaceContents: true
     case .create(_, _, _, let isFolder): !isFolder
-    case .status, .recheck, .eject, .removeAllDomains, .item, .list, .rename, .move, .delete,
-      .changes, .workingSet:
+    case .status, .recheck, .refresh, .eject, .removeAllDomains, .item, .list, .rename, .move,
+      .delete, .changes, .workingSet:
       false
     }
   }
@@ -63,6 +63,9 @@ public actor AgentService: AgentHandling {
       return .status(devices: await hub.devices(), providerEnabled: await domains.isUserEnabled())
     case (.recheck(let id), _):
       await hub.recheck(id)
+      return .done
+    case (.refresh(let id), _):
+      try await domains.refresh(id)
       return .done
     case (.eject(let id), _):
       return .removed(preserved: await domains.eject(id))

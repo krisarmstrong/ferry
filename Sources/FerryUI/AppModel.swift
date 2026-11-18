@@ -88,6 +88,20 @@ import os
     }
   }
 
+  /// The menu's Refresh: asks the agent to list each ready device's folders again, so changes
+  /// made on the device reach Finder, then reads the status.
+  public func refreshDevices() async {
+    for device in devices {
+      guard case .ready = device.state else { continue }
+      do {
+        _ = try await client.send(.refresh(device.id), file: nil)
+      } catch {
+        Self.log.error("refresh failed: \(String(describing: error), privacy: .private)")
+      }
+    }
+    await refresh()
+  }
+
   /// Refreshes now and every 2 s until the calling task is cancelled, which happens when the
   /// menu closes.
   public func watchWhileMenuOpen() async {

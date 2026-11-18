@@ -155,6 +155,11 @@ public actor DomainController {
     await manager.signal(domain)
   }
 
+  /// The connected domains of `device`, in identifier order.
+  func connectedDomains(of device: DeviceID) -> [String] {
+    domains.filter { $0.value.connected && $0.value.storage?.device == device }.keys.sorted()
+  }
+
   func isUserEnabled() async -> Bool {
     await manager.isUserEnabled()
   }
@@ -276,9 +281,11 @@ public actor DomainController {
         domains[identifier]?.connected = false
         return
       }
-      // FileProvider asks for changes only when signalled. An anchor from before the disconnect
-      // may be stale (a new agent process expires every old anchor), and the device may have
-      // changed meanwhile, so it asks now and enumerates again if the anchor expired.
+      // The device may have changed while it was away, so the folders Finder knows are listed
+      // again first. FileProvider asks for changes only when signalled. An anchor from before the
+      // disconnect may be stale (a new agent process expires every old anchor), so it asks now
+      // and enumerates again if the anchor expired.
+      _ = await relistKnownFolders(of: identifier)
       await manager.signal(identifier)
     }
     if existing.spec != spec {

@@ -55,6 +55,9 @@ private final class FakeClient: AgentSending {
     case .recheck(let id):
       log.record("recheck \(id.serial)")
       return .done
+    case .refresh(let id):
+      log.record("refresh \(id.serial)")
+      return .done
     case .removeAllDomains:
       log.record("removeAllDomains")
       return removeResult.withLock { $0 }
@@ -269,6 +272,22 @@ struct AppModelTests {
         "removeAllDomains", "unregisterAgent", "reveal \(Self.preserved.path)",
         "opensAtLogin false", "quit",
       ])
+  }
+
+  /// Refresh lists the ready devices' folders again on the agent, so changes made on a device
+  /// reach Finder, then reads the status.
+  @Test func refreshButtonRelistsReadyDevices() async {
+    let client = FakeClient(log: log)
+    client.setStatus([
+      device("A1", model: "LinkRunner-100G", .ready([])),
+      device("B1", model: "Pixel 8", .busy),
+    ])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.refresh()
+
+    await model.refreshDevices()
+
+    #expect(log.all.suffix(2) == ["refresh A1", "status"])
   }
 
   @Test func deviceTextIsEscaped() {

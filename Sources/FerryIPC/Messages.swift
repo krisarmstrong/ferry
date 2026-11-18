@@ -66,6 +66,9 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// Answered with `.status(devices:providerEnabled:)`.
   case status
   case recheck(DeviceID)
+  /// Lists again every folder the agent knows on the device's domains, so changes made on the
+  /// device reach Finder.
+  case refresh(DeviceID)
   case eject(DeviceID)
   case removeAllDomains
   case item(domain: String, id: ItemID)

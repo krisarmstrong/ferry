@@ -116,6 +116,21 @@ actor ItemTable {
     return assign(Record(path: path))
   }
 
+  /// The root and every folder the device reported, parents before their children: what a
+  /// refresh lists again.
+  func knownFolders() -> [RemotePath] {
+    let folders = records.values.filter { $0.reported?.kind == .folder }.map(\.path)
+    return [.root]
+      + folders.sorted {
+        ($0.components.count, $0.description) < ($1.components.count, $1.description)
+      }
+  }
+
+  /// Whether the table still knows the item at `path`.
+  func knows(_ path: RemotePath) -> Bool {
+    path == .root || ids[path] != nil
+  }
+
   /// `nil` when the table does not know `id`: the item was deleted, or never reported.
   func path(for id: ItemID) -> RemotePath? {
     id == .root ? .root : records[id]?.path

@@ -51,7 +51,7 @@ public struct MenuContent: View {
       Divider()
       HStack {
         Button {
-          Task { await model.refresh() }
+          Task { await model.refreshDevices() }
         } label: {
           Label {
             Text("Refresh", bundle: .module)
