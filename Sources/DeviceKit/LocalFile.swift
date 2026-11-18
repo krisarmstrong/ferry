@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Facts about a file on the Mac side of a transfer.
 public enum LocalFile {
@@ -49,5 +50,39 @@ public enum LocalFile {
     let (bytes, overflow) = UInt64(info.f_bavail).multipliedReportingOverflow(
       by: UInt64(info.f_bsize))
     return overflow ? .max : bytes
+  }
+
+  private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "LocalFile")
+
+  /// Moves a finished download from `partial` to `file`. Both renames are atomic, so `file` is
+  /// either what was there before or the complete download. Without `replacing`, a file at
+  /// `file` is `.alreadyExists(path)`, `path` being the device file downloaded.
+  public static func place(
+    _ partial: URL, at file: URL, replacing: Bool, downloadOf path: RemotePath
+  ) throws(TransportError) {
+    if replacing {
+      guard Darwin.rename(partial.path, file.path) == 0 else { throw saveFailed(file, errno) }
+      return
+    }
+    guard renamex_np(partial.path, file.path, UInt32(RENAME_EXCL)) != 0 else { return }
+    let failure = errno
+    switch failure {
+    case EEXIST:
+      throw .alreadyExists(path)
+    case ENOTSUP:
+      // Not every volume supports an exclusive rename; checking first narrows the race.
+      log.warning(
+        "exclusive rename unsupported for \(file.path, privacy: .private); checking first")
+      guard !FileManager.default.fileExists(atPath: file.path) else {
+        throw .alreadyExists(path)
+      }
+      guard Darwin.rename(partial.path, file.path) == 0 else { throw saveFailed(file, errno) }
+    default:
+      throw saveFailed(file, failure)
+    }
+  }
+
+  private static func saveFailed(_ file: URL, _ code: Int32) -> TransportError {
+    .io("saving \(file.path) failed: \(String(cString: strerror(code)))")
   }
 }

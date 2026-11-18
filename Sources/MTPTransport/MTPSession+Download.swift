@@ -58,44 +58,11 @@ extension MTPSession {
       guard size >= entry.size else {
         throw .downloadSizeMismatch(listed: entry.size, received: size)
       }
-      try Self.place(partial, at: file, replacing: replacing, downloadOf: path)
+      try LocalFile.place(partial, at: file, replacing: replacing, downloadOf: path)
       return Downloaded(listed: Self.item(entry, at: path), received: size)
     } catch {
       try? FileManager.default.removeItem(at: partial)
       throw error
     }
-  }
-}
-
-extension MTPSession {
-  /// Moves a finished download from `partial` to `file`. Both renames are atomic, so `file` is
-  /// either what was there before or the complete download.
-  private static func place(
-    _ partial: URL, at file: URL, replacing: Bool, downloadOf path: RemotePath
-  ) throws(TransportError) {
-    if replacing {
-      guard Darwin.rename(partial.path, file.path) == 0 else { throw saveFailed(file, errno) }
-      return
-    }
-    guard renamex_np(partial.path, file.path, UInt32(RENAME_EXCL)) != 0 else { return }
-    let failure = errno
-    switch failure {
-    case EEXIST:
-      throw .alreadyExists(path)
-    case ENOTSUP:
-      // Not every volume supports an exclusive rename; checking first narrows the race.
-      log.warning(
-        "exclusive rename unsupported for \(file.path, privacy: .private); checking first")
-      guard !FileManager.default.fileExists(atPath: file.path) else {
-        throw .alreadyExists(path)
-      }
-      guard Darwin.rename(partial.path, file.path) == 0 else { throw saveFailed(file, errno) }
-    default:
-      throw saveFailed(file, failure)
-    }
-  }
-
-  private static func saveFailed(_ file: URL, _ code: Int32) -> TransportError {
-    .io("saving \(file.path) failed: \(String(cString: strerror(code)))")
   }
 }
