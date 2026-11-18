@@ -50,16 +50,35 @@ public actor ADBTransport: DeviceTransport {
   private var routes: [DeviceID: ADBRoutes] = [:]
   /// Devices with an open session.
   private var held: Set<DeviceID> = []
-  /// Devices left alone after an eject, until no route to them is listed or `unpark(_:)`.
-  private var parked: Set<DeviceID> = []
+  /// Devices left alone after an eject, until `unpark(_:)` or until adb has not listed them, in
+  /// any state, for `settleTime`.
+  private var parked: [DeviceID: Parked] = [:]
+  private let now: @Sendable () -> ContinuousClock.Instant
+
+  private struct Parked {
+    var info: DeviceInfo
+    /// The adb serials it has been reached at.
+    var serials: Set<String>
+    /// When a scan first found none of them listed, if none has been listed since.
+    var missingSince: ContinuousClock.Instant?
+  }
 
   public init(port: UInt16 = 5037, locator: ADBLocator = ADBLocator()) {
     self.init(host: ADBHost(port: port, locator: locator), locator: locator)
   }
 
-  init(host: ADBHost, locator: ADBLocator) {
+  /// How long a parked device must be missing from adb's list to count as unplugged. A
+  /// restarted server lists a USB device only after it has re-enumerated, and a Wi-Fi device
+  /// can drop out briefly; a person unplugging and replugging takes longer.
+  static let settleTime = Duration.seconds(5)
+
+  init(
+    host: ADBHost, locator: ADBLocator,
+    now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
+  ) {
     self.host = host
     self.locator = locator
+    self.now = now
     let lists = host.trackDevices()
     arrivals = AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let relay = Task {
@@ -102,17 +121,16 @@ public actor ADBTransport: DeviceTransport {
         found[info.id] = entry
       }
       routes = found.mapValues { ADBRoutes(usb: $0.usb, wireless: $0.wireless.sorted()) }
-      // Gone from the list means unplugged (or disconnected): it mounts when it returns.
-      parked.formIntersection(found.keys)
-      let infos = found.values.map(\.info).sorted { $0.id.serial < $1.id.serial }
-      let listedIDs = Set(found.keys)
+      let rescanAfter = settleParked(found: found, listed: Set(listed.map(\.serial)))
+      let known = Set(found.keys).union(parked.keys)
       let unauthorized = listed.filter { $0.state == .unauthorized }
         .map(Self.describe)
-        .filter { !listedIDs.contains($0.id) }
+        .filter { !known.contains($0.id) }
         .sorted { $0.id.serial < $1.id.serial }
       return DeviceScan(
-        devices: infos.filter { !parked.contains($0.id) }, notSharing: unauthorized,
-        ejected: infos.filter { parked.contains($0.id) })
+        devices: found.values.map(\.info).filter { parked[$0.id] == nil }.sorted(by: Self.serial),
+        notSharing: unauthorized, ejected: parked.values.map(\.info).sorted(by: Self.serial),
+        rescanAfter: rescanAfter)
     }
   }
 
@@ -126,7 +144,7 @@ public actor ADBTransport: DeviceTransport {
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {
     try await gate.run { () async throws(TransportError) -> any DeviceSession in
       if held.contains(id) { throw .deviceBusy }
-      guard !parked.contains(id), let routes = routes[id], let serial = routes.preferred,
+      guard parked[id] == nil, let routes = routes[id], let serial = routes.preferred,
         let info = named[serial]
       else { throw .deviceNotFound(id) }
       let features: Set<String>
@@ -147,12 +165,15 @@ public actor ADBTransport: DeviceTransport {
   }
 
   public func park(_ id: DeviceID) async {
-    guard held.contains(id) else { return }
-    parked.insert(id)
+    guard held.contains(id), let routes = routes[id], let serial = routes.preferred,
+      let info = named[serial]
+    else { return }
+    parked[id] = Parked(
+      info: info, serials: Set(routes.wireless + [routes.usb].compactMap { $0 }))
   }
 
   public func unpark(_ id: DeviceID) async {
-    parked.remove(id)
+    parked[id] = nil
   }
 
   private func release(_ id: DeviceID) {
@@ -164,12 +185,48 @@ public actor ADBTransport: DeviceTransport {
   private func serverUnreachable(_ error: ADBError) {
     named = [:]
     routes = [:]
+    // Whether a parked device is still attached is unknown until the server answers again.
+    for id in parked.keys { parked[id]?.missingSince = nil }
     if error == .serverUnavailable {
       status = locator.adbURL() == nil ? .notInstalled : .serverDown
     } else {
       status = .serverDown
       Self.log.error("listing adb devices failed: \(String(describing: error), privacy: .public)")
     }
+  }
+
+  /// Keeps a parked device parked while adb lists it under any of its serials, in any state
+  /// (a restarted server shows a USB device as offline before it is ready), and lets it go once
+  /// it has been missing for `settleTime`. Returns how long until the soonest missing one
+  /// settles, so the hub scans again without waiting for adb.
+  private func settleParked(found: [DeviceID: Found], listed: Set<String>) -> Duration? {
+    let now = now()
+    var soonest: Duration?
+    for (id, var entry) in parked {
+      if let device = found[id] {
+        entry.info = device.info
+        entry.serials.formUnion(device.wireless + [device.usb].compactMap { $0 })
+      }
+      if found[id] != nil || !entry.serials.isDisjoint(with: listed) {
+        entry.missingSince = nil
+        parked[id] = entry
+        continue
+      }
+      let since = entry.missingSince ?? now
+      let gone = since.duration(to: now)
+      guard gone < Self.settleTime else {
+        parked[id] = nil
+        continue
+      }
+      entry.missingSince = since
+      parked[id] = entry
+      soonest = min(soonest ?? Self.settleTime, Self.settleTime - gone)
+    }
+    return soonest
+  }
+
+  private static func serial(_ lhs: DeviceInfo, _ rhs: DeviceInfo) -> Bool {
+    lhs.id.serial < rhs.id.serial
   }
 
   /// The device behind an adb serial, from its properties, read once while it stays listed.

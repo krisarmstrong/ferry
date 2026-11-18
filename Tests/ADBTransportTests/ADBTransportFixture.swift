@@ -1,6 +1,7 @@
 import DeviceKit
 import Foundation
 import Testing
+import os
 
 @testable import ADBTransport
 
@@ -29,12 +30,14 @@ enum TransportFixture {
     return device
   }
 
-  static func transport(port: UInt16, locator: ADBLocator = findsAdb) -> ADBTransport {
+  static func transport(
+    port: UInt16, locator: ADBLocator = findsAdb, clock: TestClock = TestClock()
+  ) -> ADBTransport {
     ADBTransport(
       host: ADBHost(
         port: port, locator: locator, launcher: { _ in },
         backoff: Backoff(initial: .milliseconds(20), maximum: .milliseconds(100))),
-      locator: locator)
+      locator: locator, now: { clock.now })
   }
 
   /// A hub serving `entries`, started on a free port; the caller kills it.
@@ -66,6 +69,13 @@ enum TransportFixture {
       return .failure(error)
     }
   }
+}
+
+/// A clock a test moves by hand.
+final class TestClock: Sendable {
+  private let instant = OSAllocatedUnfairLock(initialState: ContinuousClock.now)
+  var now: ContinuousClock.Instant { instant.withLock { $0 } }
+  func advance(by duration: Duration) { instant.withLock { $0 += duration } }
 }
 
 extension Result {

@@ -63,36 +63,69 @@ struct ADBTransportLifecycleTests {
     await hub.kill()
   }
 
-  @Test func aParkedDeviceIsEjectedUntilUnparkedOrGone() async throws {
-    let (hub, android) = try await Self.linkRunnerHub()
-    let transport = Fixture.transport(port: hub.port)
+  /// Opens, parks and closes the LinkRunner, as the hub's eject does.
+  static func eject(_ transport: ADBTransport) async throws {
     _ = try await transport.scan()
     let session = try await transport.open(Fixture.linkRunner)
     await transport.park(Fixture.linkRunner)
     await session.close()
-    var scan = try await transport.scan()
+  }
+
+  @Test func aParkedDeviceIsEjectedUntilUnparked() async throws {
+    let (hub, _) = try await Self.linkRunnerHub()
+    let transport = Fixture.transport(port: hub.port)
+    try await Self.eject(transport)
+    let scan = try await transport.scan()
     #expect(scan.devices.isEmpty && scan.ejected == [Fixture.linkRunnerInfo])
     #expect(
       await Fixture.open(transport, Fixture.linkRunner).failure
         == .deviceNotFound(Fixture.linkRunner))
-
-    // A server outage is not an unplug: still ejected once the server is back.
-    let port = hub.port
-    await hub.kill()
-    _ = try await transport.scan()
-    try await hub.start(port: port)
-    #expect(try await transport.scan().ejected == [Fixture.linkRunnerInfo])
-
     await transport.unpark(Fixture.linkRunner)
     #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
+    await hub.kill()
+  }
 
-    // Parked again, then unplugged: it mounts when it comes back.
-    let reopened = try await transport.open(Fixture.linkRunner)
-    await transport.park(Fixture.linkRunner)
-    await reopened.close()
+  /// A restarted server lists a USB device as absent, then offline, then ready: none of that is
+  /// an unplug, so the device stays ejected.
+  @Test func aParkSurvivesAServerRestart() async throws {
+    let (hub, android) = try await Self.linkRunnerHub()
+    let port = hub.port
+    let clock = TestClock()
+    let transport = Fixture.transport(port: port, clock: clock)
+    try await Self.eject(transport)
+
+    await hub.kill()
+    #expect(try await transport.scan() == DeviceScan(devices: []))
+    clock.advance(by: .seconds(60))
+    try await hub.start(port: port)
     hub.set([])
+    var scan = try await transport.scan()
+    #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.devices.isEmpty)
+    #expect(scan.rescanAfter != nil)
+    clock.advance(by: .seconds(1))
+    hub.set([.init(Fixture.linkRunnerSerial, "offline", device: nil)])
     scan = try await transport.scan()
-    #expect(scan.ejected.isEmpty && scan.devices.isEmpty)
+    #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.rescanAfter == nil)
+    clock.advance(by: .seconds(60))
+    hub.set([.init(Fixture.linkRunnerSerial, device: android)])
+    scan = try await transport.scan()
+    #expect(scan.ejected == [Fixture.linkRunnerInfo] && scan.devices.isEmpty)
+    await hub.kill()
+  }
+
+  /// Gone from adb's list for the settle time is an unplug: it mounts when it comes back.
+  @Test func aParkedDeviceGoneLongEnoughIsUnparked() async throws {
+    let (hub, android) = try await Self.linkRunnerHub()
+    let clock = TestClock()
+    let transport = Fixture.transport(port: hub.port, clock: clock)
+    try await Self.eject(transport)
+    hub.set([])
+    var scan = try await transport.scan()
+    #expect(scan.ejected == [Fixture.linkRunnerInfo])
+    #expect(scan.rescanAfter == ADBTransport.settleTime)
+    clock.advance(by: ADBTransport.settleTime)
+    scan = try await transport.scan()
+    #expect(scan == DeviceScan(devices: []))
     hub.set([.init(Fixture.linkRunnerSerial, device: android)])
     #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
     await hub.kill()
