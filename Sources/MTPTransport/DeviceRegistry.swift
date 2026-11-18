@@ -87,21 +87,26 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     try await gate.run { () async throws(TransportError) -> DeviceScan in
       let attached = try driver.attached()
       let present = Set(attached.map(\.location))
+      // Only a device Ferry could use stands for an ejected one on its port.
+      let candidates = attached.filter { driver.candidacy($0) != .ignored }
+      let occupied = Set(candidates.map(\.locationID))
       busy = busy.filter { present.contains($0.key) }
-      let rescanAfter = settleEjected(present: Set(attached.map(\.locationID)))
+      let rescanAfter = settleEjected(present: occupied)
       resolved = resolved.filter { present.contains($0.key) }
       for (location, gone) in opened where !present.contains(location) {
         opened[location] = nil
         await driver.close(gone.device)
       }
-      let occupied = Set(attached.map(\.locationID))
       var found = Found(ejected: ejected.filter { !occupied.contains($0.key) }.map(\.value.info))
-      for record in attached {
+      for record in candidates {
         await report(record, into: &found)
       }
+      // One device can be ejected on more than one port (see `report`): list it once.
+      var listed: Set<DeviceID> = []
+      let ejectedNow = found.ejected.filter { listed.insert($0.id).inserted }
       return DeviceScan(
         devices: found.devices, busy: found.busy, notSharing: found.notSharing,
-        ejected: found.ejected, rescanAfter: rescanAfter)
+        ejected: ejectedNow, rescanAfter: rescanAfter)
     }
   }
 
@@ -143,8 +148,11 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     do throws(TransportError) {
       let (device, info) = try await driver.open(raw, location)
       if ejected.values.contains(where: { $0.info.id == info.id }) {
-        // The ejected device on another port: let it go again.
+        // The ejected device on another port: that port is ejected too, so its resets (which
+        // closing it causes) are reported without being opened again.
+        ejected[record.locationID] = Ejected(info: info, missingSince: nil)
         await driver.close(device)
+        found.ejected.append(info)
         return
       }
       opened[location] = Scanned(device: device, info: info, port: record.locationID)

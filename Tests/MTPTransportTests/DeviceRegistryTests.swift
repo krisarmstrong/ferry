@@ -85,6 +85,9 @@ struct DeviceRegistryTests {
 
     func setBusy(_ addresses: Set<Int>) { busy = addresses }
     func setResetsOnClose(_ bus: Bus) { resetsOnClose = bus }
+    /// Ports whose device is the one first seen on another port, moved there.
+    var moved: [Int: Int] = [:]
+    func setMoved(_ port: Int, from original: Int) { moved[port] = original }
 
     func open(_ raw: Int) async throws(TransportError) -> Handle {
       active += 1
@@ -102,7 +105,9 @@ struct DeviceRegistryTests {
     }
 
     func info(_ handle: Handle) -> DeviceInfo {
-      DeviceInfo(id: DeviceID(serial: "S\(handle.raw)"), manufacturer: "Acme", model: "Phone")
+      DeviceInfo(
+        id: DeviceID(serial: "S\(moved[handle.raw] ?? handle.raw)"), manufacturer: "Acme",
+        model: "Phone")
     }
   }
 

@@ -112,4 +112,44 @@ extension DeviceRegistryTests {
 
     #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
   }
+
+  /// The ejected unit plugged into another port: it is opened once (only then is its serial
+  /// known), let go, and from then on that port is ejected too, so its resets are not opened.
+  @Test func ejectedDeviceOnAnotherPortIsOpenedOnceThenLeftAlone() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    let opened = try await registry.open(Self.id(1))
+    await registry.park(Self.id(1))
+    await registry.release(opened.location)
+    await bus.log.setMoved(2, from: 1)
+    await bus.log.setResetsOnClose(bus)
+    bus.plug([2])
+
+    for _ in 0..<3 {
+      let scan = try await registry.scan()
+      #expect(scan.devices.isEmpty)
+      #expect(scan.ejected == [Self.info(1)])
+      bus.reenumerate(2, at: 20)
+    }
+    #expect(await bus.log.opens == [1: 1, 2: 1])
+    #expect(await bus.log.closes == [2: 1])
+  }
+
+  /// Only a device Ferry could use stands for the ejected one on its port: a keyboard plugged
+  /// into that port leaves the port counting as empty.
+  @Test func nonCandidateOnAnEjectedPortIsNotTheEjectedDevice() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    let opened = try await registry.open(Self.id(1))
+    await registry.park(Self.id(1))
+    await registry.release(opened.location)
+
+    bus.plug([1], apple: [1])
+
+    #expect(
+      try await registry.scan()
+        == DeviceScan(devices: [], ejected: [Self.info(1)], rescanAfter: .seconds(3)))
+  }
 }
