@@ -94,7 +94,9 @@ public actor DomainController {
   private(set) var handledEvents = 0
   /// Set once the domains from before this process are adopted, whether or not listing them
   /// worked; until then requests wait (see `route(_:)`).
-  private var adopted = false
+  var adopted = false
+  /// Told of every change to the domains (see `publishLocations(to:)`).
+  var locationListener: WirelessVouching?
   private var adoptionWaiters: [CheckedContinuation<Void, Never>] = []
   /// Requests waiting for the domains from before this process to be adopted.
   var requestsAwaitingAdoption: Int { adoptionWaiters.count }
@@ -119,6 +121,7 @@ public actor DomainController {
   public func run() async {
     await serially { await self.adoptExisting() }
     adopted = true
+    publishLocations()
     for waiter in adoptionWaiters {
       waiter.resume()
     }
@@ -207,6 +210,7 @@ public actor DomainController {
       return await work()
     }
     tail = Task { _ = await current.value }
+    defer { if adopted { publishLocations() } }
     return await current.value
   }
 

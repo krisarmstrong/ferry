@@ -37,6 +37,7 @@ struct WirelessADBFixRoundTests {
     defer { try? FileManager.default.removeItem(at: file) }
     await Self.remembering(adb, file)
     let vouching = WirelessVouching()
+    vouching.locate(identifiers: [], devices: [])
     let wireless = WirelessADB(adb: adb, store: file, timing: Self.fast, vouching: vouching)
     #expect(vouching.serves("192.0.2.31:5555", as: Self.etherScope.id))
     #expect(!vouching.serves(Self.impostor.argument, as: Self.etherScope.id))
@@ -52,6 +53,7 @@ struct WirelessADBFixRoundTests {
   func anAddressIsNotServedWhileItsIdentityIsUnsettled() async throws {
     let adb = FakeWirelessADB()
     let vouching = WirelessVouching()
+    vouching.locate(identifiers: [], devices: [])
     let seen = Mutex<[Bool]>([])
     let address = Self.endpoint("192.0.2.50")
     await adb.set {
@@ -73,6 +75,7 @@ struct WirelessADBFixRoundTests {
   func decidingTellsTheHubToScanAgain() async throws {
     let adb = FakeWirelessADB()
     let vouching = WirelessVouching()
+    vouching.locate(identifiers: [], devices: [])
     let address = Self.endpoint("192.0.2.50")
     await adb.set { $0.units[address.argument] = .init(info: Self.stranger) }
     let ticks = Mutex(0)
@@ -90,6 +93,7 @@ struct WirelessADBFixRoundTests {
   func aWaitingAddressIsNotServed() async throws {
     let adb = FakeWirelessADB()
     let vouching = WirelessVouching()
+    vouching.locate(identifiers: [], devices: [])
     let address = Self.endpoint("192.0.2.50")
     await adb.set { $0.units[address.argument] = .init(info: Self.stranger, authorized: false) }
     let wireless = WirelessADB(
@@ -113,6 +117,7 @@ struct WirelessADBFixRoundTests {
       }
     }
     let vouching = WirelessVouching()
+    vouching.locate(identifiers: [], devices: [])
     let wireless = WirelessADB(
       adb: adb, store: WirelessADBTests.storeFile(), timing: Self.fast, vouching: vouching)
     let outcome = await wireless.connect(address)

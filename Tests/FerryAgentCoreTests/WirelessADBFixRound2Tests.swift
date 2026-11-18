@@ -91,6 +91,7 @@ struct WirelessADBFixRound2Tests {
   func connectingTwiceWhileWaitingStillServesOnceAllowed() async throws {
     let adb = FakeWirelessADB()
     let vouching = WirelessVouching()
+    vouching.locate(identifiers: [], devices: [])
     let address = Self.endpoint("192.0.2.50")
     let unit = DeviceInfo(id: DeviceID(serial: "NEWUNIT1"), manufacturer: "", model: "New")
     await adb.set { $0.units[address.argument] = .init(info: unit, authorized: false) }
@@ -114,6 +115,7 @@ struct WirelessADBFixRound2Tests {
   @Test(.timeLimit(.minutes(1)))
   func servingIsClosedUntilTheStoreIsLoaded() async throws {
     let vouching = WirelessVouching()
+    vouching.locate(identifiers: [], devices: [])
     #expect(!vouching.serves("192.0.2.50:5555", as: DeviceID(serial: "NEWUNIT1")))
     #expect(!vouching.serves("192.0.2.31:5555", as: Self.etherScope.id))
     let ticks = Mutex(0)

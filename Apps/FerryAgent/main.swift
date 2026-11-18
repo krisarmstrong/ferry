@@ -30,8 +30,9 @@ FileTransfer.sweep()
 
 // MTP and the user's adb server together: each device is served by the best method it offers.
 // What the network may serve, as WirelessADB decides; ADBTransport asks it on every scan. It
-// serves no network route until WirelessADB below has loaded its store, so a scan the hub makes
-// first cannot serve a connection the adb server kept from before this agent started.
+// serves no network route until WirelessADB below has loaded its store and the domain controller
+// has published its Finder locations, so a scan the hub makes first cannot serve a connection the
+// adb server kept from before this agent started.
 let vouching = WirelessVouching()
 let adb = ADBTransport(serving: { vouching.serves($0, as: $1) })
 let hub = DeviceHub(
@@ -48,6 +49,8 @@ let wireless = WirelessADB(
   }, located: { await domains.location(of: $0) }, vouching: vouching)
 Task { await wireless.run() }
 Task {
+  // Before adoption, so the locations reach the serving check the moment they are known.
+  await domains.publishLocations(to: vouching)
   await manager.conformExisting()
   await domains.run()
 }

@@ -1,6 +1,22 @@
 import DeviceKit
 
 extension DomainController {
+  /// The keys internal storage has had: ADB's and MTP's since Task 5, and the MTP description an
+  /// earlier Ferry used.
+  static let internalKeys = [StorageKey.internal, DomainNaming.androidInternalDescription]
+
+  /// Keeps `vouching` told of the Finder locations Ferry has: now, if the domains from before
+  /// this process are adopted, and after every change to them from then on.
+  public func publishLocations(to vouching: WirelessVouching) {
+    locationListener = vouching
+    if adopted { publishLocations() }
+  }
+
+  func publishLocations() {
+    locationListener?.locate(
+      identifiers: Set(domains.keys), devices: Set(domains.values.compactMap(\.storage?.device)))
+  }
+
   /// The name of the Finder location Ferry has for `id`, connected or not, or `nil` if it has
   /// none: a device with a location is one Ferry knows even while it is unplugged.
   ///
@@ -15,7 +31,7 @@ extension DomainController {
     if let match = domains.values.first(where: { $0.storage?.device == id }) {
       return match.spec?.displayName ?? id.serial
     }
-    let candidates = [StorageKey.internal, DomainNaming.androidInternalDescription].map {
+    let candidates = Self.internalKeys.map {
       DomainNaming.identifier(for: StorageID(device: id, key: $0))
     }
     guard let identifier = candidates.first(where: { domains[$0] != nil }) else { return nil }
