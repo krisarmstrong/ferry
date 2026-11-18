@@ -60,5 +60,6 @@ tinted and clear appearances.
 
 Recommendation: use `MenuBarGlyph` (as a template image) instead of the SF Symbol
 `externaldrive.connected.to.line.below`. The symbol is a generic external drive that other
-disk utilities also show; the glyph matches the app icon and reads cleanly at 18 px. Reasons
-and the trade-off are in `Design/REPORT.md`.
+disk utilities also show; the glyph matches the app icon and reads cleanly at 18 px. The
+trade-off: a template image has no SF Symbol weights or variants (such as a status badge). If
+those are wanted, export the glyph as a custom SF Symbol with the SF Symbols app.

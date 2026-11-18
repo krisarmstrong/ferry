@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "title": "Ferry Help",
+  "sections": [
+    {
+      "id": "getting-started",
+      "title": "Getting started",
+      "symbol": "checklist",
+      "paragraphs": [
+        "Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon.",
+        "The first time Ferry opens, it starts a small helper that talks to your devices. Devices stay in Finder even when the menu is closed."
+      ],
+      "groups": [
+        {
+          "title": "Turn on Ferry in Finder",
+          "steps": [
+            "Click the Ferry icon in the menu bar.",
+            "Click **Open System Settings**.",
+            "In Login Items & Extensions, turn on Ferry under File Providers."
+          ],
+          "note": "You only do this once."
+        }
+      ]
+    },
+    {
+      "id": "connect-netally",
+      "title": "Connect a NetAlly unit",
+      "symbol": "cable.connector",
+      "paragraphs": [
+        "For the LinkRunner 10G, EtherScope nXG and LinkRunner 100G."
+      ],
+      "steps": [
+        "Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac.",
+        "On the unit: **Settings** (bottom of the Home screen) → **Connected devices** → **USB**.",
+        "Tap **Transfer files**."
+      ],
+      "note": "The device appears in Finder once it shares files.",
+      "link": { "title": "How to connect", "target": "guide:netAllyAndroid8Board" }
+    },
+    {
+      "id": "connect-android",
+      "title": "Connect another Android phone",
+      "symbol": "smartphone",
+      "paragraphs": [
+        "Unlock the phone first. Its storage stays hidden while it is locked."
+      ],
+      "groups": [
+        {
+          "title": "Android 8 or 9",
+          "steps": [
+            "Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.",
+            "Pull down the notification shade and tap **USB charging this device**.",
+            "Tap **Transfer files**."
+          ]
+        },
+        {
+          "title": "Android 10 or newer",
+          "steps": [
+            "Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.",
+            "Pull down the notification shade and tap **Charging this device via USB**.",
+            "Under **USB preferences**, choose **File transfer**. Or open **Settings** → **Connected devices** → **USB**."
+          ]
+        }
+      ],
+      "link": { "title": "How to connect", "target": "guide" }
+    },
+    {
+      "id": "finder",
+      "title": "Using Ferry in Finder",
+      "symbol": "folder",
+      "paragraphs": [
+        "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs. An SD card is a second location.",
+        "Double-click a file to open it. Ferry copies it to the Mac when you open it.",
+        "Drag files or folders between the device and the Mac to copy them. A half-copied file never appears under its real name.",
+        "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it."
+      ],
+      "groups": [
+        {
+          "title": "Delete",
+          "paragraphs": [
+            "The device has no Trash. Finder offers **Delete Immediately**, and the file is removed from the device at once."
+          ]
+        },
+        {
+          "title": "Free up space on the Mac",
+          "paragraphs": [
+            "Control-click a file you opened and choose **Remove Download**. The file stays on the device."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "menu",
+      "title": "The menu",
+      "symbol": "menubar.rectangle",
+      "definitions": [
+        { "term": "Ready", "detail": "The device is sharing files and is in Finder." },
+        { "term": "Not sharing files", "detail": "File transfer is off on the device." },
+        { "term": "In use by another app", "detail": "Another app has the device." },
+        { "term": "Checking…", "detail": "Ferry is checking the device again." },
+        { "term": "Can't open", "detail": "The device reported an error. Click Try Again." }
+      ],
+      "groups": [
+        {
+          "title": "Menu items",
+          "definitions": [
+            { "term": "Refresh", "detail": "Checks for devices and shows changes made on the device." },
+            { "term": "Eject", "detail": "Removes the device from Finder and releases it." },
+            { "term": "Settings…", "detail": "Open at login, How to connect, Remove Ferry." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "symbol": "wrench.and.screwdriver",
+      "groups": [
+        {
+          "title": "The device does not show up",
+          "steps": [
+            "Try another cable. Some carry power only.",
+            "Unlock the device.",
+            "Turn on file transfer on the device.",
+            "Check that Ferry is on under File Providers in Login Items & Extensions.",
+            "Choose **Refresh** in the Ferry menu."
+          ]
+        },
+        {
+          "title": "Not sharing files",
+          "paragraphs": [
+            "Choose Transfer files on the device. You do not need to replug the cable."
+          ],
+          "link": { "title": "How to turn on file transfer", "target": "guide" }
+        },
+        {
+          "title": "In use by another app",
+          "paragraphs": [
+            "Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then click **Try Again**."
+          ]
+        },
+        {
+          "title": "The sidebar says \"Ferry\"",
+          "paragraphs": [
+            "With one device location, macOS labels it with the app's name. This is normal."
+          ]
+        },
+        {
+          "title": "Unplugged during a copy",
+          "paragraphs": [
+            "Plug the device back in and turn on file transfer. The copy resumes when the device is reconnected."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "privacy",
+      "title": "Privacy",
+      "symbol": "hand.raised",
+      "paragraphs": [
+        "Ferry does not use the network. No telemetry, no analytics, no account. Nothing leaves your Mac."
+      ]
+    },
+    {
+      "id": "uninstall",
+      "title": "Uninstall",
+      "symbol": "trash",
+      "steps": [
+        "In Ferry's Settings, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched.",
+        "Drag Ferry from Applications to the Trash."
+      ]
+    },
+    {
+      "id": "coming-next",
+      "title": "Coming next",
+      "symbol": "calendar",
+      "paragraphs": [
+        "ADB connection, Wi-Fi connection, and **Send to device** in Finder's Control-click menu."
+      ]
+    }
+  ]
+}
