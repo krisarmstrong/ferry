@@ -44,6 +44,7 @@ public struct MenuContent: View {
           device: device,
           eject: { Task { await model.eject(device.id) } },
           recheck: { Task { await model.recheck(device.id) } },
+          mount: { Task { await model.mount(device.id) } },
           showGuide: { openGuide(for: device) })
       }
       if let error = model.actionError {
@@ -188,6 +189,7 @@ private struct DeviceRow: View {
   let device: AttachedDevice
   let eject: () -> Void
   let recheck: () -> Void
+  let mount: () -> Void
   let showGuide: () -> Void
 
   var body: some View {
@@ -210,11 +212,14 @@ private struct DeviceRow: View {
       HStack {
         stateAction
         Spacer()
-        Button(action: eject) {
-          Label {
-            Text("Eject", bundle: .module)
-          } icon: {
-            Image(systemName: "eject")
+        // Only a device Ferry holds open can be ejected.
+        if case .ready = device.state {
+          Button(action: eject) {
+            Label {
+              Text("Eject", bundle: .module)
+            } icon: {
+              Image(systemName: "eject")
+            }
           }
         }
       }
@@ -225,6 +230,7 @@ private struct DeviceRow: View {
     switch device.state {
     case .ready: "externaldrive.connected.to.line.below"
     case .notSharingFiles: "cable.connector"
+    case .ejected: "eject"
     case .busy, .failed: "exclamationmark.triangle"
     }
   }
@@ -238,6 +244,9 @@ private struct DeviceRow: View {
       }
     case .notSharingFiles:
       Text("Choose Transfer files on the device.", bundle: .module)
+        .foregroundStyle(.secondary)
+    case .ejected:
+      Text("Not in Finder until you mount it again or plug it back in.", bundle: .module)
         .foregroundStyle(.secondary)
     case .busy:
       Text("Quit Image Capture or Android File Transfer, then try again.", bundle: .module)
@@ -255,6 +264,10 @@ private struct DeviceRow: View {
     case .notSharingFiles:
       Button(action: showGuide) {
         Text("How to turn on file transfer", bundle: .module)
+      }
+    case .ejected:
+      Button(action: mount) {
+        Text("Mount", bundle: .module)
       }
     case .busy, .failed:
       Button(action: recheck) {

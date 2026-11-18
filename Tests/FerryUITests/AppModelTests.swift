@@ -191,7 +191,7 @@ struct AppModelTests {
     client.setStatus([device("A1", model: "LinkRunner-100G", .ready([]))])
     let model = AppModel(client: client, services: FakeServices(log: log))
     await model.refresh()
-    client.setStatus([device("A1", model: "LinkRunner-100G", .notSharingFiles)])
+    client.setStatus([device("A1", model: "LinkRunner-100G", .ejected)])
     await model.eject(id)
     #expect(log.all.suffix(2) == ["eject A1", "status"])
     #expect(!model.isGuidePresented)
@@ -361,19 +361,27 @@ struct AppModelTests {
     #expect(log.all.suffix(2) == ["refresh A1", "status"])
   }
 
-  /// An ejected unit stays ejected through its own USB reset; Refresh mounts it again.
-  @Test func refreshMountsAnEjectedDeviceAgain() async {
+  /// Refresh asks the agent to try again every device it is not using: an ejected one is
+  /// mounted again, one not sharing files is checked again. The agent says which is which, so
+  /// this holds after the app relaunches.
+  @Test func refreshMountsEjectedAndRechecksNotSharingDevices() async {
     let client = FakeClient(log: log)
-    client.setStatus([device("A1", model: "LinkRunner-100G", .ready([]))])
+    client.setStatus([
+      device("A1", model: "LinkRunner-100G", .ejected),
+      device("B1", model: "Pixel 8", .notSharingFiles),
+      device("C1", model: "Pixel 9", .busy),
+    ])
     let model = AppModel(client: client, services: FakeServices(log: log))
     await model.refresh()
-    client.setStatus([device("A1", model: "LinkRunner-100G", .notSharingFiles)])
-    await model.eject(DeviceID(serial: "A1"))
 
     await model.refreshDevices()
+    #expect(log.all.suffix(3) == ["recheck A1", "recheck B1", "status"])
+  }
+
+  @Test func mountSendsRecheck() async {
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    await model.mount(DeviceID(serial: "A1"))
     #expect(log.all.suffix(2) == ["recheck A1", "status"])
-    await model.refreshDevices()
-    #expect(log.all.suffix(2) == ["status", "status"])
   }
 
   @Test func deviceTextIsEscaped() {

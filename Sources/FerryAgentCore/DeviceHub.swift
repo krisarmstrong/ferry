@@ -3,13 +3,6 @@ import os
 
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "DeviceHub")
 
-public enum HubEvent: Sendable, Equatable {
-  /// A device the hub had not listed. Emitted once per device until it is detached.
-  case attached(AttachedDevice)
-  case changed(AttachedDevice)
-  case detached(DeviceID)
-}
-
 /// The one owner of every open device session in the agent.
 ///
 /// Each USB tick on `arrivals` makes the hub scan the bus once, open the new devices, and ask
@@ -53,18 +46,21 @@ public actor DeviceHub {
   public nonisolated let events: AsyncStream<HubEvent>
   private let continuation: AsyncStream<HubEvent>.Continuation
   private let transport: any DeviceTransport
-  private let clock: any Clock<Duration>
+  let clock: any Clock<Duration>
   private var entries: [DeviceID: Entry] = [:]
   /// Devices the user ejected. Closing one can reset it into a new enumeration that the
-  /// transport offers as usable again, so the hub never opens these until the user's Try Again
-  /// or the device leaves a scan (unplugged).
+  /// transport may offer as usable again, so the hub never opens these until the user mounts
+  /// it again (`recheck`) or it is unplugged: no list of a scan names it, which the transport
+  /// ensures only once the device has been gone long enough to count as unplugged.
   private var ejected: Set<DeviceID> = []
+  /// The scan the transport asked for, without waiting for a USB event.
+  var rescan: Task<Void, Never>?
   /// Devices whose storages or open failed, with the wait before the next try. Each close of a
   /// failing Android unit can reset it into a new enumeration and a new tick, so without this a
   /// broken device would be opened again and again.
-  private var backoff: [DeviceID: Backoff] = [:]
+  var backoff: [DeviceID: Backoff] = [:]
 
-  private struct Backoff {
+  struct Backoff {
     var delay: Duration
     var waiting: Bool
     /// The wait this entry is for, so a wait from before a Try Again cannot end a later one.
@@ -73,7 +69,7 @@ public actor DeviceHub {
 
   static let firstRetryDelay = Duration.seconds(2)
   static let maxRetryDelay = Duration.seconds(60)
-  private var generations: UInt64 = 0
+  var generations: UInt64 = 0
   /// Held devices with a tick's storage read still in flight.
   private var probing: Set<DeviceID> = []
   /// The reconcile most recently asked for; the next one waits for it.
@@ -185,14 +181,14 @@ public actor DeviceHub {
     }
   }
 
-  /// Closes the device's session. It stays listed as `.notSharingFiles` until it is unplugged:
-  /// the transport is told to leave it alone first, so no scan opens it again meanwhile.
+  /// Closes the device's session. It stays listed as `.ejected` until it is unplugged or mounted
+  /// again: the transport is told to leave it alone first, so no scan opens it meanwhile.
   public func eject(_ id: DeviceID) async {
     guard case .held = entries[id]?.holding else { return }
     ejected.insert(id)
     await transport.park(id)
     guard let entry = entries[id], case .held(let session) = entry.holding else { return }
-    store(entry.info, .notSharingFiles, .unheld)
+    store(entry.info, .ejected, .unheld)
     await session.close()
     log.info("device \(id.serial, privacy: .private) ejected")
   }
@@ -200,7 +196,7 @@ public actor DeviceHub {
   // MARK: Reconcile
 
   /// Reconciles run one at a time, in the order they were asked for.
-  private func reconcile() async {
+  func reconcile() async {
     let previous = lastReconcile
     let current = Task { [weak self] in
       await previous?.value
@@ -221,7 +217,8 @@ public actor DeviceHub {
       log.error("scanning devices failed: \(String(describing: error), privacy: .private)")
       return
     }
-    let present = Set((scan.devices + scan.busy + scan.notSharing).map(\.id))
+    scheduleRescan(after: scan.rescanAfter)
+    let present = Set((scan.devices + scan.busy + scan.notSharing + scan.ejected).map(\.id))
     for (id, entry) in entries where !present.contains(id) {
       guard case .unheld = entry.holding else { continue }
       entries[id] = nil
@@ -235,6 +232,10 @@ public actor DeviceHub {
     }
     for info in scan.notSharing where isUnheld(info.id) {
       store(info, .notSharingFiles, .unheld)
+    }
+    for info in scan.ejected where isUnheld(info.id) {
+      ejected.insert(info.id)
+      store(info, .ejected, .unheld)
     }
     for info in scan.devices {
       await admit(info)
@@ -362,31 +363,5 @@ extension DeviceHub {
     for id in waitingIDs {
       await recheckHeld(id)
     }
-  }
-}
-
-// MARK: Back-off
-
-extension DeviceHub {
-  /// Holds off the next open of a failing device: 2 s, doubling to 60 s. Then rescans.
-  fileprivate func backOff(_ id: DeviceID) {
-    let delay = backoff[id].map { min($0.delay * 2, Self.maxRetryDelay) } ?? Self.firstRetryDelay
-    generations += 1
-    let token = generations
-    backoff[id] = Backoff(delay: delay, waiting: true, token: token)
-    Task { [weak self, clock] in
-      do {
-        try await clock.sleep(for: delay)
-      } catch {
-        return
-      }
-      await self?.retry(id, token: token)
-    }
-  }
-
-  fileprivate func retry(_ id: DeviceID, token: UInt64) async {
-    guard let wait = backoff[id], wait.waiting, wait.token == token else { return }
-    backoff[id]?.waiting = false
-    await reconcile()
   }
 }

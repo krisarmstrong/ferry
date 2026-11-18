@@ -107,7 +107,11 @@
         },
         {
           "term": "Not sharing files",
-          "detail": "File transfer is off or the device is locked, or you ejected it. Choose **Refresh** to bring back a device you ejected."
+          "detail": "File transfer is off or the device is locked. Choose **Transfer files** on the device, then **Refresh**."
+        },
+        {
+          "term": "Ejected",
+          "detail": "You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in."
         },
         {
           "term": "In use by another app",
@@ -128,11 +132,15 @@
           "definitions": [
             {
               "term": "Refresh",
-              "detail": "Shows changes made on the device in Finder, and brings back a device you ejected. While the menu is open, Ferry also checks for devices every 2 seconds."
+              "detail": "Shows changes made on the device in Finder, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds."
             },
             {
               "term": "Eject",
-              "detail": "Removes the device from Finder and releases it. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names."
+              "detail": "Removes a ready device from Finder and releases it; it then shows **Ejected**. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names."
+            },
+            {
+              "term": "Mount",
+              "detail": "Next to an ejected device: puts it back in Finder."
             },
             {
               "term": "Help",

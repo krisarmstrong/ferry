@@ -66,6 +66,7 @@ extension DeviceHubTests {
     await harness.clock.advance(by: .seconds(2))
     await first.waitUntilSuspended(.storages)
     await harness.hub.eject(second.info.id)
+    #expect(await harness.next() == .changed(AttachedDevice(info: second.info, state: .ejected)))
     await first.resume(.storages)
     await harness.clock.waitForSleeper()
     harness.tick()
@@ -85,10 +86,16 @@ extension DeviceHubTests {
     #expect(await harness.next() == .attached(hubReady(device)))
     await harness.transport.resetOnClose(device.info.id)
     await harness.hub.eject(device.info.id)
-    #expect(
-      await harness.next() == .changed(AttachedDevice(info: device.info, state: .notSharingFiles)))
+    #expect(await harness.next() == .changed(AttachedDevice(info: device.info, state: .ejected)))
+    // Gone for a moment (still settling), then back as an enumeration the transport offers.
     harness.tick()
     #expect(await harness.barrier()?.isAttached(serial: "BARRIER") == true)
+    harness.tick()
+    let second = await makeHubDevice("SECOND")
+    await harness.transport.attach(second)
+    harness.tick()
+    #expect(await harness.next() == .attached(hubReady(second)))
+    #expect(await harness.hub.devices().first { $0.id == device.info.id }?.state == .ejected)
     #expect(await harness.transport.openCount(of: device.info.id) == 1)
 
     await harness.hub.recheck(device.info.id)
@@ -144,5 +151,24 @@ extension DeviceHubTests {
     await harness.hub.recheck(device.info.id)
     #expect(await harness.next() == .changed(hubReady(device)))
     #expect(await harness.transport.openCount(of: device.info.id) == 3)
+  }
+
+  /// An ejected device's port is empty: the transport asks for another scan once that would count
+  /// as an unplug, and the hub scans then without waiting for a USB event.
+  @Test func hubScansAgainWhenTheTransportAsks() async {
+    var harness = HubHarness()
+    defer { harness.finish() }
+    await harness.transport.setRescanAfter(.seconds(3))
+    harness.tick()
+    await harness.clock.waitForSleeper()
+    let scans = await harness.transport.scanCount
+    await harness.transport.setRescanAfter(nil)
+
+    await harness.clock.advance(by: .seconds(3))
+
+    for _ in 0..<1_000 where await harness.transport.scanCount == scans {
+      try? await Task.sleep(for: .milliseconds(1))
+    }
+    #expect(await harness.transport.scanCount > scans)
   }
 }

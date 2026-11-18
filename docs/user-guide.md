@@ -139,7 +139,8 @@ and its state.
 | State | Meaning |
 | ----- | ------- |
 | **Ready** | The device is sharing files and is in Finder. The menu lists each storage and its free space. |
-| **Not sharing files** | The device is connected but file transfer is off or it is locked, or you ejected it. Click **How to turn on file transfer** for the steps; choose **Refresh** to bring back a device you ejected. |
+| **Not sharing files** | The device is connected but file transfer is off or it is locked. Click **How to turn on file transfer** for the steps. |
+| **Ejected** | You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in. |
 | **In use by another app** | Another app has the device. Quit it, then click **Try Again**. See [Troubleshooting](#in-use-by-another-app). |
 | **Can't open** | The device reported an error, shown under its name. Click **Try Again**, or unplug it and plug it back in. |
 
@@ -155,13 +156,15 @@ While the menu is open, Ferry checks for devices every 2 seconds.
 Menu items:
 
 - **Refresh** (⌘R): reads each ready device's folders again, so changes made on the device
-  show in Finder, and brings back a device you ejected.
-- **Eject** (next to a device): removes the device from Finder and releases it, so you can
-  unplug it or use it with another app. The device then shows **Not sharing files** until you
-  choose **Refresh** or unplug it and plug it back in. Changes that had not reached the device
+  show in Finder, mounts every device you ejected, and checks again a device that is not
+  sharing files.
+- **Eject** (next to a ready device): removes the device from Finder and releases it, so you
+  can unplug it or use it with another app. The device then shows **Ejected** until you click
+  **Mount**, choose **Refresh**, or unplug it and plug it back in. Changes that had not reached the device
   are saved to a folder on the Mac: the menu says **Unsent changes were saved to** that folder
   and offers **Reveal in Finder**. Deletes and renames that had not reached the device are
   dropped, so the device keeps those files under their old names.
+- **Mount** (next to an ejected device): puts it back in Finder.
 - **Try Again** (next to a device that is in use or can't open): asks Ferry to open the
   device again.
 - **Help** (the question-mark button, ⌘?): opens Ferry Help.
@@ -191,7 +194,7 @@ Settings:
 
 The device is connected, but file transfer is off or the device is locked. Unlock it and
 choose **Transfer files** (or **File transfer**) on the device. You do not need to replug the
-cable. If you ejected the device, choose **Refresh** instead.
+cable. A device you ejected shows **Ejected** instead: click **Mount**.
 
 ### "In use by another app"
 

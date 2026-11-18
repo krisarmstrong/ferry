@@ -181,7 +181,7 @@ struct DomainControllerTests {
     #expect(await harness.barrier(after: 3) == [firstAdded, secondAdded, removed, barrier])
     #expect(await first.closeCount == 1)
     #expect(
-      await harness.hub.devices().first { $0.id == first.info.id }?.state == .notSharingFiles)
+      await harness.hub.devices().first { $0.id == first.info.id }?.state == .ejected)
     #expect(
       await harness.service.handle(.list(domain: domainID(first), folder: .root), file: nil)
         == .failure(.deviceDisconnected))

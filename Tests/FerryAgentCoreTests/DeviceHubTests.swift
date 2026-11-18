@@ -261,7 +261,7 @@ struct DeviceHubTests {
 
     await harness.hub.eject(device.info.id)
 
-    let ejected = AttachedDevice(info: device.info, state: .notSharingFiles)
+    let ejected = AttachedDevice(info: device.info, state: .ejected)
     #expect(await harness.next() == .changed(ejected))
     #expect(await device.closeCount == 1)
     harness.tick()
@@ -289,7 +289,7 @@ struct DeviceHubTests {
     await device.resume(.storages)
     await recheck
 
-    let ejected = AttachedDevice(info: device.info, state: .notSharingFiles)
+    let ejected = AttachedDevice(info: device.info, state: .ejected)
     #expect(await harness.next() == .changed(ejected))
     let barrier = await harness.barrier()
     #expect(barrier?.isAttached(serial: "BARRIER") == true)
@@ -313,6 +313,7 @@ struct DeviceHubTests {
     await harness.clock.waitForSleeper()
 
     await harness.hub.eject(locked.info.id)
+    #expect(await harness.next() == .changed(AttachedDevice(info: locked.info, state: .ejected)))
     #expect(await !harness.hub.isRechecking)
     await harness.clock.advance(by: .seconds(10))
     let barrier = await harness.barrier()

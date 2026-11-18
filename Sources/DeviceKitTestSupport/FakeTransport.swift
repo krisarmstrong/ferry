@@ -41,7 +41,19 @@ public actor FakeTransport: DeviceTransport {
     withoutFileTransfer.append(info)
   }
 
-  /// From now on, closing `id` resets it: once closed, a scan no longer knows it was parked.
+  /// Devices reset since their close: the scans that have seen them gone.
+  private var resetScans: [DeviceID: Int] = [:]
+  private var rescanAfter: Duration?
+
+  /// The next scans ask to be repeated after `delay`, as `MTPTransport` does while an ejected
+  /// device's port is empty.
+  public func setRescanAfter(_ delay: Duration?) {
+    rescanAfter = delay
+  }
+
+  /// From now on, closing `id` resets it: once closed, the next scan finds it gone for a moment
+  /// (still reported as ejected, as `MTPTransport` reports a settling port), and the scan after
+  /// that finds a new enumeration it no longer knows was parked.
   public func resetOnClose(_ id: DeviceID) {
     resetting.insert(id)
   }
@@ -86,14 +98,21 @@ public actor FakeTransport: DeviceTransport {
     scanCount += 1
     var usable: [DeviceInfo] = []
     var busy: [DeviceInfo] = []
-    var notSharing = withoutFileTransfer
+    let notSharing = withoutFileTransfer
+    var ejected: [DeviceInfo] = []
     for device in devices {
       let info = device.info
-      if resetting.contains(info.id), await !device.isOpen {
+      if parked.contains(info.id), resetting.contains(info.id), await !device.isOpen {
+        if resetScans[info.id, default: 0] == 0 {
+          resetScans[info.id] = 1
+          ejected.append(info)
+          continue
+        }
         parked.remove(info.id)
+        resetScans[info.id] = nil
       }
       if parked.contains(info.id) {
-        notSharing.append(info)
+        ejected.append(info)
       } else if heldElsewhere.contains(info.id) {
         busy.append(
           DeviceInfo(
@@ -103,7 +122,9 @@ public actor FakeTransport: DeviceTransport {
         usable.append(info)
       }
     }
-    return DeviceScan(devices: usable, busy: busy, notSharing: notSharing)
+    return DeviceScan(
+      devices: usable, busy: busy, notSharing: notSharing, ejected: ejected,
+      rescanAfter: rescanAfter)
   }
 
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {

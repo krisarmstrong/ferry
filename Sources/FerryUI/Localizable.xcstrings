@@ -107,6 +107,9 @@
     "Eject" : {
 
     },
+    "Ejected" : {
+
+    },
     "Error: %@" : {
 
     },
@@ -131,7 +134,7 @@
     "File transfer" : {
 
     },
-    "File transfer is off or the device is locked, or you ejected it. Choose **Refresh** to bring back a device you ejected." : {
+    "File transfer is off or the device is locked. Choose **Transfer files** on the device, then **Refresh**." : {
       "extractionState" : "manual"
     },
     "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it." : {
@@ -167,10 +170,19 @@
     "Menu items" : {
       "extractionState" : "manual"
     },
+    "Mount" : {
+
+    },
     "NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG" : {
 
     },
+    "Next to an ejected device: puts it back in Finder." : {
+      "extractionState" : "manual"
+    },
     "No device connected" : {
+
+    },
+    "Not in Finder until you mount it again or plug it back in." : {
 
     },
     "Not sharing files" : {
@@ -236,7 +248,7 @@
     "Remove Ferry…" : {
 
     },
-    "Removes the device from Finder and releases it. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names." : {
+    "Removes a ready device from Finder and releases it; it then shows **Ejected**. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names." : {
       "extractionState" : "manual"
     },
     "Reveal in Finder" : {
@@ -245,7 +257,7 @@
     "Settings…" : {
 
     },
-    "Shows changes made on the device in Finder, and brings back a device you ejected. While the menu is open, Ferry also checks for devices every 2 seconds." : {
+    "Shows changes made on the device in Finder, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds." : {
       "extractionState" : "manual"
     },
     "Tap **Transfer files**." : {
@@ -342,6 +354,9 @@
       "extractionState" : "manual"
     },
     "With one device location, macOS labels it with the app's name. This is normal." : {
+      "extractionState" : "manual"
+    },
+    "You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in." : {
       "extractionState" : "manual"
     },
     "You only do this once." : {

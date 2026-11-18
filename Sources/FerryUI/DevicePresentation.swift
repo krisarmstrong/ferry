@@ -18,6 +18,7 @@ enum DevicePresentation {
     switch state {
     case .ready: LocalizedStringResource("Ready", bundle: .module)
     case .notSharingFiles: LocalizedStringResource("Not sharing files", bundle: .module)
+    case .ejected: LocalizedStringResource("Ejected", bundle: .module)
     case .busy: LocalizedStringResource("In use by another app", bundle: .module)
     case .failed: LocalizedStringResource("Can't open", bundle: .module)
     }
@@ -65,6 +66,7 @@ enum DevicePresentation {
     switch state {
     case .ready(let storages): "ready(\(storages.count))"
     case .notSharingFiles: "notSharingFiles"
+    case .ejected: "ejected"
     case .busy: "busy"
     case .failed: "failed"
     }
