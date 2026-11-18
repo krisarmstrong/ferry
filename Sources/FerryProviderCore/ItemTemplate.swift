@@ -80,7 +80,9 @@ public struct ItemTemplate: Sendable, Equatable {
     let type = item.contentType ?? .data
     let isLink = type.conforms(to: .symbolicLink) || type.conforms(to: .aliasFile)
     if isLink || (item.symlinkTargetPath ?? nil) != nil { return .link }
-    if type.conforms(to: .directory), Packages.isCode(type) { return .code }
+    // By type, or by name: a bundle copied in pieces can first arrive as a plain folder.
+    let isCode = Packages.isCode(type) || Packages.isCodeBundle(named: item.filename)
+    if type.conforms(to: .directory), isCode { return .code }
     if Packages.isDocumentPackage(type) { return .package }
     return type.conforms(to: .directory) ? .folder : .file
   }

@@ -111,6 +111,18 @@ struct ItemKindTests {
     #expect(try FileManager.default.contentsOfDirectory(atPath: fetchDir.path).count == 1)
   }
 
+  /// Copied with `cp -R` or by Finder, a bundle's folder can first arrive as a plain folder; its
+  /// name still makes it code.
+  @Test(arguments: ["Tool.app", "Plugin.bundle", "Kit.framework"])
+  func aFolderNamedLikeCodeIsCode(name: String) throws {
+    let template = try ItemTemplate(
+      Template(parent: .rootContainer, filename: name, contentType: .folder))
+    #expect(template.kind == .code)
+    #expect(
+      try ItemTemplate(Template(parent: .rootContainer, filename: "DCIM", contentType: .folder))
+        .kind == .folder)
+  }
+
   /// Apps and other code bundles have no use on a unit, and FileProvider treats them as one
   /// item where the device would show a folder: they are refused for good, with a message.
   @Test(arguments: [

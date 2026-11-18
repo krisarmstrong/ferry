@@ -23,6 +23,15 @@ public enum Packages {
     type.conforms(to: .package) && !isCode(type)
   }
 
+  /// Whether a folder of this name is an app or other code bundle.
+  public static func isCodeBundle(named name: String) -> Bool {
+    let ext = (name as NSString).pathExtension
+    guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .directory),
+      type.isDeclared
+    else { return false }
+    return isCode(type)
+  }
+
   /// Whether `type` is an app, a bundle, a plug-in, a framework, an extension or anything else
   /// that runs.
   public static func isCode(_ type: UTType) -> Bool {
