@@ -63,3 +63,39 @@ struct ADBSessionErrorTests {
     }
   }
 }
+
+/// `TransportError.fromDevice`: the errno text ends toybox's and adbd's messages, and the path
+/// before it may be any name, so only the end of the message is read.
+struct ADBDeviceMessageTests {
+  static let folder = RemotePath.root
+  static let step = ADBSession.Step("delete", .root)
+  static let creating = ADBSession.Step("upload", .root, target: .root)
+
+  @Test(
+    arguments: [
+      ("rm: /p/x: No such file or directory", step, TransportError.notFound(.root)),
+      ("mkdir: '/p/x/y': Not a directory", step, .notFound(.root)),
+      ("mkdir: '/p/x': File exists", creating, .alreadyExists(.root)),
+      ("couldn't create file: Is a directory", creating, .alreadyExists(.root)),
+      ("read failed: Is a directory", step, .notFound(.root)),
+      ("rm: /p/x: Directory not empty", step, .directoryNotEmpty(.root)),
+      ("write failed: No space left on device", creating, .insufficientSpace(needed: 0, free: 0)),
+      (
+        "rm: /p/File exists: Permission denied", step,
+        .io("delete failed: rm: /p/File exists: Permission denied")
+      ),
+      (
+        "rm: /p/No such file or directory\nrm: x: Permission denied", step,
+        .io("delete failed: rm: /p/No such file or directory\nrm: x: Permission denied")
+      ),
+      (
+        "mv: bad '/p/Directory not empty': Read-only file system", step,
+        .io("delete failed: mv: bad '/p/Directory not empty': Read-only file system")
+      ),
+    ])
+  func onlyTheEndOfAMessageNamesTheError(
+    _ message: String, _ step: ADBSession.Step, _ expected: TransportError
+  ) {
+    #expect(TransportError.fromDevice(message, step) == expected)
+  }
+}

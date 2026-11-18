@@ -124,8 +124,11 @@ extension ADBSession {
   /// `mv -n`, so an item that appeared at `target` since the check is never replaced. toybox
   /// then skips the move and still exits 0: a source still in place is that clash.
   ///
-  /// One race remains: toybox has no `-T`, so a folder created at `target` between the check
-  /// and the command receives the source inside it.
+  /// Two races remain. toybox 0.7.4 has no `-T`, so a folder created at `target` between the
+  /// check and the command receives the source inside it. And its overwrite prompt comes before
+  /// `-n` is honoured: a file appearing at `target` with no write bits is unlinked when the
+  /// prompt reads the closed stdin as yes (emulated storage gives files write bits, so this is
+  /// for volumes with other filesystems).
   private func mv(_ source: RemotePath, to target: RemotePath, under root: String, step: String)
     async throws(TransportError)
   {

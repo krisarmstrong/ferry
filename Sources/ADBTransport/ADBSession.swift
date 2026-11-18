@@ -219,18 +219,21 @@ extension ADBSession {
 }
 
 extension TransportError {
-  /// Classifies a device's message by the `strerror` text toybox and adbd end it with.
+  /// Classifies a device's message by the `strerror` text toybox's `perror_msg` and adbd's
+  /// `FAIL` end it with. Only the end is read: the path before it may be any name, even one
+  /// that reads like an error.
   static func fromDevice(_ message: String, _ step: ADBSession.Step) -> TransportError {
-    if message.contains("No such file or directory") || message.contains("Not a directory") {
+    let says = { (text: String) in message.hasSuffix(": " + text) }
+    if says("No such file or directory") || says("Not a directory") {
       return .notFound(step.path)
     }
-    if message.contains("File exists") { return .alreadyExists(step.target ?? step.path) }
-    if message.contains("Is a directory") {
+    if says("File exists") { return .alreadyExists(step.target ?? step.path) }
+    if says("Is a directory") {
       return step.target.map(TransportError.alreadyExists) ?? .notFound(step.path)
     }
-    if message.contains("Directory not empty") { return .directoryNotEmpty(step.path) }
+    if says("Directory not empty") { return .directoryNotEmpty(step.path) }
     // Neither figure is known; the caller fills in what it knows, as with MTP.
-    if message.contains("No space left on device") { return .insufficientSpace(needed: 0, free: 0) }
+    if says("No space left on device") { return .insufficientSpace(needed: 0, free: 0) }
     return .io("\(step.name) failed: \(message)")
   }
 }
