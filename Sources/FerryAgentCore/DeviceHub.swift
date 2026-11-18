@@ -290,7 +290,9 @@ public actor DeviceHub {
       return
     }
     backoff[info.id] = nil
-    log.info("device \(info.id.serial, privacy: .private) opened")
+    log.info(
+      "device \(info.id.serial, privacy: .private) opened over \(method.rawValue, privacy: .public)"
+    )
     store(info, state, .held(session), method: method)
   }
 
