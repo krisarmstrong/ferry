@@ -2,6 +2,7 @@ import DeviceKit
 import FerryIPC
 import Foundation
 import Synchronization
+import os
 
 /// The transfers the agent is running, for the menu, and the path their progress takes from the
 /// device to the client.
@@ -13,6 +14,9 @@ import Synchronization
 /// sees it complete before the reply. The handler always answers "go on": a cancel can be added
 /// there later.
 actor TransferBoard {
+  private static let log = Logger(
+    subsystem: "io.github.krisarmstrong.ferry", category: "Transfers")
+
   private var active: [(id: UUID, transfer: ActiveTransfer)] = []
 
   static let interval = Duration.milliseconds(250)
@@ -36,6 +40,7 @@ actor TransferBoard {
       for await (completed, total) in values {
         await update(id, completed: completed, total: total)
         report(completed, total)
+        Self.log.debug("progress \(completed, privacy: .public) of \(total, privacy: .public)")
         try? await Task.sleep(for: Self.interval)
       }
     }
