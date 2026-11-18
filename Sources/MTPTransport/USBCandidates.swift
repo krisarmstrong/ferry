@@ -78,36 +78,18 @@ enum USBCandidates {
   /// one through libusb seizes it from the system, so Apple devices are never candidates.
   static let appleVendorID: UInt16 = 0x05AC
 
-  /// Vendors whose devices are Android phones and tablets, for recognising one whose file
-  /// transfer is off: it then has no MTP interface, and often a product ID outside libmtp's
-  /// table. NetAlly's Android units use Google's ID.
-  static let androidVendorIDs: Set<UInt16> = [
-    0x0502,  // Acer
-    0x0B05,  // ASUS
-    0x0BB4,  // HTC
-    0x0E8D,  // MediaTek
-    0x0FCE,  // Sony
-    0x1004,  // LG
-    0x12D1,  // Huawei
-    0x17EF,  // Lenovo
-    0x18D1,  // Google, and NetAlly
-    0x1949,  // Amazon
-    0x19D2,  // ZTE
-    0x1BBB,  // TCL / Alcatel
-    0x22B8,  // Motorola
-    0x22D9,  // OPPO
-    0x2717,  // Xiaomi
-    0x2A70,  // OnePlus
-    0x2AE5,  // Fairphone
-    0x2D95,  // vivo
-    0x04E8,  // Samsung
+  /// Android devices in a USB mode without file transfer that libmtp's table does not list, by
+  /// vendor and product. Listed per device, not per vendor: an Android vendor also makes modems,
+  /// dongles and drives, which must not show as a phone with file transfer off.
+  static let chargeOnlyAndroidDevices: Set<UInt32> = [
+    0x18D1_4EE7  // Google (and NetAlly units): charging only, with USB debugging
   ]
 
   /// Decides from registry properties only; nothing here opens the device.
   ///
   /// Apple devices are denied first. A device with an unowned vendor-specific interface with
   /// three endpoints may be MTP; so may a device in libmtp's table with a Still Image interface.
-  /// A device in the table, or from a known Android vendor, whose interfaces are all
+  /// A device in the table, or in `chargeOnlyAndroidDevices`, whose interfaces are all
   /// vendor-specific (or that has none) but none looks like MTP is not sharing files. Anything
   /// else, including a Still Image camera libmtp does not list, is ignored. A device not
   /// configured yet is ignored until its interfaces register.
@@ -116,7 +98,8 @@ enum USBCandidates {
     guard let interfaces = device.interfaces else { return .ignored }
     let mtp = interfaces.contains { $0.looksLikeMTP && (inTable || !$0.hasDriver) }
     if mtp || (inTable && interfaces.contains(where: \.isStillImage)) { return .mtp }
-    let android = inTable || androidVendorIDs.contains(device.vendorID)
+    let product = UInt32(device.vendorID) << 16 | UInt32(device.productID)
+    let android = inTable || chargeOnlyAndroidDevices.contains(product)
     if android, interfaces.allSatisfy(\.isVendorSpecific) { return .notSharing }
     return .ignored
   }

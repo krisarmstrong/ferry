@@ -82,4 +82,14 @@ struct USBCandidatesTests {
     #expect(
       Self.candidacy(Self.device(vendor: 0x05AC, product: 0x12A8, interfaces: [])) == .ignored)
   }
+
+  /// Charge-only recognition is by device, not vendor: an Android vendor's other peripheral with
+  /// only vendor-specific interfaces (a dongle, a modem) is not a phone with file transfer off.
+  @Test func androidVendorsUnlistedVendorSpecificDeviceIsIgnored() {
+    #expect(!MTPDeviceTable.contains(vendor: 0x2717, product: 0x0FF0))
+    let dongle = Self.device(vendor: 0x2717, product: 0x0FF0, interfaces: [Self.adb])
+    #expect(Self.candidacy(dongle) == .ignored)
+    #expect(
+      Self.candidacy(Self.device(vendor: 0x12D1, product: 0x1506, interfaces: [])) == .ignored)
+  }
 }
