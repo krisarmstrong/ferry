@@ -125,8 +125,10 @@ copied to the device" for them.
 A folder on the device named like an app or a document package (`Tool.app`, `Notes.rtfd`)
 shows in Finder as an app or a document, because macOS goes by the name. Such a folder, and
 everything in it, is read-only on the Mac: an app saving it would replace the whole folder,
-which Ferry can't copy. Edit it on the device, or copy it to the Mac. For the same reason a
-folder on the device can't be renamed to such a name. Android's app folders, such as
+which Ferry can't copy. Edit it on the device, or copy it to the Mac. Something you put inside
+one stays on the Mac only: Finder shows "Folders named like an app or a document package, and
+what they hold, can't be changed from this Mac. Change them on the device." For the same
+reason a folder on the device can't be renamed to such a name. Android's app folders, such as
 `Android/data/com.example.app`, count too: macOS reads `.app` as an app.
 
 To remove such a folder, delete it on the device, or delete the folder that holds it from

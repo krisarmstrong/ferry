@@ -86,10 +86,14 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   ///
   /// A package-named folder and everything in it can only be read: macOS opens such a folder as
   /// an app or a document, and an app saving one replaces the whole folder, which Ferry refuses.
-  /// Edit it on the device, or copy it to the Mac.
+  /// Edit it on the device, or copy it to the Mac. Its folders still take new items on disk,
+  /// since FileProvider cannot apply a deletion the device made to a folder that is read-only
+  /// on disk; the agent refuses anything made there (`TransportError.readOnly`).
   public var capabilities: NSFileProviderItemCapabilities {
     if entry.item.path.isInPackageFolder(isFolder: entry.item.kind == .folder) {
-      return [.allowsReading, Self.allowsEvicting]
+      return entry.item.kind == .folder
+        ? [.allowsContentEnumerating, .allowsAddingSubItems, Self.allowsEvicting]
+        : [.allowsReading, Self.allowsEvicting]
     }
     var capabilities: NSFileProviderItemCapabilities = [
       .allowsReading, .allowsWriting, Self.allowsEvicting,
@@ -107,8 +111,9 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// the old ones.
   /// Bumped when Ferry changes what an item's metadata holds (2: the quarantine attribute on
   /// files; 3: on packages too; 4: every folder a plain folder, none quarantined; 5: folders
-  /// named like packages quarantined), so items FileProvider already knows pick it up.
-  static let metadataRevision = 5
+  /// named like packages quarantined; 6: folders in package folders take new items), so items
+  /// FileProvider already knows pick it up.
+  static let metadataRevision = 6
 
   public var itemVersion: NSFileProviderItemVersion {
     let content = ContentVersion(entry.item).encoded

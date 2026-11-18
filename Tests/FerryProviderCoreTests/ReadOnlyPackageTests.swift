@@ -17,15 +17,46 @@ struct ReadOnlyPackageTests {
         item: RemoteItem(path: try path(string), kind: kind, size: 0, modified: epoch)))
   }
 
-  @Test(arguments: [
-    ("/Ferry.app", ItemKind.folder), ("/Ferry.app/Contents", .folder),
-    ("/Ferry.app/Contents/MacOS/x", .file), ("/Docs/Notes.rtfd", .folder),
-    ("/Docs/Notes.rtfd/TXT.rtf", .file),
-  ])
-  func aPackageFolderAndWhatItHoldsAreReadOnly(path: String, kind: ItemKind) throws {
-    // Evictable still: the device keeps it, and Finder can free the Mac's copy.
+  /// Its files can only be read. Evictable still: the device keeps them, and Finder can free the
+  /// Mac's copy.
+  @Test(arguments: ["/Ferry.app/Contents/MacOS/x", "/Docs/Notes.rtfd/TXT.rtf"])
+  func aFileInAPackageFolderIsReadOnly(path: String) throws {
     #expect(
-      try item(path, kind: kind).capabilities == [.allowsReading, ProviderItem.allowsEvicting])
+      try item(path, kind: .file).capabilities == [.allowsReading, ProviderItem.allowsEvicting])
+  }
+
+  /// Its folders take new items on disk, so FileProvider can apply a deletion the device made
+  /// (it cannot empty a folder that is read-only on disk). The agent refuses anything created
+  /// there. Nothing renames, moves or deletes the folder itself, so no app can replace it whole.
+  @Test(arguments: ["/Ferry.app", "/Ferry.app/Contents", "/Docs/Notes.rtfd"])
+  func aFolderInAPackageFolderOnlyTakesNewItems(path: String) throws {
+    #expect(
+      try item(path).capabilities == [
+        .allowsContentEnumerating, .allowsAddingSubItems, ProviderItem.allowsEvicting,
+      ])
+  }
+
+  /// Something made on the Mac inside such a folder is refused for good, with a message, so
+  /// FileProvider does not retry it.
+  @Test func aCreateInAPackageFolderIsRefusedForGood() async throws {
+    let agent = FakeAgent([try folder("/Notes.rtfd")])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    await agent.set(failure: .readOnly(try path("/Notes.rtfd")))
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+
+    do {
+      _ = try await backend.create(
+        ItemTemplate(
+          parent: try await agent.id(try path("/Notes.rtfd")), filename: "new.txt", kind: .file),
+        contents: try writeContents(Data("n".utf8), in: dir))
+      Issue.record("the file was created")
+    } catch {
+      let error = error as NSError
+      #expect(error.domain == NSFileProviderErrorDomain)
+      #expect(error.code == NSFileProviderError.Code.cannotSynchronize.rawValue)
+      #expect(error.localizedDescription.contains("Change them on the device"))
+    }
   }
 
   @Test(arguments: [

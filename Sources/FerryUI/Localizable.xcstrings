@@ -23,7 +23,7 @@
     "A folder is deleted with its contents only if Finder has shown everything in it, at every level, as it is now. If anything inside is new or changed on the device, or a folder inside was never opened, the whole folder stays and Finder puts it back. Delete it again to remove it. A folder nested more than 64 levels deep, or holding more than 100,000 items, also stays." : {
       "extractionState" : "manual"
     },
-    "A folder on the device named like an app or a document package, such as Tool.app or Notes.rtfd, shows in Finder as an app or a document, because macOS goes by the name. It is read-only on the Mac, with everything in it: edit it on the device, or copy it to the Mac. A folder can't be renamed to such a name. To remove one, delete it on the device, or delete the folder that holds it; Finder may put that folder back once, so delete it again." : {
+    "A folder on the device named like an app or a document package, such as Tool.app or Notes.rtfd, shows in Finder as an app or a document, because macOS goes by the name. It is read-only on the Mac, with everything in it: edit it on the device, or copy it to the Mac. Something put inside one stays on the Mac, and Finder shows an error for it. A folder can't be renamed to such a name. To remove one, delete it on the device, or delete the folder that holds it; Finder may put that folder back once, so delete it again." : {
       "extractionState" : "manual"
     },
     "A package, such as an .rtfd document or an app, can't be copied to the device: compress it into a .zip first. Symbolic links and aliases can't be copied to the device either; Finder shows an error for them." : {
