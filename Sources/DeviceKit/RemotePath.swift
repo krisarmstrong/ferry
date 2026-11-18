@@ -8,6 +8,13 @@ public struct RemotePath: Hashable, Sendable, Codable, CustomStringConvertible {
   /// cannot exhaust the stack or run forever.
   public static let maxTreeDepth = 64
 
+  /// Whether a device can store `name`. libmtp sends a name as at most 255 bytes of UTF-8 (it
+  /// cuts a longer one), and PTP carries at most 254 UTF-16 units (`ptp_pack_string` sends an
+  /// empty name for more).
+  public static func fitsOnDevice(_ name: String) -> Bool {
+    name.utf8.count <= 255 && name.utf16.count <= 254
+  }
+
   /// NFC-normalized path components; empty for the root.
   public let components: [String]
 

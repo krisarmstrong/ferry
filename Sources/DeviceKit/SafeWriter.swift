@@ -32,7 +32,7 @@ public struct SafeWriter: Sendable {
   public static func backupName(for original: String) -> String {
     let unnamed = backupPrefix + UUID().uuidString
     let named = unnamed + "-" + original
-    return named.utf8.count <= maxNameBytes ? named : unnamed
+    return RemotePath.fitsOnDevice(named) ? named : unnamed
   }
 
   /// The name a backup was set aside from, or `nil` if it does not say.
@@ -48,7 +48,6 @@ public struct SafeWriter: Sendable {
   }
 
   /// The longest name, in UTF-8 bytes, Android's storage takes.
-  private static let maxNameBytes = 255
 
   private static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "SafeWriter")
@@ -80,8 +79,8 @@ public struct SafeWriter: Sendable {
     if size > target.free {
       throw .insufficientSpace(needed: size, free: target.free)
     }
-    // Read once, before the upload. `commit` sets aside whatever sits at that path when the
-    // upload ends: an item swapped in during the upload is not detected.
+    // Read once, before the upload. A file the device swaps in during the upload is caught when
+    // `commit` sets the old one aside: the backup must still be `existing`.
     let existing = try await existing(path, in: storage)
     if let expecting, existing != expecting {
       throw .changedOnDevice(path)
@@ -143,7 +142,9 @@ public struct SafeWriter: Sendable {
   /// If its original name is free, it is renamed back and returned: the replace never finished.
   /// If a complete file has the name, the replace did finish and only the backup's delete
   /// failed, so the backup is deleted once that file is read back as a file. Anything else (no
-  /// readable name, a folder at the name) leaves it alone: a backup is never deleted blindly.
+  /// readable name, a folder at the name) leaves it alone: a backup is never deleted blindly. A
+  /// backup that names no original (`.ferry-backup-<uuid>`) stays until the user deletes its
+  /// folder, and then goes with it (see `DeviceSession.delete`).
   private func resolveOrphan(
     _ backup: RemoteItem, among visible: [RemoteItem], in storage: StorageID
   )
@@ -229,7 +230,7 @@ public struct SafeWriter: Sendable {
       }
       guard case .unsupported = error else { throw error }
       // No rename: nothing can be set aside, so the old file goes before a direct upload.
-      try await session.delete(replaced.path, in: storage)
+      try await session.delete(replaced.path, in: storage, expecting: [replaced])
       return try await upload(source, to: destination.path, in: storage, progress: progress)
     }
     await session.partials.recordBackup(backup.path, in: storage)

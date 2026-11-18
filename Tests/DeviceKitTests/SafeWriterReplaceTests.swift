@@ -166,4 +166,35 @@ extension SafeWriterTests {
     #expect(await device.allPaths(in: storageID) == [path])
     #expect(await device.contents(of: path, in: storageID) == Data([9]))
   }
+
+  /// A device that cannot rename deletes the old file before the upload goes up under its name:
+  /// the delete must be of the file the write checked, not one the device swapped in meanwhile.
+  @Test func aNoRenameReplaceKeepsAFileSwappedInDuringTheUpload() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let path = try RemotePath("/a.txt")
+    try await device.seed(path, in: storageID, contents: Data([9]))
+    let checked = try await device.item(at: path, in: storageID)
+    await device.failRename(with: .unsupported("rename"), count: 10)
+    let storage = storageID
+    await device.onNextUpload {
+      try? await device.seed(path, in: storage, contents: Data("swapped on the unit".utf8))
+    }
+    try await withTempFile(Data([1, 2])) { file in
+      await #expect(throws: TransportError.changedOnDevice(path)) {
+        _ = try await writer.write(
+          from: file, to: path, in: storage, replacing: true, expecting: checked,
+          progress: { _, _ in true })
+      }
+    }
+    #expect(await device.contents(of: path, in: storageID) == Data("swapped on the unit".utf8))
+  }
+
+  /// A backup's name must fit what PTP carries: 255 UTF-8 bytes and 254 UTF-16 units.
+  @Test func aBackupNameThatWouldNotFitNamesNoOriginal() {
+    let longest = SafeWriter.backupName(for: String(repeating: "a", count: 204))
+    #expect(SafeWriter.originalName(ofBackup: longest) == nil)
+    let fits = SafeWriter.backupName(for: String(repeating: "a", count: 203))
+    #expect(SafeWriter.originalName(ofBackup: fits) == String(repeating: "a", count: 203))
+  }
 }

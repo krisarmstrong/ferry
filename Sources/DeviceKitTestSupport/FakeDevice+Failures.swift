@@ -51,6 +51,17 @@ extension FakeDevice {
     uploadHook = hook
   }
 
+  /// Runs `hook` when the next delete starts, as an app on the device adding files meanwhile.
+  public func onNextDelete(_ hook: @escaping @Sendable () async -> Void) {
+    deleteHook = hook
+  }
+
+  func runDeleteHook() async {
+    guard let hook = deleteHook else { return }
+    deleteHook = nil
+    await hook()
+  }
+
   func runUploadHook() async {
     guard let hook = uploadHook else { return }
     uploadHook = nil

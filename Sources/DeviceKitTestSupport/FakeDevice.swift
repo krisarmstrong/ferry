@@ -47,6 +47,8 @@ public actor FakeDevice: DeviceSession {
   var deleteFailure: TransportError?
   /// Runs when the next upload starts, before it reads the device's contents.
   var uploadHook: (@Sendable () async -> Void)?
+  /// Runs when the next delete starts, before it reads the device's contents.
+  var deleteHook: (@Sendable () async -> Void)?
   var listFailure: TransportError?
   var storagesFailure: TransportError?
   var storagesFailing: TransportError?
@@ -215,6 +217,7 @@ public actor FakeDevice: DeviceSession {
   public func delete(_ path: RemotePath, in storage: StorageID, expecting: [RemoteItem]?)
     async throws(TransportError)
   {
+    await runDeleteHook()
     var nodes = try nodes(in: storage)
     if let failure = deleteFailure {
       deleteFailure = nil
