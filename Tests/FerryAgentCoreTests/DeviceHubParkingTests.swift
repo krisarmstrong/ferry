@@ -156,7 +156,7 @@ extension DeviceHubTests {
   /// An ejected device's port is empty: the transport asks for another scan once that would count
   /// as an unplug, and the hub scans then without waiting for a USB event.
   @Test func hubScansAgainWhenTheTransportAsks() async {
-    var harness = HubHarness()
+    let harness = HubHarness()
     defer { harness.finish() }
     await harness.transport.setRescanAfter(.seconds(3))
     harness.tick()
