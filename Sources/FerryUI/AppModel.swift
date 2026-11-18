@@ -51,6 +51,9 @@ import os
   /// Devices the guide has opened for, or that Ferry ejected, this app run.
   private var guidedDevices: Set<DeviceID> = []
   private var emptyGuideShown = false
+  /// Devices ejected this app run and not mounted again. One stays ejected through its own USB
+  /// reset; Refresh asks the agent to mount it again.
+  private var ejectedDevices: Set<DeviceID> = []
 
   public convenience init(
     client: any AgentSending, services: any SystemServicing = SystemServices()
@@ -92,12 +95,22 @@ import os
   }
 
   /// The menu's Refresh: asks the agent to list each ready device's folders again, so changes
-  /// made on the device reach Finder, then reads the status.
+  /// made on the device reach Finder, and to mount again a device ejected earlier, then reads
+  /// the status.
   public func refreshDevices() async {
     for device in devices {
-      guard case .ready = device.state else { continue }
+      let request: AgentRequest
+      switch device.state {
+      case .ready:
+        request = .refresh(device.id)
+      case .notSharingFiles where ejectedDevices.contains(device.id):
+        ejectedDevices.remove(device.id)
+        request = .recheck(device.id)
+      default:
+        continue
+      }
       do {
-        _ = try await client.send(.refresh(device.id), file: nil)
+        _ = try await client.send(request, file: nil)
       } catch {
         Self.log.error("refresh failed: \(String(describing: error), privacy: .private)")
       }
@@ -151,6 +164,7 @@ import os
   public func eject(_ id: DeviceID) async {
     // An ejected device reports `.notSharingFiles`, which must not open the guide.
     guidedDevices.insert(id)
+    ejectedDevices.insert(id)
     await perform(.eject(id))
   }
 

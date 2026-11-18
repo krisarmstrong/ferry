@@ -6,6 +6,9 @@ public actor FakeTransport: DeviceTransport {
   private var devices: [FakeDevice]
   private var heldElsewhere: Set<DeviceID> = []
   private var parked: Set<DeviceID> = []
+  /// Devices whose close resets them into a new enumeration the transport cannot tie to the
+  /// parked one, as libmtp's release does to an Android device.
+  private var resetting: Set<DeviceID> = []
   /// Attached without file transfer: seen on USB only, as `MTPTransport` sees a device whose
   /// MTP interface is off.
   private var withoutFileTransfer: [DeviceInfo] = []
@@ -36,6 +39,11 @@ public actor FakeTransport: DeviceTransport {
   /// `info`, and it cannot be opened.
   public func attachWithoutFileTransfer(_ info: DeviceInfo) {
     withoutFileTransfer.append(info)
+  }
+
+  /// From now on, closing `id` resets it: once closed, a scan no longer knows it was parked.
+  public func resetOnClose(_ id: DeviceID) {
+    resetting.insert(id)
   }
 
   public func isParked(_ id: DeviceID) -> Bool {
@@ -81,6 +89,9 @@ public actor FakeTransport: DeviceTransport {
     var notSharing = withoutFileTransfer
     for device in devices {
       let info = device.info
+      if resetting.contains(info.id), await !device.isOpen {
+        parked.remove(info.id)
+      }
       if parked.contains(info.id) {
         notSharing.append(info)
       } else if heldElsewhere.contains(info.id) {

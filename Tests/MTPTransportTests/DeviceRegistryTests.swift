@@ -10,11 +10,13 @@ struct DeviceRegistryTests {
     let raw: Int
   }
 
-  /// What the bus holds and what the registry did to it. A device is its USB address, with the
-  /// registry entry of its current enumeration; each `plug` enumerates anew.
+  /// What the bus holds and what the registry did to it. A device is the port it is plugged
+  /// into, which is its first USB address and names its serial; each `plug` enumerates anew.
   final class Bus: Sendable {
     let attached = Mutex<[Int: USBDeviceRecord]>([:])
     let log = Log()
+    let start = ContinuousClock.now
+    let elapsed = Mutex<Duration>(.zero)
     /// How often each address was resolved to a raw device, which probes an unlisted one.
     let resolves = Mutex<[Int: Int]>([:])
     private let enumerations = Atomic<UInt64>(0)
@@ -33,16 +35,25 @@ struct DeviceRegistryTests {
       }
     }
 
-    /// The device at `address` enumerates again, as after a replug or a USB mode switch.
-    func reenumerate(_ address: Int) {
-      attached.withLock { $0[address] = record(address, vendor: 0x18D1) }
+    /// The device at `port` enumerates again, as after a replug or a USB mode switch, at
+    /// `address` (by default the same one).
+    func reenumerate(_ port: Int, at address: Int? = nil) {
+      attached.withLock { $0[port] = record(port, address: address, vendor: 0x18D1) }
+    }
+
+    func advance(by duration: Duration) {
+      elapsed.withLock { $0 += duration }
+    }
+
+    var now: ContinuousClock.Instant {
+      start.advanced(by: elapsed.withLock { $0 })
     }
 
     var devices: [USBDeviceRecord] {
       attached.withLock { $0.values.sorted { $0.address < $1.address } }
     }
 
-    private func record(_ address: Int, vendor: UInt16) -> USBDeviceRecord {
+    private func record(_ port: Int, address: Int? = nil, vendor: UInt16) -> USBDeviceRecord {
       let interfaces: [USBInterface] =
         vendor == 0x05AC
         ? [
@@ -51,7 +62,8 @@ struct DeviceRegistryTests {
         ] : [USBInterface(interfaceClass: 0xFF, subclass: 0xFF, interfaceProtocol: 0, endpoints: 3)]
       return USBDeviceRecord(
         registryID: enumerations.add(1, ordering: .sequentiallyConsistent).newValue,
-        locationID: 1 << 24, address: UInt8(address), vendorID: vendor, productID: 0x4EE1,
+        locationID: 1 << 24 | UInt32(port) << 16, address: UInt8(address ?? port),
+        vendorID: vendor, productID: 0x4EE1,
         interfaces: interfaces, vendorName: "Vendor", productName: "Product")
     }
   }
@@ -63,15 +75,12 @@ struct DeviceRegistryTests {
     private var active = 0
     /// Addresses another process holds; opening them fails.
     var busy: Set<Int> = []
-    /// Address whose device now reports another serial, as after a swap on the same port.
-    var swapped: Set<Int> = []
 
     /// Closing resets the device, so it enumerates again, as libmtp's release does to Android.
     var resetsOnClose: Bus?
 
     func setBusy(_ addresses: Set<Int>) { busy = addresses }
     func setResetsOnClose(_ bus: Bus) { resetsOnClose = bus }
-    func setSwapped(_ addresses: Set<Int>) { swapped = addresses }
 
     func open(_ raw: Int) async throws(TransportError) -> Handle {
       active += 1
@@ -89,8 +98,7 @@ struct DeviceRegistryTests {
     }
 
     func info(_ handle: Handle) -> DeviceInfo {
-      let serial = swapped.contains(handle.raw) ? "X\(handle.raw)" : "S\(handle.raw)"
-      return DeviceInfo(id: DeviceID(serial: serial), manufacturer: "Acme", model: "Phone")
+      DeviceInfo(id: DeviceID(serial: "S\(handle.raw)"), manufacturer: "Acme", model: "Phone")
     }
   }
 
@@ -112,14 +120,16 @@ struct DeviceRegistryTests {
         attached: { bus.devices },
         candidacy: { USBCandidates.candidacy(of: $0, inTable: true) },
         resolve: { record in
-          bus.resolves.withLock { $0[Int(record.address), default: 0] += 1 }
-          return Int(record.address)
+          let port = Int(record.locationID >> 16 & 0xFF)
+          bus.resolves.withLock { $0[port, default: 0] += 1 }
+          return port
         },
         open: { raw, _ throws(TransportError) in
           let handle = try await log.open(raw)
           return (handle, await log.info(handle))
         },
-        close: { await log.close($0) }))
+        close: { await log.close($0) },
+        now: { bus.now }))
   }
 
   @Test func scanOpensEachUnheldDeviceOnceAndKeepsIt() async throws {
@@ -232,7 +242,8 @@ struct DeviceRegistryTests {
         candidacy: { _ in .mtp },
         resolve: { Int($0.address) },
         open: { raw, _ in (Handle(raw: raw), Self.info(raw)) },
-        close: { _ in }))
+        close: { _ in },
+        now: { ContinuousClock.now }))
 
     await #expect(throws: TransportError.io("usb")) {
       _ = try await registry.scan()
@@ -296,8 +307,57 @@ extension DeviceRegistryTests {
       _ = try await registry.open(Self.id(1))
     }
     #expect(await bus.log.opens == [1: 1])
+  }
 
-    bus.reenumerate(1)
+  /// libmtp's release resets an Android device, so an eject is followed by a new enumeration of
+  /// it, on the same port and often at another address. It stays ejected.
+  @Test(arguments: [false, true])
+  func ejectedDeviceStaysEjectedAcrossItsOwnReset(seenAbsent: Bool) async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    let opened = try await registry.open(Self.id(1))
+    await registry.park(Self.id(1))
+    await registry.release(opened.location)
+    if seenAbsent {
+      bus.plug([])
+      _ = try await registry.scan()
+      bus.advance(by: .milliseconds(10))
+    }
+
+    bus.reenumerate(1, at: 12)
+
+    #expect(try await registry.scan() == DeviceScan(devices: [], notSharing: [Self.info(1)]))
+    #expect(await bus.log.opens == [1: 1])
+  }
+
+  @Test func ejectedDeviceUnpluggedForLongerThanTheSettleTimeIsOpenedAgain() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    let opened = try await registry.open(Self.id(1))
+    await registry.park(Self.id(1))
+    await registry.release(opened.location)
+    bus.plug([])
+    _ = try await registry.scan()
+
+    bus.advance(by: .seconds(3))
+    bus.plug([1])
+
+    #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
+  }
+
+  @Test func ejectedDeviceIsOpenedAgainOnceUnparked() async throws {
+    let bus = Bus([1])
+    let registry = makeRegistry(bus)
+    _ = try await registry.scan()
+    let opened = try await registry.open(Self.id(1))
+    await registry.park(Self.id(1))
+    await registry.release(opened.location)
+    bus.reenumerate(1, at: 12)
+
+    await registry.unpark(Self.id(1))
+
     #expect(try await registry.scan() == DeviceScan(devices: [Self.info(1)]))
   }
 

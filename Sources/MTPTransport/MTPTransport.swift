@@ -20,7 +20,8 @@ public struct MTPTransport: DeviceTransport {
         let device = try await MTPDevice.open(raw, registryID: location.registryID)
         return (device, device.info)
       },
-      close: { await $0.close() }))
+      close: { await $0.close() },
+      now: { ContinuousClock.now }))
 
   static func candidacy(of device: USBDeviceRecord) -> USBCandidacy {
     USBCandidates.candidacy(

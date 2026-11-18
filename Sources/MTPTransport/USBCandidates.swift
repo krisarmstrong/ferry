@@ -57,10 +57,23 @@ public struct USBDeviceRecord: Sendable, Hashable {
     self.productName = productName
   }
 
+  /// The port and model: what stays the same when the device enumerates again.
+  var port: USBPort {
+    USBPort(locationID: locationID, vendorID: vendorID, productID: productID)
+  }
+
   /// Where libusb finds the device: on Darwin its bus is the top byte of the location ID.
   var location: BusLocation {
     BusLocation(bus: locationID >> 24, address: address, registryID: registryID)
   }
+}
+
+/// A device model on a USB port. A reset or a mode switch enumerates the device again with a
+/// new registry entry, and often a new address, but on the same port.
+struct USBPort: Hashable, Sendable {
+  let locationID: UInt32
+  let vendorID: UInt16
+  let productID: UInt16
 }
 
 /// What Ferry may do with a USB device, decided from its registry properties alone.

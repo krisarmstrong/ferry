@@ -14,9 +14,12 @@ struct BusLocation: Hashable, Sendable {
 ///
 /// A scan reads the IOKit registry, which costs no USB I/O, and touches only candidates: a device
 /// that may speak MTP (see `USBCandidates`). With no candidate attached, libmtp is never called.
-/// A held device is never opened or claimed again: a scan reports it from the record. A parked
-/// device (one another app holds, or one the user ejected) is reported from the record too, with
-/// no I/O, until it leaves the registry or `unpark(_:)` is called. Every other candidate is opened
+/// A held device is never opened or claimed again: a scan reports it from the record. A busy
+/// device (one another app holds) is reported from the record too, with no I/O, until it leaves
+/// the registry or `unpark(_:)` is called. An ejected device is reported as not sharing files,
+/// with no I/O, by its port and model: closing it resets an Android device, which enumerates
+/// again, so its enumeration does not last. It stays ejected until it is gone from its port for
+/// `settleTime` (unplugged) or `unpark(_:)` is called. Every other candidate is opened
 /// by the scan, to read its serial, and kept open: `open(_:)` hands that handle over rather than
 /// opening again, because libmtp's release resets an Android device, which then enumerates anew
 /// at another registry entry. A kept handle whose device left is closed by the next scan. Scans
@@ -31,34 +34,40 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     var resolve: @Sendable (USBDeviceRecord) -> Raw?
     var open: @Sendable (Raw, BusLocation) async throws(TransportError) -> (Device, DeviceInfo)
     var close: @Sendable (Device) async -> Void
+    var now: @Sendable () -> ContinuousClock.Instant
+  }
+
+  /// How long an ejected device must be gone from its port to count as unplugged. A reset
+  /// re-enumerates in milliseconds; a person unplugging and replugging takes longer.
+  static var settleTime: Duration { .seconds(3) }
+
+  private struct Ejected {
+    let info: DeviceInfo
+    /// When a scan first found the port empty, if it has been since the device was last seen.
+    var missingSince: ContinuousClock.Instant?
   }
 
   typealias Opened = (device: Device, location: BusLocation)
 
-  private enum Parked {
-    /// Another process holds it: opening it failed.
-    case busy(DeviceInfo)
-    /// The user ejected it: it stays listed as not sharing files.
-    case ejected(DeviceInfo)
-
-    var info: DeviceInfo {
-      switch self {
-      case .busy(let info), .ejected(let info): info
-      }
-    }
-  }
-
   private let queue: DispatchSerialQueue
   private let driver: Driver
   private let gate = OperationGate()
-  /// Devices handed out by `open(_:)` and not yet released.
-  private var held: [BusLocation: DeviceInfo] = [:]
-  private var parked: [BusLocation: Parked] = [:]
+  /// Devices handed out by `open(_:)` and not yet released, with their ports.
+  private var held: [BusLocation: (info: DeviceInfo, port: USBPort)] = [:]
+  /// Devices another process holds: opening them failed.
+  private var busy: [BusLocation: DeviceInfo] = [:]
+  private var ejected: [USBPort: Ejected] = [:]
   /// Each candidate's raw device, or `nil` for one that is not MTP after all, so an enumeration
   /// is resolved (and an unlisted device probed) once.
   private var resolved: [BusLocation: Raw?] = [:]
-  /// Devices a scan opened and `open(_:)` has not claimed yet.
-  private var opened: [BusLocation: (device: Device, info: DeviceInfo)] = [:]
+  /// A device a scan opened and `open(_:)` has not claimed yet.
+  private struct Scanned {
+    let device: Device
+    let info: DeviceInfo
+    let port: USBPort
+  }
+
+  private var opened: [BusLocation: Scanned] = [:]
 
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     queue.asUnownedSerialExecutor()
@@ -73,14 +82,15 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     try await gate.run { () async throws(TransportError) -> DeviceScan in
       let attached = try driver.attached()
       let present = Set(attached.map(\.location))
-      parked = parked.filter { present.contains($0.key) }
+      busy = busy.filter { present.contains($0.key) }
+      settleEjected(present: Set(attached.map(\.port)))
       resolved = resolved.filter { present.contains($0.key) }
       for (location, gone) in opened where !present.contains(location) {
         opened[location] = nil
         await driver.close(gone.device)
       }
       var devices: [DeviceInfo] = []
-      var busy: [DeviceInfo] = []
+      var busyNow: [DeviceInfo] = []
       var notSharing: [DeviceInfo] = []
       for record in attached {
         let location = record.location
@@ -93,41 +103,41 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
         case .mtp:
           break
         }
-        // Parked first: an ejected device stays held until its session finishes closing.
-        switch parked[location] {
-        case .busy(let info):
-          busy.append(info)
-          continue
-        case .ejected(let info):
+        // Ejected first: it stays held until its session finishes closing.
+        if let info = ejected[record.port]?.info {
           notSharing.append(info)
           continue
-        case nil:
-          break
         }
-        if let info = held[location] ?? opened[location]?.info {
+        if let info = busy[location] {
+          busyNow.append(info)
+          continue
+        }
+        if let info = held[location]?.info ?? opened[location]?.info {
           devices.append(info)
           continue
         }
         guard let raw = resolve(record) else { continue }
         do throws(TransportError) {
           let (device, info) = try await driver.open(raw, location)
-          opened[location] = (device, info)
+          opened[location] = Scanned(device: device, info: info, port: record.port)
           devices.append(info)
         } catch {
           let info = Self.describe(record)
-          busy.append(info)
-          parked[location] = .busy(info)
+          busyNow.append(info)
+          busy[location] = info
         }
       }
-      return DeviceScan(devices: devices, busy: busy, notSharing: notSharing)
+      return DeviceScan(devices: devices, busy: busyNow, notSharing: notSharing)
     }
   }
 
   /// Hands over the device `id` a scan opened, and records it held until `release(_:)`.
   func open(_ id: DeviceID) async throws(TransportError) -> Opened {
     try await gate.run { () async throws(TransportError) -> Opened in
-      if parked.values.contains(where: { $0.info.id == id }) { throw .deviceNotFound(id) }
-      if held.values.contains(where: { $0.id == id }) { throw .deviceBusy }
+      let leftAlone =
+        ejected.values.contains { $0.info.id == id } || busy.values.contains { $0.id == id }
+      if leftAlone { throw .deviceNotFound(id) }
+      if held.values.contains(where: { $0.info.id == id }) { throw .deviceBusy }
       guard let (location, scanned) = opened.first(where: { $0.value.info.id == id }) else {
         throw .deviceNotFound(id)
       }
@@ -136,7 +146,7 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
         await driver.close(scanned.device)
         throw .deviceNotFound(id)
       }
-      held[location] = scanned.info
+      held[location] = (scanned.info, scanned.port)
       return (scanned.device, location)
     }
   }
@@ -146,16 +156,36 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     held[location] = nil
   }
 
-  /// Leaves the held device `id` alone once it is released, until it is unplugged or
-  /// `unpark(_:)` is called.
+  /// Leaves the held device `id` alone once it is released, on whatever enumeration it comes
+  /// back as, until it is unplugged or `unpark(_:)` is called.
   func park(_ id: DeviceID) {
-    guard let (location, info) = held.first(where: { $0.value.id == id }) else { return }
-    parked[location] = .ejected(info)
+    guard let device = held.values.first(where: { $0.info.id == id }) else { return }
+    ejected[device.port] = Ejected(info: device.info, missingSince: nil)
   }
 
   /// Lets the next scan open `id` again: a device that was busy or ejected.
   func unpark(_ id: DeviceID) {
-    parked = parked.filter { $0.value.info.id != id }
+    busy = busy.filter { $0.value.id != id }
+    ejected = ejected.filter { $0.value.info.id != id }
+  }
+
+  /// Notes when an ejected device's port went empty, and forgets an ejected device that has been
+  /// gone for `settleTime`: it was unplugged, so plugging it in again mounts it.
+  private func settleEjected(present: Set<USBPort>) {
+    let now = driver.now()
+    for (port, entry) in ejected {
+      if present.contains(port) {
+        if let since = entry.missingSince, since.duration(to: now) >= Self.settleTime {
+          ejected[port] = nil
+        } else {
+          ejected[port]?.missingSince = nil
+        }
+      } else if let since = entry.missingSince {
+        if since.duration(to: now) >= Self.settleTime { ejected[port] = nil }
+      } else {
+        ejected[port]?.missingSince = now
+      }
+    }
   }
 
   private func resolve(_ record: USBDeviceRecord) -> Raw? {

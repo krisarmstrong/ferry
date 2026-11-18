@@ -129,4 +129,23 @@ extension DomainControllerTests {
     }
     #expect(devices.map(\.id) == [device.info.id])
   }
+
+  /// An ejected unit that resets on close comes back as a new enumeration: its domain must not
+  /// come back with it.
+  @Test func ejectedDomainIsNotAddedAgainAfterTheDeviceResets() async throws {
+    let device = await makeDevice("A")
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    await harness.transport.resetOnClose(device.info.id)
+    #expect(
+      await harness.service.handle(.eject(device.info.id), file: nil) == .removed(preserved: []))
+    harness.tick()
+
+    let added = FakeDomainManager.Call.add(
+      DomainSpec(identifier: domainID(device), displayName: "Phone"))
+    let barrier = FakeDomainManager.Call.add(AgentHarness.barrierSpec)
+    #expect(
+      await harness.barrier(after: 2) == [added, .remove(domainID(device)), barrier])
+  }
 }

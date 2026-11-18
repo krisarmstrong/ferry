@@ -336,6 +336,21 @@ struct AppModelTests {
     #expect(log.all.suffix(2) == ["refresh A1", "status"])
   }
 
+  /// An ejected unit stays ejected through its own USB reset; Refresh mounts it again.
+  @Test func refreshMountsAnEjectedDeviceAgain() async {
+    let client = FakeClient(log: log)
+    client.setStatus([device("A1", model: "LinkRunner-100G", .ready([]))])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.refresh()
+    client.setStatus([device("A1", model: "LinkRunner-100G", .notSharingFiles)])
+    await model.eject(DeviceID(serial: "A1"))
+
+    await model.refreshDevices()
+    #expect(log.all.suffix(2) == ["recheck A1", "status"])
+    await model.refreshDevices()
+    #expect(log.all.suffix(2) == ["status", "status"])
+  }
+
   @Test func deviceTextIsEscaped() {
     let shown = device("A1", model: "Evil\u{1B}[2J\u{202E}", .busy)
     #expect(shown.displayName == "Evil\\u{1B}[2J\\u{202E}")

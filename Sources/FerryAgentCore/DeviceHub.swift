@@ -55,6 +55,10 @@ public actor DeviceHub {
   private let transport: any DeviceTransport
   private let clock: any Clock<Duration>
   private var entries: [DeviceID: Entry] = [:]
+  /// Devices the user ejected. Closing one can reset it into a new enumeration that the
+  /// transport offers as usable again, so the hub never opens these until the user's Try Again
+  /// or the device leaves a scan (unplugged).
+  private var ejected: Set<DeviceID> = []
   private var generations: UInt64 = 0
   /// Held devices with a tick's storage read still in flight.
   private var probing: Set<DeviceID> = []
@@ -129,6 +133,7 @@ public actor DeviceHub {
   public func recheck(_ id: DeviceID) async {
     guard let entry = entries[id] else { return }
     guard case .held = entry.holding else {
+      ejected.remove(id)
       await transport.unpark(id)
       await reconcile()
       return
@@ -168,6 +173,7 @@ public actor DeviceHub {
   /// the transport is told to leave it alone first, so no scan opens it again meanwhile.
   public func eject(_ id: DeviceID) async {
     guard case .held = entries[id]?.holding else { return }
+    ejected.insert(id)
     await transport.park(id)
     guard let entry = entries[id], case .held(let session) = entry.holding else { return }
     store(entry.info, .notSharingFiles, .unheld)
@@ -203,6 +209,7 @@ public actor DeviceHub {
     for (id, entry) in entries where !present.contains(id) {
       guard case .unheld = entry.holding else { continue }
       entries[id] = nil
+      ejected.remove(id)
       log.info("device \(id.serial, privacy: .private) detached")
       continuation.yield(.detached(id))
     }
@@ -222,6 +229,7 @@ public actor DeviceHub {
   private func admit(_ info: DeviceInfo) async {
     let existing = entries[info.id]
     if let existing, case .held = existing.holding { return }
+    if ejected.contains(info.id) { return }
     let generation = existing?.generation
     let session: any DeviceSession
     do throws(TransportError) {
