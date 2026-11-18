@@ -28,6 +28,8 @@ public actor ADBSession: DeviceSession {
   private var sync: ADBSync?
   /// The storage keys the device had when they were last read.
   private var knownStorages: Set<String> = []
+  /// The device's own spelling of each name, by folder (see `ADBSession+Names.swift`).
+  var rawNames: [[UInt8]: [String: String]] = [:]
   private var disconnected = false
 
   public init(
@@ -101,10 +103,6 @@ public actor ADBSession: DeviceSession {
     if !knownStorages.contains(storage.key) { _ = try await refreshStorages() }
     guard knownStorages.contains(storage.key) else { throw .storageNotFound(storage.key) }
     return root
-  }
-
-  static func devicePath(_ path: RemotePath, under root: String) -> String {
-    path == .root ? root : root + path.description
   }
 
   /// Runs `body` on the open sync connection, opening one if needed. A request that fails for

@@ -84,8 +84,8 @@ struct ADBSessionReadTests {
       ])
   }
 
-  /// A name that is not UTF-8, one whose bytes are not its NFC form (it could not be opened by
-  /// the path Ferry would give it), and anything that is neither file nor folder are left out.
+  /// A name that is not UTF-8 and anything that is neither file nor folder are left out; a
+  /// name stored in NFD is listed under its NFC form.
   @Test func listSkipsNamesItCannotAddressAgain() async throws {
     let device = FakeAndroid()
     device.addFile("/keep.txt", Data("k".utf8))
@@ -93,7 +93,7 @@ struct ADBSessionReadTests {
     device.addRaw("/", name: Array("Cafe\u{301}.txt".utf8), node: .file(Data("x".utf8), mtime: 1))
     device.addRaw("/", name: Array("link".utf8), node: .special)
     let items = try await ADBFixture.withSession(device) { try await $0.list(.root, in: storage) }
-    #expect(items.map(\.path) == [try path("/keep.txt")])
+    #expect(items.map(\.path) == [try path("/Caf\u{E9}.txt"), try path("/keep.txt")])
   }
 
   @Test(arguments: ["/missing", "/file.txt"])

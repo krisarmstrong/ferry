@@ -22,57 +22,8 @@ extension ADBSession {
       guard path != .root else {
         return RemoteItem(path: .root, kind: .folder, size: 0, modified: .distantPast)
       }
-      guard let item = try await stat(path, under: root) else { throw .notFound(path) }
-      return item
+      return try await existing(path, under: root).item
     }
-  }
-
-  /// What a folder holds that Ferry can address, and how many entries it left out.
-  struct Children {
-    var items: [RemoteItem] = []
-    var skipped = 0
-  }
-
-  /// The folder at `path`, listed fresh. A missing path or a file is `.notFound`: the sync
-  /// service answers both with an empty listing.
-  ///
-  /// Left out, as MTPSession leaves out names it cannot use: a name that is not UTF-8, one whose
-  /// bytes are not the NFC form `RemotePath` gives it (the device compares bytes, so that path
-  /// would not open it), one whose device path is too long for the sync service, and anything
-  /// that is neither a file nor a folder.
-  func children(of folder: RemotePath, under root: String) async throws(TransportError)
-    -> Children
-  {
-    guard try await stat(folder, under: root)?.kind == .folder else { throw .notFound(folder) }
-    let location = Self.devicePath(folder, under: root)
-    let listing = try await adb(Step("listing", folder)) { () async throws(ADBError) in
-      try await syncing { (sync) async throws(ADBError) in try await sync.list(location) }
-    }
-    var children = Children(skipped: listing.unreadableNames)
-    for entry in listing.entries {
-      guard let path = try? folder.appending(entry.name),
-        path.name?.utf8.elementsEqual(entry.name.utf8) == true,
-        Self.devicePath(path, under: root).utf8.count <= ADBSync.requestLimit,
-        let item = Self.item(entry.stat, at: path)
-      else {
-        children.skipped += 1
-        continue
-      }
-      children.items.append(item)
-    }
-    if children.skipped > 0 {
-      Self.log.info("listing left out \(children.skipped) entries Ferry cannot address")
-    }
-    return children
-  }
-
-  /// The item at `path`, or `nil` if there is none (or it is neither file nor folder).
-  func stat(_ path: RemotePath, under root: String) async throws(TransportError) -> RemoteItem? {
-    let location = Self.devicePath(path, under: root)
-    let stat = try await adb(Step("reading", path)) { () async throws(ADBError) in
-      try await syncing { (sync) async throws(ADBError) in try await sync.stat(location) }
-    }
-    return stat.flatMap { Self.item($0, at: path) }
   }
 
   static func item(_ stat: ADBStat, at path: RemotePath) -> RemoteItem? {
@@ -122,12 +73,11 @@ extension ADBSession {
       let root = try await root(for: storage)
       var attempt = 1
       while true {
-        guard let listed = try await stat(path, under: root), listed.kind == .file else {
-          throw .notFound(path)
-        }
+        let (listed, location) = try await existing(path, under: root)
+        guard listed.kind == .file else { throw .notFound(path) }
         do throws(TransportError) {
           return try await downloadOnce(
-            listed, from: Self.devicePath(path, under: root), to: file, replacing: replacing,
+            listed, from: location, to: file, replacing: replacing,
             progress: progress)
         } catch .downloadSizeMismatch(let listed, let received) {
           guard attempt < Self.downloadAttempts else {

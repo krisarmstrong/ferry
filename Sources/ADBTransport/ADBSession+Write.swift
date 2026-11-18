@@ -13,7 +13,9 @@ extension ADBSession {
     try await operation { () throws(TransportError) in
       let (parent, _) = try Self.split(path)
       let root = try await root(for: storage)
-      try Self.requireFree(path, among: try await children(of: parent, under: root).items)
+      let siblings = try await children(of: parent, under: root, exactSizes: false)
+      try Self.requireFree(path, among: siblings.items)
+      let location = try await location(of: path, under: root)
       let modified =
         (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
         .contentModificationDate ?? Date()
@@ -24,14 +26,13 @@ extension ADBSession {
         throw .io("could not open \(file.path): \(error.localizedDescription)")
       }
       defer { try? handle.close() }
-      let location = Self.devicePath(path, under: root)
       try await adb(Step("upload", path, target: path)) { () async throws(ADBError) in
         try await syncing { (sync) async throws(ADBError) in
           try await sync.send(
             handle, to: location, mode: Self.fileMode, mtime: modified, progress: progress)
         }
       }
-      guard let item = try await stat(path, under: root), item.kind == .file else {
+      guard let item = try await stat(at: location, as: path), item.kind == .file else {
         throw .io("upload of \(path.description) left no file")
       }
       return item
@@ -48,11 +49,11 @@ extension ADBSession {
       guard path != .root else { throw .alreadyExists(path) }
       let (parent, _) = try Self.split(path)
       let root = try await root(for: storage)
-      try Self.requireFree(path, among: try await children(of: parent, under: root).items)
-      try await shell(
-        "mkdir", ["--", Self.devicePath(path, under: root)],
-        Step("make folder", parent, target: path))
-      guard let item = try await stat(path, under: root), item.kind == .folder else {
+      let siblings = try await children(of: parent, under: root, exactSizes: false)
+      try Self.requireFree(path, among: siblings.items)
+      let location = try await location(of: path, under: root)
+      try await shell("mkdir", ["--", location], Step("make folder", parent, target: path))
+      guard let item = try await stat(at: location, as: path), item.kind == .folder else {
         throw .io("mkdir left no folder at \(path.description)")
       }
       return item
@@ -66,16 +67,25 @@ extension ADBSession {
       let (parent, name) = try Self.split(path)
       let renamed = try parent.appending(newName)
       let root = try await root(for: storage)
-      let siblings = try await children(of: parent, under: root).items
-      guard let source = siblings.first(where: { $0.path == path }) else { throw .notFound(path) }
-      guard renamed != path else { return source }
-      try Self.requireFree(renamed, among: siblings, except: path)
-      if RemotePath.collisionKey(name) == RemotePath.collisionKey(newName) {
-        try await renameCaseOnly(path, to: renamed, under: root)
-      } else {
-        try await mv(path, to: renamed, under: root, step: "rename")
+      let siblings = try await children(of: parent, under: root, exactSizes: false).items
+      guard siblings.contains(where: { $0.path == path }) else { throw .notFound(path) }
+      let source = try await location(of: path, under: root)
+      guard renamed != path else {
+        guard let item = try await stat(at: source, as: path) else { throw .notFound(path) }
+        return item
       }
-      guard let item = try await stat(renamed, under: root) else { throw .notFound(renamed) }
+      try Self.requireFree(renamed, among: siblings, except: path)
+      let folder = Self.parentLocation(source)
+      let target = folder + "/" + (renamed.name ?? newName)
+      defer { forget(folder) }
+      forget(source)
+      let step = Step("rename", path, target: renamed)
+      if RemotePath.collisionKey(name) == RemotePath.collisionKey(newName) {
+        try await renameCaseOnly(source, to: target, step)
+      } else {
+        try await mv(source, to: target, step)
+      }
+      guard let item = try await stat(at: target, as: renamed) else { throw .notFound(renamed) }
       return item
     }
   }
@@ -84,23 +94,23 @@ extension ADBSession {
   /// reports success, and for a folder it moves the folder into itself. So the item goes to a
   /// temporary name first. The name is visible, so an item stranded there by a lost device is
   /// found by the user rather than hidden or reaped.
-  private func renameCaseOnly(_ path: RemotePath, to renamed: RemotePath, under root: String)
+  private func renameCaseOnly(_ source: String, to target: String, _ step: Step)
     async throws(TransportError)
   {
-    let (parent, name) = try Self.split(path)
+    let name = step.path.name ?? ""
     let tag = "-ferry-" + UUID().uuidString.prefix(8)
-    let temporary = try parent.appending(
-      RemotePath.fitsOnDevice(name + tag) ? name + tag : "ferry-" + UUID().uuidString)
-    try await mv(path, to: temporary, under: root, step: "rename")
+    let temporary =
+      Self.parentLocation(source) + "/"
+      + (RemotePath.fitsOnDevice(name + tag) ? name + tag : "ferry-" + UUID().uuidString)
+    try await mv(source, to: temporary, step)
     do throws(TransportError) {
-      try await mv(temporary, to: renamed, under: root, step: "rename")
+      try await mv(temporary, to: target, step)
     } catch {
       do throws(TransportError) {
-        try await mv(temporary, to: path, under: root, step: "rename")
+        try await mv(temporary, to: source, step)
       } catch {
         Self.log.error(
-          "\(path.description, privacy: .private) left at \(temporary.description, privacy: .private)"
-        )
+          "\(step.path.description, privacy: .private) left at \(temporary, privacy: .private)")
       }
       throw error
     }
@@ -112,11 +122,20 @@ extension ADBSession {
     try await operation { () throws(TransportError) in
       let (_, name) = try Self.split(path)
       let root = try await root(for: storage)
-      guard try await stat(path, under: root) != nil else { throw .notFound(path) }
+      let source = try await existing(path, under: root).location
       let target = try toFolder.appending(name)
-      try Self.requireFree(target, among: try await children(of: toFolder, under: root).items)
-      try await mv(path, to: target, under: root, step: "move")
-      guard let item = try await stat(target, under: root) else { throw .notFound(target) }
+      let destination = try await children(of: toFolder, under: root, exactSizes: false)
+      try Self.requireFree(target, among: destination.items)
+      let folder = try await location(of: toFolder, under: root)
+      // A move keeps the name as the device spells it.
+      let moved = folder + "/" + Self.lastName(source)
+      defer {
+        forget(Self.parentLocation(source))
+        forget(folder)
+      }
+      forget(source)
+      try await mv(source, to: moved, Step("move", path, target: target))
+      guard let item = try await stat(at: moved, as: target) else { throw .notFound(target) }
       return item
     }
   }
@@ -129,13 +148,12 @@ extension ADBSession {
   /// `-n` is honoured: a file appearing at `target` with no write bits is unlinked when the
   /// prompt reads the closed stdin as yes (emulated storage gives files write bits, so this is
   /// for volumes with other filesystems).
-  private func mv(_ source: RemotePath, to target: RemotePath, under root: String, step: String)
+  private func mv(_ source: String, to target: String, _ step: Step)
     async throws(TransportError)
   {
-    try await shell(
-      "mv",
-      ["-n", "--", Self.devicePath(source, under: root), Self.devicePath(target, under: root)],
-      Step(step, source, target: target))
-    if try await stat(source, under: root) != nil { throw .alreadyExists(target) }
+    try await shell("mv", ["-n", "--", source, target], step)
+    if try await stat(at: source, as: step.path) != nil {
+      throw .alreadyExists(step.target ?? step.path)
+    }
   }
 }

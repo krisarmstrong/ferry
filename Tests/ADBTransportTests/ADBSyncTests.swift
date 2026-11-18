@@ -117,6 +117,22 @@ struct ADBSyncTests {
     await sync.quit()
   }
 
+  /// A caller that needs names alone skips the per-file STA2.
+  @Test func aNamesOnlyListingSendsNoStat() async throws {
+    let (sync, server) = try await sync(["stat_v2"]) { peer in
+      _ = try await peer.syncPathRequest()
+      try await peer.raw(
+        Peer.dent(name: "a.txt", mode: 0o100600, size: 3, mtime: 5)
+          + Peer.listDone(extended: false))
+      let next = try await peer.syncHeader()
+      #expect(next.id == "QUIT")
+    }
+    defer { server.stop() }
+    let entries = try await sync.list("/sdcard", exactSizes: false).entries
+    #expect(entries.map(\.name) == ["a.txt"])
+    await sync.quit()
+  }
+
   @Test func listFailureIsMapped() async throws {
     let (sync, server) = try await sync(["stat_v2", "ls_v2"]) { peer in
       _ = try await peer.syncPathRequest()

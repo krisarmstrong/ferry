@@ -17,7 +17,7 @@ extension ADBSession {
     try await operation { () throws(TransportError) in
       guard path != .root else { throw .notFound(path) }
       let root = try await root(for: storage)
-      guard let top = try await stat(path, under: root) else { throw .notFound(path) }
+      let (top, location) = try await existing(path, under: root)
       if let expecting {
         let checked = Dictionary(
           expecting.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
@@ -26,7 +26,10 @@ extension ADBSession {
           try await verify(path, depth: 0, DeleteWalk(top: path, checked: checked, root: root))
         }
       }
-      let location = Self.devicePath(path, under: root)
+      defer {
+        forget(location)
+        forget(Self.parentLocation(location))
+      }
       try await shell(
         "rm", top.kind == .folder ? ["-r", "--", location] : ["--", location], Step("delete", path))
     }

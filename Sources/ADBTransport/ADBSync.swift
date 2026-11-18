@@ -93,8 +93,10 @@ public actor ADBSync {
     try await perform { () async throws(ADBError) in try await statLocked(path) }
   }
 
-  public func list(_ dir: String) async throws(ADBError) -> Listing {
-    try await perform { () async throws(ADBError) in try await listLocked(dir) }
+  /// `exactSizes: false` is for a caller that needs names and kinds alone: without `ls_v2` it
+  /// skips the STA2 per regular file that corrects a size over 4 GB.
+  public func list(_ dir: String, exactSizes: Bool = true) async throws(ADBError) -> Listing {
+    try await perform { () async throws(ADBError) in try await listLocked(dir, exactSizes) }
   }
 
   /// Streams the file into `file`. `progress` is told the bytes received and the size `stat`
@@ -164,9 +166,9 @@ public actor ADBSync {
     public let unreadableNames: Int
   }
 
-  private func listLocked(_ dir: String) async throws(ADBError) -> Listing {
+  private func listLocked(_ dir: String, _ exactSizes: Bool) async throws(ADBError) -> Listing {
     var listing = try await (listV2 ? listWithLis2(dir) : listWithList(dir))
-    guard !listV2, statV2 else { return listing }
+    guard exactSizes, !listV2, statV2 else { return listing }
     // LIST carries 32-bit sizes, so a regular file over 4 GB reads short; STA2 has the truth.
     let prefix = dir.hasSuffix("/") ? dir : dir + "/"
     var unaddressable = 0

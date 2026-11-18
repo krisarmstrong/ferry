@@ -106,6 +106,13 @@ final class FakeAndroid: Sendable {
     state.withLock { $0.nodes[path] = node }
   }
 
+  /// The raw names in a folder under internal storage, sorted by their bytes.
+  func rawNames(in folder: String) -> [[UInt8]] {
+    let parent = Self.internalPath(folder == "/" ? "" : folder)
+    return state.withLock { $0.children(of: parent).map(Self.name) }
+      .sorted { $0.lexicographicallyPrecedes($1) }
+  }
+
   func removeMount(_ root: String) {
     state.withLock { state in
       let prefix = Self.bytes(root)
