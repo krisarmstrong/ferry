@@ -78,7 +78,8 @@
         "Double-click a file to open it. Ferry copies it to the Mac when you open it.",
         "Drag files or folders between the device and the Mac to copy them. A half-copied file never appears under its real name.",
         "Finder shows how far each copy has got, and the Ferry menu lists copies in progress under their device.",
-        "A package, such as an .rtfd document or an app, can't be copied to the device: compress it into a .zip first. On the device every folder is a plain folder, so a package made there shows as a folder with its files in it. Symbolic links and aliases can't be copied to the device either; Finder shows an error for them.",
+        "A package, such as an .rtfd document or an app, can't be copied to the device: compress it into a .zip first. Symbolic links and aliases can't be copied to the device either; Finder shows an error for them.",
+        "A folder on the device named like an app or a document package, such as Tool.app or Notes.rtfd, shows in Finder as an app or a document, because macOS goes by the name. It is read-only on the Mac, with everything in it: edit it on the device, or copy it to the Mac. A folder can't be renamed to such a name.",
         "To see files added on the device while it is connected, choose **Refresh** in the Ferry menu.",
         "Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it."
       ],
@@ -87,7 +88,7 @@
           "title": "Delete",
           "paragraphs": [
             "The device has no Trash. Finder offers **Delete Immediately**, and the file is removed from the device at once.",
-            "A folder is deleted only with everything Finder has shown in it. If the device added files to the folder since Finder last showed it, or the folder was never opened, the folder and its files stay, and Finder puts it back with the new files in it. Delete it again to remove them.",
+            "A folder is deleted with its contents only if Finder has shown everything in it, at every level, as it is now. If anything inside is new or changed on the device, or a folder inside was never opened, the whole folder stays and Finder puts it back. Delete it again to remove it. A folder nested more than 64 levels deep, or holding more than 100,000 items, also stays.",
             "A file the device changed since Finder last showed it is not deleted. Finder puts it back with the device's version."
           ]
         },

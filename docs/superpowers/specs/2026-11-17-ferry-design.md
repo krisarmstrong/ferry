@@ -94,7 +94,10 @@ mode: it enumerates over MTP but publishes no storage (seen on the LinkRunner-10
   ordinary items. macOS still types a folder on disk by its extension, so
   Finder shows `X.app` or `X.rtfd` as an app or a document: such a folder
   (extension conforming to `com.apple.package`) carries `com.apple.quarantine`
-  like a file from the device, so Gatekeeper checks it (round 8b ruling).
+  like a file from the device, so Gatekeeper checks it (round 8b ruling). Such
+  a folder and everything in it are read-only on the Mac (reading and listing
+  only), since an app saving it would replace the whole folder; no folder may
+  be renamed to such a name (round 9 ruling).
 
 ## Anti-goals (failure even if it "works")
 

@@ -594,20 +594,23 @@ Document packages and code bundles are no longer supported (see the spec's Non-g
 `PackageArchive`, `Packages`, `AgentService+Packages`, `ProviderBackend+Packages`,
 `SafeWriter+Tree`, `TreeBudget`, the `.createPackage` / `.replacePackage` requests and
 `TransportError.packageTooLarge`, with their tests. Creating a package fails for good with the
-zip message; every device folder is a plain folder (metadata revision 4). Fetched files keep
-their quarantine.
+zip message; every device folder is presented as a plain folder. Fetched files keep their
+quarantine. Round 8b quarantines package-named folders too (metadata revision 5). Round 9
+makes a package-named folder and everything in it read-only on the Mac and refuses renaming a
+folder to such a name.
 
-## Plan 2b rows (round 8)
+## Plan 2b rows (round 8 and 9)
 
-- **Upload re-lists its folder.** `MTPSession.upload`, `makeFolder` and `rename` list the
-  target folder fresh for the collision check, so copying M files into a folder of N entries
-  is O(N·M) device listing. Round 8 made item, download and delete resolve from the cache
-  (verified by one `GetObjectInfo`), not these. Keep a per-folder name index that each
-  mutation updates instead.
-- **Editing a package-named folder on the device.** A folder such as `Notes.rtfd` on the
-  device is a plain folder, but the Mac still opens it as a document by its extension. An app
-  that saves it by replacing the whole folder sends a package create, which is refused with
-  the zip message. Decide whether to say so in Help or to refuse the edit earlier.
+- **Upload re-lists its folder.** `MTPSession.upload`, `makeFolder`, `rename`, `move`,
+  `delete` and `item(at:)` list the folder fresh (round 9: correctness over speed, since
+  libmtp's object cache cannot see a replaced object), so changing M items in a folder of N
+  entries is O(N·M) device listing. Only downloads resolve from the cache. A cheaper fresh
+  check needs object handles from the device without libmtp's cache (below).
+- **libmtp's object cache.** libmtp keeps the object info it first loads for a handle and never
+  reads it again: a file an app rewrites in place, or renames keeping its handle, keeps its
+  old size, date or name until the device is opened again. Listings see only handles added and
+  removed. Read object info through `ptp_getobjectinfo` (bypassing the cache) or reopen the
+  device on Refresh.
 
 ## Plan 3 rows (deferred from the final Plan 2 review)
 

@@ -118,10 +118,15 @@ name.
 Ferry copies files and folders. A package, such as an `.rtfd` or Keynote document, an app, a
 plug-in or a framework, is one item on the Mac but a folder on the device, so Ferry does not
 copy it: Finder shows "Packages and app bundles can't be copied to the device. Compress it into
-a .zip first." Control-click it, choose **Compress**, and copy the `.zip`. On the device every
-folder is a plain folder, so a package made there shows as a folder with its files in it. Symbolic links and aliases can't be copied to the
-device either: Finder shows "Symbolic links and aliases can't be copied to the device" for
-them.
+a .zip first." Control-click it, choose **Compress**, and copy the `.zip`. Symbolic links and
+aliases can't be copied to the device either: Finder shows "Symbolic links and aliases can't be
+copied to the device" for them.
+
+A folder on the device named like an app or a document package (`Tool.app`, `Notes.rtfd`)
+shows in Finder as an app or a document, because macOS goes by the name. Such a folder, and
+everything in it, is read-only on the Mac: an app saving it would replace the whole folder,
+which Ferry can't copy. Edit it on the device, or copy it to the Mac. For the same reason a
+folder on the device can't be renamed to such a name.
 
 ### A file changed on both sides
 
@@ -145,12 +150,12 @@ Rename files and folders, and create new folders, the same way as on any drive.
 The device has no Trash. Finder offers **Delete Immediately** instead of **Move to Trash**,
 and the file is removed from the device at once. It cannot be recovered from the Mac.
 
-Ferry deletes a folder only together with everything Finder has shown in it. If the device
-added files to a folder since Finder last showed it, or the folder was never opened in Finder,
-the folder and everything in it stay, and Finder puts the folder back with the new files in
-it; delete it again to remove them. A folder nested more than 64 folders deep stays the same
-way. A file the device changed since Finder last showed it is not deleted either: Finder puts
-it back with the device's version.
+Ferry deletes a folder with its contents only if Finder has shown everything in it, at every
+level, as it is now on the device. If anything inside it is new or changed on the device, or a
+folder inside it was never opened in Finder, the whole folder stays and Finder puts it back,
+showing what is there; delete it again to remove it. A folder nested more than 64 levels deep,
+or holding more than 100,000 items, also stays. A file the device changed since Finder last
+showed it is not deleted either: Finder puts it back with the device's version.
 
 ### Free up space on the Mac
 
