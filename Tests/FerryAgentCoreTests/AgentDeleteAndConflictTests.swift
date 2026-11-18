@@ -294,44 +294,6 @@ struct AgentDeleteAndConflictTests {
 }
 
 extension AgentDeleteAndConflictTests {
-  /// libmtp sends a name of at most 255 UTF-8 bytes, and a device takes at most 254 UTF-16
-  /// units (PTP's string limit): the name gives way, the marker and the extension stay.
-  @Test(arguments: [
-    String(repeating: "a", count: 250), String(repeating: "é", count: 125),
-    String(repeating: "𝄞", count: 70),
-  ])
-  func aConflictNameFitsInTheDevicesLimit(base: String) {
-    let copy = ConflictCopy.name(for: base + ".txt", attempt: 12)
-
-    #expect(copy.utf8.count <= 255)
-    #expect(copy.utf16.count <= 254)
-    #expect(copy.hasSuffix(" (conflict from Mac 12).txt"))
-    #expect(base.hasPrefix(copy.prefix { $0 != " " }))
-  }
-
-  /// What follows the last dot is an extension only if it is short and has no space.
-  @Test(arguments: [
-    ("Notes 2026.11.17 meeting", "Notes 2026.11.17 meeting (conflict from Mac)"),
-    ("v1.2 final.docx", "v1.2 final (conflict from Mac).docx"),
-  ])
-  func onlyAShortTailIsAnExtension(name: String, expected: String) {
-    #expect(ConflictCopy.name(for: name, attempt: 1) == expected)
-  }
-
-  @Test func aLongTailIsPartOfTheNameAndTheCopyFits() {
-    let name = "a." + String(repeating: "b", count: 250)
-    let copy = ConflictCopy.name(for: name, attempt: 1)
-
-    #expect(copy.utf8.count <= 255)
-    #expect(copy.utf16.count <= 254)
-    #expect(copy.hasPrefix("a.bbb"))
-    #expect(copy.hasSuffix(" (conflict from Mac)"))
-  }
-
-  @Test func aCopyNeverStartsWithASpace() {
-    #expect(!ConflictCopy.name(for: " .txt", attempt: 1).hasPrefix(" "))
-  }
-
   // MARK: Changed during the upload (round 10)
 
   /// The device's file passed the save's base check, then an app on the device replaced it

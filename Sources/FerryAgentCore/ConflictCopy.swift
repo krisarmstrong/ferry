@@ -25,21 +25,28 @@ enum ConflictCopy {
 
   /// `report (conflict from Mac).txt`, then `report (conflict from Mac 2).txt` and so on. The
   /// marker goes before the extension, so the copy opens in the same app. An extension is a
-  /// short tail (at most 16 bytes, no space) after a dot that does not start the name, so in
-  /// `Notes 2026.11.17 meeting` the marker goes at the end. A name a device cannot store (see
-  /// `RemotePath.fitsOnDevice`) loses characters from the end of its base, never the marker or
-  /// the extension, and the copy's name never starts with a space.
+  /// short tail (at most 16 bytes, no space) after a dot that neither starts nor ends the name,
+  /// so in `Notes 2026.11.17 meeting` the marker goes at the end. A name a device cannot store
+  /// (see `RemotePath.fitsOnDevice`) loses characters from the end of its base, never the marker
+  /// or the extension (a single character too long loses its combining marks instead), and the
+  /// copy's name never starts with a space or has one before the marker. Spaces are compared as
+  /// Unicode scalars, so a space carrying a combining mark counts as one.
   static func name(for name: String, attempt: Int) -> String {
     let marker = attempt == 1 ? " (conflict from Mac)" : " (conflict from Mac \(attempt))"
     let dot = name.lastIndex(of: ".").flatMap { dot -> String.Index? in
       let tail = name[dot...]
-      return dot == name.startIndex || tail.utf8.count > 17 || tail.contains(" ") ? nil : dot
+      let isExtension =
+        dot != name.startIndex && tail.count > 1 && tail.utf8.count <= 17
+        && !tail.unicodeScalars.contains(" ")
+      return isExtension ? dot : nil
     }
-    var base = name[..<(dot ?? name.endIndex)].drop { $0 == " " }
+    var base = String(name[..<(dot ?? name.endIndex)])
+    while base.unicodeScalars.first == " " { base.removeFirst() }
     let tail = marker + (dot.map { String(name[$0...]) } ?? "")
     while !RemotePath.fitsOnDevice(base + tail), !base.isEmpty {
-      base = base.dropLast()
+      if base.count == 1 { base.unicodeScalars.removeLast() } else { base.removeLast() }
     }
+    while base.unicodeScalars.last == " " { base.unicodeScalars.removeLast() }
     return base.isEmpty ? String(tail.dropFirst()) : base + tail
   }
 
