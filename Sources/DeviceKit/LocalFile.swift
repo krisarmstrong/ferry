@@ -19,4 +19,35 @@ public enum LocalFile {
     guard let size = values.fileSize else { throw .io("cannot read the size of \(url.path)") }
     return UInt64(size)
   }
+
+  /// The prefix of the file a move on a device without MoveObject copies through.
+  public static let moveScratchPrefix = "ferry-move-"
+
+  /// Throws `.macDiskFull` unless the volume holding `url` has `needed` bytes free.
+  public static func requireSpace(_ needed: UInt64, at url: URL) throws(TransportError) {
+    var info = statfs()
+    guard statfs(url.path, &info) == 0 else { return }
+    try requireSpace(needed, free: available(info))
+  }
+
+  /// Throws `.macDiskFull` unless the volume of the open file `descriptor` has `needed` bytes
+  /// free.
+  public static func requireSpace(_ needed: UInt64, onVolumeOf descriptor: Int32)
+    throws(TransportError)
+  {
+    var info = statfs()
+    guard fstatfs(descriptor, &info) == 0 else { return }
+    try requireSpace(needed, free: available(info))
+  }
+
+  private static func requireSpace(_ needed: UInt64, free: UInt64) throws(TransportError) {
+    if needed > free { throw .macDiskFull(needed: needed, free: free) }
+  }
+
+  /// Bytes an unprivileged process may still write, saturating rather than overflowing.
+  private static func available(_ info: statfs) -> UInt64 {
+    let (bytes, overflow) = UInt64(info.f_bavail).multipliedReportingOverflow(
+      by: UInt64(info.f_bsize))
+    return overflow ? .max : bytes
+  }
 }

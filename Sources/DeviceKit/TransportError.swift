@@ -27,6 +27,8 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   case directoryNotEmpty(RemotePath)
   /// The device's copy of the file changed since the version the request was based on.
   case changedOnDevice(RemotePath)
+  /// The Mac's own volume has no room for a copy of the file.
+  case macDiskFull(needed: UInt64, free: UInt64)
   case cancelled
   case io(String)
 }

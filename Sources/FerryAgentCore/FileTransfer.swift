@@ -17,7 +17,8 @@ public enum FileTransfer {
     FileManager.default.temporaryDirectory.appending(path: scratchPrefix + UUID().uuidString)
   }
 
-  /// Deletes the scratch files, and the partial downloads beside them, that an agent which
+  /// Deletes the scratch files, the partial downloads beside them and the copies a move left
+  /// mid-way, that an agent which
   /// stopped mid-transfer left in `folder`. Run at start, before any transfer.
   public static func sweep(_ folder: URL = FileManager.default.temporaryDirectory) {
     let names: [String]
@@ -26,7 +27,9 @@ public enum FileTransfer {
     } catch {
       return
     }
-    for name in names where name.hasPrefix(scratchPrefix) || SafeWriter.isPartial(name) {
+    let scratch = [scratchPrefix, LocalFile.moveScratchPrefix]
+    for name in names
+    where scratch.contains(where: name.hasPrefix) || SafeWriter.isPartial(name) {
       remove(folder.appending(path: name))
     }
   }
@@ -46,7 +49,10 @@ public enum FileTransfer {
   /// Copies all of `source`, a regular file, into a new scratch file and returns its URL.
   @concurrent static func copyIn(_ source: Int32) async throws(TransportError) -> URL {
     try requireRegular(source)
+    var info = stat()
+    guard fstat(source, &info) == 0 else { throw .io("cannot inspect file: \(errorText())") }
     let url = scratchURL()
+    try LocalFile.requireSpace(UInt64(clamping: info.st_size), at: url.deletingLastPathComponent())
     let output = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
     guard output >= 0 else { throw .io("cannot create transfer file: \(errorText())") }
     defer { close(output) }
@@ -65,6 +71,9 @@ public enum FileTransfer {
     let input = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
     guard input >= 0 else { throw .io("cannot open transfer file: \(errorText())") }
     defer { close(input) }
+    var info = stat()
+    guard fstat(input, &info) == 0 else { throw .io("cannot inspect file: \(errorText())") }
+    try LocalFile.requireSpace(UInt64(clamping: info.st_size), onVolumeOf: target)
     guard ftruncate(target, 0) == 0 else { throw .io("cannot truncate file: \(errorText())") }
     try copy(from: input, to: target)
     guard fsync(target) == 0 else { throw .io("cannot flush file: \(errorText())") }

@@ -259,6 +259,7 @@ extension MTPSession {
     try await operation { () throws(TransportError) in
       let entry = try await entry(path, storage: raw(storage))
       guard !entry.isFolder else { throw .notFound(path) }
+      try LocalFile.requireSpace(entry.size, at: file.deletingLastPathComponent())
       let partial = file.deletingLastPathComponent()
         .appendingPathComponent(SafeWriter.partialPrefix + UUID().uuidString)
       do throws(TransportError) {

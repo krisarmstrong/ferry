@@ -35,6 +35,8 @@ public enum ErrorMapping {
       return CocoaError(.fileWriteInvalidFileName)
     case .cancelled:
       return CocoaError(.userCancelled)
+    case .macDiskFull:
+      return CocoaError(.fileWriteOutOfSpace)
     case .directoryNotEmpty:
       return NSFileProviderError(.directoryNotEmpty)
     // A replace asked to fail on conflict. A delete's conflict is `.deletionRejected`, which

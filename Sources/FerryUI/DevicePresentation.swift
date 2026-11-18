@@ -75,7 +75,7 @@ enum DevicePresentation {
       LocalizedStringResource("Cancelled.", bundle: .module)
     case .notFound, .unknownItem, .alreadyExists, .invalidName, .insufficientSpace,
       .fileTooLargeForStorage, .sizeMismatch, .downloadSizeMismatch, .nameChangedByDevice,
-      .directoryNotEmpty, .changedOnDevice:
+      .directoryNotEmpty, .changedOnDevice, .macDiskFull:
       LocalizedStringResource("The device reported an error.", bundle: .module)
     }
   }

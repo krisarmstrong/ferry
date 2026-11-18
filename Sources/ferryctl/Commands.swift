@@ -52,6 +52,8 @@ private func message(for error: TransportError) -> String {
     "The phone sent \(received) bytes of a file it lists as \(listed) bytes."
   case .nameChangedByDevice(let requested, let actual):
     "The phone saved \"\(requested)\" as \"\(actual)\"."
+  case .macDiskFull(let needed, let free):
+    "Not enough space on this Mac: need \(needed) bytes, \(free) free."
   case .directoryNotEmpty(let path): "\(path) is not empty."
   case .changedOnDevice(let path): "\(path) changed on the phone."
   case .cancelled: "Cancelled."

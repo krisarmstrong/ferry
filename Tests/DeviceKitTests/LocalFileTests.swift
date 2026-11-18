@@ -63,4 +63,15 @@ struct LocalFileTests {
       at: link, withDestinationURL: directory.appendingPathComponent("gone"))
     #expect(throws: TransportError.self) { try LocalFile.regularFileSize(link) }
   }
+
+  @Test func spaceCheckPassesForWhatFitsAndRefusesWhatDoesNot() throws {
+    defer { cleanUp() }
+    try LocalFile.requireSpace(1, at: directory)
+    #expect {
+      try LocalFile.requireSpace(UInt64.max, at: directory)
+    } throws: { error in
+      guard case TransportError.macDiskFull(UInt64.max, let free) = error else { return false }
+      return free < UInt64.max
+    }
+  }
 }

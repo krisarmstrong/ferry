@@ -15,6 +15,7 @@ struct ErrorMappingTests {
       .nameChangedByDevice(requested: "Résumé.txt", actual: "RESUME.TXT"), .cancelled,
       .io("pipe broke"), .downloadSizeMismatch(listed: 7, received: 3),
       .directoryNotEmpty(try path("/a")), .changedOnDevice(try path("/a")),
+      .macDiskFull(needed: 2, free: 1),
     ]
     for sample in samples {
       let mapped = ErrorMapping.fileProviderError(sample) as NSError
@@ -54,6 +55,7 @@ struct ErrorMappingTests {
     case .invalidName: .cocoa(.fileWriteInvalidFileName)
     case .cancelled: .cocoa(.userCancelled)
     case .directoryNotEmpty: .fileProvider(.directoryNotEmpty)
+    case .macDiskFull: .cocoa(.fileWriteOutOfSpace)
     case .changedOnDevice: .fileProvider(.localVersionConflictingWithServer)
     case .nameChangedByDevice(let requested, let actual): .described([requested, actual])
     case .deviceNotFound(let id): .described([id.serial])

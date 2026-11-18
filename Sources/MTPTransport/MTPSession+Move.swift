@@ -47,7 +47,8 @@ extension MTPSession {
     _ source: MTPEntry, from parent: RemotePath, to placement: Placement, storage: UInt32
   ) async throws(TransportError) -> RemoteItem {
     let local = FileManager.default.temporaryDirectory
-      .appendingPathComponent("ferry-move-\(UUID().uuidString)")
+      .appendingPathComponent(LocalFile.moveScratchPrefix + UUID().uuidString)
+    try LocalFile.requireSpace(source.size, at: local.deletingLastPathComponent())
     defer { try? FileManager.default.removeItem(at: local) }
     try await device.download(objectID: source.objectID, to: local) { _, _ in true }
 
