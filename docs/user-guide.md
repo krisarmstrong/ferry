@@ -158,9 +158,9 @@ Menu items:
   show in Finder, and brings back a device you ejected.
 - **Eject** (next to a device): removes the device from Finder and releases it, so you can
   unplug it or use it with another app. The device then shows **Not sharing files** until you
-  choose **Refresh** or plug it in again. Changes that had not reached the device are saved
-  to a folder on the Mac: the menu says **Unsent changes were saved to** that folder and
-  offers **Reveal in Finder**. Deletes and renames that had not reached the device are
+  choose **Refresh** or unplug it and plug it back in. Changes that had not reached the device
+  are saved to a folder on the Mac: the menu says **Unsent changes were saved to** that folder
+  and offers **Reveal in Finder**. Deletes and renames that had not reached the device are
   dropped, so the device keeps those files under their old names.
 - **Try Again** (next to a device that is in use or can't open): asks Ferry to open the
   device again.
