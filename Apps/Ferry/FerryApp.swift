@@ -1,41 +1,39 @@
-import ServiceManagement
+import FerryIPC
+import FerryUI
 import SwiftUI
-import os
 
-private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "App")
-
-/// The menu-bar app. A placeholder until the status menu lands: it registers the agent and
-/// offers Quit.
+/// The menu-bar app: registers the agent, shows its devices, and hosts the setup guide and
+/// Settings.
 @main
 struct FerryApp: App {
+  @State private var model: AppModel
+
   init() {
-    Self.registerAgent()
+    let services = SystemServices()
+    services.registerAgent()
+    let model = AppModel(
+      client: AgentClient(machServiceName: "X6JWYP43HG.io.github.krisarmstrong.ferry.agent"),
+      services: services)
+    _model = State(initialValue: model)
+    // One status request at launch, so the log shows the devices before the menu first opens.
+    Task { await model.refresh() }
   }
 
   var body: some Scene {
     MenuBarExtra("Ferry", systemImage: "externaldrive.connected.to.line.below") {
-      Button("Quit Ferry") { NSApplication.shared.terminate(nil) }
-        .keyboardShortcut("q")
+      MenuContent(model: model)
     }
-  }
+    .menuBarExtraStyle(.window)
 
-  private static func registerAgent() {
-    let agent = SMAppService.agent(plistName: "io.github.krisarmstrong.ferry.agent.plist")
-    do {
-      try agent.register()
-    } catch {
-      log.error("registering the agent failed: \(error, privacy: .public)")
+    Window(SetupGuide.windowTitle, id: SetupGuide.windowID) {
+      SetupGuide(model: model)
     }
-    log.info("agent status: \(describe(agent.status), privacy: .public)")
-  }
+    .windowResizability(.contentSize)
+    .defaultLaunchBehavior(.suppressed)
+    .restorationBehavior(.disabled)
 
-  private static func describe(_ status: SMAppService.Status) -> String {
-    switch status {
-    case .notRegistered: "notRegistered"
-    case .enabled: "enabled"
-    case .requiresApproval: "requiresApproval"
-    case .notFound: "notFound"
-    @unknown default: "unknown (\(status.rawValue))"
+    Settings {
+      SettingsView(model: model)
     }
   }
 }

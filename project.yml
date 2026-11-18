@@ -44,6 +44,10 @@ targets:
         INFOPLIST_FILE: Apps/Ferry/Info.plist
         CODE_SIGN_ENTITLEMENTS: Apps/Ferry/Ferry.entitlements
     dependencies:
+      - package: Ferry
+        product: FerryUI
+      - package: Ferry
+        product: FerryIPC
       - target: FerryAgent
         embed: true
         codeSign: false

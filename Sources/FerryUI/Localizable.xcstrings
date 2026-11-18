@@ -1,0 +1,172 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ · %@ free" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ free"
+          }
+        }
+      }
+    },
+    "%lld." : {
+
+    },
+    "Another app is using the device. Quit Image Capture or Android File Transfer." : {
+
+    },
+    "Can't open" : {
+
+    },
+    "Cancelled." : {
+
+    },
+    "Choose Transfer files on the device." : {
+
+    },
+    "Choose your device" : {
+
+    },
+    "Choose your device to see its steps." : {
+
+    },
+    "Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac." : {
+
+    },
+    "Could not change Open at login." : {
+
+    },
+    "Could not remove Ferry. Make sure Ferry is running, then try again." : {
+
+    },
+    "Device" : {
+
+    },
+    "Done" : {
+
+    },
+    "Eject" : {
+
+    },
+    "Error: %@" : {
+
+    },
+    "Ferry's helper is not responding. Quit Ferry and open it again." : {
+
+    },
+    "File transfer" : {
+
+    },
+    "How to connect" : {
+
+    },
+    "How to turn on file transfer" : {
+
+    },
+    "In Login Items & Extensions, turn on Ferry under File Providers." : {
+
+    },
+    "In use by another app" : {
+
+    },
+    "NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG" : {
+
+    },
+    "No device connected" : {
+
+    },
+    "Not sharing files" : {
+
+    },
+    "On the unit, open **Settings** (bottom of the Home screen) → **Connected devices** → **USB**." : {
+
+    },
+    "Open System Settings" : {
+
+    },
+    "Open at login" : {
+
+    },
+    "Other Android phone (Android 10 or newer)" : {
+
+    },
+    "Other Android phone (Android 8 or 9)" : {
+
+    },
+    "Pull down the notification shade and tap **Charging this device via USB**." : {
+
+    },
+    "Pull down the notification shade and tap **USB charging this device**." : {
+
+    },
+    "Quit" : {
+
+    },
+    "Quit Image Capture or Android File Transfer, then try again." : {
+
+    },
+    "Ready" : {
+
+    },
+    "Refresh" : {
+
+    },
+    "Remove Ferry" : {
+
+    },
+    "Remove Ferry?" : {
+
+    },
+    "Remove Ferry…" : {
+
+    },
+    "Settings…" : {
+
+    },
+    "Tap **Transfer files**." : {
+
+    },
+    "The device appears in Finder once it shares files." : {
+
+    },
+    "The device does not support this: %@." : {
+
+    },
+    "The device is not sharing files." : {
+
+    },
+    "The device reported an error." : {
+
+    },
+    "The device reports no storage." : {
+
+    },
+    "The device was disconnected." : {
+
+    },
+    "Try Again" : {
+
+    },
+    "Turn On File Transfer" : {
+
+    },
+    "Turn on Ferry in Finder" : {
+
+    },
+    "Under **USB preferences**, choose **File transfer**. Or open **Settings** → **Connected devices** → **USB**." : {
+
+    },
+    "Unknown device" : {
+
+    },
+    "Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked." : {
+
+    },
+    "Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched. You can then move Ferry to the Trash." : {
+
+    }
+  },
+  "version" : "1.0"
+}

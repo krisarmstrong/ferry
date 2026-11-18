@@ -1,0 +1,235 @@
+import AppKit
+import DeviceKit
+import SwiftUI
+
+/// The menu-bar window: each device with its state, then Refresh, Settings and Quit.
+///
+/// While it is open it refreshes every 2 s (see `AppModel.watchWhileMenuOpen()`), and it opens
+/// the setup guide when the model asks for it.
+public struct MenuContent: View {
+  @Environment(\.openWindow) private var openWindow
+  @Environment(\.openSettings) private var openSettings
+  private let model: AppModel
+
+  public init(model: AppModel) {
+    self.model = model
+  }
+
+  public var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if model.agent == .unreachable {
+        Label {
+          Text("Ferry's helper is not responding. Quit Ferry and open it again.", bundle: .module)
+        } icon: {
+          Image(systemName: "exclamationmark.triangle")
+            .foregroundStyle(.yellow)
+        }
+      }
+      if model.showsTurnOnRow {
+        TurnOnRow { model.turnOnInFinder() }
+      }
+      if model.agent == .running, model.devices.isEmpty {
+        NoDeviceRow { openGuide(for: nil) }
+      }
+      ForEach(model.devices) { device in
+        DeviceRow(
+          device: device,
+          eject: { Task { await model.eject(device.id) } },
+          recheck: { Task { await model.recheck(device.id) } },
+          showGuide: { openGuide(for: device) })
+      }
+      if let error = model.actionError {
+        Text(error)
+          .font(.callout)
+          .foregroundStyle(.red)
+      }
+      Divider()
+      HStack {
+        Button {
+          Task { await model.refresh() }
+        } label: {
+          Label {
+            Text("Refresh", bundle: .module)
+          } icon: {
+            Image(systemName: "arrow.clockwise")
+          }
+        }
+        .keyboardShortcut("r")
+        Spacer()
+        Button {
+          NSApp.activate()
+          openSettings()
+        } label: {
+          Text("Settings…", bundle: .module)
+        }
+        .keyboardShortcut(",")
+        Button {
+          NSApp.terminate(nil)
+        } label: {
+          Text("Quit", bundle: .module)
+        }
+        .keyboardShortcut("q")
+      }
+    }
+    .padding(12)
+    .frame(width: 320, alignment: .leading)
+    .task { await model.watchWhileMenuOpen() }
+    .onChange(of: model.isGuidePresented, initial: true) { _, presented in
+      if presented { bringGuideForward() }
+    }
+  }
+
+  private func openGuide(for device: AttachedDevice?) {
+    model.showGuide(for: device)
+    bringGuideForward()
+  }
+
+  private func bringGuideForward() {
+    NSApp.activate()
+    openWindow(id: SetupGuide.windowID)
+  }
+}
+
+/// Finder shows nothing until the user turns Ferry on in System Settings: a step, not an error.
+private struct TurnOnRow: View {
+  let turnOn: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label {
+        Text("Turn on Ferry in Finder", bundle: .module)
+          .font(.headline)
+      } icon: {
+        Image(systemName: "questionmark.circle")
+      }
+      Text(
+        "In Login Items & Extensions, turn on Ferry under File Providers.", bundle: .module
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+      Button(action: turnOn) {
+        Text("Open System Settings", bundle: .module)
+      }
+    }
+  }
+}
+
+private struct NoDeviceRow: View {
+  let showGuide: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label {
+        Text("No device connected", bundle: .module)
+          .font(.headline)
+      } icon: {
+        Image(systemName: "cable.connector")
+      }
+      Text("Choose Transfer files on the device.", bundle: .module)
+        .font(.callout)
+        .foregroundStyle(.secondary)
+      Button(action: showGuide) {
+        Text("How to connect", bundle: .module)
+      }
+    }
+  }
+}
+
+/// One device: a header with its model and state, details for that state, then its actions.
+/// Per-device tools and a connection-method label can join the header and the action row.
+private struct DeviceRow: View {
+  let device: AttachedDevice
+  let eject: () -> Void
+  let recheck: () -> Void
+  let showGuide: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label {
+        HStack(spacing: 4) {
+          Text(verbatim: device.displayName)
+            .font(.headline)
+          Text(verbatim: "·")
+            .foregroundStyle(.secondary)
+          Text(DevicePresentation.status(of: device.state))
+            .foregroundStyle(.secondary)
+        }
+        .lineLimit(1)
+      } icon: {
+        Image(systemName: symbol)
+      }
+      details
+        .font(.callout)
+      HStack {
+        stateAction
+        Spacer()
+        Button(action: eject) {
+          Label {
+            Text("Eject", bundle: .module)
+          } icon: {
+            Image(systemName: "eject")
+          }
+        }
+      }
+    }
+  }
+
+  private var symbol: String {
+    switch device.state {
+    case .ready: "externaldrive.connected.to.line.below"
+    case .notSharingFiles: "cable.connector"
+    case .busy, .failed: "exclamationmark.triangle"
+    }
+  }
+
+  @ViewBuilder private var details: some View {
+    switch device.state {
+    case .ready(let storages):
+      ForEach(storages, id: \.id) { storage in
+        Text(verbatim: DevicePresentation.storageLine(storage))
+          .foregroundStyle(.secondary)
+      }
+    case .notSharingFiles:
+      Text("Choose Transfer files on the device.", bundle: .module)
+        .foregroundStyle(.secondary)
+    case .busy:
+      Text("Quit Image Capture or Android File Transfer, then try again.", bundle: .module)
+        .foregroundStyle(.secondary)
+    case .failed(let error):
+      Text(DevicePresentation.message(for: error))
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder private var stateAction: some View {
+    switch device.state {
+    case .ready:
+      EmptyView()
+    case .notSharingFiles:
+      Button(action: showGuide) {
+        Text("How to turn on file transfer", bundle: .module)
+      }
+    case .busy, .failed:
+      Button(action: recheck) {
+        Text("Try Again", bundle: .module)
+      }
+    }
+  }
+}
+
+#Preview("Ready") {
+  MenuContent(model: .preview([PreviewClient.ready]))
+}
+
+#Preview("Not sharing, busy, failed") {
+  MenuContent(
+    model: .preview([PreviewClient.notSharing, PreviewClient.busy, PreviewClient.failed]))
+}
+
+#Preview("No device") {
+  MenuContent(model: .preview([]))
+}
+
+#Preview("Turn on in Finder") {
+  MenuContent(model: .preview([PreviewClient.ready], providerEnabled: false))
+}

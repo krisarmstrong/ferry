@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
   name: "Ferry",
+  defaultLocalization: "en",
   platforms: [.macOS(.v26)],
   products: [
     .library(name: "DeviceKit", targets: ["DeviceKit"]),
@@ -10,6 +11,7 @@ let package = Package(
     .library(name: "FerryAgentCore", targets: ["FerryAgentCore"]),
     .library(name: "FerryIPC", targets: ["FerryIPC"]),
     .library(name: "FerryProviderCore", targets: ["FerryProviderCore"]),
+    .library(name: "FerryUI", targets: ["FerryUI"]),
     .library(name: "MTPTransport", targets: ["MTPTransport"]),
   ],
   dependencies: [
@@ -23,6 +25,9 @@ let package = Package(
     .target(name: "FerryAgentCore", dependencies: ["DeviceKit", "FerryIPC", "MTPTransport"]),
     .target(name: "FerryIPC", dependencies: ["DeviceKit"]),
     .target(name: "FerryProviderCore", dependencies: ["DeviceKit", "FerryIPC"]),
+    .target(
+      name: "FerryUI", dependencies: ["DeviceKit", "FerryIPC"],
+      resources: [.process("Localizable.xcstrings")]),
     .executableTarget(
       name: "ferryctl",
       dependencies: [
@@ -41,6 +46,7 @@ let package = Package(
     .testTarget(
       name: "FerryProviderCoreTests",
       dependencies: ["FerryProviderCore", "FerryIPC", "DeviceKit"]),
+    .testTarget(name: "FerryUITests", dependencies: ["FerryUI", "FerryIPC", "DeviceKit"]),
   ],
   swiftLanguageModes: [.v6]
 )
