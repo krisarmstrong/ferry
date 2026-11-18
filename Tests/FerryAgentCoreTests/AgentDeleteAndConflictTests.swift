@@ -292,6 +292,43 @@ struct AgentDeleteAndConflictTests {
   }
 }
 
+extension AgentDeleteAndConflictTests {
+  // MARK: Changed during the upload (round 10)
+
+  /// The device's file passed the save's base check, then an app on the device replaced it
+  /// while the Mac's contents went up.
+  @Test(arguments: [ConflictPolicy.keepBoth, .fail])
+  func aFileTheDeviceReplacesDuringTheSaveIsKept(policy: ConflictPolicy) async throws {
+    let setup = try await setup([("/a.txt", "old")])
+    defer { setup.harness.finish() }
+    let file = try await setup.id("/a.txt")
+    let base = try await setup.version("/a.txt")
+    let (device, storage) = (setup.device, setup.storage)
+    await device.onNextUpload {
+      try? await device.seed(try path("/a.txt"), in: storage, contents: Data("unit edit".utf8))
+    }
+
+    let reply = await setup.send(
+      .replaceContents(domain: setup.domain, id: file, base: base, onConflict: policy),
+      file: try setup.harness.readable("mac.txt", "mac"))
+
+    #expect(await device.contents(of: try path("/a.txt"), in: storage) == Data("unit edit".utf8))
+    let copy = await device.contents(of: try path("/a (conflict from Mac).txt"), in: storage)
+    switch policy {
+    case .keepBoth:
+      guard case .keptOnDevice(let entry) = reply else {
+        Issue.record("expected the device's item, kept, got \(reply)")
+        return
+      }
+      #expect(entry.item.size == 9)
+      #expect(copy == Data("mac".utf8))
+    case .fail:
+      #expect(reply == .failure(.changedOnDevice(try path("/a.txt"))))
+      #expect(copy == nil)
+    }
+  }
+}
+
 extension AgentResponse {
   fileprivate var entryNames: [String] {
     guard case .entries(let entries) = self else { return [] }

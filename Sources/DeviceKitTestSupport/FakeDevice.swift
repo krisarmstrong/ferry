@@ -45,6 +45,8 @@ public actor FakeDevice: DeviceSession {
     let error: TransportError
   }
   var deleteFailure: TransportError?
+  /// Runs when the next upload starts, before it reads the device's contents.
+  var uploadHook: (@Sendable () async -> Void)?
   var listFailure: TransportError?
   var storagesFailure: TransportError?
   var storagesFailing: TransportError?
@@ -137,6 +139,7 @@ public actor FakeDevice: DeviceSession {
   public func upload(
     from file: URL, to path: RemotePath, in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
+    await runUploadHook()
     var nodes = try nodes(in: storage)
     guard let parent = path.parent else { throw .invalidName(path.description) }
     try requireFolder(parent, in: nodes)
@@ -273,10 +276,12 @@ public actor FakeDevice: DeviceSession {
       let moved = try RemotePath(
         (destination.components + key.components.dropFirst(depth)).map { "/" + $0 }.joined())
       nodes[moved] = nodes.removeValue(forKey: key)
+      // A stale listed size belongs to the object, so it moves with it.
+      reportedSizes[moved] = reportedSizes.removeValue(forKey: key)
     }
     tree[storage] = nodes
     guard let node = nodes[destination] else { throw .notFound(destination) }
-    return Self.item(destination, node)
+    return listedItem(destination, node)
   }
 
 }

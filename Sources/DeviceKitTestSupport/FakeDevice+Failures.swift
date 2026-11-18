@@ -45,6 +45,18 @@ extension FakeDevice {
     listFailure = error
   }
 
+  /// Runs `hook` when the next upload starts, as an app on the device changing files while the
+  /// upload goes up.
+  public func onNextUpload(_ hook: @escaping @Sendable () async -> Void) {
+    uploadHook = hook
+  }
+
+  func runUploadHook() async {
+    guard let hook = uploadHook else { return }
+    uploadHook = nil
+    await hook()
+  }
+
   /// The next delete throws `error`.
   public func failNextDelete(with error: TransportError) {
     deleteFailure = error

@@ -154,6 +154,31 @@ struct MTPSessionStaleObjectInfoTests {
     #expect(left == ["replaced on the unit"])
   }
 
+  /// The device swaps the file while the new contents go up: the backup the commit sets aside
+  /// is not the file the save checked, so it goes back, and nothing is overwritten.
+  @Test func aFileTheDeviceReplacesDuringTheUploadIsKept() async throws {
+    let device = SessionFixture.makeDevice()
+    let old = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    let checked = try await session.item(at: SessionFixture.path("/a.txt"), in: storage)
+    await device.onUpload { _ in
+      await device.removeObject(old)
+      await device.addFile(
+        "a.txt", parent: SessionFixture.root, data: Data("swapped during the upload".utf8))
+    }
+    let local = try SessionFixture.localFile(Data("mac edit".utf8))
+    defer { try? FileManager.default.removeItem(at: local) }
+
+    await #expect(throws: TransportError.changedOnDevice(try SessionFixture.path("/a.txt"))) {
+      _ = try await SafeWriter(session: session).write(
+        from: local, to: SessionFixture.path("/a.txt"), in: storage, replacing: true,
+        expecting: checked, progress: SessionFixture.noProgress)
+    }
+    #expect(await device.children(of: SessionFixture.root) == ["a.txt"])
+    let left = await device.objects.values.map { String(bytes: $0.data, encoding: .utf8) }
+    #expect(left == ["swapped during the upload"])
+  }
+
   @Test func deletingAFileTheDeviceDroppedIsNotFound() async throws {
     let device = SessionFixture.makeDevice()
     let id = await device.addFile("a.txt", parent: SessionFixture.root, data: Data("a".utf8))
