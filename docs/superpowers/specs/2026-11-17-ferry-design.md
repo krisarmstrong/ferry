@@ -250,21 +250,29 @@ must not contain file names. Therefore:
 - **Agent lifecycle.** The menu-bar app registers the agent on first launch.
   The agent then runs while registered, whether or not the menu-bar app is
   open. Settings has "Remove Ferry", which removes all domains (keeping unsent
-  file contents, as Eject does) and then unregisters the agent. A Mac where the app was never launched shows nothing.
+  file contents, as Eject does) and then unregisters the agent. A Mac where the
+  app was never launched shows nothing.
 - **Write safety.** An upload goes to a hidden temp name
   (`.ferry-partial-<uuid>`) and is renamed when it completes. On failure
   the agent deletes the partial object. Leftover objects with that prefix
   (from a crash or an unplug) are hidden from listings and deleted whenever
   their folder is listed. This is lazy because walking a whole phone at
-  connect can take minutes. A content modify uploads the new data to a
-  temp name, renames the old object to a hidden `.ferry-backup-<uuid>`, renames the
-  temp into place, and only then deletes the backup; if the temp cannot be renamed,
-  the backup is renamed back, so a failure never loses both versions. Listings hide
-  backups; one from an earlier session (its delete failed, or the agent stopped) is
-  deleted when its folder is listed and no write is in flight there. Only a device
-  that cannot rename at all falls back to delete-then-upload, and any failure is
-  surfaced as an error, never hidden. Capabilities are queried per device through
-  `DeviceTransport`.
+  connect can take minutes.
+- **Replacing a file.** A content modify uploads the new data to a temp name,
+  renames the old object to a hidden `.ferry-backup-<uuid>-<original name>`,
+  renames the temp into place, and only then deletes the backup. If the temp
+  cannot be renamed, the backup is renamed back, so a failure never loses both
+  versions. (A name too long to fit is set aside as `.ferry-backup-<uuid>`.)
+  Listings hide backups. A backup this session made, or one in a folder with a
+  write in flight, is left alone. Any other backup (the agent stopped, or the
+  device was unplugged between the two renames) is resolved when its folder is
+  listed:
+  - its original name is free: the backup is renamed back (restored);
+  - a complete file holds the name, read back as a file: the backup is deleted;
+  - anything else (a folder at the name, no readable name): it is kept.
+  A backup is never deleted blindly. Only a device that cannot rename at all
+  falls back to delete-then-upload, and any failure is surfaced as an error,
+  never hidden. Capabilities are queried per device through `DeviceTransport`.
 - **Item identity.** One domain per device serial + storage, so it persists
   across reconnects. Its identifier is the SHA-256 (hex) of "<serial>|<storage key>",
   never parsed back, so the serial is not in FileProvider's logs or paths. Item
