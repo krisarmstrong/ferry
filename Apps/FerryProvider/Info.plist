@@ -26,6 +26,10 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSExtension</key>
 	<dict>
+		<key>NSExtensionFileProviderAdditionalSyncableExtendedAttributes</key>
+		<array>
+			<string>com.apple.quarantine</string>
+		</array>
 		<key>NSExtensionFileProviderDocumentGroup</key>
 		<string>$(FERRY_TEAM_ID).io.github.krisarmstrong.ferry</string>
 		<key>NSExtensionFileProviderSupportsEnumeration</key>

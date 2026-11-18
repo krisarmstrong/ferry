@@ -62,6 +62,25 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
 
   public var contentModificationDate: Date? { entry.item.modified }
 
+  /// Every file from the device carries `com.apple.quarantine` as a downloaded file does, so
+  /// Gatekeeper checks an app or script from a USB device before it first runs. FileProvider
+  /// writes an item's syncable extended attributes onto the file on disk; the extension's
+  /// Info.plist declares this one syncable. A marker set on the fetched file itself does not
+  /// reach the disk: FileProvider takes only its contents.
+  public var extendedAttributes: [String: Data] {
+    guard entry.item.kind == .file else { return [:] }
+    return [Self.quarantineAttribute: quarantine]
+  }
+
+  static let quarantineAttribute = "com.apple.quarantine"
+
+  /// `0083;<seconds since 1970, hex>;Ferry;<identifier>`: downloaded (0x0003) from an untrusted
+  /// source (0x0080) by Ferry. Built from the item alone, so it is the same every time.
+  private var quarantine: Data {
+    let seconds = max(0, Int(entry.item.modified.timeIntervalSince1970.rounded(.down)))
+    return Data("0083;\(String(seconds, radix: 16));Ferry;\(entry.id.rawValue)".utf8)
+  }
+
   /// On a folder, `.allowsReading` and `.allowsWriting` are `.allowsContentEnumerating` and
   /// `.allowsAddingSubItems`: the SDK defines them as the same bits.
   ///
@@ -82,12 +101,18 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   /// across launches. FileProvider keeps an item's metadata until its version changes, so a
   /// Ferry that changes capabilities must change the version too, or items already known keep
   /// the old ones.
+  /// Bumped when Ferry changes what an item's metadata holds (2: the quarantine attribute), so
+  /// items FileProvider already knows pick it up.
+  static let metadataRevision = 2
+
   public var itemVersion: NSFileProviderItemVersion {
     let content = ContentVersion(entry.item).encoded
     // Neither an identifier nor a name contains "/", so the fields cannot run together.
     let metadata = Data(
       SHA256.hash(
-        data: Data("\(entry.parent.rawValue)/\(filename)/\(capabilities.rawValue)".utf8)))
+        data: Data(
+          "\(entry.parent.rawValue)/\(filename)/\(capabilities.rawValue)/\(Self.metadataRevision)"
+            .utf8)))
     return NSFileProviderItemVersion(contentVersion: content, metadataVersion: metadata)
   }
 }

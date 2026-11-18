@@ -49,3 +49,7 @@ check-app:
 	      || { echo "error: the parts of $(APP) name different teams: $$teams" >&2; exit 1; }; \
 	  done
 	@echo "app bundle carries its team ID in every part"
+	@# Files from a device are quarantined through this syncable attribute (see ProviderItem).
+	@/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionFileProviderAdditionalSyncableExtendedAttributes' \
+	  '$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Info.plist' | grep -q 'com.apple.quarantine' \
+	  || { echo "error: the extension does not declare com.apple.quarantine syncable" >&2; exit 1; }

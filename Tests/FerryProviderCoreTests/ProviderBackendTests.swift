@@ -259,13 +259,14 @@ import UniformTypeIdentifiers
 
   /// FileProvider keeps an item's metadata until its version changes, so the capabilities must
   /// be part of it: a Ferry that grants new ones (as `.allowsEvicting` was) would otherwise
-  /// leave every item Finder already knew with the old ones.
-  @Test func metadataVersionCoversCapabilities() throws {
+  /// leave every item Finder already knew with the old ones. The revision does the same for
+  /// anything else the metadata gains, such as the quarantine attribute.
+  @Test func metadataVersionCoversCapabilitiesAndRevision() throws {
     let parent = ItemID.random()
     let item = ProviderItem(
       ProviderEntry(id: .random(), parent: parent, item: try file("/a.txt", size: 1)))
     let withCapabilities = Data(
-      SHA256.hash(data: Data("\(parent.rawValue)/a.txt/\(item.capabilities.rawValue)".utf8)))
+      SHA256.hash(data: Data("\(parent.rawValue)/a.txt/\(item.capabilities.rawValue)/2".utf8)))
     let withoutCapabilities = Data(SHA256.hash(data: Data("\(parent.rawValue)/a.txt".utf8)))
 
     #expect(item.itemVersion.metadataVersion == withCapabilities)

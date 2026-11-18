@@ -1,4 +1,3 @@
-import CoreServices
 import DeviceKit
 import FerryIPC
 import FerryProviderCore
@@ -88,22 +87,25 @@ struct ItemKindTests {
 
 /// Contents from a USB device are untrusted downloads: Gatekeeper checks an app or script from
 /// one before it runs.
-struct FetchQuarantineTests {
-  @Test func aFetchedFileIsQuarantined() async throws {
-    let agent = FakeAgent(
-      [try file("/run.command", size: 2)], contents: [try path("/run.command"): Data("hi".utf8)])
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let dir = try scratchDirectory()
-    defer { try? FileManager.default.removeItem(at: dir) }
+struct QuarantineTests {
+  @Test func aFileFromTheDeviceCarriesTheQuarantine() throws {
+    let id = ItemID.random()
+    let item = ProviderItem(
+      ProviderEntry(
+        id: id, parent: .root,
+        item: RemoteItem(
+          path: try path("/run.command"), kind: .file, size: 2,
+          modified: Date(timeIntervalSince1970: 0x6553_F100))))
 
-    let (url, _) = try await backend.fetch(
-      try await agent.identifier(try path("/run.command")), into: dir)
+    let value = try #require(item.extendedAttributes["com.apple.quarantine"])
 
-    let size = getxattr(url.path, "com.apple.quarantine", nil, 0, 0, 0)
-    #expect(size > 0)
-    let properties = try url.resourceValues(forKeys: [.quarantinePropertiesKey])
-      .quarantineProperties
-    #expect(properties?[kLSQuarantineAgentNameKey as String] as? String == "Ferry")
+    #expect(String(bytes: value, encoding: .utf8) == "0083;6553f100;Ferry;\(id.rawValue)")
+  }
+
+  @Test func aFolderCarriesNone() throws {
+    let item = ProviderItem(
+      ProviderEntry(id: .random(), parent: .root, item: try folder("/DCIM")))
+    #expect(item.extendedAttributes.isEmpty)
   }
 }
 
