@@ -83,7 +83,8 @@ public actor CompositeTransport: DeviceTransport {
     return DeviceScan(
       devices: last.devices, busy: last.busy, notSharing: last.notSharing, ejected: last.ejected,
       rescanAfter: staleRetry, method: last.method, methods: last.methods,
-      awaitingAuthorization: last.awaitingAuthorization, presentOverUSB: last.presentOverUSB)
+      awaitingAuthorization: last.awaitingAuthorization, presentOverUSB: last.presentOverUSB,
+      adbStatus: last.adbStatus, awaitingUSBDebugging: last.awaitingUSBDebugging)
   }
 
   private func merge(mtp viaMTP: DeviceScan, adb viaADB: DeviceScan) -> DeviceScan {
@@ -130,7 +131,8 @@ public actor CompositeTransport: DeviceTransport {
       notSharing: leftOut["notSharing"] ?? [], ejected: ejected, rescanAfter: rescanAfter,
       method: .usbFileTransfer, methods: methods,
       awaitingAuthorization: viaMTP.awaitingAuthorization + viaADB.awaitingAuthorization,
-      presentOverUSB: onUSB)
+      presentOverUSB: onUSB, adbStatus: viaADB.adbStatus ?? viaMTP.adbStatus,
+      awaitingUSBDebugging: viaMTP.awaitingUSBDebugging.union(viaADB.awaitingUSBDebugging))
   }
 
   private func rememberNames(_ viaMTP: DeviceScan) {
@@ -195,6 +197,10 @@ public actor CompositeTransport: DeviceTransport {
   public func unpark(_ id: DeviceID) async {
     await mtp.unpark(id)
     await adb.unpark(id)
+  }
+
+  public func startADBServer() async {
+    await adb.startADBServer()
   }
 
   private static func attempt(_ transport: any DeviceTransport, _ name: String) async

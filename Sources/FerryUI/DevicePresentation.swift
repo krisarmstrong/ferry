@@ -25,6 +25,55 @@ enum DevicePresentation {
     }
   }
 
+  /// How Ferry reaches the device, as the menu shows it under the device's name.
+  static func method(_ method: ConnectionMethod) -> LocalizedStringResource {
+    switch method {
+    case .usbADB: LocalizedStringResource("USB · ADB", bundle: .module)
+    case .wifiADB: LocalizedStringResource("Wi-Fi · ADB", bundle: .module)
+    case .usbFileTransfer: LocalizedStringResource("USB · File transfer", bundle: .module)
+    }
+  }
+
+  /// The method the menu shows for `device`: only a device Ferry is serving has one.
+  static func shownMethod(of device: AttachedDevice) -> ConnectionMethod? {
+    if case .ready = device.state { device.method } else { nil }
+  }
+
+  /// A line the menu adds under a device, with an action where it has one.
+  enum Hint: Equatable {
+    /// USB debugging is off; the guide turns it on for more tools.
+    case moreTools
+    /// USB debugging is on and waits for the user to allow this Mac on the device.
+    case allowUSBDebugging
+  }
+
+  static func hint(for device: AttachedDevice, awaitingUSBDebugging: Bool) -> Hint? {
+    switch device.state {
+    case .ready, .notSharingFiles:
+      if awaitingUSBDebugging { return .allowUSBDebugging }
+      if case .ready = device.state, device.method == .usbFileTransfer { return .moreTools }
+      return nil
+    case .ejected, .busy, .failed:
+      return nil
+    }
+  }
+
+  /// Whether the device is waiting for file transfer. A device only adb lists, as unauthorised,
+  /// shows as not sharing files too, but file transfer is not what it needs.
+  static func needsFileTransferSteps(_ device: AttachedDevice) -> Bool {
+    device.state == .notSharingFiles && device.method != .usbADB
+  }
+
+  static let installCommand = "brew install --cask android-platform-tools"
+
+  /// A network device waiting for the user to allow this Mac on it. The address comes from
+  /// adb's listing, so it is escaped.
+  static func waitingLine(for address: String) -> String {
+    let address = DisplayText.escaped(address)
+    return String(
+      localized: LocalizedStringResource("Waiting for Allow on \(address)", bundle: .module))
+  }
+
   static func storageLine(_ storage: StorageInfo) -> String {
     let free = storage.free.formatted(.byteCount(style: .file))
     let name = DisplayText.escaped(storage.description)

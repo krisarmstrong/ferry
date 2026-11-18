@@ -14,6 +14,9 @@
     "%lld." : {
 
     },
+    "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device." : {
+      "extractionState" : "manual"
+    },
     "A file changed on both sides" : {
       "extractionState" : "manual"
     },
@@ -42,6 +45,9 @@
         }
       }
     },
+    "Allow USB debugging on the device" : {
+      "extractionState" : "manual"
+    },
     "An app or script from the device does not open at once" : {
       "extractionState" : "manual"
     },
@@ -57,10 +63,16 @@
     "Another app is using the device. Quit Image Capture or Android File Transfer." : {
 
     },
+    "Ask NetAlly to enable ADB on the tester." : {
+      "extractionState" : "manual"
+    },
     "Can't open" : {
 
     },
     "Cancelled." : {
+
+    },
+    "Check again" : {
 
     },
     "Check that Ferry is on under File Providers in Login Items & Extensions." : {
@@ -101,6 +113,9 @@
     },
     "Control-click a file you opened and choose **Remove Download**. The file stays on the device." : {
       "extractionState" : "manual"
+    },
+    "Copy" : {
+
     },
     "Copying “%@” to the device · %lld%%" : {
       "localizations" : {
@@ -161,14 +176,29 @@
     "Ferry Help" : {
 
     },
-    "Ferry does not use the network. No telemetry, no analytics, no account. Nothing leaves your Mac." : {
+    "Ferry has no telemetry, no analytics and no account, and sends nothing to any server. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else." : {
       "extractionState" : "manual"
     },
     "Ferry is waiting for its helper to answer, for example just after Ferry opens." : {
       "extractionState" : "manual"
     },
+    "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check again** once it is installed." : {
+      "extractionState" : "manual"
+    },
+    "Ferry reaches the device over ADB on a USB cable." : {
+      "extractionState" : "manual"
+    },
+    "Ferry reaches the device over ADB on your network." : {
+      "extractionState" : "manual"
+    },
+    "Ferry reaches the device over USB file transfer. Turn on USB debugging to use ADB instead." : {
+      "extractionState" : "manual"
+    },
     "Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon." : {
       "extractionState" : "manual"
+    },
+    "Ferry switches to ADB as soon as you allow this Mac on the device." : {
+
     },
     "Ferry's help could not be loaded. Reinstalling Ferry restores it." : {
 
@@ -206,6 +236,9 @@
     "Getting started" : {
       "extractionState" : "manual"
     },
+    "Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**." : {
+      "extractionState" : "manual"
+    },
     "Help" : {
       "extractionState" : "manual"
     },
@@ -214,6 +247,9 @@
     },
     "How to connect" : {
 
+    },
+    "How to turn on USB debugging" : {
+      "extractionState" : "manual"
     },
     "How to turn on file transfer" : {
 
@@ -243,7 +279,13 @@
     "In use by another app" : {
 
     },
+    "Install adb for more tools…" : {
+      "extractionState" : "manual"
+    },
     "Menu items" : {
+      "extractionState" : "manual"
+    },
+    "More tools with USB debugging…" : {
       "extractionState" : "manual"
     },
     "Mount" : {
@@ -264,8 +306,26 @@
     "Not sharing files" : {
 
     },
+    "On the device, tick **Always allow from this computer** and tap **Allow**." : {
+      "extractionState" : "manual"
+    },
+    "On the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on." : {
+      "extractionState" : "manual"
+    },
     "On the unit: **Settings** (bottom of the Home screen) → **Connected devices** → **USB**." : {
 
+    },
+    "Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555." : {
+      "extractionState" : "manual"
+    },
+    "Open **Settings** → **About phone** and tap **Build number** until developer mode is on." : {
+      "extractionState" : "manual"
+    },
+    "Open **Settings** → **System** → **About phone** and tap **Build number** until developer mode is on." : {
+      "extractionState" : "manual"
+    },
+    "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**." : {
+      "extractionState" : "manual"
     },
     "Open System Settings" : {
 
@@ -274,6 +334,9 @@
 
     },
     "Open at login, How to connect, Help and Remove Ferry." : {
+      "extractionState" : "manual"
+    },
+    "Opens the steps that turn on USB debugging." : {
       "extractionState" : "manual"
     },
     "Opens this window." : {
@@ -331,6 +394,12 @@
       "extractionState" : "manual"
     },
     "Reveal in Finder" : {
+
+    },
+    "Set Up Your Device" : {
+
+    },
+    "Set up" : {
 
     },
     "Settings…" : {
@@ -393,17 +462,29 @@
     "Try another cable. Some carry power only." : {
       "extractionState" : "manual"
     },
-    "Turn On File Transfer" : {
-
-    },
     "Turn on Ferry in Finder" : {
 
     },
     "Turn on file transfer on the device." : {
       "extractionState" : "manual"
     },
+    "USB debugging" : {
+
+    },
+    "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **Allow**." : {
+      "extractionState" : "manual"
+    },
+    "USB · ADB" : {
+      "extractionState" : "manual"
+    },
+    "USB · File transfer" : {
+      "extractionState" : "manual"
+    },
     "Under **USB preferences**, choose **File transfer**. Or open **Settings** → **Connected devices** → **USB**." : {
 
+    },
+    "Under each device" : {
+      "extractionState" : "manual"
     },
     "Uninstall" : {
       "extractionState" : "manual"
@@ -432,7 +513,22 @@
     "Using Ferry in Finder" : {
       "extractionState" : "manual"
     },
+    "Waiting for Allow on" : {
+      "extractionState" : "manual"
+    },
+    "Waiting for Allow on %@" : {
+
+    },
+    "Wi-Fi · ADB" : {
+      "extractionState" : "manual"
+    },
+    "With USB debugging on, Ferry serves the device over ADB, which is faster than file transfer and adds more tools. File transfer keeps working without it." : {
+      "extractionState" : "manual"
+    },
     "With one device location, macOS labels it with the app's name. This is normal." : {
+      "extractionState" : "manual"
+    },
+    "With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester offers ADB only after this." : {
       "extractionState" : "manual"
     },
     "You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in." : {
@@ -443,6 +539,9 @@
     },
     "Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched. You can then move Ferry to the Trash." : {
 
+    },
+    "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check again**." : {
+      "extractionState" : "manual"
     },
     "macOS can't find Ferry's helper" : {
       "localizations" : {

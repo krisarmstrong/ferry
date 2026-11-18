@@ -11,6 +11,7 @@ Ferry is free and open source (MIT). It needs macOS 26 or later on an Apple sili
 - [Getting started](#getting-started)
 - [Connect a NetAlly unit](#connect-a-netally-unit)
 - [Connect another Android phone](#connect-another-android-phone)
+- [USB debugging (ADB)](#usb-debugging-adb)
 - [Using Ferry in Finder](#using-ferry-in-finder)
 - [The menu](#the-menu)
 - [Troubleshooting](#troubleshooting)
@@ -83,6 +84,53 @@ Unlock the phone first. Android hides the phone's storage while it is locked.
 
 Menu names vary a little between phone makers. Look for the USB notification and the option
 that mentions file transfer.
+
+## USB debugging (ADB)
+
+File transfer is enough to browse and copy. With USB debugging on, Ferry serves the device over
+ADB instead, which is faster and adds more tools. File transfer keeps working without it, and
+Ferry falls back to it whenever ADB is off.
+
+Ferry needs `adb`, from Google's Android platform tools. It never installs or bundles it. If it
+is missing, the menu shows **Install adb for more tools…** with the command to run in Terminal,
+a **Copy** button and a **Check again** button:
+
+```text
+brew install --cask android-platform-tools
+```
+
+Click **Check again** once it is installed. From a device that is serving files over file
+transfer, **More tools with USB debugging…** in the menu opens the steps below for its model.
+
+### NetAlly LinkRunner 10G, LinkRunner 100G and EtherScope nXG
+
+1. Ask NetAlly to enable ADB on the tester.
+2. On the tester: **Settings** → **System** → **About tester**. Tap **Build number** until
+   developer mode is on.
+3. Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.
+4. With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester
+   offers ADB only after this.
+5. On the device, tick **Always allow from this computer** and tap **Allow**.
+
+Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555.
+
+### Android 8 or 9
+
+1. Unlock the phone and connect it to the Mac with a USB cable.
+2. Open **Settings** → **System** → **About phone** and tap **Build number** until developer
+   mode is on.
+3. Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.
+4. On the device, tick **Always allow from this computer** and tap **Allow**.
+
+### Android 10 or newer
+
+1. Unlock the phone and connect it to the Mac with a USB cable.
+2. Open **Settings** → **About phone** and tap **Build number** until developer mode is on.
+3. Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.
+4. On the device, tick **Always allow from this computer** and tap **Allow**.
+
+Until you tap **Allow**, the menu shows **Allow USB debugging on the device** and Ferry keeps
+serving the device over file transfer. The method it uses shows under each ready device.
 
 ## Using Ferry in Finder
 
@@ -179,8 +227,8 @@ the device, Control-click the file and choose **Remove Download**.
 
 ## The menu
 
-Click the Ferry icon in the menu bar to see each connected device, its storage and free space,
-and its state.
+Click the Ferry icon in the menu bar to see each connected device, how Ferry reaches it, its
+storage and free space, and its state.
 
 | State | Meaning |
 | ----- | ------- |
@@ -204,6 +252,20 @@ Above the devices, the menu can also show:
 
 While the menu is open, Ferry checks for devices every 2 seconds.
 
+Under each ready device, the menu says how Ferry reaches it:
+
+| Shown | Meaning |
+| ----- | ------- |
+| **USB · ADB** | ADB over a USB cable. |
+| **Wi-Fi · ADB** | ADB over your network. |
+| **USB · File transfer** | USB file transfer, with USB debugging off or not yet allowed. |
+
+A device on file transfer also shows **More tools with USB debugging…**, which opens the
+[steps](#usb-debugging-adb), or **Allow USB debugging on the device** once USB debugging is on
+and waits for you to tap **Allow**. When `adb` is not installed and a device is connected, the
+menu shows **Install adb for more tools…**. A device on your network that waits for you to allow
+this Mac shows **Waiting for Allow on** its address.
+
 Menu items:
 
 - **Refresh** (⌘R): reads each ready device's folders again, so changes made on the device
@@ -225,7 +287,7 @@ Menu items:
 Settings:
 
 - **Open at login**: starts the Ferry menu-bar item when you log in.
-- **How to connect**: opens the file-transfer steps.
+- **How to connect**: opens the setup guide, on file transfer or USB debugging.
 - **Help**: opens Ferry Help.
 - **Remove Ferry…**: see [Uninstall](#uninstall).
 
@@ -296,8 +358,9 @@ in Finder as one, and is marked the same way.
 
 ## Privacy
 
-Ferry does not use the network. It has no telemetry, analytics, crash reporting or account.
-Your files go only between the device and your Mac; nothing leaves the Mac.
+Ferry has no telemetry, analytics, crash reporting or account, and sends nothing to any server.
+Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to
+that device on your network and nowhere else.
 
 ## Uninstall
 
@@ -310,7 +373,6 @@ Do step 1 first. It is the step that removes the Finder locations and stops the 
 
 ## Coming next
 
-- **ADB connection**, for devices with USB debugging turned on.
 - **Wi-Fi connection**, without a cable.
 - **Send to device** in Finder: send selected files to a connected device from the
   Control-click menu.

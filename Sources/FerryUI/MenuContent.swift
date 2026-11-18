@@ -38,10 +38,21 @@ public struct MenuContent: View {
       ForEach(model.devices) { device in
         DeviceRow(
           device: device, transfers: model.transfers(on: device.id),
+          awaitingUSBDebugging: model.isAwaitingUSBDebugging(device.id),
           eject: { Task { await model.eject(device.id) } },
           recheck: { Task { await model.recheck(device.id) } },
           mount: { Task { await model.mount(device.id) } },
-          showGuide: { openGuide(for: device) })
+          showGuide: { openGuide(for: device) },
+          showUSBDebugging: { openUSBDebuggingGuide(for: device) })
+      }
+      ForEach(model.awaitingAuthorization, id: \.self) { address in
+        Text(verbatim: DevicePresentation.waitingLine(for: address))
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+      if model.showsInstallADB {
+        InstallADBRow(
+          copy: { model.copyInstallCommand() }, checkAgain: { Task { await model.recheckADB() } })
       }
       if let error = model.actionError {
         Text(verbatim: error)
@@ -107,6 +118,10 @@ public struct MenuContent: View {
 
   private func openGuide(for device: AttachedDevice?) {
     model.showGuide(for: device)
+  }
+
+  private func openUSBDebuggingGuide(for device: AttachedDevice) {
+    model.showUSBDebuggingGuide(for: device)
   }
 }
 
@@ -216,15 +231,22 @@ private struct NoDeviceRow: View {
   }
 }
 
-/// One device: a header with its model and state, details for that state, then its actions.
-/// Per-device tools and a connection-method label can join the header and the action row.
+/// One device: a header with its model and state, how Ferry reaches it, details for that state,
+/// a hint about USB debugging where it applies, then its actions. Per-device tools can join the
+/// action row.
 private struct DeviceRow: View {
   let device: AttachedDevice
   let transfers: [ActiveTransfer]
+  let awaitingUSBDebugging: Bool
   let eject: () -> Void
   let recheck: () -> Void
   let mount: () -> Void
   let showGuide: () -> Void
+  let showUSBDebugging: () -> Void
+
+  private var hint: DevicePresentation.Hint? {
+    DevicePresentation.hint(for: device, awaitingUSBDebugging: awaitingUSBDebugging)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -241,8 +263,24 @@ private struct DeviceRow: View {
       } icon: {
         Image(systemName: symbol)
       }
+      if let method = DevicePresentation.shownMethod(of: device) {
+        Text(DevicePresentation.method(method))
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
       details
         .font(.callout)
+      switch hint {
+      case .allowUSBDebugging:
+        Text("Allow USB debugging on the device", bundle: .module)
+          .font(.callout)
+      case .moreTools:
+        Button(action: showUSBDebugging) {
+          Text("More tools with USB debugging…", bundle: .module)
+        }
+      case nil:
+        EmptyView()
+      }
       HStack {
         stateAction
         Spacer()
@@ -282,8 +320,10 @@ private struct DeviceRow: View {
           .truncationMode(.middle)
       }
     case .notSharingFiles:
-      Text("Choose Transfer files on the device.", bundle: .module)
-        .foregroundStyle(.secondary)
+      if DevicePresentation.needsFileTransferSteps(device) {
+        Text("Choose Transfer files on the device.", bundle: .module)
+          .foregroundStyle(.secondary)
+      }
     case .ejected:
       Text("Not in Finder until you mount it again or plug it back in.", bundle: .module)
         .foregroundStyle(.secondary)
@@ -301,8 +341,10 @@ private struct DeviceRow: View {
     case .ready:
       EmptyView()
     case .notSharingFiles:
-      Button(action: showGuide) {
-        Text("How to turn on file transfer", bundle: .module)
+      if DevicePresentation.needsFileTransferSteps(device) {
+        Button(action: showGuide) {
+          Text("How to turn on file transfer", bundle: .module)
+        }
       }
     case .ejected:
       Button(action: mount) {
@@ -318,6 +360,14 @@ private struct DeviceRow: View {
 
 #Preview("Ready") {
   MenuContent(model: .preview([PreviewClient.ready]))
+}
+
+#Preview("Methods") {
+  MenuContent(
+    model: .preview(
+      [
+        PreviewClient.ready, PreviewClient.readyOverADB, PreviewClient.readyOverWiFi,
+      ], adb: .notInstalled))
 }
 
 #Preview("Not sharing, busy, failed") {

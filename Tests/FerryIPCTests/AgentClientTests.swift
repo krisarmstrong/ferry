@@ -230,7 +230,7 @@ func theProviderMaySendOnlyItemRequests() async throws {
       == .entries(try listing()))
   for request: AgentRequest in [
     .status, .eject(DeviceID(serial: "A")), .removeAllDomains, .recheck(DeviceID(serial: "A")),
-    .refresh(DeviceID(serial: "A")),
+    .refresh(DeviceID(serial: "A")), .recheckADB,
   ] {
     #expect(
       try await harness.client.send(request, file: nil) == .failure(.io("request not allowed")),

@@ -10,7 +10,8 @@
 
 Section  = { id, title, symbol, paragraphs?, steps?, definitions?, groups?: [Group], note?, link? }
 Group    = { title, paragraphs?, steps?, definitions?, note?, link? }
-link     = { title, target }    target: "guide" or "guide:<DeviceFamily case>"
+link     = { title, target }    target: "guide", "guide:<DeviceFamily case>", "debugging" or
+                                "debugging:<DeviceFamily case>"
 definitions = [{ term, detail }]
 ```
 
@@ -55,7 +56,8 @@ Bracketed names stand for each section's SF Symbol (`symbol` in `help.json`).
   others hide. An empty result shows `ContentUnavailableView.search`.
 - A `link` renders as a bordered button at the end of the block. `"guide"` opens the setup
   guide window with the model picker; `"guide:<case>"` opens it preselected to that
-  `DeviceFamily`. This is the "How to connect" deep link.
+  `DeviceFamily`. `"debugging"` and `"debugging:<case>"` do the same on the USB debugging steps
+  instead of the file-transfer steps. This is the "How to connect" deep link.
 - The window opens on the section the reader last chose, kept with `@AppStorage`, and on
   **Getting started** the first time (or when the remembered section no longer exists). The
   window itself is not restored at launch. The sidebar's selection and the detail always

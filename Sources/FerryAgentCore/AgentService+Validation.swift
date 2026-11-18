@@ -81,7 +81,8 @@ extension AgentService {
     switch request {
     case .fetch, .replaceContents: true
     case .create(_, _, _, let isFolder): !isFolder
-    case .status, .recheck, .refresh, .eject, .removeAllDomains, .item, .list, .rename, .move,
+    case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .item, .list, .rename,
+      .move,
       .delete, .changes, .workingSet:
       false
     }

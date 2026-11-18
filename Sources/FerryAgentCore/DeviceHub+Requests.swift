@@ -21,6 +21,13 @@ extension DeviceHub {
     await recheckHeld(id)
   }
 
+  /// The user's Check again for adb: looks for `adb` and starts its server, then scans, so the
+  /// next status shows what that found.
+  public func recheckADB() async {
+    await transport.startADBServer()
+    await reconcile()
+  }
+
   /// Closes the device's session once the requests on it have finished. It stays listed as
   /// `.ejected` until it is unplugged or mounted again: the transport is told to leave it alone
   /// first, so no scan opens it meanwhile.

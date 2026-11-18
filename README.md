@@ -12,7 +12,7 @@ LinkRunner 100G) and need to move test results, captures and files between the t
 Mac. It works with other Android phones too. macOS has no built-in way to browse an Android
 device over USB; Ferry adds one that uses Finder itself, so you browse, open, copy, rename and
 delete with the tools you already know, including any app's Open and Save dialogs. It is free
-and open source (MIT), and it never uses the network.
+and open source (MIT), and it sends nothing to any server.
 
 <!-- Screenshots: add once captured on macOS 26, as docs/screenshots/{finder,menu,guide}.png.
 

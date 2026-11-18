@@ -36,4 +36,70 @@ struct GuideStepsTests {
       #expect(!String(localized: family.title).isEmpty)
     }
   }
+
+  private static func debugging(_ family: DeviceFamily) -> [String] {
+    GuideSteps.steps(for: family, topic: .usbDebugging).map { String(localized: $0) }
+  }
+
+  @Test func theTopicChoosesTheSteps() {
+    for family in DeviceFamily.allCases {
+      #expect(GuideSteps.steps(for: family, topic: .fileTransfer) == GuideSteps.steps(for: family))
+      #expect(GuideSteps.steps(for: family, topic: .usbDebugging) != GuideSteps.steps(for: family))
+    }
+  }
+
+  @Test func netAllyDebuggingStepsFollowTheBoard() {
+    let steps = Self.debugging(.netAllyAndroid8Board)
+    #expect(steps.count == 5)
+    #expect(steps[0] == "Ask NetAlly to enable ADB on the tester.")
+    #expect(steps[1].contains("**Settings** → **System** → **About tester**"))
+    #expect(steps[1].contains("**Build number**"))
+    #expect(steps[2].contains("**Settings** → **System** → **Developer options**"))
+    #expect(steps[2].contains("**USB debugging**"))
+    // The board offers ADB only after the toggle is cycled with the cable in.
+    #expect(steps[3].contains("cable") && steps[3].contains("off and on"))
+    #expect(
+      steps[4].contains("**Always allow from this computer**") && steps[4].contains("**Allow**"))
+  }
+
+  /// How a NetAlly unit is unlocked is NetAlly's to share, not Ferry's.
+  @Test(arguments: DeviceFamily.allCases)
+  func noGuideDescribesTheUnlock(family: DeviceFamily) {
+    for topic in GuideTopic.allCases {
+      let steps = GuideSteps.steps(for: family, topic: topic).map { String(localized: $0) }
+      for step in steps {
+        #expect(!step.localizedCaseInsensitiveContains("unlockdetail"), "\(step)")
+        #expect(!step.localizedCaseInsensitiveContains("code"), "\(step)")
+        #expect(!step.localizedCaseInsensitiveContains("dial"), "\(step)")
+      }
+    }
+    #expect(
+      Self.debugging(family).contains { $0.contains("NetAlly") }
+        == (family == .netAllyAndroid8Board))
+  }
+
+  @Test func genericAndroidDebuggingStepsNameTheirSettings() {
+    let older = Self.debugging(.otherAndroid8to9)
+    let newer = Self.debugging(.otherAndroid10Plus)
+    for steps in [older, newer] {
+      #expect(steps.contains { $0.contains("**Build number**") })
+      #expect(steps.contains { $0.contains("**Developer options**") })
+      #expect(steps.contains { $0.contains("**USB debugging**") })
+      #expect(steps.last?.contains("**Always allow from this computer**") == true)
+    }
+    #expect(older.contains { $0.contains("**System** → **About phone**") })
+    #expect(newer.contains { $0.contains("**About phone**") })
+  }
+
+  /// NetAlly testers listen for ADB over the network once ADB is enabled.
+  @Test func onlyTheNetAllyBoardNotesNetworkADB() throws {
+    let note = try #require(GuideSteps.debuggingNote(for: .netAllyAndroid8Board))
+    #expect(String(localized: note).contains("5555"))
+    #expect(GuideSteps.debuggingNote(for: .otherAndroid8to9) == nil)
+    #expect(GuideSteps.debuggingNote(for: .otherAndroid10Plus) == nil)
+  }
+
+  @Test func everyTopicHasATitle() {
+    for topic in GuideTopic.allCases { #expect(!String(localized: topic.title).isEmpty) }
+  }
 }

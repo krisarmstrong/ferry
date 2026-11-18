@@ -15,6 +15,13 @@ public protocol DeviceTransport: Sendable {
   func park(_ id: DeviceID) async
   /// Lets the next scan try `id` again: a device reported busy, or one parked.
   func unpark(_ id: DeviceID) async
+  /// Looks for `adb` again and starts its server, for a user who has just installed it. A
+  /// transport without adb does nothing.
+  func startADBServer() async
+}
+
+extension DeviceTransport {
+  public func startADBServer() async {}
 }
 
 public protocol DeviceSession: Sendable {

@@ -43,6 +43,15 @@ extension DeviceHub {
   /// Network devices waiting for the user to allow this Mac, as of the most recent scan.
   public func awaitingAuthorization() -> [String] { awaiting }
 
+  /// Whether adb can be used, as of the most recent scan; `nil` before the first, or with no adb.
+  public func adbStatus() -> ADBStatus? { adbState }
+
+  /// Devices with USB debugging on that wait for the user to allow this Mac, as of the most
+  /// recent scan.
+  public func awaitingUSBDebugging() -> [DeviceID] {
+    awaitingDebugging.sorted { $0.serial < $1.serial }
+  }
+
   /// Swaps and ejects waiting for a device's requests to finish.
   var waitingForRequests: Int { drainWaiters.values.map(\.count).reduce(0, +) }
 

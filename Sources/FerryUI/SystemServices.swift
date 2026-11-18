@@ -28,6 +28,8 @@ public protocol SystemServicing {
   /// Shows the items in Finder.
   func reveal(_ urls: [URL])
   func quit()
+  /// Puts `text` on the pasteboard.
+  func copy(_ text: String)
 }
 
 /// `SMAppService`, `NSWorkspace` and `NSApplication`.
@@ -99,6 +101,11 @@ public final class SystemServices: SystemServicing {
 
   public func quit() {
     NSApplication.shared.terminate(nil)
+  }
+
+  public func copy(_ text: String) {
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
   }
 
   private nonisolated static func describe(_ status: SMAppService.Status) -> String {

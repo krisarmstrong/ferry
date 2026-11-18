@@ -137,18 +137,26 @@ public struct StatusReport: Codable, Sendable, Equatable {
   public let transfers: [ActiveTransfer]
   /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
   public let awaitingAuthorization: [String]
+  /// Whether adb can be used; `nil` until the agent has looked.
+  public let adbStatus: ADBStatus?
+  /// Devices with USB debugging on that wait for the user to allow this Mac on them. A device
+  /// listed here may still be served another way, over file transfer.
+  public let awaitingUSBDebugging: [DeviceID]
   /// Where the system saved unsent changes of domains the agent retired on its own (a storage's
   /// domain replaced under its method-neutral key), as `.removed` reports for an eject.
   public let preservedChanges: [URL]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
-    awaitingAuthorization: [String] = [], preservedChanges: [URL] = []
+    awaitingAuthorization: [String] = [], adbStatus: ADBStatus? = nil,
+    awaitingUSBDebugging: [DeviceID] = [], preservedChanges: [URL] = []
   ) {
     self.devices = devices
     self.provider = provider
     self.transfers = transfers
     self.awaitingAuthorization = awaitingAuthorization
+    self.adbStatus = adbStatus
+    self.awaitingUSBDebugging = awaitingUSBDebugging
     self.preservedChanges = preservedChanges
   }
 }
@@ -164,6 +172,9 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// Answered with `.status`.
   case status
   case recheck(DeviceID)
+  /// Looks for `adb` again and starts its server, for a user who has just installed it. Answered
+  /// with `.done`; the next `.status` shows what it found.
+  case recheckADB
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
   /// device reach Finder.
   case refresh(DeviceID)

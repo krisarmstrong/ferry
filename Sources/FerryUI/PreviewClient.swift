@@ -12,6 +12,12 @@ struct PreviewClient: AgentSending {
         id: StorageID(device: DeviceID(serial: "LR1"), key: "Internal shared storage|0"),
         description: "Internal shared storage", capacity: 64_000_000_000, free: 41_500_000_000)
     ]), method: .usbFileTransfer)
+  static let readyOverADB = AttachedDevice(
+    info: DeviceInfo(id: DeviceID(serial: "LR2"), manufacturer: "NetAlly", model: "LinkRunner 10G"),
+    state: .ready([]), method: .usbADB)
+  static let readyOverWiFi = AttachedDevice(
+    info: DeviceInfo(id: DeviceID(serial: "ES2"), manufacturer: "NetAlly", model: "EtherScope nXG"),
+    state: .ready([]), method: .wifiADB)
   static let notSharing = AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: "ES1"), manufacturer: "NetAlly", model: "EtherScope nXG"),
     state: .notSharingFiles, method: .usbFileTransfer)
@@ -24,6 +30,7 @@ struct PreviewClient: AgentSending {
 
   let devices: [AttachedDevice]
   let provider: ProviderState
+  let adb: ADBStatus?
 
   func send(
     _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
@@ -31,16 +38,18 @@ struct PreviewClient: AgentSending {
     -> AgentResponse
   {
     switch request {
-    case .status: .status(StatusReport(devices: devices, provider: provider))
+    case .status: .status(StatusReport(devices: devices, provider: provider, adbStatus: adb))
     default: .done
     }
   }
 }
 
 extension AppModel {
-  static func preview(_ devices: [AttachedDevice], provider: ProviderState = .enabled) -> AppModel {
+  static func preview(
+    _ devices: [AttachedDevice], provider: ProviderState = .enabled, adb: ADBStatus? = nil
+  ) -> AppModel {
     AppModel(
-      client: PreviewClient(devices: devices, provider: provider),
+      client: PreviewClient(devices: devices, provider: provider, adb: adb),
       services: PreviewServices())
   }
 }
@@ -55,4 +64,5 @@ private final class PreviewServices: SystemServicing {
   func open(_ url: URL) {}
   func reveal(_ urls: [URL]) {}
   func quit() {}
+  func copy(_ text: String) {}
 }

@@ -87,8 +87,8 @@ public actor AgentService: AgentHandling {
         expired: changes.expired)
     case (.workingSet(let domain, let page), _):
       return try await workingSet(page, in: domain)
-    case (.fetch, nil), (.replaceContents, nil), (.status, _), (.recheck, _), (.refresh, _),
-      (.eject, _), (.removeAllDomains, _):
+    case (.fetch, nil), (.replaceContents, nil), (.status, _), (.recheck, _), (.recheckADB, _),
+      (.refresh, _), (.eject, _), (.removeAllDomains, _):
       throw .io("bad request")
     }
   }
@@ -105,9 +105,13 @@ public actor AgentService: AgentHandling {
           devices: await hub.devices(), provider: await domains.providerState(),
           transfers: await transfers.list(),
           awaitingAuthorization: await hub.awaitingAuthorization(),
+          adbStatus: await hub.adbStatus(), awaitingUSBDebugging: await hub.awaitingUSBDebugging(),
           preservedChanges: await domains.preservedByRetirement))
     case .recheck(let id):
       await hub.recheck(id)
+      return .done
+    case .recheckADB:
+      await hub.recheckADB()
       return .done
     case .refresh(let id):
       try await domains.refresh(id)

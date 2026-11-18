@@ -43,7 +43,9 @@ struct ADBTransportTimeoutTests {
     }
     let transport = Fixture.transport(port: server.port, answerLimit: Self.limit)
     let started = ContinuousClock.now
-    #expect(try await transport.scan() == DeviceScan(devices: [], method: .usbADB))
+    #expect(
+      try await transport.scan() == DeviceScan(devices: [], method: .usbADB, adbStatus: .serverDown)
+    )
     #expect(started.duration(to: .now) < Self.limit + .seconds(3))
     #expect(await transport.status == .serverDown)
     await server.stopAndWait()

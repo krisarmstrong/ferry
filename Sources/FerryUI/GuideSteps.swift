@@ -23,7 +23,20 @@ public enum DeviceFamily: String, Sendable, CaseIterable, Hashable {
   }
 }
 
-/// How to turn on file transfer, per device family. The NetAlly steps follow each model's
+/// What the setup guide walks through.
+public enum GuideTopic: String, Sendable, CaseIterable, Hashable {
+  case fileTransfer
+  case usbDebugging
+
+  public var title: LocalizedStringResource {
+    switch self {
+    case .fileTransfer: LocalizedStringResource("File transfer", bundle: .module)
+    case .usbDebugging: LocalizedStringResource("USB debugging", bundle: .module)
+    }
+  }
+}
+
+/// How to turn on file transfer and USB debugging, per device family. The NetAlly steps follow each model's
 /// AllyWare 3.x user guide ("Using a USB Type-C to USB Cable"); the guides say "PC or tablet",
 /// so these name the Mac instead.
 public enum GuideSteps {
@@ -42,7 +55,81 @@ public enum GuideSteps {
     return netAllyAndroid8Models.contains(key) ? .netAllyAndroid8Board : nil
   }
 
-  public static func steps(for family: DeviceFamily) -> [LocalizedStringResource] {
+  /// The steps for `topic` on `family`: file transfer unless asked for USB debugging.
+  public static func steps(
+    for family: DeviceFamily, topic: GuideTopic = .fileTransfer
+  ) -> [LocalizedStringResource] {
+    switch topic {
+    case .fileTransfer: transferSteps(for: family)
+    case .usbDebugging: debuggingSteps(for: family)
+    }
+  }
+
+  /// A line under the family's USB debugging steps, if it has one: NetAlly testers also listen
+  /// for ADB over the network once ADB is enabled.
+  public static func debuggingNote(for family: DeviceFamily) -> LocalizedStringResource? {
+    switch family {
+    case .netAllyAndroid8Board:
+      LocalizedStringResource(
+        "Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555.",
+        bundle: .module)
+    case .otherAndroid8to9, .otherAndroid10Plus:
+      nil
+    }
+  }
+
+  private static func debuggingSteps(for family: DeviceFamily) -> [LocalizedStringResource] {
+    switch family {
+    case .netAllyAndroid8Board:
+      // NetAlly enables ADB on a tester itself; how is NetAlly's to share, so the guide only
+      // says to ask.
+      [
+        LocalizedStringResource("Ask NetAlly to enable ADB on the tester.", bundle: .module),
+        LocalizedStringResource(
+          """
+          On the tester: **Settings** → **System** → **About tester**. Tap **Build number** \
+          until developer mode is on.
+          """, bundle: .module),
+        LocalizedStringResource(
+          "Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
+          bundle: .module),
+        LocalizedStringResource(
+          """
+          With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. \
+          The tester offers ADB only after this.
+          """, bundle: .module),
+        allowThisComputer,
+      ]
+    case .otherAndroid8to9:
+      [
+        unlockAndConnect,
+        LocalizedStringResource(
+          """
+          Open **Settings** → **System** → **About phone** and tap **Build number** until \
+          developer mode is on.
+          """, bundle: .module),
+        LocalizedStringResource(
+          "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
+          bundle: .module),
+        allowThisComputer,
+      ]
+    case .otherAndroid10Plus:
+      [
+        unlockAndConnect,
+        LocalizedStringResource(
+          """
+          Open **Settings** → **About phone** and tap **Build number** until developer mode is \
+          on.
+          """, bundle: .module),
+        LocalizedStringResource(
+          "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
+          bundle: .module),
+        allowThisComputer,
+      ]
+    }
+  }
+
+  private static func transferSteps(for family: DeviceFamily) -> [LocalizedStringResource] {
     switch family {
     case .netAllyAndroid8Board:
       [
@@ -80,6 +167,10 @@ public enum GuideSteps {
       ]
     }
   }
+
+  private static let allowThisComputer = LocalizedStringResource(
+    "On the device, tick **Always allow from this computer** and tap **Allow**.",
+    bundle: .module)
 
   private static let unlockAndConnect = LocalizedStringResource(
     """

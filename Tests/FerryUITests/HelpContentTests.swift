@@ -87,6 +87,24 @@ struct HelpContentTests {
       android.groups.map(\.body.steps) == [keys(.otherAndroid8to9), keys(.otherAndroid10Plus)])
   }
 
+  @Test func debuggingStepsMatchTheSetupGuide() throws {
+    func keys(_ family: DeviceFamily) -> [String] {
+      GuideSteps.steps(for: family, topic: .usbDebugging).map(\.key)
+    }
+    let section = try Self.section("usb-debugging")
+    let groups = Dictionary(uniqueKeysWithValues: section.groups.map { ($0.title, $0.body) })
+    #expect(
+      groups["NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG"]?.steps
+        == keys(.netAllyAndroid8Board))
+    #expect(groups["Android 8 or 9"]?.steps == keys(.otherAndroid8to9))
+    #expect(groups["Android 10 or newer"]?.steps == keys(.otherAndroid10Plus))
+    let note = try #require(GuideSteps.debuggingNote(for: .netAllyAndroid8Board))
+    #expect(
+      groups["NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG"]?.note == note.key)
+    #expect(section.body.link?.topic == .usbDebugging)
+    #expect(section.body.link?.family == nil)
+  }
+
   @Test func linkTargetsDecode() throws {
     let json = """
       {"version": 1, "title": "T", "sections": [
@@ -97,12 +115,29 @@ struct HelpContentTests {
       """
     let sections = try Self.decode(json).sections
     #expect(sections[0].body.link?.family == nil)
+    #expect(sections[0].body.link?.topic == .fileTransfer)
     #expect(sections[1].body.link?.family == .otherAndroid10Plus)
+    #expect(sections[1].body.link?.topic == .fileTransfer)
     #expect(sections[0].groups.isEmpty)
     #expect(sections[0].body.steps.isEmpty)
   }
 
-  @Test(arguments: ["guide:aircheckG3", "web", "guide:"])
+  @Test func debuggingLinkTargetsDecode() throws {
+    let json = """
+      {"version": 1, "title": "T", "sections": [
+        {"id": "a", "title": "A", "symbol": "folder", "link": {"title": "L", "target": "debugging"}},
+        {"id": "b", "title": "B", "symbol": "folder",
+         "link": {"title": "L", "target": "debugging:netAllyAndroid8Board"}}
+      ]}
+      """
+    let sections = try Self.decode(json).sections
+    #expect(sections[0].body.link?.family == nil)
+    #expect(sections[0].body.link?.topic == .usbDebugging)
+    #expect(sections[1].body.link?.family == .netAllyAndroid8Board)
+    #expect(sections[1].body.link?.topic == .usbDebugging)
+  }
+
+  @Test(arguments: ["guide:aircheckG3", "web", "guide:", "debugging:", "debugging:aircheckG3"])
   func unknownLinkTargetIsRejected(target: String) {
     let json = """
       {"version": 1, "title": "T", "sections": [

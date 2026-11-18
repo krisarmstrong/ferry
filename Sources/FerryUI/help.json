@@ -70,6 +70,50 @@
       }
     },
     {
+      "id": "usb-debugging",
+      "title": "USB debugging",
+      "symbol": "terminal",
+      "paragraphs": [
+        "With USB debugging on, Ferry serves the device over ADB, which is faster than file transfer and adds more tools. File transfer keeps working without it.",
+        "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check again** once it is installed."
+      ],
+      "groups": [
+        {
+          "title": "NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG",
+          "steps": [
+            "Ask NetAlly to enable ADB on the tester.",
+            "On the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on.",
+            "Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
+            "With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester offers ADB only after this.",
+            "On the device, tick **Always allow from this computer** and tap **Allow**."
+          ],
+          "note": "Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555."
+        },
+        {
+          "title": "Android 8 or 9",
+          "steps": [
+            "Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.",
+            "Open **Settings** → **System** → **About phone** and tap **Build number** until developer mode is on.",
+            "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
+            "On the device, tick **Always allow from this computer** and tap **Allow**."
+          ]
+        },
+        {
+          "title": "Android 10 or newer",
+          "steps": [
+            "Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.",
+            "Open **Settings** → **About phone** and tap **Build number** until developer mode is on.",
+            "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
+            "On the device, tick **Always allow from this computer** and tap **Allow**."
+          ]
+        }
+      ],
+      "link": {
+        "title": "How to turn on USB debugging",
+        "target": "debugging"
+      }
+    },
+    {
       "id": "finder",
       "title": "Using Ferry in Finder",
       "symbol": "folder",
@@ -145,6 +189,39 @@
         }
       ],
       "groups": [
+        {
+          "title": "Under each device",
+          "definitions": [
+            {
+              "term": "USB · ADB",
+              "detail": "Ferry reaches the device over ADB on a USB cable."
+            },
+            {
+              "term": "Wi-Fi · ADB",
+              "detail": "Ferry reaches the device over ADB on your network."
+            },
+            {
+              "term": "USB · File transfer",
+              "detail": "Ferry reaches the device over USB file transfer. Turn on USB debugging to use ADB instead."
+            },
+            {
+              "term": "More tools with USB debugging…",
+              "detail": "Opens the steps that turn on USB debugging."
+            },
+            {
+              "term": "Allow USB debugging on the device",
+              "detail": "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **Allow**."
+            },
+            {
+              "term": "Waiting for Allow on",
+              "detail": "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device."
+            },
+            {
+              "term": "Install adb for more tools…",
+              "detail": "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check again**."
+            }
+          ]
+        },
         {
           "title": "Menu items",
           "definitions": [
@@ -245,7 +322,7 @@
       "title": "Privacy",
       "symbol": "hand.raised",
       "paragraphs": [
-        "Ferry does not use the network. No telemetry, no analytics, no account. Nothing leaves your Mac."
+        "Ferry has no telemetry, no analytics and no account, and sends nothing to any server. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else."
       ]
     },
     {

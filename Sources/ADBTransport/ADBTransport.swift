@@ -2,15 +2,6 @@ import DeviceKit
 import Foundation
 import os
 
-/// Whether adb can be used, for the menu to show.
-public enum ADBStatus: Sendable, Equatable {
-  case available
-  /// No `adb` in any of the places Ferry looks, and no server answering.
-  case notInstalled
-  /// `adb` is installed but its server is not answering.
-  case serverDown
-}
-
 /// The adb serials a device answers on: its USB serial and any `host:port` it is connected at.
 public struct ADBRoutes: Sendable, Equatable {
   public let usb: String?
@@ -151,7 +142,8 @@ public actor ADBTransport: DeviceTransport {
       } catch {
         serverUnreachable(error)
         return DeviceScan(
-          devices: [], ejected: parked.values.map(\.info).sorted(by: Self.serial), method: .usbADB)
+          devices: [], ejected: parked.values.map(\.info).sorted(by: Self.serial), method: .usbADB,
+          adbStatus: status)
       }
       status = .available
       let usable = listed.filter { $0.state == .device }
@@ -187,7 +179,27 @@ public actor ADBTransport: DeviceTransport {
         method: .usbADB,
         methods: Dictionary(uniqueKeysWithValues: overNetwork.map { ($0, .wifiADB) }),
         awaitingAuthorization: unauthorized.filter(\.isWireless).map(\.serial),
-        presentOverUSB: onUSB.union(found.filter { $0.value.usb != nil }.keys))
+        presentOverUSB: onUSB.union(found.filter { $0.value.usb != nil }.keys),
+        adbStatus: .available,
+        awaitingUSBDebugging: Self.waitingForAllow(listed))
+    }
+  }
+
+  /// The devices adb lists over USB as unauthorised: USB debugging is on, the user has not
+  /// allowed this Mac yet.
+  private static func waitingForAllow(_ listed: [ADBDevice]) -> Set<DeviceID> {
+    Set(
+      listed.filter { $0.state == .unauthorized && !$0.isWireless }
+        .map { describe($0).id })
+  }
+
+  /// Looks for `adb` again and starts its server, which the user may have just installed. A
+  /// missing `adb` is no error: the next scan reports `.notInstalled`.
+  public func startADBServer() async {
+    do throws(ADBError) {
+      try await host.startServer()
+    } catch {
+      Self.log.info("starting adb: \(String(describing: error), privacy: .public)")
     }
   }
 

@@ -73,7 +73,7 @@ public enum ClientRole: Sendable, CaseIterable {
   /// Whether a client in this role may send `request`.
   public func allows(_ request: AgentRequest) -> Bool {
     switch request {
-    case .status, .recheck, .refresh, .eject, .removeAllDomains:
+    case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains:
       self == .app
     case .item, .list, .fetch, .create, .rename, .move, .replaceContents, .delete, .changes,
       .workingSet:

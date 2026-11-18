@@ -34,6 +34,12 @@ import os
   public private(set) var helper = HelperStatus.allowed
   /// Transfers the agent is running, as of the last status.
   public private(set) var transfers: [ActiveTransfer] = []
+  /// Whether adb can be used; `nil` until the agent has looked.
+  public private(set) var adbStatus: ADBStatus?
+  /// Devices with USB debugging on that wait for the user to allow this Mac on them.
+  private(set) var awaitingUSBDebugging: Set<DeviceID> = []
+  /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
+  public private(set) var awaitingAuthorization: [String] = []
   /// The last failed action, shown until the next one succeeds. It can carry device-supplied
   /// detail, so it is shown verbatim, never parsed as Markdown.
   public private(set) var actionError: String?
@@ -48,13 +54,14 @@ import os
 
   /// The steps the guide shows; `nil` shows the model picker.
   public var guideFamily: DeviceFamily?
+  public var guideTopic = GuideTopic.fileTransfer
   public var isGuidePresented = false
   /// Set with `isGuidePresented`, and cleared by the one view that brings the guide window
   /// forward, so reopening the menu does not pull the guide in front of it again.
   private(set) var guideOpenPending = false
 
   private let client: any AgentSending
-  private let services: any SystemServicing
+  let services: any SystemServicing
   private let sleep: @Sendable (Duration) async throws -> Void
   /// Devices the guide has opened for this app run.
   private var guidedDevices: Set<DeviceID> = []
@@ -164,8 +171,9 @@ import os
   }
 
   /// Opens the guide with the family's steps, or the model picker for `nil`.
-  public func showGuide(family: DeviceFamily?) {
+  public func showGuide(family: DeviceFamily?, topic: GuideTopic = .fileTransfer) {
     guideFamily = family
+    guideTopic = topic
     isGuidePresented = true
     guideOpenPending = true
   }
@@ -290,7 +298,7 @@ import os
     services.quit()
   }
 
-  private func perform(_ request: AgentRequest) async {
+  func perform(_ request: AgentRequest) async {
     preservedChanges = []
     do {
       switch try await client.send(request, file: nil) {
@@ -316,6 +324,9 @@ import os
     helper = .allowed
     provider = report.provider
     transfers = report.transfers
+    adbStatus = report.adbStatus
+    awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
+    awaitingAuthorization = report.awaitingAuthorization
     agent = .running
     // The agent replaced a domain on its own and the system kept its unsent changes: shown as an
     // eject's are.
@@ -323,11 +334,15 @@ import os
     where !preservedChanges.contains(location) {
       preservedChanges.append(location)
     }
-    let states = devices.map { DevicePresentation.kind(of: $0.state) }.joined(separator: ",")
+    let states = devices.map { "\(DevicePresentation.kind(of: $0.state))/\($0.method.rawValue)" }
+      .joined(separator: ",")
+    let adb = report.adbStatus.map { String(describing: $0) } ?? "unknown"
     Self.log.info(
-      "devices: [\(states, privacy: .public)] provider: \(report.provider.rawValue, privacy: .public)"
-    )
-    for device in devices where device.state == .notSharingFiles {
+      """
+      devices: [\(states, privacy: .public)] provider: \(report.provider.rawValue, privacy: .public) \
+      adb: \(adb, privacy: .public)
+      """)
+    for device in devices where DevicePresentation.needsFileTransferSteps(device) {
       guard guidedDevices.insert(device.id).inserted, !isGuidePresented else { continue }
       showGuide(for: device)
     }

@@ -95,6 +95,8 @@ public actor DeviceHub {
 
   /// Network devices waiting for the user to allow this Mac, from the most recent scan.
   var awaiting: [String] = []
+  var adbState: ADBStatus?
+  var awaitingDebugging: Set<DeviceID> = []
   /// Devices whose next swap attempt is held off: their new session was not ready.
   var swapHolds: [DeviceID: Backoff] = [:]
   /// MTP sessions kept open, idle, while ADB serves their device.
@@ -222,6 +224,8 @@ public actor DeviceHub {
     }
     scheduleRescan(after: scan.rescanAfter)
     awaiting = scan.awaitingAuthorization
+    adbState = scan.adbStatus
+    awaitingDebugging = scan.awaitingUSBDebugging
     let present = Set((scan.devices + scan.busy + scan.notSharing + scan.ejected).map(\.id))
     for (id, entry) in entries where !present.contains(id) {
       guard case .unheld = entry.holding else { continue }

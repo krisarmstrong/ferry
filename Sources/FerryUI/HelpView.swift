@@ -135,7 +135,7 @@ private struct HelpBodyView: View {
       }
       if let link = blocks.link {
         Button {
-          model.showGuide(family: link.family)
+          model.showGuide(family: link.family, topic: link.topic)
           _ = model.takeGuideOpenRequest()
           openWindow(id: SetupGuide.windowID)
         } label: {

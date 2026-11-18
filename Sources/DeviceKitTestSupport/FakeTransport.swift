@@ -54,6 +54,31 @@ public actor FakeTransport: DeviceTransport {
   private var withdrawn: Set<DeviceID> = []
   private var scanFailure: TransportError?
   private var busyKeepsSerial = false
+  private var adbStatus: ADBStatus?
+  private var adbStatusAfterStart: ADBStatus?
+  private var awaitingUSBDebugging: Set<DeviceID> = []
+  /// How many times `startADBServer()` was called.
+  public private(set) var serverStarts = 0
+
+  /// The scans report adb as `status`, as `ADBTransport` does.
+  public func setADBStatus(_ status: ADBStatus?) {
+    adbStatus = status
+  }
+
+  /// Starting the adb server makes the scans report `status` from then on.
+  public func setADBStatusAfterStart(_ status: ADBStatus) {
+    adbStatusAfterStart = status
+  }
+
+  /// adb lists `id` over USB as unauthorised.
+  public func requireUSBDebuggingAllow(_ id: DeviceID) {
+    awaitingUSBDebugging.insert(id)
+  }
+
+  public func startADBServer() async {
+    serverStarts += 1
+    if let adbStatusAfterStart { adbStatus = adbStatusAfterStart }
+  }
 
   /// A USB route presents `id` in a state the fake does not list (offline), as adb reports.
   public func presentOverUSB(_ id: DeviceID) {
@@ -163,7 +188,7 @@ public actor FakeTransport: DeviceTransport {
     return DeviceScan(
       devices: usable, busy: busy, notSharing: notSharing, ejected: ejected,
       rescanAfter: rescanAfter, method: method, methods: methods, awaitingAuthorization: awaiting,
-      presentOverUSB: overUSB)
+      presentOverUSB: overUSB, adbStatus: adbStatus, awaitingUSBDebugging: awaitingUSBDebugging)
   }
 
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {

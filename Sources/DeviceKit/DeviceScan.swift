@@ -26,6 +26,11 @@ public struct DeviceScan: Sendable, Equatable, Codable {
   /// network route never serves one of these: a serial alone does not prove a network device is
   /// the unit on the cable.
   public let presentOverUSB: Set<DeviceID>
+  /// What the transport found of adb itself; `nil` for a transport that has no adb.
+  public let adbStatus: ADBStatus?
+  /// Devices adb lists over USB as unauthorised: USB debugging is on, but the user has not yet
+  /// allowed this Mac on the device. Another route may still serve them.
+  public let awaitingUSBDebugging: Set<DeviceID>
 
   /// `method` is how the transport reaches what it lists: MTP is always `.usbFileTransfer`. A
   /// transport with more than one route names the exceptions in `methods`.
@@ -33,7 +38,8 @@ public struct DeviceScan: Sendable, Equatable, Codable {
     devices: [DeviceInfo], busy: [DeviceInfo] = [], notSharing: [DeviceInfo] = [],
     ejected: [DeviceInfo] = [], rescanAfter: Duration? = nil,
     method: ConnectionMethod = .usbFileTransfer, methods: [DeviceID: ConnectionMethod] = [:],
-    awaitingAuthorization: [String] = [], presentOverUSB: Set<DeviceID> = []
+    awaitingAuthorization: [String] = [], presentOverUSB: Set<DeviceID> = [],
+    adbStatus: ADBStatus? = nil, awaitingUSBDebugging: Set<DeviceID> = []
   ) {
     self.devices = devices
     self.busy = busy
@@ -44,6 +50,8 @@ public struct DeviceScan: Sendable, Equatable, Codable {
     self.methods = methods.filter { $0.value != method }
     self.awaitingAuthorization = awaitingAuthorization
     self.presentOverUSB = presentOverUSB
+    self.adbStatus = adbStatus
+    self.awaitingUSBDebugging = awaitingUSBDebugging
   }
 
   /// How the transport reaches `id`.

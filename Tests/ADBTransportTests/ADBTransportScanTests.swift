@@ -107,7 +107,29 @@ struct ADBTransportScanTests {
     #expect(scan.devices.isEmpty)
     #expect(scan.notSharing.map(\.id.serial) == ["abc"])
     #expect(scan.awaitingAuthorization == ["192.0.2.31:5555"])
+    // Only an unauthorised USB entry waits for the user to allow USB debugging.
+    #expect(scan.awaitingUSBDebugging == [DeviceID(serial: "abc")])
+    #expect(scan.adbStatus == .available)
     await hub.kill()
+  }
+
+  @Test func anAnsweringServerIsAvailableAndWaitsForNobody() async throws {
+    let hub = try await Fixture.hub([
+      .init(Fixture.linkRunnerSerial, device: Fixture.android(serial: Fixture.linkRunnerSerial))
+    ])
+    let scan = try await Fixture.transport(port: hub.port).scan()
+    #expect(scan.adbStatus == .available)
+    #expect(scan.awaitingUSBDebugging.isEmpty)
+    await hub.kill()
+  }
+
+  /// Check again with no `adb` to find is no error: the scan still says it is not installed.
+  @Test func startingAdbThatIsNotInstalledChangesNothing() async throws {
+    let closed = try ClosedPort()
+    let transport = Fixture.transport(port: closed.port, locator: ADBHostTests.noAdb)
+    await transport.startADBServer()
+    #expect(try await transport.scan().adbStatus == .notInstalled)
+    withExtendedLifetime(closed) {}
   }
 
   @Test func anAddressReusedByAnotherDeviceIsAskedAgain() async throws {
@@ -137,7 +159,7 @@ struct ADBTransportScanTests {
     let closed = try ClosedPort()
     let transport = Fixture.transport(port: closed.port, locator: ADBHostTests.noAdb)
     let scan = try await transport.scan()
-    #expect(scan == DeviceScan(devices: [], method: .usbADB))
+    #expect(scan == DeviceScan(devices: [], method: .usbADB, adbStatus: .notInstalled))
     #expect(await transport.status == .notInstalled)
     withExtendedLifetime(closed) {}
   }
@@ -145,7 +167,9 @@ struct ADBTransportScanTests {
   @Test func installedWithNoServerIsServerDown() async throws {
     let closed = try ClosedPort()
     let transport = Fixture.transport(port: closed.port)
-    #expect(try await transport.scan() == DeviceScan(devices: [], method: .usbADB))
+    #expect(
+      try await transport.scan() == DeviceScan(devices: [], method: .usbADB, adbStatus: .serverDown)
+    )
     #expect(await transport.status == .serverDown)
     withExtendedLifetime(closed) {}
   }

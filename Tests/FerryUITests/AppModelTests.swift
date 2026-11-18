@@ -30,12 +30,15 @@ final class FakeClient: AgentSending {
 
   func setStatus(
     _ devices: [AttachedDevice], provider: ProviderState = .enabled,
-    transfers: [ActiveTransfer] = [], preserved: [URL] = []
+    transfers: [ActiveTransfer] = [], preserved: [URL] = [], adb: ADBStatus? = nil,
+    awaitingUSBDebugging: [DeviceID] = [], awaitingAuthorization: [String] = []
   ) {
     status.withLock {
       $0 = .status(
         StatusReport(
-          devices: devices, provider: provider, transfers: transfers, preservedChanges: preserved))
+          devices: devices, provider: provider, transfers: transfers,
+          awaitingAuthorization: awaitingAuthorization, adbStatus: adb,
+          awaitingUSBDebugging: awaitingUSBDebugging, preservedChanges: preserved))
     }
   }
 
@@ -66,6 +69,9 @@ final class FakeClient: AgentSending {
       return .done
     case .refresh(let id):
       log.record("refresh \(id.serial)")
+      return .done
+    case .recheckADB:
+      log.record("recheckADB")
       return .done
     case .removeAllDomains:
       log.record("removeAllDomains")
@@ -155,12 +161,19 @@ final class FakeServices: SystemServicing {
   func quit() {
     log.record("quit")
   }
+
+  func copy(_ text: String) {
+    log.record("copy \(text)")
+  }
 }
 
-func device(_ serial: String, model: String, _ state: DeviceState) -> AttachedDevice {
+func device(
+  _ serial: String, model: String, _ state: DeviceState,
+  method: ConnectionMethod = .usbFileTransfer
+) -> AttachedDevice {
   AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: serial), manufacturer: "NetAlly", model: model),
-    state: state, method: .usbFileTransfer)
+    state: state, method: method)
 }
 
 @MainActor

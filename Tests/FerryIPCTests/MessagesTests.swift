@@ -26,13 +26,16 @@ private func tag(_ request: AgentRequest) -> Int {
   case .changes: 12
   case .workingSet: 13
   case .refresh: 14
+  case .recheckADB: 15
   }
 }
 
 private func requests() -> [AgentRequest] {
   let photo = ItemID.random()
   let camera = ItemID.random()
-  var all: [AgentRequest] = [.status, .recheck(device), .refresh(device), .eject(device)]
+  var all: [AgentRequest] = [
+    .status, .recheck(device), .refresh(device), .eject(device), .recheckADB,
+  ]
   all.append(.removeAllDomains)
   all += [.item(domain: domain, id: photo), .list(domain: domain, folder: .root)]
   all.append(.fetch(domain: domain, id: photo))
@@ -136,6 +139,13 @@ private func responses() throws -> [AgentResponse] {
       StatusReport(
         devices: [], provider: .enabled, awaitingAuthorization: ["192.0.2.31:5555"])),
   ]
+  for adb in [nil, ADBStatus.available, .notInstalled, .serverDown] {
+    all.append(
+      .status(
+        StatusReport(
+          devices: [ready], provider: .enabled, adbStatus: adb,
+          awaitingUSBDebugging: [device])))
+  }
   all += [.entry(item), .entry(root), .entries([item, root]), .entries([])]
   all.append(.keptOnDevice(item))
   all += [.done, .failure(.deviceDisconnected)]
@@ -151,7 +161,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...14))
+  #expect(Set(requests().map(tag)) == Set(0...15))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }

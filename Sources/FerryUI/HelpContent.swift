@@ -124,11 +124,13 @@ struct HelpDefinition: Decodable, Sendable, Hashable {
   let detail: String
 }
 
-/// A button that opens the setup guide: with the model picker, or with one family's steps.
+/// A button that opens the setup guide: with the model picker, or with one family's steps, on
+/// file transfer or USB debugging.
 struct HelpLink: Decodable, Sendable, Hashable {
   let title: String
   /// The family the guide opens on; `nil` shows the model picker.
   let family: DeviceFamily?
+  let topic: GuideTopic
 
   private enum CodingKeys: String, CodingKey {
     case title, target
@@ -138,18 +140,33 @@ struct HelpLink: Decodable, Sendable, Hashable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     title = try container.decode(String.self, forKey: .title)
     let target = try container.decode(String.self, forKey: .target)
-    if target == "guide" {
-      family = nil
-      return
+    for topic in GuideTopic.allCases {
+      let (word, name) = Self.targetPrefix(of: topic)
+      if target == word {
+        family = nil
+        self.topic = topic
+        return
+      }
+      if target.hasPrefix(name) {
+        guard let family = DeviceFamily(rawValue: String(target.dropFirst(name.count))) else {
+          break
+        }
+        self.family = family
+        self.topic = topic
+        return
+      }
     }
-    let prefix = "guide:"
-    guard target.hasPrefix(prefix),
-      let family = DeviceFamily(rawValue: String(target.dropFirst(prefix.count)))
-    else {
-      throw DecodingError.dataCorruptedError(
-        forKey: .target, in: container, debugDescription: "unknown link target \(target)")
+    throw DecodingError.dataCorruptedError(
+      forKey: .target, in: container, debugDescription: "unknown link target \(target)")
+  }
+
+  /// The target word that opens the guide on `topic` with the model picker, and the prefix that
+  /// names a family.
+  private static func targetPrefix(of topic: GuideTopic) -> (word: String, family: String) {
+    switch topic {
+    case .fileTransfer: ("guide", "guide:")
+    case .usbDebugging: ("debugging", "debugging:")
     }
-    self.family = family
   }
 }
 
