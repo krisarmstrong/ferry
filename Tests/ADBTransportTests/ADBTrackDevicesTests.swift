@@ -51,7 +51,7 @@ struct ADBTrackDevicesTests {
     let port = try await closedPort()
     let launches = Box(0)
     let servers = Box<[FakeADBServer]>([])
-    let first = try await Self.serve(port: port, "abc device\n", closeAfter: .milliseconds(50))
+    let first = try await Self.serve(port: port, "abc device\n", closeAfter: .milliseconds(200))
     await servers.set([first])
     let host = ADBHost(
       port: port,
@@ -63,7 +63,7 @@ struct ADBTrackDevicesTests {
         do {
           let server = try await Self.serve(
             port: port, launch == 1 ? "def device\n" : "ghi device\n",
-            closeAfter: launch == 1 ? .milliseconds(50) : nil)
+            closeAfter: launch == 1 ? .milliseconds(200) : nil)
           await servers.set(await servers.value + [server])
         } catch {
           throw .failed("fake server: \(error)")
@@ -141,10 +141,12 @@ struct ADBTrackDevicesTests {
     let host = ADBHost(port: server.port, locator: Self.noAdb)
     let stream = host.trackDevices()
     try await Task.sleep(for: .milliseconds(300))
+    var received: [String]?
     for await list in stream {
-      #expect(list.map(\.serial) == ["d"])
+      received = list.map(\.serial)
       break
     }
+    #expect(received == ["d"])
   }
 
   @Test func stoppingIterationStopsTheReconnectLoop() async throws {
