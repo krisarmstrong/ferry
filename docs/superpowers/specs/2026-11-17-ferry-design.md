@@ -216,7 +216,10 @@ native Swift ADB engine (no install step) is a future-release row, not Plan 2b.
 **One device, one Finder location, best method wins.** The agent sees a device through MTP, ADB
 over USB, or ADB over Wi-Fi, and keys it by its serial (`ro.serialno` for ADB, the USB serial
 for MTP: the same string on Android) so the Finder location and item identities stay the same
-whichever method serves it. Preference: ADB over USB, then ADB over Wi-Fi, then MTP. MTP is
+whichever method serves it. Preference: ADB over USB, then MTP over USB, then ADB over the
+network (amended 2026-11-18 after a security review: a network device must never take over a
+USB-attached unit's location on a matching serial alone; the network route serves a device only
+while no USB route presents it). MTP is
 never removed: it is the fallback whenever USB debugging is off, unauthorised, or `adb` is not
 installed. Switching method mid-session is a session replacement in the hub, not a new domain.
 
