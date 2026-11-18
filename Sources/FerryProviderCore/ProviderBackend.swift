@@ -51,16 +51,19 @@ public actor ProviderBackend {
     let itemID = try Self.itemID(id)
     let url = dir.appending(path: UUID().uuidString, directoryHint: .notDirectory)
     let handle = try Self.createExclusively(url)
-    let item: ProviderEntry
+    let item: ProviderItem
     do {
       defer { try? handle.close() }
-      item = try await entry(
-        .fetch(domain: domain, id: itemID), file: handle, progress: progress)
+      item = ProviderItem(
+        try await entry(.fetch(domain: domain, id: itemID), file: handle, progress: progress))
     } catch {
       try? FileManager.default.removeItem(at: url)
       throw error
     }
-    return (url, ProviderItem(item))
+    guard item.isPackage else { return (url, item) }
+    // A document package came as one archive: FileProvider takes it as the folder it holds.
+    defer { try? FileManager.default.removeItem(at: url) }
+    return (try Self.unpack(url, in: dir), item)
   }
 
   /// Makes a folder (a package too: FileProvider then creates its contents inside it), or
@@ -76,10 +79,16 @@ public actor ProviderBackend {
     switch template.kind {
     case .link:
       throw Self.linkRefused
+    case .package:
+      guard let contents else { throw CocoaError(.featureUnsupported) }
+      return ProviderItem(
+        try await sendingPackage(
+          contents,
+          as: .createPackage(domain: domain, parent: template.parent, name: template.filename)))
     case .folder:
       let folder = try await entry(request)
-      // FileProvider syncs a package as one item and hands over its folder as `contents`; a
-      // plain folder comes with none, its children each created on their own.
+      // FileProvider hands over a code bundle as one item, its folder as `contents`; a plain
+      // folder comes with none, its children each created on their own.
       if let contents { try await uploadTree(contents, into: folder.id) }
       return ProviderItem(folder)
     case .file:
@@ -149,7 +158,10 @@ public actor ProviderBackend {
       }
       latest = current
     }
-    if changed.contains(.contents), let contents, template.kind == .folder {
+    if changed.contains(.contents), let contents, template.kind == .package {
+      latest = try await sendingPackage(
+        contents, as: .replacePackage(domain: domain, id: itemID))
+    } else if changed.contains(.contents), let contents, template.kind == .folder {
       // A package edited on the Mac: its folder is the new contents.
       try await syncTree(contents, into: itemID)
       latest = try await entry(.item(domain: domain, id: itemID))

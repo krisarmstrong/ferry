@@ -38,11 +38,7 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
       // A folder named like a document package (`Notes.rtfd`) is one, as on a Mac volume. A
       // folder named like code (an app, plug-in or any other bundle) stays a folder, so Finder
       // never offers code from a USB device as something to launch.
-      let ext = (filename as NSString).pathExtension
-      guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .package),
-        type.isDeclared, !Self.codeTypes.contains(where: type.conforms(to:))
-      else { return .folder }
-      return type
+      return Packages.documentType(named: filename) ?? .folder
     case .file:
       let ext = (filename as NSString).pathExtension
       guard !ext.isEmpty else { return .data }
@@ -50,11 +46,10 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
     }
   }
 
-  /// Bundles of code, and anything that runs.
-  private static let codeTypes: [UTType] = [
-    .application, .applicationBundle, .bundle, .executable, .pluginBundle, .framework,
-    .applicationExtension, .script, UTType("com.apple.system-extension"),
-  ].compactMap { $0 }
+  /// A document package: one item to FileProvider, fetched and sent whole.
+  public var isPackage: Bool {
+    entry.item.kind == .folder && Packages.documentType(named: filename) != nil
+  }
 
   public var documentSize: NSNumber? {
     entry.item.kind == .file ? NSNumber(value: entry.item.size) : nil
@@ -62,13 +57,13 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
 
   public var contentModificationDate: Date? { entry.item.modified }
 
-  /// Every file from the device carries `com.apple.quarantine` as a downloaded file does, so
+  /// Every file and document package from the device carries `com.apple.quarantine` as a downloaded file does, so
   /// Gatekeeper checks an app or script from a USB device before it first runs. FileProvider
   /// writes an item's syncable extended attributes onto the file on disk; the extension's
   /// Info.plist declares this one syncable. A marker set on the fetched file itself does not
   /// reach the disk: FileProvider takes only its contents.
   public var extendedAttributes: [String: Data] {
-    guard entry.item.kind == .file else { return [:] }
+    guard entry.item.kind == .file || isPackage else { return [:] }
     return [Self.quarantineAttribute: quarantine]
   }
 

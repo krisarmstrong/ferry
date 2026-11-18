@@ -35,9 +35,12 @@ public struct ItemTemplate: Sendable, Equatable {
   /// What an item is on the Mac, and so what it becomes on the device.
   public enum Kind: Sendable, Equatable {
     case file
-    /// A folder, or a package (an `.rtfd` document, an app): a folder on disk that Finder shows
-    /// as one item. On the device it is a folder with the same name.
+    /// A folder, or a code bundle (an app, a plug-in), which Ferry keeps an ordinary folder on
+    /// the device.
     case folder
+    /// A document package (an `.rtfd`, a Keynote file): one item to FileProvider, a folder on
+    /// the device, always sent whole (see `Packages`).
+    case package
     /// A symbolic link or a Finder alias, which MTP has no way to store.
     case link
   }
@@ -76,6 +79,7 @@ public struct ItemTemplate: Sendable, Equatable {
     let type = item.contentType ?? .data
     let isLink = type.conforms(to: .symbolicLink) || type.conforms(to: .aliasFile)
     if isLink || (item.symlinkTargetPath ?? nil) != nil { return .link }
+    if Packages.isDocumentPackage(type) { return .package }
     return type.conforms(to: .directory) ? .folder : .file
   }
 }

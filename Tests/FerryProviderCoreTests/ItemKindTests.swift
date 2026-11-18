@@ -12,9 +12,9 @@ import UniformTypeIdentifiers
 struct ItemKindTests {
   @Test(arguments: [
     (UTType.folder, ItemTemplate.Kind.folder),
-    (UTType("com.apple.rtfd")!, .folder),
+    (UTType("com.apple.rtfd")!, .package),
+    (UTType.package, .package),
     (UTType.applicationBundle, .folder),
-    (UTType.package, .folder),
     (UTType.bundle, .folder),
     (UTType.symbolicLink, .link),
     (UTType.aliasFile, .link),
@@ -27,65 +27,116 @@ struct ItemKindTests {
     #expect(template.kind == kind)
   }
 
-  @Test func aPackageIsCreatedAsAFolder() async throws {
-    let agent = FakeAgent()
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let template = try ItemTemplate(
-      Template(
-        parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!))
-
-    let made = try await backend.create(template, contents: nil)
-
-    #expect(
-      await agent.requests == [
-        .create(domain: domain, parent: .root, name: "Notes.rtfd", isFolder: true)
-      ])
-    #expect(made.contentType == UTType("com.apple.rtfd"))
-  }
-
-  /// FileProvider hands over a package as one item with its folder as the contents: everything
-  /// in it goes to the device, links aside.
-  @Test func aPackagesContentsAreCopiedIntoItsFolder() async throws {
+  /// A document package goes to the agent as one archive, made whole on the device.
+  @Test func aPackageIsCreatedWhole() async throws {
     let agent = FakeAgent()
     let backend = ProviderBackend(domain: domain, client: agent)
     let dir = try scratchDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
-    let package = dir.appending(path: "Notes.rtfd", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(
-      at: package.appending(path: "Media"), withIntermediateDirectories: true)
-    try Data("rtf".utf8).write(to: package.appending(path: "TXT.rtf"))
-    try Data("png".utf8).write(to: package.appending(path: "Media/a.png"))
+    let package = try localPackage("rtf", in: dir)
+
+    let made = try await backend.create(
+      try ItemTemplate(
+        Template(
+          parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!)),
+      contents: package)
+
+    #expect(
+      await agent.requests == [.createPackage(domain: domain, parent: .root, name: "Notes.rtfd")])
+    #expect(made.contentType == UTType("com.apple.rtfd"))
+    let sent = try await extracted(agent.packages[try path("/Notes.rtfd")], in: dir)
+    #expect(try Data(contentsOf: sent.appending(path: "TXT.rtf")) == Data("rtf".utf8))
+    #expect(try Data(contentsOf: sent.appending(path: "Media/a.png")) == Data("png".utf8))
+  }
+
+  /// An edit of a document package replaces it whole.
+  @Test func aPackageEditReplacesItWhole() async throws {
+    let agent = FakeAgent()
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let template = try ItemTemplate(
+      Template(
+        parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!))
+    let made = try await backend.create(template, contents: try localPackage("old", in: dir))
+    let edited = dir.appending(path: "edited")
+    try FileManager.default.createDirectory(at: edited, withIntermediateDirectories: false)
+
+    _ = try await backend.modify(
+      made.itemIdentifier, to: template, changed: .contents,
+      contents: try localPackage("new", in: edited))
+
+    #expect(
+      await agent.requests.last
+        == .replacePackage(domain: domain, id: try #require(ItemID(made.itemIdentifier))))
+    let sent = try await extracted(agent.packages[try path("/Notes.rtfd")], in: dir)
+    #expect(try Data(contentsOf: sent.appending(path: "TXT.rtf")) == Data("new".utf8))
+  }
+
+  /// A fetched document package is a folder holding all of it, as FileProvider places it.
+  @Test func aPackageIsFetchedAsAFolder() async throws {
+    let agent = FakeAgent()
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let made = try await backend.create(
+      try ItemTemplate(
+        Template(
+          parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!)),
+      contents: try localPackage("rtf", in: dir))
+    let fetchDir = dir.appending(path: "fetch")
+    try FileManager.default.createDirectory(at: fetchDir, withIntermediateDirectories: false)
+
+    let (url, item) = try await backend.fetch(made.itemIdentifier, into: fetchDir)
+
+    var isFolder: ObjCBool = false
+    #expect(FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder))
+    #expect(isFolder.boolValue)
+    #expect(try Data(contentsOf: url.appending(path: "TXT.rtf")) == Data("rtf".utf8))
+    #expect(try Data(contentsOf: url.appending(path: "Media/a.png")) == Data("png".utf8))
+    #expect(item.contentType == UTType("com.apple.rtfd"))
+    // Only the folder is left: the archive it came in is gone.
+    #expect(try FileManager.default.contentsOfDirectory(atPath: fetchDir.path).count == 1)
+  }
+
+  /// A code bundle (shown as a folder, see `ProviderItem.contentType`) comes with its folder as
+  /// the contents: everything in it goes to the device, links aside.
+  @Test func aBundlesContentsAreCopiedIntoItsFolder() async throws {
+    let agent = FakeAgent()
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let package = try localPackage("rtf", in: dir, named: "Plugin.bundle")
     try FileManager.default.createSymbolicLink(
       at: package.appending(path: "link"), withDestinationURL: package.appending(path: "TXT.rtf"))
     let template = try ItemTemplate(
-      Template(
-        parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!))
+      Template(parent: .rootContainer, filename: "Plugin.bundle", contentType: .bundle))
 
     _ = try await backend.create(template, contents: package)
 
-    #expect(await agent.contents[try path("/Notes.rtfd/TXT.rtf")] == Data("rtf".utf8))
-    #expect(await agent.contents[try path("/Notes.rtfd/Media/a.png")] == Data("png".utf8))
-    #expect(await agent.items[try path("/Notes.rtfd/link")] == nil)
+    #expect(await agent.contents[try path("/Plugin.bundle/TXT.rtf")] == Data("rtf".utf8))
+    #expect(await agent.contents[try path("/Plugin.bundle/Media/a.png")] == Data("png".utf8))
+    #expect(await agent.items[try path("/Plugin.bundle/link")] == nil)
   }
 
-  /// Editing a package already on the device: FileProvider sends the package with its folder
+  /// Editing a code bundle already on the device: FileProvider sends the package with its folder
   /// as the new contents. The device folder is brought in line: changed and new files go up,
   /// files no longer in the package go.
-  @Test func aPackageEditUpdatesTheDeviceFolder() async throws {
+  @Test func aBundleEditUpdatesTheDeviceFolder() async throws {
     let agent = FakeAgent(
       [
-        try folder("/Notes.rtfd"), try file("/Notes.rtfd/TXT.rtf", size: 3),
-        try file("/Notes.rtfd/old.png", size: 3), try file("/Notes.rtfd/same.png", size: 4),
+        try folder("/Plugin.bundle"), try file("/Plugin.bundle/TXT.rtf", size: 3),
+        try file("/Plugin.bundle/old.png", size: 3), try file("/Plugin.bundle/same.png", size: 4),
       ],
       contents: [
-        try path("/Notes.rtfd/TXT.rtf"): Data("old".utf8),
-        try path("/Notes.rtfd/old.png"): Data("old".utf8),
-        try path("/Notes.rtfd/same.png"): Data("same".utf8),
+        try path("/Plugin.bundle/TXT.rtf"): Data("old".utf8),
+        try path("/Plugin.bundle/old.png"): Data("old".utf8),
+        try path("/Plugin.bundle/same.png"): Data("same".utf8),
       ])
     let backend = ProviderBackend(domain: domain, client: agent)
     let dir = try scratchDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
-    let package = dir.appending(path: "Notes.rtfd", directoryHint: .isDirectory)
+    let package = dir.appending(path: "Plugin.bundle", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: package.appending(path: "Media"), withIntermediateDirectories: true)
     try Data("edited".utf8).write(to: package.appending(path: "TXT.rtf"))
@@ -94,16 +145,16 @@ struct ItemKindTests {
     try Data("same".utf8).write(to: same)
     try FileManager.default.setAttributes(
       [.modificationDate: epoch.addingTimeInterval(-60)], ofItemAtPath: same.path)
-    let id = try await agent.identifier(try path("/Notes.rtfd"))
+    let id = try await agent.identifier(try path("/Plugin.bundle"))
 
     let item = try await backend.modify(
-      id, to: ItemTemplate(parent: .root, filename: "Notes.rtfd", kind: .folder),
+      id, to: ItemTemplate(parent: .root, filename: "Plugin.bundle", kind: .folder),
       changed: .contents, contents: package)
 
     #expect(item.itemIdentifier == id)
-    #expect(await agent.contents[try path("/Notes.rtfd/TXT.rtf")] == Data("edited".utf8))
-    #expect(await agent.contents[try path("/Notes.rtfd/Media/a.png")] == Data("png".utf8))
-    #expect(await agent.items[try path("/Notes.rtfd/old.png")] == nil)
+    #expect(await agent.contents[try path("/Plugin.bundle/TXT.rtf")] == Data("edited".utf8))
+    #expect(await agent.contents[try path("/Plugin.bundle/Media/a.png")] == Data("png".utf8))
+    #expect(await agent.items[try path("/Plugin.bundle/old.png")] == nil)
     // Unchanged since the device's copy was made: not sent again.
     let replaced = await agent.requests.filter {
       if case .replaceContents = $0 { return true }
@@ -255,4 +306,25 @@ struct MayAlreadyExistTests {
           parent: .root, filename: "DCIM", kind: .file, size: 0, modified: epoch))
         == nil)
   }
+}
+
+/// A local package `named` holding `TXT.rtf` (`text`) and `Media/a.png`, in `folder`.
+func localPackage(_ text: String, in folder: URL, named name: String = "Notes.rtfd") throws -> URL {
+  let package = folder.appending(path: name, directoryHint: .isDirectory)
+  try FileManager.default.createDirectory(
+    at: package.appending(path: "Media"), withIntermediateDirectories: true)
+  try Data(text.utf8).write(to: package.appending(path: "TXT.rtf"))
+  try Data("png".utf8).write(to: package.appending(path: "Media/a.png"))
+  return package
+}
+
+/// The tree in a package archive the fake agent received, extracted into a new folder.
+func extracted(_ archive: Data?, in folder: URL) throws -> URL {
+  let file = folder.appending(path: "archive-\(UUID().uuidString)")
+  try (archive ?? Data()).write(to: file)
+  let reader = try FileHandle(forReadingFrom: file)
+  defer { try? reader.close() }
+  let out = folder.appending(path: "extracted-\(UUID().uuidString)")
+  try PackageArchive.extract(from: reader, to: out)
+  return out
 }
