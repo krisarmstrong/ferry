@@ -6,7 +6,7 @@
 ## Schema
 
 ```text
-{ version, title, sections: [Section] }
+{ version, sections: [Section] }
 
 Section  = { id, title, symbol, paragraphs?, steps?, definitions?, groups?: [Group], note?, link? }
 Group    = { title, paragraphs?, steps?, definitions?, note?, link? }
@@ -56,9 +56,13 @@ Bracketed names stand for each section's SF Symbol (`symbol` in `help.json`).
 - A `link` renders as a bordered button at the end of the block. `"guide"` opens the setup
   guide window with the model picker; `"guide:<case>"` opens it preselected to that
   `DeviceFamily`. This is the "How to connect" deep link.
-- The window opens on the section the reader last chose, kept with `@SceneStorage`, and on
-  **Getting started** the first time. Opening on **Troubleshooting** from a device in an error
+- The window opens on the section the reader last chose, kept with `@AppStorage`, and on
+  **Getting started** the first time (or when the remembered section no longer exists). The
+  window itself is not restored at launch. The sidebar's selection and the detail always
+  show the same section: the chosen one if the search shows it, else the first shown. Opening on **Troubleshooting** from a device in an error
   state is not built: the menu has one Help button, not one per device.
 - Minimum size about 640 × 420; the sidebar is collapsible like any split view.
 - Load `help.json` once from the bundle into `Decodable` structs; it is static content, so no
-  observation is needed.
+  observation is needed. If it is missing or does not decode, a fault is logged and the window
+  shows "Help isn't available"; `make app` checks the built app carries it.
+- Planned features ("Coming next") are in the user guide and README only, not in the app.

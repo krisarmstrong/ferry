@@ -9,7 +9,7 @@
 ## Integration
 - `project.yml` adds `Ferry.icon` as a `wrapper.icon` resource with `ASSETCATALOG_COMPILER_APPICON_NAME: Ferry`; the built app has `Ferry.icns` + `Assets.car` and `CFBundleIconName = Ferry`.
 - `Apps/Ferry/Assets.xcassets/MenuBarGlyph.imageset` (SVG, preserve-vector, template) is the `MenuBarExtra` label, with accessibility label "Ferry".
-- `HelpView` (`Window("Ferry Help", id: "help")`): NavigationSplitView, SF Symbol sidebar, numbered steps shared with the setup guide (`NumberedSteps`), toolbar search with `ContentUnavailableView.search`, `@SceneStorage("help.section")`, links into the setup guide via `AppModel.showGuide(family:)`.
+- `HelpView` (`Window("Ferry Help", id: "help")`): NavigationSplitView, SF Symbol sidebar, numbered steps shared with the setup guide (`NumberedSteps`), toolbar search with `ContentUnavailableView.search`, `@AppStorage("help.section")` (the window is not restored at launch), links into the setup guide via `AppModel.showGuide(family:)`.
 - Entry points: menu bottom-row `questionmark.circle` (⌘?), Settings "Ferry Help".
 - All help strings in `Localizable.xcstrings` (58 keys); connection steps reuse `GuideSteps` keys.
 - `HelpContentTests`: decoding, unique ids, SF Symbols exist, catalog coverage, `GuideSteps` parity, link targets, case/diacritic/Markdown-insensitive search.
