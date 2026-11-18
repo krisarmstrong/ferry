@@ -6,6 +6,7 @@ let package = Package(
   defaultLocalization: "en",
   platforms: [.macOS(.v26)],
   products: [
+    .library(name: "ADBTransport", targets: ["ADBTransport"]),
     .library(name: "DeviceKit", targets: ["DeviceKit"]),
     .library(name: "DeviceKitTestSupport", targets: ["DeviceKitTestSupport"]),
     .library(name: "FerryAgentCore", targets: ["FerryAgentCore"]),
@@ -18,6 +19,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
   ],
   targets: [
+    .target(name: "ADBTransport"),
     .target(name: "DeviceKit"),
     .target(name: "DeviceKitTestSupport", dependencies: ["DeviceKit"]),
     .systemLibrary(name: "CLibMTP", pkgConfig: "libmtp", providers: [.brew(["libmtp"])]),
@@ -34,6 +36,7 @@ let package = Package(
         "DeviceKit", "MTPTransport",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ]),
+    .testTarget(name: "ADBTransportTests", dependencies: ["ADBTransport"]),
     .testTarget(
       name: "DeviceKitTests", dependencies: ["DeviceKit", "DeviceKitTestSupport"]),
     .testTarget(
