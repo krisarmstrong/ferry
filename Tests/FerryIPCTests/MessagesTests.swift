@@ -26,18 +26,18 @@ private func tag(_ request: AgentRequest) -> Int {
   }
 }
 
-private func requests() throws -> [AgentRequest] {
-  let photo = try RemotePath("/DCIM/Camera/photo.jpg")
-  let camera = try RemotePath("/DCIM/Camera")
+private func requests() -> [AgentRequest] {
+  let photo = ItemID.random()
+  let camera = ItemID.random()
   var all: [AgentRequest] = [.status, .recheck(device), .eject(device), .removeAllDomains]
-  all += [.item(domain: domain, path: photo), .list(domain: domain, folder: .root)]
-  all.append(.fetch(domain: domain, path: photo))
-  all.append(.create(domain: domain, path: photo, isFolder: false))
-  all.append(.create(domain: domain, path: camera, isFolder: true))
-  all.append(.rename(domain: domain, path: photo, to: "renamed.jpg"))
-  all.append(.move(domain: domain, path: photo, toFolder: .root))
-  all.append(.replaceContents(domain: domain, path: photo))
-  all.append(.delete(domain: domain, path: camera))
+  all += [.item(domain: domain, id: photo), .list(domain: domain, folder: .root)]
+  all.append(.fetch(domain: domain, id: photo))
+  all.append(.create(domain: domain, parent: camera, name: "photo.jpg", isFolder: false))
+  all.append(.create(domain: domain, parent: .root, name: "Camera", isFolder: true))
+  all.append(.rename(domain: domain, id: photo, to: "renamed.jpg"))
+  all.append(.move(domain: domain, id: photo, toFolder: .root))
+  all.append(.replaceContents(domain: domain, id: photo))
+  all.append(.delete(domain: domain, id: camera))
   return all
 }
 
@@ -51,15 +51,16 @@ private func tag(_ error: TransportError) -> Int {
   case .deviceLocked: 5
   case .deviceDisconnected: 6
   case .notFound: 7
-  case .alreadyExists: 8
-  case .invalidName: 9
-  case .unsupported: 10
-  case .insufficientSpace: 11
-  case .fileTooLargeForStorage: 12
-  case .sizeMismatch: 13
-  case .nameChangedByDevice: 14
-  case .cancelled: 15
-  case .io: 16
+  case .unknownItem: 8
+  case .alreadyExists: 9
+  case .invalidName: 10
+  case .unsupported: 11
+  case .insufficientSpace: 12
+  case .fileTooLargeForStorage: 13
+  case .sizeMismatch: 14
+  case .nameChangedByDevice: 15
+  case .cancelled: 16
+  case .io: 17
   }
 }
 
@@ -67,7 +68,10 @@ private func errors() throws -> [TransportError] {
   let photo = try RemotePath("/DCIM/Camera/photo.jpg")
   var all: [TransportError] = [.noDeviceConnected, .deviceNotFound(device), .noStorage]
   all += [.storageNotFound("SD card"), .deviceBusy, .deviceLocked, .deviceDisconnected]
-  all += [.notFound(photo), .alreadyExists(photo), .invalidName("a/b"), .unsupported("copy")]
+  all += [
+    .notFound(photo), .unknownItem, .alreadyExists(photo), .invalidName("a/b"),
+    .unsupported("copy"),
+  ]
   all += [.insufficientSpace(needed: 10, free: 5), .fileTooLargeForStorage(size: 5_000_000_000)]
   all += [.sizeMismatch(expected: 10, actual: 9), .cancelled, .io("read failed")]
   all.append(.nameChangedByDevice(requested: "Ä.txt", actual: "A.txt"))
@@ -77,17 +81,22 @@ private func errors() throws -> [TransportError] {
 private func tag(_ response: AgentResponse) -> Int {
   switch response {
   case .status: 0
-  case .item: 1
-  case .items: 2
+  case .entry: 1
+  case .entries: 2
   case .done: 3
   case .failure: 4
   }
 }
 
 private func responses() throws -> [AgentResponse] {
-  let item = RemoteItem(
-    path: try RemotePath("/DCIM/Camera/photo.jpg"), kind: .file, size: 1_234,
-    modified: Date(timeIntervalSince1970: 1_700_000_000))
+  let item = ProviderEntry(
+    id: .random(), parent: .random(),
+    item: RemoteItem(
+      path: try RemotePath("/DCIM/Camera/photo.jpg"), kind: .file, size: 1_234,
+      modified: Date(timeIntervalSince1970: 1_700_000_000)))
+  let root = ProviderEntry(
+    id: .root, parent: .root,
+    item: RemoteItem(path: .root, kind: .folder, size: 0, modified: .distantPast))
   let storage = StorageInfo(
     id: StorageID(device: device, key: "Internal|vol0"), description: "Internal",
     capacity: 1_000, free: 900)
@@ -98,7 +107,8 @@ private func responses() throws -> [AgentResponse] {
     info: DeviceInfo(id: DeviceID(serial: "B"), manufacturer: "Pixel", model: "8"),
     state: .failed(.deviceLocked))
   var all: [AgentResponse] = [.status(devices: [ready, locked], providerEnabled: true)]
-  all += [.item(item), .items([item, item]), .items([]), .done, .failure(.deviceDisconnected)]
+  all += [.entry(item), .entry(root), .entries([item, root]), .entries([])]
+  all += [.done, .failure(.deviceDisconnected)]
   return all
 }
 
@@ -107,14 +117,14 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(try requests().map(tag)) == Set(0...11))
-  for request in try requests() {
+  #expect(Set(requests().map(tag)) == Set(0...11))
+  for request in requests() {
     #expect(try roundTrip(request) == request)
   }
 }
 
 @Test func everyErrorRoundTripsJSON() throws {
-  #expect(Set(try errors().map(tag)) == Set(0...16))
+  #expect(Set(try errors().map(tag)) == Set(0...17))
   for error in try errors() {
     #expect(try roundTrip(AgentResponse.failure(error)) == .failure(error))
   }
@@ -147,9 +157,19 @@ private func reply(to data: Data) async throws -> AgentResponse {
   #expect(try await reply(to: Data("not json".utf8)) == .failure(.io("bad request")))
 }
 
-@Test func traversingPathRepliesBadRequest() async throws {
-  let data = Data(#"{"list":{"domain":"d","folder":"/DCIM/../.."}}"#.utf8)
+/// Only `root` and the agent's UUIDs are identifiers, so a client cannot name an item by path.
+@Test(arguments: ["/DCIM", "/DCIM/../..", "", "ROOT", "0e9b1e0a-9c1f-4a43-9f43-0f1f1a2b3c4d"])
+func nonIdentifierRepliesBadRequest(_ folder: String) async throws {
+  let data = Data(#"{"list":{"domain":"d","folder":"\#(folder)"}}"#.utf8)
   #expect(try await reply(to: data) == .failure(.io("bad request")))
+}
+
+@Test func identifiersAreRootOrUppercaseUUIDs() throws {
+  let id = ItemID.random()
+  #expect(ItemID(rawValue: id.rawValue) == id)
+  #expect(ItemID(rawValue: "root") == .root)
+  #expect(ItemID(rawValue: id.rawValue.lowercased()) == nil)
+  #expect(try roundTrip(id) == id)
 }
 
 private let requirements =

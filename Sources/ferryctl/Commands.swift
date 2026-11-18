@@ -38,6 +38,7 @@ private func message(for error: TransportError) -> String {
   case .deviceLocked: "The device is connected but not sharing files. \(enableFileTransfer)"
   case .deviceDisconnected: "The phone was disconnected."
   case .notFound(let path): "\(path) does not exist on the phone."
+  case .unknownItem: "The item no longer exists on the phone."
   case .alreadyExists(let path): "\(path) already exists on the phone. Use --replace to overwrite."
   case .invalidName(let name): "\"\(name)\" is not a valid name."
   case .unsupported(let what): "The phone does not support this: \(what)."

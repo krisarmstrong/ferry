@@ -5,11 +5,15 @@ import Testing
 
 @testable import FerryIPC
 
-private func listing() throws(TransportError) -> [RemoteItem] {
+private let listedID = ItemID.random()
+
+private func listing() throws(TransportError) -> [ProviderEntry] {
   [
-    RemoteItem(
-      path: try RemotePath("/DCIM/a.jpg"), kind: .file, size: 3,
-      modified: Date(timeIntervalSince1970: 1_700_000_000))
+    ProviderEntry(
+      id: listedID, parent: .root,
+      item: RemoteItem(
+        path: try RemotePath("/DCIM/a.jpg"), kind: .file, size: 3,
+        modified: Date(timeIntervalSince1970: 1_700_000_000)))
   ]
 }
 
@@ -31,7 +35,7 @@ private struct StubHandler: AgentHandling {
       }
     case .list:
       do {
-        return .items(try listing())
+        return .entries(try listing())
       } catch {
         return .failure(error)
       }
@@ -111,7 +115,7 @@ func fileDescriptorCrossesConnection() async throws {
   defer { try? handle.close() }
 
   let response = try await harness.client.send(
-    .fetch(domain: "d", path: try RemotePath("/a.jpg")), file: handle)
+    .fetch(domain: "d", id: listedID), file: handle)
 
   #expect(response == .done)
   #expect(try Data(contentsOf: target) == fetched)
@@ -122,7 +126,7 @@ func clientServerOverAnonymousListener() async throws {
   let harness = Harness()
   defer { harness.finish() }
   let response = try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
-  #expect(response == .items(try listing()))
+  #expect(response == .entries(try listing()))
 }
 
 @Test(.timeLimit(.minutes(1)))
@@ -145,7 +149,7 @@ func reconnectsAfterConnectionIsInvalidated() async throws {
     try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
   }
   let response = try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
-  #expect(response == .items(try listing()))
+  #expect(response == .entries(try listing()))
 }
 
 @Test(.timeLimit(.minutes(1)))

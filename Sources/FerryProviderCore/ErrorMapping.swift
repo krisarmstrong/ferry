@@ -20,7 +20,7 @@ public enum ErrorMapping {
     case .deviceLocked:
       return NSFileProviderError(.notAuthenticated)
     // An unknown domain names a storage that no longer exists, so nothing in it does either.
-    case .notFound, .storageNotFound:
+    case .notFound, .unknownItem, .storageNotFound:
       return NSFileProviderError(.noSuchItem)
     case .alreadyExists:
       return NSFileProviderError(.filenameCollision)

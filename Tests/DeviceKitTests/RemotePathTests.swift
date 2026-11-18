@@ -50,4 +50,16 @@ struct RemotePathTests {
     #expect(try decoder.decode(RemotePath.self, from: encoder.encode(path)) == path)
     #expect(try decoder.decode(RemoteItem.self, from: encoder.encode(item)) == item)
   }
+
+  @Test func rebasingFollowsAMovedAncestor() throws {
+    let folder = try RemotePath("/A/B")
+    let inside = try RemotePath("/A/B/c.txt")
+    #expect(inside.isWithin(folder))
+    #expect(folder.isWithin(folder))
+    #expect(!(try RemotePath("/A/BC")).isWithin(folder))
+    #expect(inside.isWithin(.root))
+    #expect(inside.rebased(from: folder, to: try RemotePath("/Z")) == (try RemotePath("/Z/c.txt")))
+    #expect(folder.rebased(from: folder, to: .root) == .root)
+    #expect((try RemotePath("/A/BC")).rebased(from: folder, to: .root) == nil)
+  }
 }

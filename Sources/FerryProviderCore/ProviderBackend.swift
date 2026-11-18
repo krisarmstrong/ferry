@@ -9,6 +9,10 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 
 /// Everything the FileProvider extension does for one domain, forwarded to the agent.
 ///
+/// Every argument is `Sendable`: the extension snapshots FileProvider's own arguments into
+/// `ItemTemplate` and `ItemChanges` before it starts a task (see `ItemTemplate`). Items are named
+/// by the agent's identifiers, so a rename or move keeps an item's identity.
+///
 /// FileProvider calls concurrently. The backend keeps no state between calls and adds no
 /// ordering: the agent serializes operations per device. Calls carry no timeout of their own;
 /// FileProvider times out and cancels its operations itself.
@@ -26,15 +30,15 @@ public actor ProviderBackend {
   }
 
   public func item(_ id: NSFileProviderItemIdentifier) async throws -> ProviderItem {
-    ProviderItem(try await remoteItem(try Self.path(of: id)))
+    ProviderItem(try await entry(.item(domain: domain, id: try Self.itemID(id))))
   }
 
   /// The working set is empty: Ferry does not track items outside the folders Finder lists.
   public func children(of id: NSFileProviderItemIdentifier) async throws -> [ProviderItem] {
     if id == .workingSet { return [] }
-    let response = try await send(.list(domain: domain, folder: try Self.path(of: id)))
-    guard case .items(let items) = response else { throw Self.unexpected(response) }
-    return items.map(ProviderItem.init)
+    let response = try await send(.list(domain: domain, folder: try Self.itemID(id)))
+    guard case .entries(let entries) = response else { throw Self.unexpected(response) }
+    return entries.map(ProviderItem.init)
   }
 
   /// Downloads into a new file in `dir`. The item is read first, so if the file changes on the
@@ -44,13 +48,13 @@ public actor ProviderBackend {
   public func fetch(_ id: NSFileProviderItemIdentifier, into dir: URL) async throws
     -> (URL, ProviderItem)
   {
-    let path = try Self.path(of: id)
-    let item = try await remoteItem(path)
+    let itemID = try Self.itemID(id)
+    let item = try await entry(.item(domain: domain, id: itemID))
     let url = dir.appending(path: UUID().uuidString, directoryHint: .notDirectory)
     let handle = try Self.createExclusively(url)
     do {
       defer { try? handle.close() }
-      let response = try await send(.fetch(domain: domain, path: path), file: handle)
+      let response = try await send(.fetch(domain: domain, id: itemID), file: handle)
       guard case .done = response else { throw Self.unexpected(response) }
     } catch {
       try? FileManager.default.removeItem(at: url)
@@ -61,79 +65,69 @@ public actor ProviderBackend {
 
   /// Makes a folder, or uploads `contents` as a file. Symbolic links and aliases come with no
   /// contents, and MTP cannot store them.
-  public func create(_ template: any NSFileProviderItem, contents: URL?) async throws
-    -> ProviderItem
-  {
-    let parent = try Self.path(of: template.parentItemIdentifier)
-    let path = try Self.mapped { () throws(TransportError) in
-      try parent.appending(template.filename)
-    }
-    if template.contentType?.conforms(to: .folder) == true {
-      return try await itemResponse(.create(domain: domain, path: path, isFolder: true))
+  public func create(_ template: ItemTemplate, contents: URL?) async throws -> ProviderItem {
+    let request = AgentRequest.create(
+      domain: domain, parent: template.parent, name: template.filename,
+      isFolder: template.isFolder)
+    if template.isFolder {
+      return ProviderItem(try await entry(request))
     }
     guard let contents else { throw CocoaError(.featureUnsupported) }
     let handle = try FileHandle(forReadingFrom: contents)
     defer { try? handle.close() }
-    return try await itemResponse(
-      .create(domain: domain, path: path, isFolder: false), file: handle)
+    return ProviderItem(try await entry(request, file: handle))
   }
 
   /// Applies the changed fields in order: parent (move), then filename (rename), then contents.
-  /// A field reported as changed that names what the item already has sends nothing. Other
-  /// fields, such as dates and tags, have nowhere to go on an MTP device.
+  /// The item is read first when its parent or name may change, so a field reported as changed
+  /// that names what the item already has sends nothing. The item keeps `id` throughout: a
+  /// different identifier would tell FileProvider to merge the item into another.
   public func modify(
-    _ item: any NSFileProviderItem, changed: NSFileProviderItemFields, contents: URL?
+    _ id: NSFileProviderItemIdentifier, to template: ItemTemplate, changed: ItemChanges,
+    contents: URL?
   ) async throws -> ProviderItem {
-    var path = try Self.path(of: item.itemIdentifier)
-    let folder = try Self.path(of: item.parentItemIdentifier)
-    let filename = item.filename
-    var latest: RemoteItem?
+    let itemID = try Self.itemID(id)
+    var latest: ProviderEntry?
 
-    if changed.contains(.parentItemIdentifier), path.parent != folder {
-      let moved = try await itemResponse(.move(domain: domain, path: path, toFolder: folder))
-      latest = moved.remote
-      path = moved.remote.path
-    }
-    if changed.contains(.filename), let parent = path.parent {
-      let renamed = try Self.mapped { () throws(TransportError) in
-        try parent.appending(filename)
+    if !changed.isDisjoint(with: [.parent, .filename]) {
+      var current = try await entry(.item(domain: domain, id: itemID))
+      if changed.contains(.parent), current.parent != template.parent {
+        current = try await entry(.move(domain: domain, id: itemID, toFolder: template.parent))
       }
-      // Compared as paths, so another normal form of the same name is no change, but a change
-      // of case is: the agent lets an item take a name only its own name collides with.
-      if renamed != path {
-        let item = try await itemResponse(.rename(domain: domain, path: path, to: filename))
-        latest = item.remote
-        path = item.remote.path
+      if changed.contains(.filename), let parent = current.item.path.parent {
+        let renamed = try Self.mapped { () throws(TransportError) in
+          try parent.appending(template.filename)
+        }
+        // Compared as paths, so another normal form of the same name is no change, but a change
+        // of case is: the agent lets an item take a name only its own name collides with.
+        if renamed != current.item.path {
+          current = try await entry(.rename(domain: domain, id: itemID, to: template.filename))
+        }
       }
+      latest = current
     }
     if changed.contains(.contents), let contents {
       let handle = try FileHandle(forReadingFrom: contents)
       defer { try? handle.close() }
-      let item = try await itemResponse(
-        .replaceContents(domain: domain, path: path), file: handle)
-      latest = item.remote
+      latest = try await entry(.replaceContents(domain: domain, id: itemID), file: handle)
     }
     if let latest { return ProviderItem(latest) }
-    return ProviderItem(try await remoteItem(path))
+    return ProviderItem(try await entry(.item(domain: domain, id: itemID)))
   }
 
   public func delete(_ id: NSFileProviderItemIdentifier) async throws {
-    let response = try await send(.delete(domain: domain, path: try Self.path(of: id)))
+    let response = try await send(.delete(domain: domain, id: try Self.itemID(id)))
     guard case .done = response else { throw Self.unexpected(response) }
   }
 
   // MARK: Requests
 
-  private func remoteItem(_ path: RemotePath) async throws -> RemoteItem {
-    try await itemResponse(.item(domain: domain, path: path)).remote
-  }
-
-  private func itemResponse(_ request: AgentRequest, file: FileHandle? = nil) async throws
-    -> ProviderItem
+  private func entry(_ request: AgentRequest, file: FileHandle? = nil) async throws
+    -> ProviderEntry
   {
     let response = try await send(request, file: file)
-    guard case .item(let item) = response else { throw Self.unexpected(response) }
-    return ProviderItem(item)
+    guard case .entry(let entry) = response else { throw Self.unexpected(response) }
+    return entry
   }
 
   /// Sends `request`, turning a thrown error and a `.failure` reply alike into a FileProvider
@@ -164,13 +158,10 @@ public actor ProviderBackend {
 
   // MARK: Local mapping
 
-  /// Every identifier other than the root is a path. The trash, the working set and anything
-  /// else that does not parse name no item on the device.
-  private static func path(of id: NSFileProviderItemIdentifier) throws -> RemotePath {
-    if id == .rootContainer { return .root }
-    guard id.rawValue.hasPrefix("/"), let path = try? RemotePath(id.rawValue), path != .root
-    else { throw NSFileProviderError(.noSuchItem) }
-    return path
+  /// The trash, the working set and anything else the agent did not assign name no item.
+  private static func itemID(_ id: NSFileProviderItemIdentifier) throws -> ItemID {
+    guard let itemID = ItemID(id) else { throw NSFileProviderError(.noSuchItem) }
+    return itemID
   }
 
   private static func mapped<T>(_ body: () throws(TransportError) -> T) throws -> T {

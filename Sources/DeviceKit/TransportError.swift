@@ -8,6 +8,8 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   case deviceLocked
   case deviceDisconnected
   case notFound(RemotePath)
+  /// An item identifier the agent does not know: the item was deleted, or its domain removed.
+  case unknownItem
   case alreadyExists(RemotePath)
   case invalidName(String)
   case unsupported(String)

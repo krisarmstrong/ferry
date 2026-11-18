@@ -1,35 +1,91 @@
 import DeviceKit
 import Foundation
 
+/// An item's identity in a domain, assigned by the agent the first time it sees the item and kept
+/// across renames and moves.
+///
+/// FileProvider may write identifiers to system logs, so they never carry a name: every
+/// identifier is a random UUID string, except `root`. Decoding accepts nothing else.
+public struct ItemID: Hashable, Sendable, Codable, RawRepresentable {
+  /// The storage root, which FileProvider calls `.rootContainer`.
+  public static let root = ItemID(uncheckedRawValue: "root")
+
+  public let rawValue: String
+
+  public init?(rawValue: String) {
+    guard rawValue == Self.root.rawValue || UUID(uuidString: rawValue)?.uuidString == rawValue
+    else { return nil }
+    self.rawValue = rawValue
+  }
+
+  private init(uncheckedRawValue: String) {
+    rawValue = uncheckedRawValue
+  }
+
+  /// A new identifier, never equal to one assigned before.
+  public static func random() -> ItemID {
+    ItemID(uncheckedRawValue: UUID().uuidString)
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let string = try decoder.singleValueContainer().decode(String.self)
+    guard let id = ItemID(rawValue: string) else {
+      throw DecodingError.dataCorrupted(
+        .init(codingPath: decoder.codingPath, debugDescription: "invalid item identifier"))
+    }
+    self = id
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+}
+
+/// An item with its identity, as the agent reports it. The root is its own parent.
+public struct ProviderEntry: Sendable, Codable, Equatable {
+  public let id: ItemID
+  public let parent: ItemID
+  public let item: RemoteItem
+
+  public init(id: ItemID, parent: ItemID, item: RemoteItem) {
+    self.id = id
+    self.parent = parent
+    self.item = item
+  }
+}
+
 /// A request from the app or the FileProvider extension to the agent, sent as JSON.
 ///
-/// It arrives from a sandboxed process the agent does not control. File contents never travel as
-/// paths: `fetch`, `create` (of a file) and `replaceContents` come with an open file descriptor,
-/// so the agent never opens a file the peer named. `RemotePath` rejects `..` and empty
-/// components when decoded.
+/// It arrives from a sandboxed process the agent does not control. Items are named by `ItemID`,
+/// which the agent resolves through its own table, so a client can only reach items the agent
+/// has reported. File contents never travel as paths: `fetch`, `create` (of a file) and
+/// `replaceContents` come with an open file descriptor, so the agent never opens a file the peer
+/// named.
 public enum AgentRequest: Codable, Sendable, Equatable {
   /// Answered with `.status(devices:providerEnabled:)`.
   case status
   case recheck(DeviceID)
   case eject(DeviceID)
   case removeAllDomains
-  case item(domain: String, path: RemotePath)
-  case list(domain: String, folder: RemotePath)
-  /// Downloads `path` into the writable file sent with the request.
-  case fetch(domain: String, path: RemotePath)
-  /// Uploads the readable file sent with the request, or makes a folder (sent with no file).
-  case create(domain: String, path: RemotePath, isFolder: Bool)
-  case rename(domain: String, path: RemotePath, to: String)
-  case move(domain: String, path: RemotePath, toFolder: RemotePath)
-  /// Replaces the file at `path` with the readable file sent with the request.
-  case replaceContents(domain: String, path: RemotePath)
-  case delete(domain: String, path: RemotePath)
+  case item(domain: String, id: ItemID)
+  case list(domain: String, folder: ItemID)
+  /// Downloads the file into the writable file sent with the request.
+  case fetch(domain: String, id: ItemID)
+  /// Uploads the readable file sent with the request as `name` in `parent`, or makes a folder
+  /// (sent with no file). `name` must be one path component.
+  case create(domain: String, parent: ItemID, name: String, isFolder: Bool)
+  case rename(domain: String, id: ItemID, to: String)
+  case move(domain: String, id: ItemID, toFolder: ItemID)
+  /// Replaces the file with the readable file sent with the request.
+  case replaceContents(domain: String, id: ItemID)
+  case delete(domain: String, id: ItemID)
 }
 
 public enum AgentResponse: Codable, Sendable, Equatable {
   case status(devices: [AttachedDevice], providerEnabled: Bool)
-  case item(RemoteItem)
-  case items([RemoteItem])
+  case entry(ProviderEntry)
+  case entries([ProviderEntry])
   case done
   case failure(TransportError)
 }

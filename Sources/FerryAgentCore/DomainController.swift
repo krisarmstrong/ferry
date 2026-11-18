@@ -1,4 +1,6 @@
 import DeviceKit
+import FerryIPC
+import Foundation
 import os
 
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "DomainController")
@@ -12,7 +14,7 @@ public protocol DomainManaging: Sendable {
   func remove(_ identifier: String) async throws
   func removeAll() async throws
   /// Tells the system the folder's contents changed.
-  func signal(_ identifier: String, folder: RemotePath) async
+  func signal(_ identifier: String, folder: ItemID) async
   /// Whether the user has enabled Ferry's domains. New domains start disabled and only the user
   /// can enable them, so `false` is a normal state.
   func isUserEnabled() async -> Bool
@@ -31,6 +33,10 @@ public protocol DomainManaging: Sendable {
 /// At start, every domain the system already has (from before an agent restart) is disconnected
 /// until its device is ready again. After `removeAll` the controller adds nothing more, so Remove
 /// Ferry leaves no domain behind however long the agent takes to stop.
+///
+/// Each domain has one `ItemTable`, loaded from the store when first used. It outlives a
+/// disconnect and an agent restart, so Finder's items keep their identity across both; removing
+/// the domain discards it.
 public actor DomainController {
   /// What a request on a domain runs against.
   struct Route: Sendable {
@@ -38,6 +44,8 @@ public actor DomainController {
     let session: any DeviceSession
     /// The one writer over `session`, so every upload shares one in-flight registry.
     let writer: SafeWriter
+    /// The domain's one item table.
+    let items: ItemTable
   }
 
   private struct Domain {
@@ -54,7 +62,10 @@ public actor DomainController {
 
   private let hub: DeviceHub
   private let manager: any DomainManaging
+  private let itemStore: URL
   private var domains: [String: Domain] = [:]
+  /// The item table of each domain used since it was added or adopted.
+  private var tables: [String: ItemTable] = [:]
   /// The held session of each device with a connected domain.
   private var links: [DeviceID: Link] = [:]
   /// The operation most recently queued; the next one waits for it.
@@ -67,9 +78,19 @@ public actor DomainController {
   /// Hub events handled so far.
   private(set) var handledEvents = 0
 
-  public init(hub: DeviceHub, manager: any DomainManaging) {
+  /// `itemStore` is the folder holding the item tables, one file per domain. It must be the
+  /// agent's own: the sandboxed extension can write to the app group's container.
+  public init(hub: DeviceHub, manager: any DomainManaging, itemStore: URL) {
     self.hub = hub
     self.manager = manager
+    self.itemStore = itemStore
+  }
+
+  /// The agent's item store, in its own Application Support folder.
+  public static func defaultItemStore() throws -> URL {
+    try FileManager.default.url(
+      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+    ).appending(path: "io.github.krisarmstrong.ferry.agent/items", directoryHint: .isDirectory)
   }
 
   /// Follows the hub until the calling task is cancelled. Call it once: it is the only consumer
@@ -104,15 +125,35 @@ public actor DomainController {
     guard entry.connected, let storage = entry.storage, let link = links[storage.device] else {
       throw .deviceDisconnected
     }
-    return Route(storage: storage, session: link.session, writer: link.writer)
+    return Route(
+      storage: storage, session: link.session, writer: link.writer, items: table(for: domain))
   }
 
-  func signal(_ domain: String, folder: RemotePath) async {
+  func signal(_ domain: String, folder: ItemID) async {
     await manager.signal(domain, folder: folder)
   }
 
   func isUserEnabled() async -> Bool {
     await manager.isUserEnabled()
+  }
+
+  /// The domain's table, loaded on first use. Nothing awaits between the lookup and the insert,
+  /// so a domain never has two.
+  private func table(for domain: String) -> ItemTable {
+    if let table = tables[domain] { return table }
+    let table = ItemTable(domain: domain, store: itemStore)
+    tables[domain] = table
+    return table
+  }
+
+  /// Deletes the domain's table, loaded or not, so a domain added again starts with new
+  /// identifiers.
+  private func discardTable(of domain: String) async {
+    if let table = tables.removeValue(forKey: domain) {
+      await table.discard()
+    } else {
+      ItemTable.discard(domain: domain, in: itemStore)
+    }
   }
 
   // MARK: Operations
@@ -269,6 +310,7 @@ public actor DomainController {
       domains[identifier] = nil
     }
     for identifier in identifiers {
+      await discardTable(of: identifier)
       do {
         try await manager.remove(identifier)
       } catch {
@@ -282,6 +324,11 @@ public actor DomainController {
     retired = true
     domains = [:]
     links = [:]
+    for table in tables.values {
+      await table.discard()
+    }
+    tables = [:]
+    ItemTable.discardAll(in: itemStore)
     do {
       try await manager.removeAll()
       return nil

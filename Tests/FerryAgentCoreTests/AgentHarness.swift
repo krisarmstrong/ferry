@@ -13,7 +13,7 @@ actor FakeDomainManager: DomainManaging {
     case reconnect(String)
     case remove(String)
     case removeAll
-    case signal(String, RemotePath)
+    case signal(String, ItemID)
   }
 
   private(set) var calls: [Call] = []
@@ -32,7 +32,7 @@ actor FakeDomainManager: DomainManaging {
   func reconnect(_ identifier: String) async throws { record(.reconnect(identifier)) }
   func remove(_ identifier: String) async throws { record(.remove(identifier)) }
   func removeAll() async throws { record(.removeAll) }
-  func signal(_ identifier: String, folder: RemotePath) async {
+  func signal(_ identifier: String, folder: ItemID) async {
     record(.signal(identifier, folder))
   }
   func isUserEnabled() async -> Bool { userEnabled }
@@ -105,6 +105,12 @@ func path(_ string: String) throws -> RemotePath {
   try RemotePath(string)
 }
 
+/// A new folder for item tables, which a test may share between harnesses to restart the agent.
+func itemStore() -> URL {
+  FileManager.default.temporaryDirectory.appending(
+    path: "ferry-items-\(UUID().uuidString)", directoryHint: .isDirectory)
+}
+
 /// A hub, domain controller and request service over a fake transport, with USB ticks under the
 /// test's control and a temporary directory for the files a client would send.
 struct AgentHarness {
@@ -114,16 +120,18 @@ struct AgentHarness {
   let controller: DomainController
   let service: AgentService
   let scratch: URL
+  let store: URL
   private let ticks: AsyncStream<Void>.Continuation
   private let runner: Task<Void, Never>
 
-  init(devices: [FakeDevice] = [], existing: [String] = []) throws {
+  init(devices: [FakeDevice] = [], existing: [String] = [], store: URL = itemStore()) throws {
+    self.store = store
     manager = FakeDomainManager(existing: existing)
     transport = FakeTransport(devices: devices)
     let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
     self.ticks = ticks
     hub = DeviceHub(transport: transport, arrivals: arrivals, clock: ManualClock())
-    controller = DomainController(hub: hub, manager: manager)
+    controller = DomainController(hub: hub, manager: manager, itemStore: store)
     scratch = FileManager.default.temporaryDirectory.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
@@ -133,6 +141,11 @@ struct AgentHarness {
 
   func tick() {
     ticks.yield()
+  }
+
+  /// The identifier the domain's table has for `path`, assigning one if it has none.
+  func id(_ path: RemotePath, in domain: String) async throws -> ItemID {
+    try await controller.route(domain).items.id(for: path)
   }
 
   /// Plugs in a ready device of another model and returns every manager call once its domain is
@@ -168,9 +181,13 @@ struct AgentHarness {
     return (url, try FileHandle(forWritingTo: url))
   }
 
-  func finish() {
+  /// Stops the harness. `keepingStore` leaves the item tables for a harness that restarts.
+  func finish(keepingStore: Bool = false) {
     ticks.finish()
     runner.cancel()
     try? FileManager.default.removeItem(at: scratch)
+    if !keepingStore {
+      try? FileManager.default.removeItem(at: store)
+    }
   }
 }
