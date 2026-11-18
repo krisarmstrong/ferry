@@ -59,20 +59,77 @@ extension SafeWriterTests {
     #expect(await device.contents(of: backups[0], in: storageID) == Data([9]))
   }
 
-  @Test func staleBackupIsKeptWhileAWriteInItsFolderIsInFlight() async throws {
+  @Test func staleBackupIsLeftAloneWhileAWriteInItsFolderIsInFlight() async throws {
     let device = makeDevice()
     let writer = SafeWriter(session: device)
-    let backup = try RemotePath("/\(SafeWriter.backupPrefix)\(UUID().uuidString)")
+    let backup = try RemotePath("/" + SafeWriter.backupName(for: "a.txt"))
     try await device.seed(backup, in: storageID, contents: Data([9]))
     let partial = try RemotePath("/\(SafeWriter.partialPrefix)\(UUID().uuidString)")
     await device.partials.registerInFlight(partial, in: storageID)
 
     #expect(try await writer.visibleList(.root, in: storageID).isEmpty)
     #expect(await device.allPaths(in: storageID) == [backup])
+  }
 
-    await device.partials.unregisterInFlight(partial, in: storageID)
-    #expect(try await writer.visibleList(.root, in: storageID).isEmpty)
-    #expect(await device.allPaths(in: storageID).isEmpty)
+  /// Unplugged between setting the old file aside and renaming the new one into place: the old
+  /// file survives only as a backup. The next session puts it back under its name.
+  @Test func backupLeftByAnUnplugIsRestoredByTheNextSession() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let path = try RemotePath("/a.txt")
+    try await device.seed(path, in: storageID, contents: Data([9]))
+    // The partial's rename and the restore both fail, as when the cable is pulled.
+    await device.failRename(with: .deviceDisconnected, skipping: 1, count: 2)
+    try await withTempFile(Data([1, 2])) { file in
+      await #expect(throws: TransportError.deviceDisconnected) {
+        _ = try await writer.write(from: file, to: path, replacing: true)
+      }
+    }
+    #expect(await device.contents(of: path, in: storageID) == nil)
+
+    let later = await device.newSession()
+    let listed = try await SafeWriter(session: later).visibleList(.root, in: storageID)
+
+    #expect(listed.map(\.path) == [path])
+    #expect(await later.contents(of: path, in: storageID) == Data([9]))
+    #expect(await later.allPaths(in: storageID) == [path])
+  }
+
+  /// The new file made it into place but the backup's delete failed: the next session deletes
+  /// the backup, having checked the file at its name is a complete file.
+  @Test func backupWhoseNameHoldsTheNewFileIsDeletedByTheNextSession() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let path = try RemotePath("/a.txt")
+    try await device.seed(path, in: storageID, contents: Data([9]))
+    await device.failNextDelete(with: .io("delete failed"))
+    try await withTempFile(Data([1, 2])) { file in
+      _ = try await writer.write(from: file, to: path, replacing: true)
+    }
+
+    let later = await device.newSession()
+    let listed = try await SafeWriter(session: later).visibleList(.root, in: storageID)
+
+    #expect(listed.map(\.path) == [path])
+    #expect(await later.allPaths(in: storageID) == [path])
+    #expect(await later.contents(of: path, in: storageID) == Data([1, 2]))
+  }
+
+  /// Never deleted blindly: a backup whose name is now a folder, or whose original name cannot
+  /// be read, stays (hidden).
+  @Test func backupThatCannotBeResolvedIsKept() async throws {
+    let device = makeDevice()
+    let writer = SafeWriter(session: device)
+    let shadowed = try RemotePath("/" + SafeWriter.backupName(for: "a"))
+    let unnamed = try RemotePath("/\(SafeWriter.backupPrefix)\(UUID().uuidString)")
+    try await device.seed(shadowed, in: storageID, contents: Data([9]))
+    try await device.seed(unnamed, in: storageID, contents: Data([8]))
+    _ = try await device.makeFolder(RemotePath("/a"), in: storageID)
+
+    #expect(
+      try await writer.visibleList(.root, in: storageID).map(\.path) == [try RemotePath("/a")])
+    #expect(await device.contents(of: shadowed, in: storageID) == Data([9]))
+    #expect(await device.contents(of: unnamed, in: storageID) == Data([8]))
   }
 
   /// Only a device that cannot rename gets a direct upload; a failed rename must not.

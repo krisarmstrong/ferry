@@ -18,26 +18,32 @@ public actor FakeDevice: DeviceSession {
     case waiting(CheckedContinuation<Void, Never>)
   }
 
-  private enum Node {
+  enum Node {
     case file(Data, modified: Date)
     case folder(modified: Date)
   }
 
   public nonisolated let info: DeviceInfo
   public nonisolated let partials = PartialRegistry()
-  private let storageInfos: [StorageInfo]
-  private let deviceCapabilities: DeviceCapabilities
-  private var tree: [StorageID: [RemotePath: Node]]
+  let storageInfos: [StorageInfo]
+  let deviceCapabilities: DeviceCapabilities
+  var tree: [StorageID: [RemotePath: Node]]
   private var locked = false
   private var disconnected = false
   private var suspensions: [SuspendableCall: Suspension] = [:]
-  private var uploadFailure: (afterBytes: UInt64, error: TransportError)?
-  private var uploadTruncation: UInt64?
-  private var renameFailure: (skipping: Int, error: TransportError)?
-  private var deleteFailure: TransportError?
-  private var listFailure: TransportError?
-  private var storagesFailure: TransportError?
-  private var storagesFailing: TransportError?
+  var uploadFailure: (afterBytes: UInt64, error: TransportError)?
+  var uploadTruncation: UInt64?
+  var renameFailure: RenameFailure?
+
+  struct RenameFailure {
+    var skipping: Int
+    var remaining: Int
+    let error: TransportError
+  }
+  var deleteFailure: TransportError?
+  var listFailure: TransportError?
+  var storagesFailure: TransportError?
+  var storagesFailing: TransportError?
 
   public init(
     info: DeviceInfo, storages: [StorageInfo],
@@ -157,11 +163,13 @@ public actor FakeDevice: DeviceSession {
     async throws(TransportError) -> RemoteItem
   {
     let nodes = try nodes(in: storage)
-    if let failure = renameFailure {
+    if var failure = renameFailure {
       if failure.skipping > 0 {
-        renameFailure = (failure.skipping - 1, failure.error)
+        failure.skipping -= 1
+        renameFailure = failure
       } else {
-        renameFailure = nil
+        failure.remaining -= 1
+        renameFailure = failure.remaining > 0 ? failure : nil
         throw failure.error
       }
     }
@@ -352,47 +360,4 @@ extension FakeDevice {
     }
   }
 
-  /// The next upload stores its first `afterBytes` bytes, then throws `error`.
-  public func failUpload(afterBytes: UInt64, with error: TransportError) {
-    uploadFailure = (afterBytes, error)
-  }
-
-  /// Uploads keep only the first `bytes` bytes and report success. `nil` turns this off.
-  public func truncateUploads(to bytes: UInt64?) {
-    uploadTruncation = bytes
-  }
-
-  /// The rename after the next `skipping` ones throws `error`. `nil` clears a pending failure.
-  public func failRename(with error: TransportError?, skipping: Int = 0) {
-    renameFailure = error.map { (skipping, $0) }
-  }
-
-  /// The next delete throws `error`.
-  public func failNextDelete(with error: TransportError) {
-    deleteFailure = error
-  }
-
-  /// Every `storages()` throws `error` until this is called with `nil`.
-  public func failStorages(with error: TransportError?) {
-    storagesFailing = error
-  }
-
-  /// The next `storages()` throws `error`.
-  public func failNextStorages(with error: TransportError) {
-    storagesFailure = error
-  }
-
-  /// The next `list(_:in:)` throws `error`. `nil` clears a pending failure.
-  public func failList(with error: TransportError?) {
-    listFailure = error
-  }
-
-  public func contents(of path: RemotePath, in storage: StorageID) -> Data? {
-    if case .file(let data, _) = tree[storage]?[path] { return data }
-    return nil
-  }
-
-  public func allPaths(in storage: StorageID) -> [RemotePath] {
-    (tree[storage] ?? [:]).keys.sorted { $0.description < $1.description }
-  }
 }
