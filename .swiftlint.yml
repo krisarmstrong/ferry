@@ -1,4 +1,5 @@
 included:
+  - Apps
   - Sources
   - Tests
 

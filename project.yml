@@ -1,0 +1,106 @@
+name: Ferry
+
+options:
+  bundleIdPrefix: io.github.krisarmstrong
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+
+packages:
+  Ferry:
+    path: .
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: X6JWYP43HG
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: Apple Development
+    ARCHS: arm64
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    # Off for development: the agent loads Homebrew's libmtp, which library validation would
+    # refuse. Plan 3 bundles libmtp and turns this on.
+    ENABLE_HARDENED_RUNTIME: NO
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Ferry:
+    type: application
+    platform: macOS
+    sources:
+      - path: Apps/Ferry
+      # The agent's launchd plist, where SMAppService.agent(plistName:) looks for it.
+      - path: Apps/FerryAgent/io.github.krisarmstrong.ferry.agent.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.krisarmstrong.ferry
+        PRODUCT_NAME: Ferry
+        INFOPLIST_FILE: Apps/Ferry/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/Ferry/Ferry.entitlements
+    dependencies:
+      - target: FerryAgent
+        embed: true
+        codeSign: false
+        copy:
+          destination: executables
+      - target: FerryProvider
+        embed: true
+
+  FerryAgent:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Apps/FerryAgent
+        excludes:
+          - "*.plist"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.krisarmstrong.ferry.agent
+        PRODUCT_NAME: FerryAgent
+        CODE_SIGN_ENTITLEMENTS: Apps/FerryAgent/FerryAgent.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        # A tool has no bundle, so its Info.plist (and so its signing identifier) lives in the
+        # binary.
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: Ferry
+        product: FerryAgentCore
+      - package: Ferry
+        product: FerryIPC
+      - package: Ferry
+        product: MTPTransport
+      - package: Ferry
+        product: DeviceKit
+
+  FerryProvider:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Apps/FerryProvider
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.krisarmstrong.ferry.provider
+        PRODUCT_NAME: FerryProvider
+        INFOPLIST_FILE: Apps/FerryProvider/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/FerryProvider/FerryProvider.entitlements
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: Ferry
+        product: FerryProviderCore
+      - package: Ferry
+        product: FerryIPC
+      - package: Ferry
+        product: DeviceKit
+
+schemes:
+  Ferry:
+    build:
+      targets:
+        Ferry: all

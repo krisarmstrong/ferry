@@ -10,6 +10,7 @@ let package = Package(
     .library(name: "FerryAgentCore", targets: ["FerryAgentCore"]),
     .library(name: "FerryIPC", targets: ["FerryIPC"]),
     .library(name: "FerryProviderCore", targets: ["FerryProviderCore"]),
+    .library(name: "MTPTransport", targets: ["MTPTransport"]),
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
