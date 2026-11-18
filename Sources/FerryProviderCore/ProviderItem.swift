@@ -62,14 +62,26 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
     return [Self.quarantineAttribute: quarantine]
   }
 
-  /// A folder whose name's extension is a package type (`Ferry.app`, `Notes.rtfd`). Ferry
-  /// presents it as a plain folder, but macOS types a folder on disk by its extension, so Finder
-  /// still shows it as a document or an app; the quarantine makes Gatekeeper check such an app
-  /// as a download.
+  /// A folder with a package name. Ferry presents it as a plain folder, but macOS types a folder
+  /// on disk by its extension, so Finder still shows it as a document or an app; the quarantine
+  /// makes Gatekeeper check such an app as a download.
   private var isPackageNamed: Bool {
-    let ext = (filename as NSString).pathExtension
-    guard entry.item.kind == .folder, !ext.isEmpty,
-      let type = UTType(filenameExtension: ext, conformingTo: .directory)
+    entry.item.kind == .folder && Self.isPackageName(filename)
+  }
+
+  /// A package-named folder or anything inside one, which is read-only on the Mac (see
+  /// `capabilities`).
+  private var isInPackageFolder: Bool {
+    let path = entry.item.path
+    let folders = entry.item.kind == .folder ? path.components : path.components.dropLast()
+    return folders.contains(where: Self.isPackageName)
+  }
+
+  /// Whether a folder of this name is a package to macOS: its extension is a declared type
+  /// conforming to `com.apple.package` (`Ferry.app`, `Notes.rtfd`).
+  static func isPackageName(_ name: String) -> Bool {
+    let ext = (name as NSString).pathExtension
+    guard !ext.isEmpty, let type = UTType(filenameExtension: ext, conformingTo: .directory)
     else { return false }
     return type.isDeclared && type.conforms(to: .package)
   }
@@ -88,7 +100,12 @@ public final class ProviderItem: NSObject, NSFileProviderItem, Sendable {
   ///
   /// Every item is evictable, so Finder offers Remove Download and the system can reclaim space:
   /// the device keeps the contents.
+  ///
+  /// A package-named folder and everything in it can only be read: macOS opens such a folder as
+  /// an app or a document, and an app saving one replaces the whole folder, which Ferry refuses.
+  /// Edit it on the device, or copy it to the Mac.
   public var capabilities: NSFileProviderItemCapabilities {
+    if isInPackageFolder { return .allowsReading }
     var capabilities: NSFileProviderItemCapabilities = [
       .allowsReading, .allowsWriting, Self.allowsEvicting,
     ]

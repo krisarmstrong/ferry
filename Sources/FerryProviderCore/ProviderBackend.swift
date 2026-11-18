@@ -158,6 +158,9 @@ public actor ProviderBackend {
         // Compared as paths, so another normal form of the same name is no change, but a change
         // of case is: the agent lets an item take a name only its own name collides with.
         if renamed != current.item.path {
+          if current.item.kind == .folder, ProviderItem.isPackageName(template.filename) {
+            throw Self.packageNameRefused
+          }
           current = try await entry(.rename(domain: domain, id: itemID, to: template.filename))
         }
       }
@@ -291,6 +294,16 @@ public actor ProviderBackend {
     userInfo: [
       NSLocalizedDescriptionKey:
         "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
+    ])
+
+  /// macOS would open the folder as an app or a document, read-only (see
+  /// `ProviderItem.capabilities`). `.cannotSynchronize` is final until the item changes.
+  static let packageNameRefused = NSFileProviderError(
+    .cannotSynchronize,
+    userInfo: [
+      NSLocalizedDescriptionKey:
+        "A folder on the device can’t take a package name, such as .app or .rtfd: macOS would "
+        + "open it as an app or a document."
     ])
 
   static let linkRefused = NSFileProviderError(
