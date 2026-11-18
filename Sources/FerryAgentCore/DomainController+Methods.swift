@@ -3,38 +3,49 @@ import DeviceKit
 /// What the controller does when a device's method or storage keys change.
 extension DomainController {
   /// Records each ready device's method and storages, learns which volume a card MTP knows by
-  /// description is when a device was just seen the other way, and returns the devices whose
-  /// method changed.
-  func noteMethods(of devices: [AttachedDevice]) -> [DeviceID] {
+  /// description is when a device was just seen the other way in the same attachment, and
+  /// returns the devices whose method changed and the volumes whose match moved to another card.
+  func noteMethods(of devices: [AttachedDevice]) -> (moved: [DeviceID], unmatched: [StorageID]) {
     var moved: [DeviceID] = []
+    var unmatched: [StorageID] = []
     for device in devices {
       guard case .ready(let storages) = device.state else { continue }
       if let last = lastReady[device.id], last.method != device.method {
         moved.append(device.id)
-        learn(device.id, [last, (method: device.method, storages: storages)])
+        if let replaced = learn(device.id, [last, (method: device.method, storages: storages)]) {
+          unmatched.append(StorageID(device: device.id, key: replaced))
+        }
       }
       lastReady[device.id] = (device.method, storages)
     }
-    return moved
+    return (moved, unmatched)
+  }
+
+  /// Forgets the device's last reading, when it leaves or is newly attached: a later reading is
+  /// of another attachment, whose cards may not be the ones seen.
+  func forgetReading(of device: DeviceID) {
+    lastReady[device] = nil
   }
 
   /// Learns which volume a card MTP knows by description is, from the device seen both ways.
+  /// Returns the volume a replaced match had.
   private func learn(
     _ device: DeviceID, _ sides: [(method: ConnectionMethod, storages: [StorageInfo])]
-  ) {
+  ) -> String? {
     guard let mtp = sides.first(where: { $0.method == .usbFileTransfer }),
       let adb = sides.first(where: { $0.method != .usbFileTransfer })
-    else { return }
-    if aliases.learn(device, mtp: mtp.storages, adb: adb.storages) {
-      aliases.save(to: itemStore)
-    }
+    else { return nil }
+    let learnt = aliases.learn(device, mtp: mtp.storages, adb: adb.storages)
+    if learnt.changed { aliases.save(to: itemStore) }
+    return learnt.replaced
   }
 
-  /// Removes the domain a ready storage had under a former key, keeping unsent changes as Remove
-  /// Ferry does, unless a live storage claims it. Where they went is kept for the app.
-  func retire(_ former: StorageID) async {
+  /// Removes the domain a storage of an attached device had under a former key, keeping unsent
+  /// changes as Remove Ferry does, unless it is one of the `live` domains. Where they went is
+  /// kept for the app.
+  func retire(_ former: StorageID, live: Set<String>) async {
     let identifier = DomainNaming.identifier(for: former)
-    guard let domain = domains[identifier], [nil, former].contains(domain.storage) else { return }
+    guard domains[identifier] != nil, !live.contains(identifier) else { return }
     domains[identifier] = nil
     await discardTable(of: identifier)
     if let preserved = await remove(identifier) {

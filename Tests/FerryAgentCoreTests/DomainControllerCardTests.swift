@@ -16,26 +16,35 @@ struct DomainControllerCardTests {
   static let adbCard = StorageID(device: id, key: StorageKey.volume("1234-ABCD"))
   static let photo = "/DCIM/p.jpg"
 
-  func mtp() async throws -> FakeDevice {
+  static let cardA = (volume: "1234-ABCD", capacity: UInt64(1 << 30))
+  static let cardB = (volume: "5678-EF01", capacity: UInt64(1 << 31))
+
+  /// The unit over MTP with a card of `capacity` holding `file`; its MTP key is the card's
+  /// description, the same for every card of the vendor.
+  func mtp(capacity: UInt64 = cardA.capacity, file: String = photo) async throws -> FakeDevice {
     let device = FakeDevice(
       info: DeviceInfo(id: Self.id, manufacturer: "NetAlly", model: "LinkRunner-100G"),
       storages: [
         neutralStorage("S1"),
-        StorageInfo(id: Self.mtpCard, description: "SD card", capacity: 1 << 30, free: 1 << 29),
+        StorageInfo(id: Self.mtpCard, description: "SD card", capacity: capacity, free: 1 << 29),
       ])
-    try await device.seed(try path(Self.photo), in: Self.mtpCard, contents: Data("p".utf8))
+    try await device.seed(try path(file), in: Self.mtpCard, contents: Data("p".utf8))
     return device
   }
 
-  func adb() async throws -> FakeDevice {
+  /// The unit over ADB with the volume `volume` of `capacity` holding `file`.
+  func adb(
+    volume: String = cardA.volume, capacity: UInt64 = cardA.capacity, file: String = photo
+  ) async throws -> FakeDevice {
+    let card = StorageID(device: Self.id, key: StorageKey.volume(volume))
     let device = FakeDevice(
       info: DeviceInfo(id: Self.id, manufacturer: "", model: "LinkRunner 100G"),
       storages: [
         neutralStorage("S1"),
         StorageInfo(
-          id: Self.adbCard, description: "Removable storage", capacity: 1 << 30, free: 1 << 29),
+          id: card, description: "Removable storage", capacity: capacity, free: 1 << 29),
       ])
-    try await device.seed(try path(Self.photo), in: Self.adbCard, contents: Data("p".utf8))
+    try await device.seed(try path(file), in: card, contents: Data("p".utf8))
     return device
   }
 

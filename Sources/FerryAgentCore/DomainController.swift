@@ -239,8 +239,10 @@ public actor DomainController {
     // so its old session is never kept for the new one.
     switch event {
     case .detached(let id):
+      forgetReading(of: id)
       await disconnectDomains(of: id)
     case .attached(let device), .changed(let device):
+      if case .attached = event { forgetReading(of: device.id) }
       if case .ready = device.state { break }
       await disconnectDomains(of: device.id)
     }
@@ -249,14 +251,17 @@ public actor DomainController {
 
   private func reconcile() async {
     let devices = await hub.devices()
-    let moved = noteMethods(of: devices)
+    let (moved, unmatched) = noteMethods(of: devices)
     let wanted = DomainNaming.domains(for: devices, aliases: aliases)
     let live = Set(wanted.map(\.spec.identifier))
     for (identifier, domain) in domains where domain.connected && !live.contains(identifier) {
       await disconnect(identifier)
     }
+    for former in unmatched {
+      await retire(former, live: live)
+    }
     for domain in wanted where !ejecting.contains(domain.storage.device) {
-      for former in domain.formers { await retire(former) }
+      for former in domain.formers { await retire(former, live: live) }
       await connect(domain.spec, domain.storage)
     }
     for device in moved {

@@ -138,6 +138,8 @@ extension DeviceHub {
       await kept.removeValue(forKey: id)?.close()
       if let listing {
         store(listing.info, listing.state, .unheld, method: listing.method)
+        // The listing is from before the drain, which can be long: what is attached now decides.
+        Task { [weak self] in await self?.reconcile() }
       } else {
         drop(id)
       }

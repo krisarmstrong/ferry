@@ -22,6 +22,9 @@ import os
 /// without falls back to its USB location and cannot be matched.
 ///
 /// Only when both transports' scans fail does the scan fail.
+///
+/// `scan` awaits between reading its stored views and committing new ones; that is safe because
+/// its one caller, `DeviceHub`, runs scans one at a time.
 public actor CompositeTransport: DeviceTransport {
   private static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "CompositeTransport")
@@ -70,13 +73,16 @@ public actor CompositeTransport: DeviceTransport {
     return merge(mtp: viaMTP, adb: viaADB)
   }
 
-  /// A transport's last view, standing in for a scan that failed: the same devices, with no
-  /// rescan of its own asked for.
+  /// How soon to scan again after a transport's scan failed.
+  static let staleRetry = Duration.seconds(2)
+
+  /// A transport's last view, standing in for a scan that failed: the same devices, scanned again
+  /// soon, so a view gone stale (a unit unplugged meanwhile) does not stand for long.
   private static func unchanged(_ last: DeviceScan?) -> DeviceScan {
-    guard let last else { return DeviceScan(devices: []) }
+    guard let last else { return DeviceScan(devices: [], rescanAfter: staleRetry) }
     return DeviceScan(
       devices: last.devices, busy: last.busy, notSharing: last.notSharing, ejected: last.ejected,
-      method: last.method, methods: last.methods,
+      rescanAfter: staleRetry, method: last.method, methods: last.methods,
       awaitingAuthorization: last.awaitingAuthorization, presentOverUSB: last.presentOverUSB)
   }
 

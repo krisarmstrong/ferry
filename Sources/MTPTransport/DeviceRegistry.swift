@@ -112,9 +112,14 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
       var listed: Set<DeviceID> = []
       let ejectedNow = found.ejected.filter { listed.insert($0.id).inserted }
       let soonest = [rescanAfter, found.rescanAfter].compactMap { $0 }.min()
+      // Every candidate with a USB serial presents it, settled or not, opened or not: a network
+      // route must not serve it meanwhile. One named by location can match no serial.
+      let serials = candidates.compactMap(\.serial).filter { !$0.isEmpty }
+      let unique = serials.filter { serial in serials.filter { $0 == serial }.count == 1 }
       return DeviceScan(
         devices: found.devices, busy: found.busy, notSharing: found.notSharing,
-        ejected: ejectedNow, rescanAfter: soonest)
+        ejected: ejectedNow, rescanAfter: soonest,
+        presentOverUSB: Set(unique.map { DeviceID(serial: $0) }))
     }
   }
 

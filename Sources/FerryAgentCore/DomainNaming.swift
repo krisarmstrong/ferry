@@ -66,7 +66,7 @@ public enum DomainNaming {
       let base =
         models[model, default: 0] > 1 ? "\(model) (\(device.id.serial.suffix(4)))" : model
       return storages.enumerated().map { index, storage in
-        let identity = aliases.identity(of: storage.id)
+        let identity = aliases.identity(of: storage)
         let spec = DomainSpec(
           identifier: identifier(for: identity),
           displayName: index == 0 ? base : base + " – SD card")

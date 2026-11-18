@@ -271,6 +271,7 @@ struct CompositeTransportTests {
     let failed = try await composite.scan()
     #expect(failed.devices == [mtpDevice.info])
     #expect(failed.method(of: id) == .usbFileTransfer)
+    #expect(failed.rescanAfter == CompositeTransport.staleRetry)
 
     await mtp.failScans(with: nil)
     await mtp.detach(id)
