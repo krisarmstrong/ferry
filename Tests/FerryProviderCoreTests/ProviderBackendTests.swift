@@ -1,3 +1,4 @@
+import CryptoKit
 import DeviceKit
 import FerryIPC
 import FerryProviderCore
@@ -254,6 +255,21 @@ import UniformTypeIdentifiers
     #expect(base.contentVersion == renamed.contentVersion)
     #expect(base.metadataVersion != renamed.metadataVersion)
     #expect(base.metadataVersion != moved.metadataVersion)
+  }
+
+  /// FileProvider keeps an item's metadata until its version changes, so the capabilities must
+  /// be part of it: a Ferry that grants new ones (as `.allowsEvicting` was) would otherwise
+  /// leave every item Finder already knew with the old ones.
+  @Test func metadataVersionCoversCapabilities() throws {
+    let parent = ItemID.random()
+    let item = ProviderItem(
+      ProviderEntry(id: .random(), parent: parent, item: try file("/a.txt", size: 1)))
+    let withCapabilities = Data(
+      SHA256.hash(data: Data("\(parent.rawValue)/a.txt/\(item.capabilities.rawValue)".utf8)))
+    let withoutCapabilities = Data(SHA256.hash(data: Data("\(parent.rawValue)/a.txt".utf8)))
+
+    #expect(item.itemVersion.metadataVersion == withCapabilities)
+    #expect(item.itemVersion.metadataVersion != withoutCapabilities)
   }
 
   @Test func modifyReturnsSameIdentifier() async throws {
