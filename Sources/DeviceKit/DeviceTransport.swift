@@ -30,10 +30,11 @@ public protocol DeviceSession: Sendable {
   func item(at path: RemotePath, in storage: StorageID) async throws(TransportError) -> RemoteItem
   /// Without `replacing`, a file already at `file` when the download completes is
   /// `.alreadyExists` and is left untouched.
+  @discardableResult
   func download(
     _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
     progress: ProgressHandler
-  ) async throws(TransportError)
+  ) async throws(TransportError) -> Downloaded
   /// `path` must not already exist.
   func upload(
     from file: URL, to path: RemotePath, in storage: StorageID, progress: ProgressHandler
@@ -47,4 +48,22 @@ public protocol DeviceSession: Sendable {
   /// Deleting a folder deletes its contents.
   func delete(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
   func close() async
+}
+
+/// A finished download: the file as the device listed it, and how many bytes arrived. They
+/// differ when the device's metadata is stale (an app rewrote the file): the bytes are the
+/// truth, since the device reported the transfer complete.
+public struct Downloaded: Sendable, Equatable {
+  public let listed: RemoteItem
+  public let received: UInt64
+
+  public init(listed: RemoteItem, received: UInt64) {
+    self.listed = listed
+    self.received = received
+  }
+
+  /// The file as received.
+  public var item: RemoteItem {
+    RemoteItem(path: listed.path, kind: listed.kind, size: received, modified: listed.modified)
+  }
 }

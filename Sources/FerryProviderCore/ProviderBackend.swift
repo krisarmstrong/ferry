@@ -42,22 +42,20 @@ public actor ProviderBackend {
     return entries.map(ProviderItem.init)
   }
 
-  /// Downloads into a new file in `dir`. The item is read first, so if the file changes on the
-  /// device in between, FileProvider holds newer contents under an older version and fetches it
-  /// again, rather than older contents under a newer version, which it would keep. Anything but
-  /// `.done` removes the file, which may hold a truncated prefix.
+  /// Downloads into a new file in `dir`, and returns the item as the agent received it: its
+  /// version describes exactly these bytes, including a size larger than the device's stale
+  /// listing. Anything but an item removes the file, which may hold a truncated prefix.
   public func fetch(
     _ id: NSFileProviderItemIdentifier, into dir: URL, progress: TransferProgressHandler? = nil
   ) async throws -> (URL, ProviderItem) {
     let itemID = try Self.itemID(id)
-    let item = try await entry(.item(domain: domain, id: itemID))
     let url = dir.appending(path: UUID().uuidString, directoryHint: .notDirectory)
     let handle = try Self.createExclusively(url)
+    let item: ProviderEntry
     do {
       defer { try? handle.close() }
-      let response = try await send(
+      item = try await entry(
         .fetch(domain: domain, id: itemID), file: handle, progress: progress)
-      guard case .done = response else { throw Self.unexpected(response) }
     } catch {
       try? FileManager.default.removeItem(at: url)
       throw error

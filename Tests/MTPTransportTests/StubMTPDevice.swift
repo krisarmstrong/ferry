@@ -50,6 +50,11 @@ actor StubMTPDevice: MTPDeviceOperations {
   private var uploadFailure: TransportError?
   /// Downloads write at most this many bytes and still report success.
   private var downloadLimit: Int?
+  /// Downloads cut short this many more times, then write everything.
+  private var shortDownloads = 0
+  /// Sizes the device reports for objects instead of their real ones, as stale metadata does.
+  private var reportedSizes: [UInt32: UInt64] = [:]
+  private(set) var downloadCount = 0
   /// The next download writes half the object, then throws this.
   private var downloadFailure: TransportError?
   /// Names the device stores differently from what it was sent, as a FAT card or 7-bit
@@ -93,6 +98,16 @@ actor StubMTPDevice: MTPDeviceOperations {
 
   func failNextUpload(with error: TransportError) {
     uploadFailure = error
+  }
+
+  /// The next `count` downloads write half the object and still report success.
+  func cutShortNextDownloads(_ count: Int) {
+    shortDownloads = count
+  }
+
+  /// The device lists and describes `id` as `size` bytes, whatever it holds.
+  func reportSize(_ size: UInt64, for id: UInt32) {
+    reportedSizes[id] = size
   }
 
   func limitDownloads(to bytes: Int) {
@@ -158,7 +173,7 @@ actor StubMTPDevice: MTPDeviceOperations {
   func list(storage: UInt32, parent: UInt32) throws(TransportError) -> [MTPEntry] {
     record()
     try requireOpen()
-    return objects.filter { $0.value.parent == parent }.map { Self.entry($0.key, $0.value) }
+    return objects.filter { $0.value.parent == parent }.map { entry($0.key, $0.value) }
       .sorted { $0.objectID < $1.objectID }
   }
 
@@ -169,7 +184,12 @@ actor StubMTPDevice: MTPDeviceOperations {
     let failure = downloadFailure
     downloadFailure = nil
     var data = object.data
+    downloadCount += 1
     if let downloadLimit { data = data.prefix(downloadLimit) }
+    if shortDownloads > 0 {
+      shortDownloads -= 1
+      data = data.prefix(data.count / 2)
+    }
     if failure != nil { data = data.prefix(data.count / 2) }
     do { try data.write(to: file) } catch { throw .io(error.localizedDescription) }
     if let interloper = downloadInterloper {
@@ -236,7 +256,7 @@ actor StubMTPDevice: MTPDeviceOperations {
   }
 
   func metadata(objectID: UInt32) throws(TransportError) -> MTPEntry {
-    Self.entry(objectID, try object(objectID))
+    entry(objectID, try object(objectID))
   }
 
   func close() {
@@ -269,9 +289,9 @@ actor StubMTPDevice: MTPDeviceOperations {
     return object
   }
 
-  private static func entry(_ id: UInt32, _ object: Object) -> MTPEntry {
+  private func entry(_ id: UInt32, _ object: Object) -> MTPEntry {
     MTPEntry(
       objectID: id, name: object.name, isFolder: object.isFolder,
-      size: UInt64(object.data.count), modified: object.modified)
+      size: reportedSizes[id] ?? UInt64(object.data.count), modified: object.modified)
   }
 }

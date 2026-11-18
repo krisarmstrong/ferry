@@ -67,6 +67,43 @@ struct MTPSessionFreshResolutionTests {
     #expect(await device.children(of: folder) == ["a.txt"])
   }
 
+  /// A device whose metadata is stale (an app rewrote the file) lists fewer bytes than it
+  /// sends. libmtp reports the transfer complete, so the file is whole: it is kept, at the
+  /// size received.
+  @Test func aDownloadLongerThanListedIsKeptAtItsRealSize() async throws {
+    let device = SessionFixture.makeDevice()
+    let id = await device.addFile("global.o", parent: SessionFixture.root, data: Data(count: 40))
+    await device.reportSize(32, for: id)
+    let session = MTPSession(device: device)
+    let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: target) }
+
+    let result = try await session.download(
+      SessionFixture.path("/global.o"), in: storage, to: target, replacing: true,
+      progress: SessionFixture.noProgress)
+
+    #expect(try Data(contentsOf: target).count == 40)
+    #expect(result.listed.size == 32)
+    #expect(result.received == 40)
+  }
+
+  @Test func aShortDownloadIsTriedOnceMore() async throws {
+    let device = SessionFixture.makeDevice()
+    await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
+    await device.cutShortNextDownloads(1)
+    let session = MTPSession(device: device)
+    let target = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: target) }
+
+    let result = try await session.download(
+      SessionFixture.path("/a.txt"), in: storage, to: target, replacing: true,
+      progress: SessionFixture.noProgress)
+
+    #expect(try Data(contentsOf: target) == Data("hello".utf8))
+    #expect(result.received == 5)
+    #expect(await device.downloadCount == 2)
+  }
+
   @Test func aShortDownloadSaysTheDeviceSentLessThanItListed() async throws {
     let device = SessionFixture.makeDevice()
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
@@ -79,5 +116,7 @@ struct MTPSessionFreshResolutionTests {
         SessionFixture.path("/a.txt"), in: storage, to: target, replacing: true,
         progress: SessionFixture.noProgress)
     }
+    // Tried twice, then reported truncated.
+    #expect(await device.downloadCount == 2)
   }
 }

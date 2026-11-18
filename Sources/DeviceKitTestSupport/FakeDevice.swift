@@ -34,6 +34,8 @@ public actor FakeDevice: DeviceSession {
   var uploadFailure: (afterBytes: UInt64, error: TransportError)?
   var uploadTruncation: UInt64?
   var renameFailure: RenameFailure?
+  /// Sizes listed for files instead of their real ones, as a device's stale metadata does.
+  var reportedSizes: [RemotePath: UInt64] = [:]
   /// The name the device stores a backup under instead of the one it was sent.
   var backupStoredAs: String?
 
@@ -89,7 +91,7 @@ public actor FakeDevice: DeviceSession {
     let nodes = try nodes(in: storage)
     try requireFolder(folder, in: nodes)
     return nodes.filter { $0.key.parent == folder }
-      .map { Self.item($0.key, $0.value) }
+      .map { listedItem($0.key, $0.value) }
       .sorted { $0.path.description < $1.path.description }
   }
 
@@ -100,15 +102,23 @@ public actor FakeDevice: DeviceSession {
     guard let node = path == .root ? .folder(modified: .distantPast) : nodes[path] else {
       throw .notFound(path)
     }
-    return Self.item(path, node)
+    return listedItem(path, node)
   }
 
+  /// The item as the device lists it, with any stale size it reports.
+  private func listedItem(_ path: RemotePath, _ node: Node) -> RemoteItem {
+    let item = Self.item(path, node)
+    guard let size = reportedSizes[path] else { return item }
+    return RemoteItem(path: path, kind: item.kind, size: size, modified: item.modified)
+  }
+
+  @discardableResult
   public func download(
     _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
     progress: ProgressHandler
-  ) async throws(TransportError) {
+  ) async throws(TransportError) -> Downloaded {
     let nodes = try nodes(in: storage)
-    guard case .file(let data, _) = nodes[path] else { throw .notFound(path) }
+    guard case .file(let data, let modified) = nodes[path] else { throw .notFound(path) }
     let total = UInt64(data.count)
     guard progress(0, total) else { throw .cancelled }
     do {
@@ -119,6 +129,9 @@ public actor FakeDevice: DeviceSession {
       throw .io(error.localizedDescription)
     }
     guard progress(total, total) else { throw .cancelled }
+    let listed = RemoteItem(
+      path: path, kind: .file, size: reportedSizes[path] ?? total, modified: modified)
+    return Downloaded(listed: listed, received: total)
   }
 
   public func upload(

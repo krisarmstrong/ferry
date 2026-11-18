@@ -229,3 +229,11 @@ struct AgentHarness {
     }
   }
 }
+
+extension AgentResponse {
+  /// Whether the reply carries an item, as a fetch, create or change does.
+  var isEntry: Bool {
+    if case .entry = self { return true }
+    return false
+  }
+}

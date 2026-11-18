@@ -32,7 +32,7 @@ struct TransferProgressTests {
       .fetch(domain: domain, id: try await harness.id(try path("/a.txt"), in: domain)),
       file: handle, progress: reports.record)
 
-    #expect(reply == .done)
+    #expect(reply.isEntry)
     #expect(reports.all.last == [3, 3])
     guard case .status(let report) = await harness.service.handle(.status, file: nil) else {
       Issue.record("expected a status")
@@ -84,5 +84,43 @@ struct TransferProgressTests {
     open.finish()
     try await running.value
     #expect(await board.list().isEmpty)
+  }
+}
+
+/// A file whose listed size is stale downloads whole, and Finder's item then shows the size
+/// that arrived, also after the folder is listed again with the stale size.
+@Suite(.timeLimit(.minutes(1)))
+struct StaleSizeFetchTests {
+  @Test func aFileLongerThanListedIsFetchedAndKeepsItsRealSize() async throws {
+    let device = await makeDevice("A")
+    let storage = storageID(device)
+    let file = try path("/.settings/global.o")
+    try await device.seed(file, in: storage, contents: Data(count: 40))
+    await device.reportSize(32, for: file)
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    let domain = domainID(device)
+    let id = try await harness.id(file, in: domain)
+    let (target, handle) = try harness.writable("out", "")
+
+    let reply = await harness.service.handle(.fetch(domain: domain, id: id), file: handle)
+
+    guard case .entry(let entry) = reply else {
+      Issue.record("expected the fetched item, got \(reply)")
+      return
+    }
+    #expect(entry.id == id)
+    #expect(entry.item.size == 40)
+    #expect(try Data(contentsOf: target).count == 40)
+    let settings = try await harness.id(try path("/.settings"), in: domain)
+    guard
+      case .entries(let listed) = await harness.service.handle(
+        .list(domain: domain, folder: settings), file: nil)
+    else {
+      Issue.record("expected a listing")
+      return
+    }
+    #expect(listed.map(\.item.size) == [40])
   }
 }

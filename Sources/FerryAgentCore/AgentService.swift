@@ -73,8 +73,7 @@ public actor AgentService: AgentHandling {
     case (.list(let domain, let folder), _):
       return .entries(try await list(folder, in: domain))
     case (.fetch(let domain, let id), let file?):
-      try await fetch(id, in: domain, into: file, progress: progress)
-      return .done
+      return .entry(try await fetch(id, in: domain, into: file, progress: progress))
     case (.create(let domain, let parent, let name, _), let file?):
       return .entry(try await upload(file, as: name, in: parent, of: domain, progress: progress))
     case (.create(let domain, let parent, let name, _), nil):
@@ -260,24 +259,27 @@ private struct Replacement {
 
 extension AgentService {
   /// Downloads into a scratch file, then copies it into `target`. Replacing, because the scratch
-  /// path is new and nothing else may be there.
+  /// path is new and nothing else may be there. Returns the item as it arrived: a device with
+  /// stale metadata sends more than it lists, and Finder's item takes the real size.
   fileprivate func fetch(
     _ id: ItemID, in domain: String, into target: Int32,
     progress: @escaping TransferProgressHandler
-  ) async throws(TransportError) {
+  ) async throws(TransportError) -> ProviderEntry {
     try FileTransfer.requireRegular(target)
     let scratch = FileTransfer.scratchURL()
     defer { FileTransfer.remove(scratch) }
-    try await gated(domain) { route throws(TransportError) in
+    let entry = try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: id)
-      try await transfers.track(
+      let downloaded = try await transfers.track(
         Self.transfer(path, .toMac, on: route), report: progress
       ) { handler throws(TransportError) in
         try await route.session.download(
           path, in: route.storage, to: scratch, replacing: true, progress: handler)
       }
+      return await route.items.downloaded(downloaded)
     }
     try await FileTransfer.copyOut(scratch, to: target)
+    return entry
   }
 
   /// Copies `source` into a scratch file, then uploads that through the domain's writer.

@@ -25,6 +25,11 @@ extension FakeDevice {
     backupStoredAs = actual
   }
 
+  /// The device lists the file at `path` as `size` bytes, whatever it holds.
+  public func reportSize(_ size: UInt64, for path: RemotePath) {
+    reportedSizes[path] = size
+  }
+
   /// The next `storages()` throws `error`.
   public func failNextStorages(with error: TransportError) {
     storagesFailure = error

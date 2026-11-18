@@ -169,8 +169,13 @@ actor FakeAgent: AgentSending {
     case .list(_, let folder):
       return .entries(try listing(folder))
     case .fetch(_, let id):
-      try fetch(try path(id), into: file)
-      return .done
+      let fetched = try path(id)
+      try fetch(fetched, into: file)
+      let listed = try existing(fetched)
+      let received = RemoteItem(
+        path: fetched, kind: .file, size: UInt64(contents[fetched]?.count ?? 0),
+        modified: listed.modified)
+      return .entry(try entry(received, id: id))
     case .create(_, let parent, let name, let isFolder):
       let created = try await create(
         try path(parent).appending(name), isFolder: isFolder, from: file)

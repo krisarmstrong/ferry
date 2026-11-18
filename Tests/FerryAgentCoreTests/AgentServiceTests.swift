@@ -121,7 +121,7 @@ struct AgentServiceTests {
     let (target, handle) = try harness.writable("fetched.txt", "stale and longer contents")
 
     let fetch = AgentRequest.fetch(domain: domain, id: try await setup.id(paths.old))
-    #expect(await harness.service.handle(fetch, file: handle) == .done)
+    #expect(await harness.service.handle(fetch, file: handle).isEntry)
 
     #expect(try Data(contentsOf: target) == Data("old".utf8))
   }
@@ -147,7 +147,7 @@ struct AgentServiceTests {
 
     let (target, handle) = try harness.writable("large-copy.bin", "")
     let fetch = AgentRequest.fetch(domain: domain, id: entry.id)
-    #expect(await harness.service.handle(fetch, file: handle) == .done)
+    #expect(await harness.service.handle(fetch, file: handle).isEntry)
     #expect(try Data(contentsOf: target) == contents)
   }
 

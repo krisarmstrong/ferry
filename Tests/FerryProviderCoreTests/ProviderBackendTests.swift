@@ -78,9 +78,24 @@ import UniformTypeIdentifiers
     #expect(url.deletingLastPathComponent().standardizedFileURL == dir.standardizedFileURL)
     #expect(try Data(contentsOf: url) == bytes)
     #expect(item.itemIdentifier == NSFileProviderItemIdentifier(id))
-    // The item is read before the bytes: a newer file under an older version gets fetched again.
-    #expect(
-      await agent.requests == [.item(domain: domain, id: id), .fetch(domain: domain, id: id)])
+    #expect(await agent.requests == [.fetch(domain: domain, id: id)])
+  }
+
+  /// The device listed the file as smaller than it is: the item FileProvider gets describes the
+  /// bytes it got.
+  @Test func fetchReturnsTheItemAsReceived() async throws {
+    let bytes = Data(count: 40)
+    let agent = FakeAgent(
+      [try file("/global.o", size: 32)], contents: [try path("/global.o"): bytes])
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+
+    let (url, item) = try await backend.fetch(
+      try await agent.identifier(try path("/global.o")), into: dir)
+
+    #expect(try Data(contentsOf: url).count == 40)
+    #expect(item.documentSize == 40)
   }
 
   @Test func failedFetchLeavesNoFile() async throws {

@@ -40,6 +40,9 @@ actor ItemTable {
     var path: RemotePath
     var reported: ReportedItem?
     var listed: Bool
+    /// The size a download delivered when the device lists the file as smaller: its metadata
+    /// is stale. Listings that still say `listed` at `modified` mean this size.
+    var received: ReceivedSize?
 
     init(path: RemotePath, item: RemoteItem? = nil, listed: Bool = false) {
       self.path = path
@@ -57,6 +60,12 @@ actor ItemTable {
         RemoteItem(path: path, kind: $0.kind, size: $0.size, modified: $0.modified)
       }
     }
+  }
+
+  fileprivate struct ReceivedSize: Codable, Equatable {
+    let listed: UInt64
+    let modified: Date
+    let actual: UInt64
   }
 
   fileprivate struct Stored: Codable {
@@ -150,6 +159,22 @@ actor ItemTable {
     return observe(item)
   }
 
+  /// A file just downloaded, at the size that arrived. If that is more than the device lists,
+  /// the table remembers it, so later listings with the same stale size and date keep reporting
+  /// the real one and Finder does not see the file change back and forth.
+  func downloaded(_ download: Downloaded) -> ProviderEntry {
+    defer { save() }
+    let listed = download.listed
+    if let id = ids[listed.path], records[id] != nil {
+      records[id]?.received =
+        download.received == listed.size
+        ? nil
+        : ReceivedSize(listed: listed.size, modified: listed.modified, actual: download.received)
+      dirty = true
+    }
+    return observe(download.item)
+  }
+
   /// An item Ferry just made at a path the device had free. Whatever the table had there is
   /// stale and forgotten, so the new item never takes an old identifier.
   func created(_ item: RemoteItem) -> ProviderEntry {
@@ -239,17 +264,22 @@ actor ItemTable {
 
   // MARK: Private
 
-  private func observe(_ item: RemoteItem) -> ProviderEntry {
-    if item.path == .root { return ProviderEntry(id: .root, parent: .root, item: item) }
+  private func observe(_ reported: RemoteItem) -> ProviderEntry {
+    if reported.path == .root { return ProviderEntry(id: .root, parent: .root, item: reported) }
+    var item = reported
     let id: ItemID
     if let known = ids[item.path], let record = records[known] {
+      item = Self.corrected(item, by: record.received)
       if record.describes(item) { return entry(item, id: known) }
       if let kind = record.reported?.kind, kind != item.kind {
         forget(subtree(of: item.path))
         id = assign(Record(path: item.path, item: item))
       } else {
         id = known
-        records[id] = Record(path: item.path, item: item, listed: record.listed)
+        var updated = Record(path: item.path, item: item, listed: record.listed)
+        // Still the same stale listing: keep reading it as the size that arrived.
+        updated.received = record.received.flatMap { $0.modified == item.modified ? $0 : nil }
+        records[id] = updated
         dirty = true
       }
     } else {
@@ -258,6 +288,15 @@ actor ItemTable {
     let entry = entry(item, id: id)
     changeLog.record(.updated(entry))
     return entry
+  }
+
+  /// `item` at the size a download delivered, if the device still lists it as it did then.
+  private static func corrected(_ item: RemoteItem, by received: ReceivedSize?) -> RemoteItem {
+    guard let received, item.kind == .file, item.size == received.listed,
+      item.modified == received.modified
+    else { return item }
+    return RemoteItem(
+      path: item.path, kind: item.kind, size: received.actual, modified: item.modified)
   }
 
   private func markListed(_ folder: RemotePath) {
