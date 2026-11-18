@@ -187,17 +187,19 @@ actor ItemTable {
     return children.map(observe)
   }
 
-  /// The items from `offset` on, at most `size`, ordered by identifier, with the offset of the
-  /// next page if there is one. Only items the agent reported are in it, not the root or a
-  /// folder known only as some item's parent.
-  func workingSet(from offset: Int, size: Int) -> (entries: [ProviderEntry], next: Int?) {
-    defer { save() }
-    let reported = records.compactMap { id, record in record.item.map { (id, $0) } }
-      .sorted { $0.0.rawValue < $1.0.rawValue }
-    guard offset < reported.count else { return ([], nil) }
-    let end = min(offset + size, reported.count)
-    let entries = reported[offset..<end].map { entry($1, id: $0) }
-    return (entries, end < reported.count ? end : nil)
+  /// At most `size` items after `cursor` in identifier order, and the cursor for the next page
+  /// if there is one: the last identifier returned. A cursor, unlike an offset, still finds the
+  /// right place after items before it are forgotten, so a page never skips one. Only items the
+  /// agent reported are in it, not the root or a folder known only as some item's parent.
+  func workingSet(after cursor: ItemID?, size: Int) -> (entries: [ProviderEntry], next: ItemID?) {
+    let remaining = records.compactMap { id, record -> (id: ItemID, item: RemoteItem)? in
+      guard let item = record.item, cursor.map({ id.rawValue > $0.rawValue }) ?? true else {
+        return nil
+      }
+      return (id, item)
+    }.sorted { $0.id.rawValue < $1.id.rawValue }
+    let page = remaining.prefix(size)
+    return (page.map { entry($0.item, id: $0.id) }, remaining.count > size ? page.last?.id : nil)
   }
 
   /// The changes recorded after `anchor`; see `ChangeLog`.

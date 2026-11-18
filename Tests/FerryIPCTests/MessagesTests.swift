@@ -41,7 +41,7 @@ private func requests() -> [AgentRequest] {
   all.append(.replaceContents(domain: domain, id: photo))
   all.append(.delete(domain: domain, id: camera))
   all += [.changes(domain: domain, since: nil), .changes(domain: domain, since: Data([1, 2, 3]))]
-  all += [.workingSet(domain: domain, page: nil), .workingSet(domain: domain, page: 500)]
+  all += [.workingSet(domain: domain, page: nil), .workingSet(domain: domain, page: Data([7]))]
   return all
 }
 
@@ -117,7 +117,7 @@ private func responses() throws -> [AgentResponse] {
   all += [.done, .failure(.deviceDisconnected)]
   all.append(.changes(anchor: Data([9]), updated: [item], deleted: [.random()], expired: false))
   all.append(.changes(anchor: Data(), updated: [], deleted: [], expired: true))
-  all += [.page(entries: [item, root], next: 2), .page(entries: [], next: nil)]
+  all += [.page(entries: [item, root], next: Data([7])), .page(entries: [], next: nil)]
   return all
 }
 

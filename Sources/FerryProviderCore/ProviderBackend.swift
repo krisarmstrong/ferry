@@ -120,9 +120,10 @@ public actor ProviderBackend {
   /// `changes(since:)`. FileProvider re-enumerates it after an expired anchor, so it must hold
   /// every item FileProvider has, or FileProvider would take the missing ones as deleted.
   public func workingSet(from page: NSFileProviderPage) async throws -> ProviderPage {
-    let response = try await send(.workingSet(domain: domain, page: try Self.offset(of: page)))
+    let response = try await send(.workingSet(domain: domain, page: try Self.cursor(of: page)))
     guard case .page(let entries, let next) = response else { throw Self.unexpected(response) }
-    return ProviderPage(items: entries.map(ProviderItem.init), next: next.map(Self.page))
+    return ProviderPage(
+      items: entries.map(ProviderItem.init), next: next.map(NSFileProviderPage.init(rawValue:)))
   }
 
   /// The anchor the working set's changes start from now.
@@ -191,22 +192,17 @@ public actor ProviderBackend {
 
   // MARK: Local mapping
 
-  /// A page after the first is the agent's offset as 8 big-endian bytes. Anything else from
-  /// FileProvider than an initial page or one of these is expired.
-  private static func offset(of page: NSFileProviderPage) throws -> Int? {
+  /// A page after the first carries the agent's cursor: the last identifier it served, as
+  /// UTF-8. Anything from FileProvider other than an initial page or such a cursor is expired.
+  private static func cursor(of page: NSFileProviderPage) throws -> Data? {
     let initial = [
       NSFileProviderPage.initialPageSortedByName as Data,
       NSFileProviderPage.initialPageSortedByDate as Data,
     ]
     if initial.contains(page.rawValue) { return nil }
-    guard page.rawValue.count == 8 else { throw NSFileProviderError(.pageExpired) }
-    let offset = page.rawValue.reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
-    guard let value = Int(exactly: offset) else { throw NSFileProviderError(.pageExpired) }
-    return value
-  }
-
-  private static func page(_ offset: Int) -> NSFileProviderPage {
-    withUnsafeBytes(of: UInt64(offset).bigEndian) { NSFileProviderPage(rawValue: Data($0)) }
+    guard let text = String(data: page.rawValue, encoding: .utf8), ItemID(rawValue: text) != nil
+    else { throw NSFileProviderError(.pageExpired) }
+    return page.rawValue
   }
 
   /// The trash, the working set and anything else the agent did not assign name no item.

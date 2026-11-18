@@ -96,12 +96,7 @@ public actor AgentService: AgentHandling {
         anchor: changes.anchor, updated: changes.updated, deleted: changes.deleted,
         expired: changes.expired)
     case (.workingSet(let domain, let page), _):
-      let offset = page ?? 0
-      guard offset >= 0 else { throw .io("bad request") }
-      let (entries, next) = try await gated(domain) { route in
-        await route.items.workingSet(from: offset, size: Self.workingSetPageSize)
-      }
-      return .page(entries: entries, next: next)
+      return try await workingSet(page, in: domain)
     case (.fetch, nil), (.replaceContents, nil):
       throw .io("bad request")
     }
@@ -147,6 +142,22 @@ public actor AgentService: AgentHandling {
         path, in: route.storage, to: scratch, replacing: true, progress: Self.ignoreProgress)
     }
     try await FileTransfer.copyOut(scratch, to: target)
+  }
+
+  /// One page of the working set. The page token is the last identifier served, as UTF-8.
+  private func workingSet(_ page: Data?, in domain: String) async throws(TransportError)
+    -> AgentResponse
+  {
+    let cursor = try page.map { data throws(TransportError) in
+      guard let id = String(data: data, encoding: .utf8).flatMap(ItemID.init(rawValue:)) else {
+        throw .io("bad request")
+      }
+      return id
+    }
+    let (entries, next) = try await gated(domain) { route in
+      await route.items.workingSet(after: cursor, size: Self.workingSetPageSize)
+    }
+    return .page(entries: entries, next: next.map { Data($0.rawValue.utf8) })
   }
 
   // MARK: Changing

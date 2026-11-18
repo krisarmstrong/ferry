@@ -233,8 +233,9 @@ struct ItemTableTests {
       .root, children: [try file("/a"), try file("/b"), try folder("/C")])
     _ = await table.id(for: try path("/known-only-by-path"))
 
-    let first = await table.workingSet(from: 0, size: 2)
-    let second = await table.workingSet(from: try #require(first.next), size: 2)
+    let first = await table.workingSet(after: nil, size: 2)
+    let cursor: ItemID = try #require(first.next)
+    let second = await table.workingSet(after: cursor, size: 2)
 
     #expect(first.entries.count == 2)
     #expect(second.next == nil)
@@ -244,6 +245,26 @@ struct ItemTableTests {
         == (first.entries + second.entries).sorted {
           $0.id.rawValue < $1.id.rawValue
         })
-    #expect(await table.workingSet(from: 3, size: 2).entries.isEmpty)
+    #expect(await table.workingSet(after: second.entries.last?.id, size: 2).entries.isEmpty)
+  }
+
+  /// An item deleted after it was served must not shift an unchanged one out of the next page:
+  /// FileProvider would take the missing item as deleted, and no change would ever restore it.
+  @Test func deleteBetweenPagesSkipsNothing() async throws {
+    let table = ItemTable(domain: tableDomain, store: store())
+    let all = await table.listed(.root, children: try (0..<6).map { try file("/f\($0)") })
+
+    let first = await table.workingSet(after: nil, size: 2)
+    let served = try #require(first.entries.first)
+    await table.removed(served.item.path)
+    var delivered = first.entries.map(\.id)
+    var next = first.next
+    while let cursor = next {
+      let page = await table.workingSet(after: cursor, size: 2)
+      delivered += page.entries.map(\.id)
+      next = page.next
+    }
+
+    #expect(Set(all.map(\.id)).subtracting(delivered).isEmpty)
   }
 }

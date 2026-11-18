@@ -53,7 +53,7 @@ private struct Domain {
   /// Every page of the working set.
   func workingSet() async throws -> (entries: [ProviderEntry], pages: Int) {
     var entries: [ProviderEntry] = []
-    var page: Int?
+    var page: Data?
     var pages = 0
     repeat {
       guard case .page(let found, let next) = await send(.workingSet(domain: name, page: page))
@@ -176,6 +176,7 @@ struct AgentChangeTests {
     #expect(Set(set.map(\.id)) == Set((relisted + nested).map(\.id)))
     #expect(!set.contains { $0.id == .root || $0.id == doomed.id || $0.id == reshaped.id })
     #expect(
-      await domain.send(.workingSet(domain: domain.name, page: -1)) == .failure(.io("bad request")))
+      await domain.send(.workingSet(domain: domain.name, page: Data("/Docs".utf8)))
+        == .failure(.io("bad request")))
   }
 }

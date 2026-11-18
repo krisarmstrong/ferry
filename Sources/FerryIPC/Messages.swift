@@ -85,8 +85,8 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   case changes(domain: String, since: Data?)
   /// One page of every item the agent has reported in the domain, root excluded, in a stable
   /// order: the working set FileProvider enumerates after it drops its cache. `page` is the
-  /// `next` of the previous `.page`, or `nil` for the first.
-  case workingSet(domain: String, page: Int?)
+  /// opaque `next` of the previous `.page`, or `nil` for the first.
+  case workingSet(domain: String, page: Data?)
 }
 
 public enum AgentResponse: Codable, Sendable, Equatable {
@@ -98,7 +98,7 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   /// agent's window), so the lists are empty and the client must enumerate everything again.
   case changes(anchor: Data, updated: [ProviderEntry], deleted: [ItemID], expired: Bool)
   /// Answers `.workingSet`. `next` is `nil` on the last page.
-  case page(entries: [ProviderEntry], next: Int?)
+  case page(entries: [ProviderEntry], next: Data?)
   case done
   case failure(TransportError)
 }

@@ -189,16 +189,17 @@ actor FakeAgent: AgentSending {
     return entries
   }
 
-  /// Pages of two, ordered by identifier, like the agent's pages of 500.
-  private func workingSetPage(_ page: Int?) throws(TransportError) -> AgentResponse {
-    let known = paths.filter { $0.key != .root }.sorted { $0.key.rawValue < $1.key.rawValue }
-    let start = page ?? 0
-    let end = min(start + 2, known.count)
+  /// Pages of two after a cursor, the last identifier served, like the agent's pages of 500.
+  private func workingSetPage(_ page: Data?) throws(TransportError) -> AgentResponse {
+    let cursor = page.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    let remaining = paths.filter { $0.key != .root && $0.key.rawValue > cursor }
+      .sorted { $0.key.rawValue < $1.key.rawValue }
     var entries: [ProviderEntry] = []
-    for (id, path) in known[start..<end] {
+    for (id, path) in remaining.prefix(2) {
       entries.append(try entry(try existing(path), id: id))
     }
-    return .page(entries: entries, next: end < known.count ? end : nil)
+    let next = remaining.count > 2 ? entries.last.map { Data($0.id.rawValue.utf8) } : nil
+    return .page(entries: entries, next: next)
   }
 
   private func path(_ id: ItemID) throws(TransportError) -> RemotePath {
