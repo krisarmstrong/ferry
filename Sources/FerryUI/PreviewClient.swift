@@ -45,8 +45,9 @@ extension AppModel {
 
 @MainActor
 private final class PreviewServices: SystemServicing {
-  var opensAtLogin = false
-  func setOpensAtLogin(_ enabled: Bool) { opensAtLogin = enabled }
+  func registerAgent() async {}
+  func opensAtLogin() async -> Bool { false }
+  func setOpensAtLogin(_ enabled: Bool) async {}
   func unregisterAgent() {}
   func open(_ url: URL) {}
   func reveal(_ urls: [URL]) {}

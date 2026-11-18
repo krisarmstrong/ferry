@@ -18,7 +18,7 @@ final class CallLog: Sendable {
 }
 
 /// Answers `.status` with whatever the test last set, and records every request.
-private final class FakeClient: AgentSending {
+final class FakeClient: AgentSending {
   let log: CallLog
   private let status = Mutex<AgentResponse>(.status(devices: [], providerEnabled: true))
   private let removeResult = Mutex<AgentResponse>(.removed(preserved: []))
@@ -69,7 +69,7 @@ private final class FakeClient: AgentSending {
 
 /// Fails the first `failures` status requests, as a client whose agent is still starting does,
 /// then answers with no devices.
-private final class StartingClient: AgentSending {
+final class StartingClient: AgentSending {
   private let remaining: Mutex<Int>
 
   init(failures: Int) {
@@ -89,7 +89,7 @@ private final class StartingClient: AgentSending {
 }
 
 /// Refuses every request, as a client whose agent is not running does.
-private struct UnreachableClient: AgentSending {
+struct UnreachableClient: AgentSending {
   func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
     -> AgentResponse
   {
@@ -98,19 +98,28 @@ private struct UnreachableClient: AgentSending {
 }
 
 @MainActor
-private final class FakeServices: SystemServicing {
+final class FakeServices: SystemServicing {
   let log: CallLog
-  var opensAtLogin = true
+  var loginItem = true
   var failLoginItem = false
 
   init(log: CallLog) {
     self.log = log
   }
 
-  func setOpensAtLogin(_ enabled: Bool) throws {
+  func registerAgent() async {
+    log.record("registerAgent")
+  }
+
+  func opensAtLogin() async -> Bool {
+    log.record("readLoginItem")
+    return loginItem
+  }
+
+  func setOpensAtLogin(_ enabled: Bool) async throws {
     log.record("opensAtLogin \(enabled)")
     if failLoginItem { throw CocoaError(.featureUnsupported) }
-    opensAtLogin = enabled
+    loginItem = enabled
   }
 
   func unregisterAgent() async throws {
@@ -130,7 +139,7 @@ private final class FakeServices: SystemServicing {
   }
 }
 
-private func device(_ serial: String, model: String, _ state: DeviceState) -> AttachedDevice {
+func device(_ serial: String, model: String, _ state: DeviceState) -> AttachedDevice {
   AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: serial), manufacturer: "NetAlly", model: model),
     state: state)
@@ -260,91 +269,6 @@ struct AppModelTests {
     #expect(!model.isChecking)
   }
 
-  @Test func removeFerryCallsRemoveAllThenUnregister() async {
-    let services = FakeServices(log: log)
-    let model = AppModel(client: FakeClient(log: log), services: services)
-    await model.removeFerry()
-    #expect(log.all == ["removeAllDomains", "unregisterAgent", "opensAtLogin false", "quit"])
-  }
-
-  @Test func removeFerryQuitsWhenOnlyTheLoginItemRemains() async {
-    let services = FakeServices(log: log)
-    services.failLoginItem = true
-    let model = AppModel(client: FakeClient(log: log), services: services)
-    await model.removeFerry()
-    #expect(log.all == ["removeAllDomains", "unregisterAgent", "opensAtLogin false", "quit"])
-  }
-
-  @Test func removeFerryStopsWhenDomainsRemain() async {
-    let client = FakeClient(log: log)
-    client.failRemoveAll()
-    let model = AppModel(client: client, services: FakeServices(log: log))
-    await model.removeFerry()
-    #expect(log.all == ["removeAllDomains"])
-    #expect(model.actionError != nil)
-  }
-
-  /// A folder like the one the system saves unsent changes to, holding a file or empty.
-  static func savedFolder(holdingFile: Bool) throws -> URL {
-    let folder = FileManager.default.temporaryDirectory.appending(
-      path: "Ferry unsent \(UUID().uuidString)", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    if holdingFile {
-      try Data("x".utf8).write(to: folder.appending(path: "report.txt"))
-    }
-    return folder
-  }
-
-  @Test func ejectShowsWhereUnsentChangesWereSaved() async throws {
-    let saved = try Self.savedFolder(holdingFile: true)
-    defer { try? FileManager.default.removeItem(at: saved) }
-    let client = FakeClient(log: log)
-    client.preserve([saved])
-    let model = AppModel(client: client, services: FakeServices(log: log))
-
-    await model.eject(DeviceID(serial: "A1"))
-
-    #expect(model.preservedChanges == [saved])
-    #expect(model.actionError == nil)
-    model.revealPreservedChanges()
-    #expect(log.all.last == "reveal \(saved.path)")
-  }
-
-  /// The system can name a location it left empty, or none at all: nothing to show then.
-  @Test func ejectShowsNoMessageForAnEmptyOrMissingLocation() async throws {
-    let empty = try Self.savedFolder(holdingFile: false)
-    defer { try? FileManager.default.removeItem(at: empty) }
-    let missing = FileManager.default.temporaryDirectory.appending(path: "Ferry gone \(UUID())")
-    let client = FakeClient(log: log)
-    client.preserve([empty, missing])
-    let model = AppModel(client: client, services: FakeServices(log: log))
-
-    await model.eject(DeviceID(serial: "A1"))
-
-    #expect(model.preservedChanges.isEmpty)
-  }
-
-  @Test func ejectWithNothingUnsentShowsNoMessage() async {
-    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
-    await model.eject(DeviceID(serial: "A1"))
-    #expect(model.preservedChanges.isEmpty)
-  }
-
-  /// Ferry quits right after Remove Ferry, so a menu message would never be seen: the saved
-  /// changes are shown in Finder instead, if there are any.
-  @Test(arguments: [true, false])
-  func removeFerryRevealsSavedChangesBeforeQuitting(holdingFile: Bool) async throws {
-    let saved = try Self.savedFolder(holdingFile: holdingFile)
-    defer { try? FileManager.default.removeItem(at: saved) }
-    let client = FakeClient(log: log)
-    client.preserve([saved])
-    let model = AppModel(client: client, services: FakeServices(log: log))
-    await model.removeFerry()
-    let reveal = holdingFile ? ["reveal \(saved.path)"] : []
-    #expect(
-      log.all == ["removeAllDomains", "unregisterAgent"] + reveal + ["opensAtLogin false", "quit"])
-  }
-
   /// Refresh lists the ready devices' folders again on the agent, so changes made on a device
   /// reach Finder, then reads the status.
   @Test func refreshButtonRelistsReadyDevices() async {
@@ -382,6 +306,20 @@ struct AppModelTests {
     let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
     await model.mount(DeviceID(serial: "A1"))
     #expect(log.all.suffix(2) == ["recheck A1", "status"])
+  }
+
+  /// SMAppService must not run on the main thread: the model touches no system service when it
+  /// is made, and reads the login item only once launched, off the main actor.
+  @Test func makingTheModelTouchesNoSystemService() {
+    _ = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    #expect(log.all.isEmpty)
+  }
+
+  @Test func launchRegistersTheAgentThenReadsStatusAndLoginItem() async {
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    await model.launch()
+    #expect(log.all == ["registerAgent", "status", "readLoginItem"])
+    #expect(model.opensAtLogin)
   }
 
   @Test func deviceTextIsEscaped() {

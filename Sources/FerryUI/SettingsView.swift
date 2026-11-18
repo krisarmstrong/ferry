@@ -14,7 +14,9 @@ public struct SettingsView: View {
   public var body: some View {
     Form {
       Toggle(
-        isOn: Binding(get: { model.opensAtLogin }, set: { model.setOpensAtLogin($0) })
+        isOn: Binding(
+          get: { model.opensAtLogin },
+          set: { enabled in Task { await model.setOpensAtLogin(enabled) } })
       ) {
         Text("Open at login", bundle: .module)
       }

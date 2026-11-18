@@ -36,7 +36,8 @@ import os
   /// Where the system saved changes an eject removed before they reached the device. Shown until
   /// the next action.
   public private(set) var preservedChanges: [URL] = []
-  public private(set) var opensAtLogin: Bool
+  /// Read from the system once launched (see `launch()`); `false` until then.
+  public private(set) var opensAtLogin = false
 
   /// The steps the guide shows; `nil` shows the model picker.
   public var guideFamily: DeviceFamily?
@@ -65,7 +66,6 @@ import os
     self.client = client
     self.services = services
     self.sleep = sleep
-    opensAtLogin = services.opensAtLogin
   }
 
   /// No answer from the agent yet, so whether a device is attached is not known.
@@ -197,16 +197,24 @@ import os
     services.open(Self.loginItemsSettings)
   }
 
-  public func setOpensAtLogin(_ enabled: Bool) {
+  /// Registers the agent, reads its status, then whether Ferry opens at login. The system calls
+  /// run off the main actor (see `SystemServices`), so the app opens without waiting on them.
+  public func launch() async {
+    await services.registerAgent()
+    await refresh()
+    opensAtLogin = await services.opensAtLogin()
+  }
+
+  public func setOpensAtLogin(_ enabled: Bool) async {
     do {
-      try services.setOpensAtLogin(enabled)
+      try await services.setOpensAtLogin(enabled)
       actionError = nil
     } catch {
       Self.log.error("open at login: \(error, privacy: .public)")
       actionError = String(
         localized: LocalizedStringResource("Could not change Open at login.", bundle: .module))
     }
-    opensAtLogin = services.opensAtLogin
+    opensAtLogin = await services.opensAtLogin()
   }
 
   /// Removes Ferry's locations from Finder, unregisters the agent and the login item, and
@@ -232,9 +240,9 @@ import os
     if !preserved.isEmpty {
       services.reveal(preserved)
     }
-    if services.opensAtLogin {
+    if await services.opensAtLogin() {
       do {
-        try services.setOpensAtLogin(false)
+        try await services.setOpensAtLogin(false)
       } catch {
         Self.log.error("removing the login item failed: \(error, privacy: .public)")
       }

@@ -9,14 +9,13 @@ struct FerryApp: App {
   @State private var model: AppModel
 
   init() {
-    let services = SystemServices()
-    services.registerAgent()
     let model = AppModel(
       client: AgentClient(machServiceName: "X6JWYP43HG.io.github.krisarmstrong.ferry.agent"),
-      services: services)
+      services: SystemServices())
     _model = State(initialValue: model)
-    // One status request at launch, so the log shows the devices before the menu first opens.
-    Task { await model.refresh() }
+    // Registers the agent and reads the status once, so the log shows the devices before the
+    // menu first opens. The system calls run off the main thread.
+    Task { await model.launch() }
   }
 
   var body: some Scene {
