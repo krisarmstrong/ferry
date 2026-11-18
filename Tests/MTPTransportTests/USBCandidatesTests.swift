@@ -41,15 +41,46 @@ struct USBCandidatesTests {
     #expect(Self.candidacy(linkRunner) == .mtp)
   }
 
-  @Test func unknownDeviceWithAnUnownedMTPInterfaceIsAdmitted() {
+  /// Outside libmtp's table, only an interface that names itself MTP may be probed, and only
+  /// once the device has settled (see `DeviceRegistry`).
+  @Test func unknownAndroidWithAnInterfaceNamedMTPIsProbed() {
     #expect(!MTPDeviceTable.contains(vendor: 0x1234, product: 0x5678))
+    let named = USBInterface(
+      interfaceClass: 0xFF, subclass: 0xFF, interfaceProtocol: 0, endpoints: 3, name: "MTP")
     #expect(
-      Self.candidacy(Self.device(vendor: 0x1234, product: 0x5678, interfaces: [Self.mtp])) == .mtp)
+      Self.candidacy(Self.device(vendor: 0x1234, product: 0x5678, interfaces: [named, Self.adb]))
+        == .probe)
+  }
+
+  @Test func unknownPTPStyleInterfaceNamedMTPIsProbed() {
+    let named = USBInterface(
+      interfaceClass: 0x06, subclass: 1, interfaceProtocol: 1, endpoints: 3, name: "mtp")
+    #expect(
+      Self.candidacy(Self.device(vendor: 0x1234, product: 0x5678, interfaces: [named])) == .probe)
+  }
+
+  /// A Garmin, an SDR or lab gear: a driverless vendor-specific interface with three endpoints
+  /// that does not say MTP. Opening it through libusb would seize it.
+  @Test(arguments: [nil, "Garmin USB", "Bulk"] as [String?])
+  func unknownVendorInterfaceThatDoesNotSayMTPIsIgnored(name: String?) {
+    let unnamed = USBInterface(
+      interfaceClass: 0xFF, subclass: 0xFF, interfaceProtocol: 0, endpoints: 3, name: name)
+    #expect(
+      Self.candidacy(Self.device(vendor: 0x091E, product: 0x0003, interfaces: [unnamed]))
+        == .ignored)
+  }
+
+  @Test func unknownInterfaceNamedMTPWithTheWrongShapeIsIgnored() {
+    let odd = USBInterface(
+      interfaceClass: 0xFF, subclass: 0x42, interfaceProtocol: 1, endpoints: 3, name: "MTP")
+    #expect(
+      Self.candidacy(Self.device(vendor: 0x1234, product: 0x5678, interfaces: [odd])) == .ignored)
   }
 
   @Test func unknownVendorInterfaceThatADriverOwnsIsIgnored() {
     let owned = USBInterface(
-      interfaceClass: 0xFF, subclass: 0xFF, interfaceProtocol: 0, endpoints: 3, hasDriver: true)
+      interfaceClass: 0xFF, subclass: 0xFF, interfaceProtocol: 0, endpoints: 3, hasDriver: true,
+      name: "MTP")
     #expect(
       Self.candidacy(Self.device(vendor: 0x0BDA, product: 0x8153, interfaces: [owned])) == .ignored)
   }

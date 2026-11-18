@@ -41,6 +41,10 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     var now: @Sendable () -> ContinuousClock.Instant
   }
 
+  /// How long a device outside libmtp's table must have been attached before it is opened, so
+  /// its drivers have matched and `USBInterface.hasDriver` can be trusted.
+  static var probeSettleTime: Duration { .seconds(1) }
+
   /// How long an ejected device must be gone from its port to count as unplugged. A reset
   /// re-enumerates in milliseconds; a person unplugging and replugging takes longer.
   static var settleTime: Duration { .seconds(3) }
@@ -73,6 +77,8 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
   }
 
   private var opened: [BusLocation: Scanned] = [:]
+  /// When each enumeration of a `.probe` candidate was first seen.
+  private var firstSeen: [BusLocation: ContinuousClock.Instant] = [:]
 
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     queue.asUnownedSerialExecutor()
@@ -93,6 +99,7 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
       busy = busy.filter { present.contains($0.key) }
       let rescanAfter = settleEjected(present: occupied)
       resolved = resolved.filter { present.contains($0.key) }
+      firstSeen = firstSeen.filter { present.contains($0.key) }
       for (location, gone) in opened where !present.contains(location) {
         opened[location] = nil
         await driver.close(gone.device)
@@ -104,9 +111,10 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
       // One device can be ejected on more than one port (see `report`): list it once.
       var listed: Set<DeviceID> = []
       let ejectedNow = found.ejected.filter { listed.insert($0.id).inserted }
+      let soonest = [rescanAfter, found.rescanAfter].compactMap { $0 }.min()
       return DeviceScan(
         devices: found.devices, busy: found.busy, notSharing: found.notSharing,
-        ejected: ejectedNow, rescanAfter: rescanAfter)
+        ejected: ejectedNow, rescanAfter: soonest)
     }
   }
 
@@ -116,6 +124,8 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     var busy: [DeviceInfo] = []
     var notSharing: [DeviceInfo] = []
     var ejected: [DeviceInfo]
+    /// When a device not yet settled may be opened.
+    var rescanAfter: Duration?
   }
 
   /// Sorts one attached device into `found`, opening it only if it is a new candidate.
@@ -135,6 +145,11 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
       return
     case .mtp:
       break
+    case .probe:
+      if let wait = settling(location) {
+        found.rescanAfter = min(found.rescanAfter ?? wait, wait)
+        return
+      }
     }
     if let info = busy[location] {
       found.busy.append(info)
@@ -225,6 +240,18 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
       }
     }
     return soonest
+  }
+
+  /// How long until a `.probe` candidate has been attached for `probeSettleTime`, or `nil` once
+  /// it has. The first sighting starts the wait.
+  private func settling(_ location: BusLocation) -> Duration? {
+    let now = driver.now()
+    guard let since = firstSeen[location] else {
+      firstSeen[location] = now
+      return Self.probeSettleTime
+    }
+    let waited = since.duration(to: now)
+    return waited >= Self.probeSettleTime ? nil : Self.probeSettleTime - waited
   }
 
   private func resolve(_ record: USBDeviceRecord) -> Raw? {

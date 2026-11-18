@@ -6,16 +6,19 @@ public struct USBInterface: Sendable, Hashable {
   public let endpoints: UInt8
   /// A macOS driver owns the interface, so it is not an MTP interface nobody serves.
   public let hasDriver: Bool
+  /// The interface's string descriptor (`kUSBString`), which Android sets to "MTP".
+  public let name: String?
 
   public init(
     interfaceClass: UInt8, subclass: UInt8, interfaceProtocol: UInt8, endpoints: UInt8,
-    hasDriver: Bool = false
+    hasDriver: Bool = false, name: String? = nil
   ) {
     self.interfaceClass = interfaceClass
     self.subclass = subclass
     self.interfaceProtocol = interfaceProtocol
     self.endpoints = endpoints
     self.hasDriver = hasDriver
+    self.name = name
   }
 
   /// Android's MTP interface: vendor-specific, with bulk in, bulk out and interrupt endpoints.
@@ -26,6 +29,18 @@ public struct USBInterface: Sendable, Hashable {
   var isStillImage: Bool { interfaceClass == 0x06 }
 
   var isVendorSpecific: Bool { interfaceClass == 0xFF }
+
+  /// An interface no driver serves that says it is MTP, with MTP's shape: Android's
+  /// vendor-specific 0xFF/0xFF/0x00 with three endpoints, or Still Image 6/1/1. The name is
+  /// matched as libmtp's own probe matches it: containing "MTP" in any case.
+  var announcesMTP: Bool {
+    guard !hasDriver, let name, name.range(of: "MTP", options: .caseInsensitive) != nil else {
+      return false
+    }
+    let android = interfaceClass == 0xFF && subclass == 0xFF && interfaceProtocol == 0
+    let stillImage = interfaceClass == 0x06 && subclass == 1 && interfaceProtocol == 1
+    return (android && endpoints == 3) || stillImage
+  }
 }
 
 /// A USB device as the IOKit registry describes it, read without opening the device.
@@ -69,6 +84,10 @@ enum USBCandidacy: Sendable, Equatable {
   case ignored
   /// May speak MTP, so libmtp may open it.
   case mtp
+  /// Not in libmtp's table, but an interface says it is MTP. libmtp may open it once the device
+  /// has settled: its drivers may not have matched yet when it first appears (see
+  /// `DeviceRegistry`).
+  case probe
   /// A known Android device attached without an MTP interface: file transfer is off on it.
   case notSharing
 }
@@ -87,8 +106,11 @@ enum USBCandidates {
 
   /// Decides from registry properties only; nothing here opens the device.
   ///
-  /// Apple devices are denied first. A device with an unowned vendor-specific interface with
-  /// three endpoints may be MTP; so may a device in libmtp's table with a Still Image interface.
+  /// Apple devices are denied first. A device in libmtp's table with an MTP-shaped interface
+  /// (vendor-specific with three endpoints) or a Still Image one is MTP. A device outside the
+  /// table is probed only if an interface no driver owns says it is MTP (`announcesMTP`): a
+  /// vendor-specific interface alone also describes GPS units, radios and lab gear, which libusb
+  /// would seize.
   /// A device in the table, or in `chargeOnlyAndroidDevices`, whose interfaces are all
   /// vendor-specific (or that has none) but none looks like MTP is not sharing files. Anything
   /// else, including a Still Image camera libmtp does not list, is ignored. A device not
@@ -96,8 +118,10 @@ enum USBCandidates {
   static func candidacy(of device: USBDeviceRecord, inTable: Bool) -> USBCandidacy {
     if device.vendorID == appleVendorID { return .ignored }
     guard let interfaces = device.interfaces else { return .ignored }
-    let mtp = interfaces.contains { $0.looksLikeMTP && (inTable || !$0.hasDriver) }
-    if mtp || (inTable && interfaces.contains(where: \.isStillImage)) { return .mtp }
+    if inTable, interfaces.contains(where: { $0.looksLikeMTP || $0.isStillImage }) {
+      return .mtp
+    }
+    if !inTable, interfaces.contains(where: \.announcesMTP) { return .probe }
     let product = UInt32(device.vendorID) << 16 | UInt32(device.productID)
     let android = inTable || chargeOnlyAndroidDevices.contains(product)
     if android, interfaces.allSatisfy(\.isVendorSpecific) { return .notSharing }

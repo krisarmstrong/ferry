@@ -88,7 +88,7 @@ public enum USBRegistry {
         USBInterface(
           interfaceClass: interfaceClass, subclass: subclass,
           interfaceProtocol: interfaceProtocol, endpoints: endpoints,
-          hasDriver: hasDriver(child)))
+          hasDriver: hasDriver(child), name: string(child, kUSBHostInterfacePropertyString)))
     }
     return interfaces
   }
