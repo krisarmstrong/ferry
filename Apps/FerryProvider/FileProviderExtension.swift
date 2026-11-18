@@ -14,9 +14,12 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
 
   required init(domain: NSFileProviderDomain) {
     manager = NSFileProviderManager(for: domain)
+    // The build records the signing team in Info.plist; `make app` checks it is there.
+    guard let identity = FerryIdentity() else {
+      preconditionFailure("FerryTeamID is missing from the extension's Info.plist")
+    }
     backend = ProviderBackend(
-      domain: domain.identifier.rawValue,
-      client: AgentClient(machServiceName: "X6JWYP43HG.io.github.krisarmstrong.ferry.agent"))
+      domain: domain.identifier.rawValue, client: AgentClient(identity: identity))
     super.init()
   }
 

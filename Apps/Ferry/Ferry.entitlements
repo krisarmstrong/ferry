@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>X6JWYP43HG.io.github.krisarmstrong.ferry</string>
+		<string>$(FERRY_TEAM_ID).io.github.krisarmstrong.ferry</string>
 	</array>
 </dict>
 </plist>

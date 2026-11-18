@@ -9,9 +9,11 @@ struct FerryApp: App {
   @State private var model: AppModel
 
   init() {
-    let model = AppModel(
-      client: AgentClient(machServiceName: "X6JWYP43HG.io.github.krisarmstrong.ferry.agent"),
-      services: SystemServices())
+    // The build records the signing team in Info.plist; `make app` checks it is there.
+    guard let identity = FerryIdentity() else {
+      preconditionFailure("FerryTeamID is missing from Ferry's Info.plist")
+    }
+    let model = AppModel(client: AgentClient(identity: identity), services: SystemServices())
     _model = State(initialValue: model)
     // Registers the agent and reads the status once, so the log shows the devices before the
     // menu first opens. The system calls run off the main thread.

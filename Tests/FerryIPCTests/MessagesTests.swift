@@ -186,8 +186,8 @@ func nonIdentifierRepliesBadRequest(_ folder: String) async throws {
 }
 
 private let requirements =
-  [AgentListenerDelegate.ferryClientRequirement]
-  + [AgentListenerDelegate.agentRequirement]
+  [FerryIdentity(teamID: "X6JWYP43HG")].compactMap { $0 }
+  .flatMap { [$0.clientRequirement, $0.agentRequirement] }
 
 @Test(arguments: requirements)
 func requirementCompiles(_ text: String) throws {

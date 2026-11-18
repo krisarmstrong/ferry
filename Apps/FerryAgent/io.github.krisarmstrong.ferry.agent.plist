@@ -12,7 +12,7 @@
 	</array>
 	<key>MachServices</key>
 	<dict>
-		<key>X6JWYP43HG.io.github.krisarmstrong.ferry.agent</key>
+		<key>$(FERRY_TEAM_ID).io.github.krisarmstrong.ferry.agent</key>
 		<true/>
 	</dict>
 	<key>RunAtLoad</key>

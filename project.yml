@@ -12,7 +12,10 @@ packages:
 
 settings:
   base:
-    DEVELOPMENT_TEAM: X6JWYP43HG
+    # The team that signs Ferry. It also names the app group and the agent's Mach service, and
+    # each bundle records it as FerryTeamID. Override with `make app TEAM=<your team ID>`.
+    FERRY_TEAM_ID: X6JWYP43HG
+    DEVELOPMENT_TEAM: $(FERRY_TEAM_ID)
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: Apple Development
     ARCHS: arm64
@@ -35,12 +38,6 @@ targets:
       - path: Design/Icon/Ferry.icon
         type: file
         buildPhase: resources
-      # The agent's launchd plist, where SMAppService.agent(plistName:) looks for it.
-      - path: Apps/FerryAgent/io.github.krisarmstrong.ferry.agent.plist
-        buildPhase:
-          copyFiles:
-            destination: wrapper
-            subpath: Contents/Library/LaunchAgents
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.krisarmstrong.ferry
@@ -48,6 +45,17 @@ targets:
         INFOPLIST_FILE: Apps/Ferry/Info.plist
         CODE_SIGN_ENTITLEMENTS: Apps/Ferry/Ferry.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: Ferry
+    postBuildScripts:
+      # The agent's launchd plist, where SMAppService.agent(plistName:) looks for it, with the
+      # team's Mach service name filled in. A copy phase would keep $(FERRY_TEAM_ID) verbatim.
+      - name: Install the agent's launchd plist
+        inputFiles:
+          - $(SRCROOT)/Apps/FerryAgent/io.github.krisarmstrong.ferry.agent.plist
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchAgents/io.github.krisarmstrong.ferry.agent.plist
+        script: |
+          mkdir -p "$(dirname "$SCRIPT_OUTPUT_FILE_0")"
+          sed "s/[$](FERRY_TEAM_ID)/${FERRY_TEAM_ID}/g" "$SCRIPT_INPUT_FILE_0" > "$SCRIPT_OUTPUT_FILE_0"
     dependencies:
       - package: Ferry
         product: FerryUI
@@ -74,6 +82,8 @@ targets:
         PRODUCT_NAME: FerryAgent
         CODE_SIGN_ENTITLEMENTS: Apps/FerryAgent/FerryAgent.entitlements
         GENERATE_INFOPLIST_FILE: YES
+        # Merged with the generated keys: it adds FerryTeamID.
+        INFOPLIST_FILE: Apps/FerryAgent/Info.plist
         # A tool has no bundle, so its Info.plist (and so its signing identifier) lives in the
         # binary.
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES

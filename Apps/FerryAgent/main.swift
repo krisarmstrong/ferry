@@ -9,6 +9,12 @@ import os
 
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "Agent")
 
+// The team the build signed Ferry with, which names the Mach service and admits clients.
+guard let identity = FerryIdentity() else {
+  log.fault("FerryTeamID is missing from the agent's Info.plist")
+  exit(EXIT_FAILURE)
+}
+
 let itemStore: URL
 do {
   itemStore = try DomainController.defaultItemStore()
@@ -28,8 +34,9 @@ Task {
 }
 
 // The listener holds its delegate weakly; both live for the whole process.
-let delegate = AgentListenerDelegate(handler: AgentService(hub: hub, domains: domains))
-let listener = NSXPCListener(machServiceName: "X6JWYP43HG.io.github.krisarmstrong.ferry.agent")
+let delegate = AgentListenerDelegate(
+  handler: AgentService(hub: hub, domains: domains), identity: identity)
+let listener = NSXPCListener(machServiceName: identity.machServiceName)
 listener.delegate = delegate
 listener.resume()
 log.info("agent started")

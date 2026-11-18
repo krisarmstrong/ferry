@@ -63,15 +63,24 @@ SwiftLint and Homebrew's libmtp.
 
 ```sh
 brew install libmtp swiftlint xcodegen
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
 make app     # Ferry.app, with its helper and Finder extension, in .build/xcode/Build/Products/Debug
 make test    # unit tests, no device needed
 make lint fmt-check
 ```
 
-`make app` signs with your Apple Development identity. Device integration tests are off by
-default; see [docs/TESTING.md](docs/TESTING.md).
+`make app` signs with an Apple Development identity of the team in `FERRY_TEAM_ID`
+(`project.yml`; the project's own team by default). To build with your own team, pass its
+ten-character team ID:
+
+```sh
+make app TEAM=ABCDE12345
+```
+
+The team ID also names Ferry's app group and its helper's XPC service, and the app, helper and
+Finder extension only talk to each other when signed by that team, so all three take it from the
+build (each records it as `FerryTeamID` in its Info.plist). `make app` checks that every part
+carries it. Device integration tests are off by default; see [docs/TESTING.md](docs/TESTING.md).
 
 `ferryctl` is a command-line front end for testing against a real device. Turn on file
 transfer first, then:

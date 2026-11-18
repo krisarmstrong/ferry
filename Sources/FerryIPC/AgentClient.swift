@@ -21,7 +21,7 @@ public protocol AgentSending: Sendable {
 /// which the caller has closed and removed by then.
 public actor AgentClient: AgentSending {
   private enum Target {
-    case machService(String)
+    case machService(String, requirement: String)
     case endpoint(NSXPCListenerEndpoint)
   }
 
@@ -31,8 +31,9 @@ public actor AgentClient: AgentSending {
   private let target: Target
   private var connection: NSXPCConnection?
 
-  public init(machServiceName: String) {
-    target = .machService(machServiceName)
+  /// Connects to the agent of `identity`'s team, which must be signed by that team.
+  public init(identity: FerryIdentity) {
+    target = .machService(identity.machServiceName, requirement: identity.agentRequirement)
   }
 
   /// Connects to an anonymous listener in the same process, without checking its signature.
@@ -85,11 +86,11 @@ public actor AgentClient: AgentSending {
     if let connection { return connection }
     let made: NSXPCConnection
     switch target {
-    case .machService(let name):
+    case .machService(let name, let requirement):
       made = NSXPCConnection(machServiceName: name)
       // Any same-user process can register this name in the gui domain first, so only a
       // Ferry-signed agent may answer.
-      made.setCodeSigningRequirement(AgentListenerDelegate.agentRequirement)
+      made.setCodeSigningRequirement(requirement)
     case .endpoint(let endpoint):
       made = NSXPCConnection(listenerEndpoint: endpoint)
     }

@@ -18,25 +18,13 @@ public protocol AgentHandling: Sendable {
 
 /// Accepts connections on the agent's listener and routes their requests to a handler.
 public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Sendable {
-  /// Admits only the Ferry app and its FileProvider extension, signed by the Ferry team.
-  public static let ferryClientRequirement = """
-    anchor apple generic and certificate leaf[subject.OU] = "X6JWYP43HG" and \
-    (identifier "io.github.krisarmstrong.ferry" or \
-    identifier "io.github.krisarmstrong.ferry.provider")
-    """
-
-  /// The agent itself, as its clients require it to be signed.
-  public static let agentRequirement = """
-    anchor apple generic and certificate leaf[subject.OU] = "X6JWYP43HG" and \
-    identifier "io.github.krisarmstrong.ferry.agent"
-    """
-
   private let handler: any AgentHandling
   private let codeSigningRequirement: String?
 
-  /// Admits only peers that satisfy `ferryClientRequirement`, checked on every message.
-  public convenience init(handler: any AgentHandling) {
-    self.init(handler: handler, codeSigningRequirement: Self.ferryClientRequirement)
+  /// Admits only the Ferry app and its extension signed by `identity`'s team, checked on every
+  /// message.
+  public convenience init(handler: any AgentHandling, identity: FerryIdentity) {
+    self.init(handler: handler, codeSigningRequirement: identity.clientRequirement)
   }
 
   /// A nil requirement admits any peer, which only an anonymous listener in tests may use.

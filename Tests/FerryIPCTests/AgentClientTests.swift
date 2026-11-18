@@ -5,6 +5,9 @@ import Testing
 
 @testable import FerryIPC
 
+/// The team the signed-only listener in these tests admits; no test peer is signed by it.
+private let testIdentity = FerryIdentity(teamID: "X6JWYP43HG")!
+
 private let listedID = ItemID.random()
 
 private func listing() throws(TransportError) -> [ProviderEntry] {
@@ -85,7 +88,7 @@ private struct Harness {
     let handler = StubHandler(started: startedContinuation, release: releaseStream)
     delegate = RefusingDelegate(
       inner: signedOnly
-        ? AgentListenerDelegate(handler: handler)
+        ? AgentListenerDelegate(handler: handler, identity: testIdentity)
         : AgentListenerDelegate(handler: handler, codeSigningRequirement: nil),
       refusals: refusals)
     listener.delegate = delegate
