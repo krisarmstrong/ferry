@@ -131,8 +131,14 @@ public actor ADBSession: DeviceSession {
 
   /// Runs `body` on the open sync connection, opening one if needed. A request that fails for
   /// any reason but a refused argument has ended the connection, so it is let go.
+  ///
+  /// adbd keeps a sync connection until it is told to quit, and every failure drops it here, so
+  /// a kept connection that closes was ended by its transport: the device left, or the server
+  /// stopped, perhaps to come straight back (`adb kill-server`). The device may answer again at
+  /// once, but on a new transport, so this session's route is gone either way.
   func syncing<T>(_ body: (ADBSync) async throws(ADBError) -> T) async throws(ADBError) -> T {
     let open: ADBSync
+    let kept = sync != nil
     if let sync {
       open = sync
     } else {
@@ -143,6 +149,7 @@ public actor ADBSession: DeviceSession {
       return try await body(open)
     } catch {
       if case .invalidArgument = error {} else { sync = nil }
+      if kept, error == .connectionClosed { throw .deviceGone(serial) }
       throw error
     }
   }
@@ -210,6 +217,8 @@ extension ADBSession {
   /// | `invalidArgument` (a path the sync service cannot carry) | `.invalidName(path)` |
   /// | `failed(message)`, from the device | by its `strerror` text (`fromDevice`) |
   /// | `connectionClosed`, `protocolViolation` | `.io` |
+  ///
+  /// A kept sync connection that closes is `deviceGone` already (see `syncing`).
   ///
   /// Any `.io` is a lost device instead when the server no longer knows the device.
   func failure(_ error: ADBError, _ step: Step) async -> TransportError {

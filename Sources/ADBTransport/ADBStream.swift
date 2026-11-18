@@ -101,14 +101,12 @@ public actor ADBStream {
     }
   }
 
-  private static func received(
+  static func received(
     _ chunk: Data?, isComplete: Bool, error: NWError?
   ) -> Result<Data, ADBError> {
     // Data that arrived with the end of the stream or an error is still data.
     if let chunk, !chunk.isEmpty { return .success(chunk) }
-    // Network.framework reports the peer's orderly FIN as ENODATA when data was in flight.
-    if case .posix(.ENODATA) = error { return .failure(.connectionClosed) }
-    if let error { return .failure(.failed(error.localizedDescription)) }
+    if let error { return .failure(failure(error)) }
     // With minimumIncompleteLength 1 a receive carries data, an error or the end of the stream.
     return isComplete
       ? .failure(.connectionClosed) : .failure(.protocolViolation("receive returned nothing"))
@@ -119,7 +117,17 @@ public actor ADBStream {
       connection.send(
         content: data, completion: .contentProcessed { continuation.resume(returning: $0) })
     }
-    if let error { throw .failed(error.localizedDescription) }
+    if let error { throw Self.failure(error) }
+  }
+
+  /// A peer that went away is a closed connection, however the socket says so: Network.framework
+  /// reports an orderly FIN as ENODATA when data was in flight, and a server that died as a reset
+  /// or a broken pipe.
+  private static func failure(_ error: NWError) -> ADBError {
+    switch error {
+    case .posix(.ENODATA), .posix(.ECONNRESET), .posix(.EPIPE): .connectionClosed
+    default: .failed(error.localizedDescription)
+    }
   }
 
   public func close() {

@@ -163,13 +163,14 @@ struct ADBSessionDownloadTests {
     #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
   }
 
-  /// A connection that drops while the device stays is an I/O failure; the next call reconnects.
+  /// A connection that drops mid-request while the device stays is an I/O failure; the next
+  /// call reconnects.
   @Test func aDroppedConnectionToAPresentDeviceIsNotADisconnect() async throws {
     let device = FakeAndroid()
     device.addFile("/a.txt", Data("a".utf8))
     try await ADBFixture.withSession(device) { session in
-      _ = try await session.list(.root, in: storage)
-      device.dropConnections()
+      // The session's first request, on a connection it has just opened.
+      device.beforeNextSync("STA2") { $0.dropConnections() }
       await #expect {
         _ = try await session.list(.root, in: storage)
       } throws: { error in
@@ -179,6 +180,21 @@ struct ADBSessionDownloadTests {
       let listed = try await session.list(.root, in: storage)
       #expect(listed.count == 1)
       #expect(await session.capabilities() == [.move, .copy])
+    }
+  }
+
+  /// A kept connection closes only when its transport ends (the device or the server went away,
+  /// perhaps to return at once), so the session is over even if the device answers again.
+  @Test func aKeptConnectionThatClosesIsADisconnect() async throws {
+    let device = FakeAndroid()
+    device.addFile("/a.txt", Data("a".utf8))
+    try await ADBFixture.withSession(device) { session in
+      _ = try await session.list(.root, in: storage)
+      device.dropConnections()
+      await #expect(throws: TransportError.deviceDisconnected) {
+        _ = try await session.list(.root, in: storage)
+      }
+      #expect(await session.capabilities().isEmpty)
     }
   }
 }
