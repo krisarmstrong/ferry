@@ -167,7 +167,7 @@ level, as it is now on the device. If anything inside it is new or changed on th
 folder inside it was never opened in Finder, the whole folder stays and Finder puts it back,
 showing what is there; delete it again to remove it. A folder nested more than 64 levels deep,
 or holding more than 100,000 items, also stays, and so does a folder that holds a file whose
-name the Mac can't show (Finder shows such a folder as empty): delete it on the device. A file
+name the Mac can't show (Finder leaves that file out of the folder): delete it on the device. A file
 the device changed since Finder last showed it is not deleted either: Finder puts it back with
 the device's version.
 
