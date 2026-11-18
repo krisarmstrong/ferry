@@ -59,6 +59,20 @@ public actor DeviceHub {
   /// transport offers as usable again, so the hub never opens these until the user's Try Again
   /// or the device leaves a scan (unplugged).
   private var ejected: Set<DeviceID> = []
+  /// Devices whose storages or open failed, with the wait before the next try. Each close of a
+  /// failing Android unit can reset it into a new enumeration and a new tick, so without this a
+  /// broken device would be opened again and again.
+  private var backoff: [DeviceID: Backoff] = [:]
+
+  private struct Backoff {
+    var delay: Duration
+    var waiting: Bool
+    /// The wait this entry is for, so a wait from before a Try Again cannot end a later one.
+    let token: UInt64
+  }
+
+  static let firstRetryDelay = Duration.seconds(2)
+  static let maxRetryDelay = Duration.seconds(60)
   private var generations: UInt64 = 0
   /// Held devices with a tick's storage read still in flight.
   private var probing: Set<DeviceID> = []
@@ -134,6 +148,7 @@ public actor DeviceHub {
     guard let entry = entries[id] else { return }
     guard case .held = entry.holding else {
       ejected.remove(id)
+      backoff[id] = nil
       await transport.unpark(id)
       await reconcile()
       return
@@ -153,6 +168,7 @@ public actor DeviceHub {
       await session.close()
       guard let latest = entries[id], latest.generation == current.generation else { return }
       store(latest.info, .failed(error), .unheld)
+      backOff(id)
     case .state(let state):
       store(current.info, state, current.holding)
     case .gone:
@@ -210,6 +226,7 @@ public actor DeviceHub {
       guard case .unheld = entry.holding else { continue }
       entries[id] = nil
       ejected.remove(id)
+      backoff[id] = nil
       log.info("device \(id.serial, privacy: .private) detached")
       continuation.yield(.detached(id))
     }
@@ -229,7 +246,7 @@ public actor DeviceHub {
   private func admit(_ info: DeviceInfo) async {
     let existing = entries[info.id]
     if let existing, case .held = existing.holding { return }
-    if ejected.contains(info.id) { return }
+    if ejected.contains(info.id) || backoff[info.id]?.waiting == true { return }
     let generation = existing?.generation
     let session: any DeviceSession
     do throws(TransportError) {
@@ -239,6 +256,7 @@ public actor DeviceHub {
     } catch {
       guard entries[info.id]?.generation == generation else { return }
       store(info, error == .deviceBusy ? .busy : .failed(error), .unheld)
+      if error != .deviceBusy { backOff(info.id) }
       return
     }
     let reading = await Self.read(session)
@@ -250,8 +268,10 @@ public actor DeviceHub {
       await session.close()
       guard entries[info.id]?.generation == generation else { return }
       store(info, state, .unheld)
+      backOff(info.id)
       return
     }
+    backoff[info.id] = nil
     log.info("device \(info.id.serial, privacy: .private) opened")
     store(info, state, .held(session))
   }
@@ -305,16 +325,20 @@ public actor DeviceHub {
     }
     updatePolling()
   }
+}
 
+// MARK: Polling
+
+extension DeviceHub {
   /// Held devices not sharing files, in serial order.
-  private var waitingIDs: [DeviceID] {
+  fileprivate var waitingIDs: [DeviceID] {
     entries.values.compactMap { entry in
       guard case .held = entry.holding, entry.state == .notSharingFiles else { return nil }
       return entry.info.id
     }.sorted { $0.serial < $1.serial }
   }
 
-  private func updatePolling() {
+  func updatePolling() {
     let waiting = !waitingIDs.isEmpty
     if waiting, poller == nil {
       poller = Task { [weak self, clock] in
@@ -334,9 +358,35 @@ public actor DeviceHub {
     }
   }
 
-  private func recheckWaiting() async {
+  fileprivate func recheckWaiting() async {
     for id in waitingIDs {
       await recheckHeld(id)
     }
+  }
+}
+
+// MARK: Back-off
+
+extension DeviceHub {
+  /// Holds off the next open of a failing device: 2 s, doubling to 60 s. Then rescans.
+  fileprivate func backOff(_ id: DeviceID) {
+    let delay = backoff[id].map { min($0.delay * 2, Self.maxRetryDelay) } ?? Self.firstRetryDelay
+    generations += 1
+    let token = generations
+    backoff[id] = Backoff(delay: delay, waiting: true, token: token)
+    Task { [weak self, clock] in
+      do {
+        try await clock.sleep(for: delay)
+      } catch {
+        return
+      }
+      await self?.retry(id, token: token)
+    }
+  }
+
+  fileprivate func retry(_ id: DeviceID, token: UInt64) async {
+    guard let wait = backoff[id], wait.waiting, wait.token == token else { return }
+    backoff[id]?.waiting = false
+    await reconcile()
   }
 }

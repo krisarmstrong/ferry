@@ -37,6 +37,7 @@ public actor FakeDevice: DeviceSession {
   private var deleteFailure: TransportError?
   private var listFailure: TransportError?
   private var storagesFailure: TransportError?
+  private var storagesFailing: TransportError?
 
   public init(
     info: DeviceInfo, storages: [StorageInfo],
@@ -64,6 +65,7 @@ public actor FakeDevice: DeviceSession {
       storagesFailure = nil
       throw failure
     }
+    if let failing = storagesFailing { throw failing }
     try requireAvailable()
     return storageInfos
   }
@@ -368,6 +370,11 @@ extension FakeDevice {
   /// The next delete throws `error`.
   public func failNextDelete(with error: TransportError) {
     deleteFailure = error
+  }
+
+  /// Every `storages()` throws `error` until this is called with `nil`.
+  public func failStorages(with error: TransportError?) {
+    storagesFailing = error
   }
 
   /// The next `storages()` throws `error`.

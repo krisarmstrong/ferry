@@ -190,7 +190,9 @@ struct DeviceHubTests {
     await #expect(throws: TransportError.io("stall")) {
       _ = try await harness.hub.session(for: device.info.id)
     }
-    harness.tick()
+    // The retry waits out the first back-off.
+    await harness.clock.waitForSleeper()
+    await harness.clock.advance(by: DeviceHub.firstRetryDelay)
     #expect(await harness.next() == .changed(hubReady(device)))
     #expect(await harness.transport.openCount(of: device.info.id) == 2)
   }

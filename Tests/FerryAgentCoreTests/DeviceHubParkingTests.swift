@@ -111,4 +111,38 @@ extension DeviceHubTests {
     harness.tick()
     #expect(await harness.next() == .attached(hubReady(replugged)))
   }
+
+  /// A device whose storages keep failing is closed each time, which can reset it into a new
+  /// enumeration and a new tick. Retries back off, 2 s doubling to 60 s, and Try Again retries
+  /// at once.
+  @Test func failingDeviceIsRetriedWithBackoff() async {
+    let device = await makeHubDevice("A")
+    await device.failStorages(with: .io("broken"))
+    var harness = HubHarness(devices: [device])
+    defer { harness.finish() }
+    let failed = AttachedDevice(info: device.info, state: .failed(.io("broken")))
+    #expect(await harness.next() == .attached(failed))
+    await harness.clock.waitForSleeper()
+
+    harness.tick()
+    #expect(await harness.barrier()?.isAttached(serial: "BARRIER") == true)
+    #expect(await harness.transport.openCount(of: device.info.id) == 1)
+
+    await harness.clock.advance(by: .seconds(2))
+    await harness.clock.waitForSleeper()
+    #expect(await harness.transport.openCount(of: device.info.id) == 2)
+
+    await harness.clock.advance(by: .seconds(2))
+    harness.tick()
+    let other = await makeHubDevice("OTHER")
+    await harness.transport.attach(other)
+    harness.tick()
+    #expect(await harness.next() == .attached(hubReady(other)))
+    #expect(await harness.transport.openCount(of: device.info.id) == 2)
+
+    await device.failStorages(with: nil)
+    await harness.hub.recheck(device.info.id)
+    #expect(await harness.next() == .changed(hubReady(device)))
+    #expect(await harness.transport.openCount(of: device.info.id) == 3)
+  }
 }
