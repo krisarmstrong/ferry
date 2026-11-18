@@ -79,7 +79,11 @@ public actor ProviderBackend {
     case .link:
       throw Self.linkRefused
     case .folder:
-      return ProviderItem(try await entry(request))
+      let folder = try await entry(request)
+      // FileProvider syncs a package as one item and hands over its folder as `contents`; a
+      // plain folder comes with none, its children each created on their own.
+      if let contents { try await uploadTree(contents, into: folder.id) }
+      return ProviderItem(folder)
     case .file:
       break
     }
@@ -114,6 +118,29 @@ public actor ProviderBackend {
 
   private static func seconds(_ date: Date) -> Int64 {
     Int64(clamping: Int(exactly: date.timeIntervalSince1970.rounded(.down)) ?? 0)
+  }
+
+  /// Copies the folder at `local` into the device folder `parent`: subfolders and regular
+  /// files, depth first. Symbolic links inside it have nothing MTP can store and are left out.
+  private func uploadTree(_ local: URL, into parent: ItemID) async throws {
+    let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
+    let children = try FileManager.default.contentsOfDirectory(
+      at: local, includingPropertiesForKeys: keys)
+    for child in children.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+      let values = try child.resourceValues(forKeys: Set(keys))
+      if values.isSymbolicLink == true { continue }
+      let name = child.lastPathComponent
+      if values.isDirectory == true {
+        let folder = try await entry(
+          .create(domain: domain, parent: parent, name: name, isFolder: true))
+        try await uploadTree(child, into: folder.id)
+      } else if values.isRegularFile == true {
+        let handle = try FileHandle(forReadingFrom: child)
+        defer { try? handle.close() }
+        _ = try await entry(
+          .create(domain: domain, parent: parent, name: name, isFolder: false), file: handle)
+      }
+    }
   }
 
   /// Applies the changed fields in order: parent (move), then filename (rename), then contents.

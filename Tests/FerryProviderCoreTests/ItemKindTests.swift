@@ -43,6 +43,31 @@ struct ItemKindTests {
     #expect(made.contentType == UTType("com.apple.rtfd"))
   }
 
+  /// FileProvider hands over a package as one item with its folder as the contents: everything
+  /// in it goes to the device, links aside.
+  @Test func aPackagesContentsAreCopiedIntoItsFolder() async throws {
+    let agent = FakeAgent()
+    let backend = ProviderBackend(domain: domain, client: agent)
+    let dir = try scratchDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let package = dir.appending(path: "Notes.rtfd", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: package.appending(path: "Media"), withIntermediateDirectories: true)
+    try Data("rtf".utf8).write(to: package.appending(path: "TXT.rtf"))
+    try Data("png".utf8).write(to: package.appending(path: "Media/a.png"))
+    try FileManager.default.createSymbolicLink(
+      at: package.appending(path: "link"), withDestinationURL: package.appending(path: "TXT.rtf"))
+    let template = try ItemTemplate(
+      Template(
+        parent: .rootContainer, filename: "Notes.rtfd", contentType: UTType("com.apple.rtfd")!))
+
+    _ = try await backend.create(template, contents: package)
+
+    #expect(await agent.contents[try path("/Notes.rtfd/TXT.rtf")] == Data("rtf".utf8))
+    #expect(await agent.contents[try path("/Notes.rtfd/Media/a.png")] == Data("png".utf8))
+    #expect(await agent.items[try path("/Notes.rtfd/link")] == nil)
+  }
+
   @Test(arguments: [UTType.symbolicLink, UTType.aliasFile])
   func aLinkIsRefusedForGoodWithAMessage(type: UTType) async throws {
     let agent = FakeAgent()
