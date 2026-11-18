@@ -7,12 +7,28 @@ import Foundation
 /// in its container for a symlink between the agent's check and its use, and have the agent read
 /// or write outside the client's sandbox. Copies stream in chunks, so size is not limited, and use
 /// positional reads and writes, so neither descriptor's current offset matters.
-enum FileTransfer {
+public enum FileTransfer {
   private static let chunk = 1 << 20
+
+  private static let scratchPrefix = "ferry-transfer-"
 
   /// A new path in the agent's own temporary directory, with nothing there yet.
   static func scratchURL() -> URL {
-    FileManager.default.temporaryDirectory.appending(path: "ferry-transfer-\(UUID().uuidString)")
+    FileManager.default.temporaryDirectory.appending(path: scratchPrefix + UUID().uuidString)
+  }
+
+  /// Deletes the scratch files, and the partial downloads beside them, that an agent which
+  /// stopped mid-transfer left in `folder`. Run at start, before any transfer.
+  public static func sweep(_ folder: URL = FileManager.default.temporaryDirectory) {
+    let names: [String]
+    do {
+      names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+    } catch {
+      return
+    }
+    for name in names where name.hasPrefix(scratchPrefix) || SafeWriter.isPartial(name) {
+      remove(folder.appending(path: name))
+    }
   }
 
   /// Deletes a scratch file. One that was never created is already gone.

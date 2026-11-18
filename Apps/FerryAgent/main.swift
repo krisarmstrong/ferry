@@ -17,6 +17,8 @@ do {
   exit(EXIT_FAILURE)
 }
 
+FileTransfer.sweep()
+
 let hub = DeviceHub(transport: MTPTransport(), arrivals: USBWatcher.ticks())
 let manager = FileProviderDomains()
 let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
