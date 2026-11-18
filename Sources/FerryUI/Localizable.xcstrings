@@ -619,6 +619,9 @@
     "Use over Wi-Fi" : {
 
     },
+    "Use the IP address the device shows under Pair device with pairing code." : {
+
+    },
     "Using Ferry in Finder" : {
       "extractionState" : "manual"
     },

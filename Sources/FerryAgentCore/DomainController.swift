@@ -85,19 +85,19 @@ public actor DomainController {
   private var tables: [String: ItemTable] = [:]
   /// The operation most recently queued; the next one waits for it.
   private var tail: Task<Void, Never>?
-  /// Devices whose eject is closing their session. Their domains are gone and must not come
-  /// back from a device list read before the hub marked them ejected.
+  /// Devices whose eject is closing their session: their domains must not come back meanwhile.
   private var ejecting: Set<DeviceID> = []
   /// Set by `removeAll`: no domain is added, reconnected or disconnected afterwards.
-  private var retired = false
+  var retired = false
   /// Hub events handled so far.
   private(set) var handledEvents = 0
-  /// Set once the domains from before this process are adopted, whether or not listing them
-  /// worked; until then requests wait (see `route(_:)`).
+  /// Set once the domains from before this process are adopted (or listing them failed).
   var adopted = false
-  /// Told of every change to the domains (see `publishLocations(to:)`).
+  /// See `publishLocations(to:)`.
   var locationListener: WirelessVouching?
-  private var adoptionWaiters: [CheckedContinuation<Void, Never>] = []
+  var adoptionWaiters: [CheckedContinuation<Void, Never>] = []
+  /// False while the system's domains could not be listed (see `retryListing()`).
+  var locationsComplete = false
   /// Requests waiting for the domains from before this process to be adopted.
   var requestsAwaitingAdoption: Int { adoptionWaiters.count }
 
@@ -119,12 +119,11 @@ public actor DomainController {
   /// Follows the hub until the calling task is cancelled. Call it once: it is the only consumer
   /// of the hub's events.
   public func run() async {
-    await serially { await self.adoptExisting() }
+    locationsComplete = await serially { await self.adoptExisting() }
     adopted = true
     publishLocations()
-    for waiter in adoptionWaiters {
-      waiter.resume()
-    }
+    if !locationsComplete { retryListing() }
+    for waiter in adoptionWaiters { waiter.resume() }
     adoptionWaiters = []
     for await event in hub.events {
       await serially { await self.handle(event) }
@@ -203,7 +202,7 @@ public actor DomainController {
   /// Runs operations one at a time, in the order they were asked for, so an eject cannot
   /// interleave with a reconcile that read the device list before it. Every change to `domains`
   /// and `links` happens inside one of these operations.
-  private func serially<T: Sendable>(_ work: @escaping @Sendable () async -> T) async -> T {
+  func serially<T: Sendable>(_ work: @escaping @Sendable () async -> T) async -> T {
     let previous = tail
     let current = Task {
       await previous?.value
@@ -215,16 +214,15 @@ public actor DomainController {
   }
 
   /// Records the system's domains as disconnected, so a ready device reconnects its domain
-  /// rather than adding it again, and an absent device's domain does not look live. A domain
-  /// named the way an earlier Ferry named them, by serial, is removed first (keeping unsent
-  /// changes) with its item table; its storage comes back under its new identifier once ready.
-  private func adoptExisting() async {
+  /// rather than adding it again. One named by serial, as an earlier Ferry did, is removed first
+  /// (keeping unsent changes) with its item table. Returns whether the domains could be listed.
+  func adoptExisting() async -> Bool {
     let identifiers: [String]
     do {
       identifiers = try await manager.existing()
     } catch {
       log.error("listing existing domains failed: \(error, privacy: .private)")
-      return
+      return false
     }
     for identifier in identifiers.filter({ !DomainNaming.isIdentifier($0) }).sorted() {
       ItemTable.discard(domain: identifier, in: itemStore)
@@ -238,6 +236,7 @@ public actor DomainController {
     for identifier in adopted {
       await disconnect(identifier)
     }
+    return true
   }
 
   private func handle(_ event: HubEvent) async {
@@ -276,6 +275,7 @@ public actor DomainController {
     guard var existing = domains[identifier] else {
       guard await isServed(storage.device) else { return }
       domains[identifier] = Domain(spec: spec, storage: storage, connected: true)
+      publishLocations()
       do {
         try await manager.add(spec)
       } catch {

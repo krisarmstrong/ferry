@@ -57,6 +57,8 @@ public enum WirelessFailure: Codable, Sendable, Equatable {
   case otherDevice
   /// The device did not say who it is (no serial number), so it was disconnected.
   case unidentified
+  /// Pairing was given a name; it needs the IP address the device shows.
+  case pairingNeedsAddress
   /// The address no longer stands for the device the menu showed; the menu has the current offer.
   case offerChanged
   /// adb's own words, one line.

@@ -14,7 +14,11 @@ extension WirelessADB {
   /// adb's mDNS while one is missing. Call it once.
   public func run() async {
     let poller = Task { await self.pollMDNS() }
-    defer { poller.cancel() }
+    let refusals = Task { await self.offerRefusedRoutes() }
+    defer {
+      poller.cancel()
+      refusals.cancel()
+    }
     var reconnectDue = true
     for await event in adb.trackServer() {
       switch event {
@@ -25,6 +29,22 @@ extension WirelessADB {
         guard reconnectDue, reconnecting == nil else { continue }
         reconnectDue = false
         reconnecting = Task { await self.reconnectMissing(listed) }
+      }
+    }
+  }
+
+  /// Offers each route the serving check refused because its device has a Finder location, by
+  /// the name Ferry has for the device, instead of leaving it refused without a word. An adb serial
+  /// that is not an address (an mDNS name) cannot be confirmed by address and is not offered.
+  func offerRefusedRoutes() async {
+    for await refusal in vouching.refusals {
+      guard let endpoint = WirelessEndpoint(parsing: refusal.adbSerial, defaultPort: nil) else {
+        continue
+      }
+      await gate.run {
+        var name = await knownNames()[refusal.id]
+        if name == nil { name = await located(refusal.id) }
+        offer(endpoint, as: refusal.id, named: name ?? refusal.id.serial)
       }
     }
   }
@@ -115,16 +135,19 @@ extension WirelessADB {
   /// An address the device no longer has (forgotten meanwhile) is not tried.
   func reconnect(_ id: DeviceID, _ entry: Entry, since: UInt64? = nil) async -> WirelessOutcome {
     var last = WirelessOutcome.failed(.notRemembered)
+    // Forgotten since this was planned (and perhaps added again by the user): left alone.
+    func stale() -> Bool { since.flatMap { since in forgotten[id].map { $0 > since } } == true }
     for address in entry.addresses where address.learnt.reconnects {
-      guard entries[id]?.addresses.contains(address) == true else { continue }
+      guard entries[id]?.addresses.contains(address) == true, !stale() else { continue }
       last = await attempt(
         address.endpoint, for: Purpose(learnt: address.learnt, expected: id, since: since),
         all: [address.endpoint])
       if last.reachedTheDevice { return last }
     }
     // Forgotten meanwhile: nothing more is done for it, not even an offer.
-    guard entries[id] != nil, let services = try? await adb.mdnsServices(),
-      let service = services.first(where: { Self.advertises($0, id) }), entries[id] != nil
+    guard entries[id] != nil, !stale(), let services = try? await adb.mdnsServices(),
+      let service = services.first(where: { Self.advertises($0, id) }), entries[id] != nil,
+      !stale()
     else { return last }
     return offer(service.endpoint, as: id, named: entry.name)
       ? .needsConfirmation(service.endpoint) : last
@@ -173,6 +196,8 @@ extension WirelessADB {
         return .failed(.adb(detail))
       }
     } catch {
+      // adb may finish the connect after its client gave up (a timeout): nothing is kept.
+      if error != .serverUnavailable, error != .adbNotInstalled { await drop(endpoint) }
       return Self.failure(error)
     }
   }
@@ -219,6 +244,10 @@ extension WirelessADB {
     if isNew, !trusted, let name = knownNow[info.id] {
       log.info("\(endpoint.argument, privacy: .private) claims a known device; asking the user")
       await drop(endpoint)
+      // A forget may have run during the disconnect.
+      if let forgottenAt = forgotten[info.id], forgottenAt > since {
+        return .failed(.notRemembered)
+      }
       let offered = offer(endpoint, as: info.id, named: name)
       return offered ? .needsConfirmation(endpoint) : .failed(.otherDevice)
     }

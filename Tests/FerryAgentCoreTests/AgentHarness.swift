@@ -28,8 +28,12 @@ actor FakeDomainManager: DomainManaging {
   private var nextWaiter = 0
 
   /// `existing` are the domains the system already has, as after an agent restart.
-  init(existing: [String] = []) {
+  /// How many listings of the system's domains fail before one succeeds.
+  private var listingFailures: Int
+
+  init(existing: [String] = [], listingFailures: Int = 0) {
     preexisting = existing
+    self.listingFailures = listingFailures
   }
 
   func add(_ spec: DomainSpec) async throws { record(.add(spec)) }
@@ -50,6 +54,10 @@ actor FakeDomainManager: DomainManaging {
   func existing() async throws -> [String] {
     if existingHeld {
       await withCheckedContinuation { existingWaiter = $0 }
+    }
+    if listingFailures > 0 {
+      listingFailures -= 1
+      throw CocoaError(.featureUnsupported)
     }
     return preexisting
   }

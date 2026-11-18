@@ -48,6 +48,9 @@ public struct WirelessEndpoint: Hashable, Sendable, Codable {
     return (text[..<colon], text[text.index(after: colon)...])
   }
 
+  /// Whether the host is an IP address rather than a name.
+  public var isAddressLiteral: Bool { Self.addressBytes(host) != nil }
+
   /// Whether `other` names the same host: the same address for IP literals (so `2001:db8::5`
   /// and `2001:DB8:0::5` match), the same name, ignoring ASCII case, for hostnames. Zones are
   /// refused at parsing, so a link-local IPv6 address never gets here: it would need its zone

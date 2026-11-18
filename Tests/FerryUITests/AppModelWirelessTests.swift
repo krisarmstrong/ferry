@@ -39,6 +39,7 @@ struct AppModelWirelessTests {
     #expect(AppModel.isValidPairing(address: "192.0.2.169:37123", code: "482913"))
     #expect(!AppModel.isValidPairing(address: "192.0.2.169", code: "482913"))
     #expect(!AppModel.isValidPairing(address: "192.0.2.169:37123", code: "48291"))
+    #expect(!AppModel.isValidPairing(address: "pixel.lan:37123", code: "482913"))
     let client = FakeClient(log: log)
     let model = model(client)
     #expect(await model.pair(address: "192.0.2.169:37123", code: "482913") == true)

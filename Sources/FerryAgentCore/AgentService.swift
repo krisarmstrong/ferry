@@ -126,6 +126,8 @@ public actor AgentService: AgentHandling {
     case .eject(let id):
       return .removed(preserved: await domains.eject(id))
     case .removeAllDomains:
+      // Remove Ferry forgets the devices it reconnects over the network too.
+      await wireless?.forgetAll()
       return .removed(preserved: try await domains.removeAll())
     default:
       return await performWirelessRequest(request)

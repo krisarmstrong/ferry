@@ -148,6 +148,11 @@ enum DevicePresentation {
       String(
         localized: LocalizedStringResource(
           "The device didn't say which device it is, so Ferry disconnected it.", bundle: .module))
+    case .pairingNeedsAddress:
+      String(
+        localized: LocalizedStringResource(
+          "Use the IP address the device shows under Pair device with pairing code.",
+          bundle: .module))
     case .offerChanged:
       String(
         localized: LocalizedStringResource(

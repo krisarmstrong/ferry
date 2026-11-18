@@ -35,6 +35,8 @@ actor FakeWirelessADB: WirelessADBControl {
   var serverUp = true
   /// How long `connect` takes for an address, as an unreachable host does.
   var connectDelay: [String: Duration] = [:]
+  /// Connects that throw (adb timed out), by address.
+  var connectThrows: Set<String> = []
   /// Identity reads that fail, by adb serial.
   var unreadable: Set<String> = []
   /// adb serials whose device reports no serial number.
@@ -80,6 +82,7 @@ actor FakeWirelessADB: WirelessADBControl {
     maxInFlight = max(maxInFlight, inFlight)
     if let delay = connectDelay[endpoint.argument] { try? await Task.sleep(for: delay) }
     inFlight -= 1
+    if connectThrows.contains(endpoint.argument) { throw .failed("adb did not finish") }
     guard let unit = units[endpoint.argument] else {
       return .failed("failed to connect to '\(endpoint.argument)': Connection refused")
     }

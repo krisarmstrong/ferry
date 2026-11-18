@@ -10,9 +10,10 @@ extension AppModel {
     WirelessEndpoint(parsing: text) != nil
   }
 
-  /// Pairing takes the address with the port the device shows, and its six-digit code.
+  /// Pairing takes the IP address with the port the device shows, and its six-digit code.
   public static func isValidPairing(address: String, code: String) -> Bool {
-    WirelessEndpoint(parsing: address, defaultPort: nil) != nil && PairingCode(code) != nil
+    WirelessEndpoint(parsing: address, defaultPort: nil)?.isAddressLiteral == true
+      && PairingCode(code) != nil
   }
 
   public func isRemembered(_ id: DeviceID) -> Bool {

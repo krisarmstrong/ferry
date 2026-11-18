@@ -17,7 +17,7 @@ struct WirelessVouchingLocationTests {
     let vouching = WirelessVouching()
     vouching.remember([:])
     #expect(!vouching.serves(Self.address, as: DeviceID(serial: "NEWUNIT1")))
-    vouching.locate(identifiers: [], devices: [])
+    vouching.locate(identifiers: [], devices: [], complete: true)
     #expect(vouching.serves(Self.address, as: DeviceID(serial: "NEWUNIT1")))
   }
 
@@ -28,7 +28,7 @@ struct WirelessVouchingLocationTests {
     vouching.remember([:])
     vouching.locate(
       identifiers: [DomainNaming.identifier(for: StorageID(device: located, key: key))],
-      devices: [])
+      devices: [], complete: true)
     #expect(!vouching.serves(Self.address, as: located))
     #expect(vouching.serves(Self.address, as: DeviceID(serial: "NEWUNIT1")))
   }
@@ -36,7 +36,7 @@ struct WirelessVouchingLocationTests {
   @Test func aLocatedDeviceIsNotServedUnvouchedButIsAtAVouchedAddress() throws {
     let located = DeviceID(serial: "LR1")
     let vouching = WirelessVouching()
-    vouching.locate(identifiers: [], devices: [located])
+    vouching.locate(identifiers: [], devices: [located], complete: true)
     let vouched = try #require(WirelessEndpoint(parsing: Self.address))
     vouching.remember([
       located: WirelessADB.Entry(name: "LR", addresses: [.init(endpoint: vouched, learnt: .user)])

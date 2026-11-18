@@ -202,6 +202,9 @@ public actor WirelessADB {
 
   public func pair(_ endpoint: WirelessEndpoint, code: PairingCode) async -> WirelessOutcome {
     await gate.run { () async -> WirelessOutcome in
+      // The connect service is matched by address, so the pairing host must be the address the
+      // device shows; a name never matches what adb's mDNS lists.
+      guard endpoint.isAddressLiteral else { return .failed(.pairingNeedsAddress) }
       do throws(ADBError) {
         switch try await adb.pair(endpoint, code: code) {
         case .failed(let detail):
@@ -269,6 +272,11 @@ public actor WirelessADB {
       unconfirmedAddresses[address] = nil
       ignored.insert(address)
     }
+  }
+
+  /// Forgets every remembered device, as Remove Ferry does.
+  public func forgetAll() async {
+    for id in entries.keys.sorted(by: { $0.serial < $1.serial }) { await forget(id) }
   }
 
   /// Forgets the device and revokes everything under way for it: disconnects adb from its
