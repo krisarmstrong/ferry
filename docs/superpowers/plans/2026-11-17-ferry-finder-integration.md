@@ -46,9 +46,9 @@ in `docs/superpowers/plans/2026-11-17-ferry-core-transport.md`.
 - Domain identifier: `<serial>|<StorageID.key>`. Domain display name: `<Model>` or
   `<Model> (<last 4 of serial>)` when two attached devices share a model, plus ` – SD card` for
   a secondary storage (spec).
-- Item identifier: the storage-relative path string (`RemotePath.description`).
-  `NSFileProviderItemIdentifier.rootContainer` maps to `RemotePath.root`. MTP object IDs never
-  leave the agent.
+- Item identifier: an opaque, stable, agent-assigned ID (spec "Item identity", amended after
+  Task 5). `NSFileProviderItemIdentifier.rootContainer` is the storage root. Neither paths nor
+  MTP object IDs leave the agent as identifiers.
 - An unplugged device's domain is disconnected, not removed. "Eject" removes it. "Remove Ferry"
   removes all domains and then unregisters the agent (spec).
 - No telemetry, no network, no AI, no NetAlly logos or branding. Model names are used only to
@@ -368,6 +368,60 @@ contents (`replaceContents`).
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run `make test lint fmt-check` and expect it to pass.
 - [ ] **Step 5:** Commit `feat: add FileProvider mapping core`.
+
+---
+
+### Task 5b: Stable item identifiers (amendment)
+
+Added after Task 5: path-as-identifier breaks FileProvider (a changed identifier on modify means
+"merge and delete the other") and leaks file names into system logs. One unit across FerryIPC,
+FerryAgentCore and FerryProviderCore, reviewed together with Task 5.
+
+**Files:**
+- Create: `Sources/FerryAgentCore/ItemTable.swift` (per-domain identifier ↔ path table, persisted
+  as one JSON file per domain under the agent's Application Support, atomic writes)
+- Modify: `Sources/FerryIPC/Messages.swift`, `Sources/FerryAgentCore/AgentService.swift`,
+  `Sources/FerryAgentCore/DomainController.swift`, `Sources/FerryProviderCore/*`
+- Test: `Tests/FerryAgentCoreTests/ItemTableTests.swift`, plus updates to the IPC, agent and
+  provider tests
+
+**Interfaces — Produces:**
+```swift
+public struct ItemID: Hashable, Sendable, Codable, RawRepresentable { public static let root: ItemID }  // root ↔ .rootContainer
+public struct ProviderEntry: Sendable, Codable, Equatable { public let id: ItemID; public let parent: ItemID; public let item: RemoteItem }
+// AgentRequest cases take ItemIDs: item(domain:id:), list(domain:folder:), fetch(domain:id:),
+// create(domain:parent:name:isFolder:), rename(domain:id:to:), move(domain:id:toFolder:),
+// replaceContents(domain:id:), delete(domain:id:). Responses: .entry(ProviderEntry), .entries([ProviderEntry]).
+actor ItemTable {
+  init(domain: String, store: URL)                  // loads; missing file ⇒ empty
+  func id(for path: RemotePath) -> ItemID           // assigns on first sight
+  func path(for id: ItemID) -> RemotePath?          // nil ⇒ .notFound
+  func moved(_ from: RemotePath, to: RemotePath)    // rewrites the subtree, IDs unchanged
+  func removed(_ path: RemotePath)                  // prunes the subtree
+  func listed(_ folder: RemotePath, children: [String])  // prunes children that vanished
+}
+public struct ItemTemplate: Sendable { public let parent: ItemID; public let filename: String; public let isFolder: Bool }
+// ProviderBackend.create/modify take ItemTemplate (and changed fields) instead of `any NSFileProviderItem` (Task 5 Sendable finding)
+```
+Rules:
+- IDs are random (UUID strings), never derived from names.
+- The table persists across agent restarts, so Finder's cached items keep their identity.
+- Signals use the parent folder's ID.
+
+- [ ] **Step 1: Write failing tests:**
+  - `idsAreStableAcrossRenameAndMove`
+  - `subtreeMovesKeepIDs`
+  - `deletePrunes`
+  - `listingPrunesVanishedChildren`
+  - `tablePersistsAcrossReload`
+  - `idsContainNoNames`
+  - `unknownIDIsNotFound`
+  - `modifyReturnsSameIdentifier` (provider)
+  - `templateIsSendableSnapshot` (provider)
+- [ ] **Step 2:** Run the new tests and confirm they FAIL.
+- [ ] **Step 3:** Implement. Migrate all IPC, agent and provider code and their tests.
+- [ ] **Step 4:** Run `make test lint fmt-check` and confirm it passes.
+- [ ] **Step 5:** Commit `feat: give items stable identifiers`.
 
 ---
 

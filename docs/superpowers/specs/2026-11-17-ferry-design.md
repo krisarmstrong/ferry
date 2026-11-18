@@ -154,7 +154,7 @@ Ferry.app (SwiftUI menu-bar app, LSUIElement)
   enumerate, fetchContents (agent downloads to a file in the app-group
   container, extension hands it to the system), createItem (upload), modify
   (rename/move; content change = upload to temp name then swap), delete.
-  Item identifier = `"<storageID>/<objectID>"`; root = storage root.
+  Item identifiers are opaque, stable IDs assigned by the agent (see "Item identity").
 - **Packages:**
   - `DeviceKit` — `DeviceTransport` protocol + value types (`DeviceInfo`,
     `StorageInfo`, `RemoteItem`, errors). No libmtp import.
@@ -177,6 +177,22 @@ strings; capabilities such as "supports move" are queried, not assumed).
 MTP has no reliable change events. v1: re-enumerate on folder open and on the
 menu "Refresh"; after its own writes the agent signals the working set. No
 polling loops.
+
+## Item identity (amended 2026-11-17)
+
+FileProvider identifies an item by its `itemIdentifier` across renames and moves: a remote
+reparent keeps the identifier and changes `parentItemIdentifier`, and a `modifyItem` that
+returns a *different* identifier tells the system to merge into that item and delete the
+other one from disk (`NSFileProviderReplicatedExtension.h`, "merge" and "reparented"
+passages). Identifiers may also be written to system logs (`NSFileProviderItem.h`), so they
+must not contain file names. Therefore:
+
+- The agent assigns each item an opaque random identifier on first sight and keeps a
+  per-domain table identifier ↔ storage-relative path, persisted in the agent's own
+  Application Support (not the app-group container, which the sandboxed extension can write).
+- Rename and move update the table for the item and its subtree; delete and listings that
+  drop a child prune it. A change made on the phone (outside Ferry) appears as a new item.
+- FerryIPC speaks identifiers, not paths; the root is `NSFileProviderItemIdentifier.rootContainer`.
 
 ## Testing and quality bar
 
