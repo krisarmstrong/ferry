@@ -287,14 +287,6 @@ actor StubMTPDevice: MTPDeviceOperations {
     return loaded(entry(objectID, try object(objectID)))
   }
 
-  /// As libmtp after the device is opened again: no object info is loaded.
-  func reopen() throws(TransportError) {
-    record()
-    try requireOpen()
-    reopenCount += 1
-    loadedInfo = [:]
-  }
-
   func close() {
     record()
     closed = true
@@ -341,5 +333,15 @@ actor StubMTPDevice: MTPDeviceOperations {
     MTPEntry(
       objectID: id, parent: object.parent, name: object.name, isFolder: object.isFolder,
       size: reportedSizes[id] ?? UInt64(object.data.count), modified: object.modified)
+  }
+}
+
+extension StubMTPDevice {
+  /// As libmtp after the device is opened again: no object info is loaded.
+  func reopen() throws(TransportError) {
+    record()
+    try requireOpen()
+    reopenCount += 1
+    loadedInfo = [:]
   }
 }

@@ -234,12 +234,6 @@ public actor FakeDevice: DeviceSession {
     tree[storage] = nodes
   }
 
-  /// Counts the calls; the fake remembers nothing a reread would change.
-  public func forgetCachedItems() async throws(TransportError) {
-    try requireAvailable()
-    forgetCount += 1
-  }
-
   public func close() async {
     await pauseIfSuspended(.close)
     isOpen = false
@@ -382,4 +376,12 @@ extension FakeDevice {
     }
   }
 
+}
+
+extension FakeDevice {
+  /// Counts the calls; the fake remembers nothing a reread would change.
+  public func forgetCachedItems() async throws(TransportError) {
+    try requireAvailable()
+    forgetCount += 1
+  }
 }

@@ -4,14 +4,6 @@ import Dispatch
 import Foundation
 import os
 
-/// A device for libmtp to open, built by `MTPDeviceTable` from the IOKit registry.
-///
-/// `@unchecked`: the struct's only pointers are the vendor and product strings, which point into
-/// libmtp's static device table and are never written or freed.
-struct RawDeviceRef: @unchecked Sendable {
-  let raw: LIBMTP_raw_device_t
-}
-
 /// Owns one libmtp device handle; every call runs on its own serial queue.
 ///
 /// libmtp is not thread-safe per device, so the actor's executor is a private serial queue and
@@ -56,24 +48,6 @@ actor MTPDevice {
     info = opened.info
     self.raw = raw
     self.registryID = registryID
-  }
-
-  /// Releases the handle and opens the same enumeration of the device again, on this queue.
-  /// libmtp keeps the object info it first read for each object until the device is opened
-  /// again, so this is how a Refresh sees files changed on the device. The device must still be
-  /// attached and answer as the same device; otherwise, or if another app took it meanwhile,
-  /// it is gone for this session.
-  func reopen() throws(TransportError) {
-    guard handle != nil, isStillAttached() else {
-      close()
-      throw .deviceDisconnected
-    }
-    close()
-    guard let opened = DeviceOpener.openNow(raw), opened.info.id == info.id else {
-      Self.log.error("reopening the device failed")
-      throw .deviceDisconnected
-    }
-    handle = opened.handle
   }
 
   isolated deinit {
@@ -318,7 +292,7 @@ actor MTPDevice {
     }
   }
 
-  fileprivate static func identify(
+  static func identify(
     _ handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>, raw: LIBMTP_raw_device_t
   ) -> DeviceInfo {
     let serial = takeString(LIBMTP_Get_Serialnumber(handle))
@@ -350,45 +324,29 @@ actor MTPDevice {
 }
 
 extension MTPDevice {
+  /// Releases the handle and opens the same enumeration of the device again, on this queue.
+  /// libmtp keeps the object info it first read for each object until the device is opened
+  /// again, so this is how a Refresh sees files changed on the device. The device must still be
+  /// attached and answer as the same device; otherwise, or if another app took it meanwhile,
+  /// it is gone for this session.
+  func reopen() throws(TransportError) {
+    guard handle != nil, isStillAttached() else {
+      close()
+      throw .deviceDisconnected
+    }
+    close()
+    guard let opened = DeviceOpener.openNow(raw), opened.info.id == info.id else {
+      Self.log.error("reopening the device failed")
+      throw .deviceDisconnected
+    }
+    handle = opened.handle
+  }
+
   /// Releases the USB interface now, so the device can be opened again at once. Idempotent.
   func close() {
     guard let handle else { return }
     LIBMTP_Release_Device(handle)
     self.handle = nil
-  }
-}
-
-/// A handle just opened, on its way from `DeviceOpener` to the `MTPDevice` that owns it.
-///
-/// `@unchecked`: the handle is used only on the device's queue, before and after the hand-off,
-/// and nothing else keeps it.
-private struct OpenedHandle: @unchecked Sendable {
-  let handle: UnsafeMutablePointer<LIBMTP_mtpdevice_t>
-  let info: DeviceInfo
-}
-
-/// Runs the open on a device's queue before the `MTPDevice` that will own the handle exists.
-private actor DeviceOpener {
-  private let queue: DispatchSerialQueue
-
-  nonisolated var unownedExecutor: UnownedSerialExecutor {
-    queue.asUnownedSerialExecutor()
-  }
-
-  init(queue: DispatchSerialQueue) {
-    self.queue = queue
-  }
-
-  func open(_ raw: RawDeviceRef) -> OpenedHandle? {
-    Self.openNow(raw)
-  }
-
-  /// Opens `raw` on the calling thread, which must be the device's queue.
-  nonisolated static func openNow(_ raw: RawDeviceRef) -> OpenedHandle? {
-    _ = MTPDevice.libraryInitialized
-    var raw = raw.raw
-    guard let handle = LIBMTP_Open_Raw_Device_Uncached(&raw) else { return nil }
-    return OpenedHandle(handle: handle, info: MTPDevice.identify(handle, raw: raw))
   }
 }
 
@@ -411,16 +369,4 @@ private func reportProgress(_ sent: UInt64, _ total: UInt64, _ data: UnsafeRawPo
     return 1
   }
   return 0
-}
-
-extension MTPEntry {
-  init(_ file: LIBMTP_file_t) {
-    self.init(
-      objectID: file.item_id,
-      parent: file.parent_id,
-      name: file.filename.map { String(cString: $0) } ?? "",
-      isFolder: file.filetype == LIBMTP_FILETYPE_FOLDER,
-      size: file.filesize,
-      modified: Date(timeIntervalSince1970: TimeInterval(file.modificationdate)))
-  }
 }
