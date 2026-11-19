@@ -68,6 +68,8 @@ public actor FakeDevice: DeviceSession {
   /// Opened by its transport and not closed since.
   public private(set) var isOpen = false
   public private(set) var closeCount = 0
+  /// Calls to `forgetCachedItems()`.
+  public private(set) var forgetCount = 0
   public private(set) var storagesCallCount = 0
 
   // MARK: DeviceSession
@@ -230,6 +232,12 @@ public actor FakeDevice: DeviceSession {
     if let expecting { try requireChecked(doomed, at: path, expecting) }
     for key in doomed.keys { nodes[key] = nil }
     tree[storage] = nodes
+  }
+
+  /// Counts the calls; the fake remembers nothing a reread would change.
+  public func forgetCachedItems() async throws(TransportError) {
+    try requireAvailable()
+    forgetCount += 1
   }
 
   public func close() async {

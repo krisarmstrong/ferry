@@ -56,6 +56,17 @@ actor MTPSession: DeviceSession {
     try await operation { () throws(TransportError) in try await refreshStorages() }
   }
 
+  /// Reopens the device between operations, then reads its storages again, since their raw
+  /// IDs are per connection. A device that cannot be opened again is gone.
+  func forgetCachedItems() async throws(TransportError) {
+    try await operation { () throws(TransportError) in
+      await resolver.invalidateAll()
+      try await device.reopen()
+      rawStorages = [:]
+      _ = try await refreshStorages()
+    }
+  }
+
   func close() async {
     await gate.run { () async in
       await resolver.invalidateAll()

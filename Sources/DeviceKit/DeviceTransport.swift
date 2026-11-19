@@ -61,6 +61,11 @@ public protocol DeviceSession: Sendable {
   /// anything new or changed inside is `.directoryNotEmpty(path)`, and then nothing is deleted.
   func delete(_ path: RemotePath, in storage: StorageID, expecting: [RemoteItem]?)
     async throws(TransportError)
+  /// Forgets whatever the session, or the library under it, remembers of the device's items, so
+  /// the next reads see the device as it is now: the menu's Refresh. MTP reopens the device, since
+  /// libmtp keeps the object info it first read for an object, and so never sees a file an app
+  /// rewrote in place or renamed; ADB reads everything fresh and has nothing to forget.
+  func forgetCachedItems() async throws(TransportError)
   func close() async
 }
 

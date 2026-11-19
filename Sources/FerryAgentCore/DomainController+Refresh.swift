@@ -6,9 +6,23 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 extension DomainController {
   /// Lists again every folder the device's connected domains know, so files added, changed or
   /// removed on the device are recorded in each domain's change log, and signals each domain
-  /// that changed. FileProvider learns of changes made outside Finder only this way.
+  /// that changed. FileProvider learns of changes made outside Finder only this way. The session
+  /// first forgets what it remembers of the device's items (MTP reopens the device), so a file
+  /// an app rewrote in place shows its new size and date.
   func refresh(_ device: DeviceID) async throws(TransportError) {
-    for identifier in connectedDomains(of: device) {
+    let identifiers = connectedDomains(of: device)
+    guard !identifiers.isEmpty else { return }
+    let lease = try await leaseSession(of: device)
+    let forgotten: Result<Void, TransportError>
+    do throws(TransportError) {
+      try await lease.session.forgetCachedItems()
+      forgotten = .success(())
+    } catch {
+      forgotten = .failure(error)
+    }
+    await hub.release(lease)
+    try forgotten.get()
+    for identifier in identifiers {
       try await refreshDomain(identifier)
     }
   }

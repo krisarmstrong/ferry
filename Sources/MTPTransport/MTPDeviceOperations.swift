@@ -19,6 +19,8 @@ protocol MTPDeviceOperations: Sendable {
   func move(objectID: UInt32, storage: UInt32, newParent: UInt32) async throws(TransportError)
   func delete(objectID: UInt32) async throws(TransportError)
   func metadata(objectID: UInt32) async throws(TransportError) -> MTPEntry
+  /// Closes the device and opens it again, which drops libmtp's object cache.
+  func reopen() async throws(TransportError)
   func close() async
 }
 

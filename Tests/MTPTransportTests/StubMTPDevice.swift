@@ -36,6 +36,7 @@ actor StubMTPDevice: MTPDeviceOperations {
   private(set) var objects: [UInt32: Object] = [:]
   private(set) var calls: [Call] = []
   private(set) var closed = false
+  private(set) var reopenCount = 0
   /// Every device call, mutating or not, including ones that threw.
   private(set) var callCount = 0
   /// Whether a call arrived while an upload was still in progress.
@@ -284,6 +285,14 @@ actor StubMTPDevice: MTPDeviceOperations {
       return info
     }
     return loaded(entry(objectID, try object(objectID)))
+  }
+
+  /// As libmtp after the device is opened again: no object info is loaded.
+  func reopen() throws(TransportError) {
+    record()
+    try requireOpen()
+    reopenCount += 1
+    loadedInfo = [:]
   }
 
   func close() {

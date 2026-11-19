@@ -28,6 +28,8 @@ actor MTPDevice {
   /// The device's IOKit registry entry, to tell a lost link from a protocol error without USB
   /// I/O. A replug or USB mode switch gets a new entry even at the same address.
   private let registryID: UInt64
+  /// What the handle was opened from, to open it again (see `reopen()`).
+  private let raw: RawDeviceRef
   nonisolated let info: DeviceInfo
 
   nonisolated var unownedExecutor: UnownedSerialExecutor {
@@ -43,14 +45,35 @@ actor MTPDevice {
     // Open and identify on the device's queue too, so no libmtp call for this handle ever
     // runs anywhere else.
     guard let opened = await DeviceOpener(queue: queue).open(raw) else { throw .deviceBusy }
-    return MTPDevice(queue: queue, opened: opened, registryID: registryID)
+    return MTPDevice(queue: queue, opened: opened, raw: raw, registryID: registryID)
   }
 
-  private init(queue: DispatchSerialQueue, opened: OpenedHandle, registryID: UInt64) {
+  private init(
+    queue: DispatchSerialQueue, opened: OpenedHandle, raw: RawDeviceRef, registryID: UInt64
+  ) {
     self.queue = queue
     handle = opened.handle
     info = opened.info
+    self.raw = raw
     self.registryID = registryID
+  }
+
+  /// Releases the handle and opens the same enumeration of the device again, on this queue.
+  /// libmtp keeps the object info it first read for each object until the device is opened
+  /// again, so this is how a Refresh sees files changed on the device. The device must still be
+  /// attached and answer as the same device; otherwise, or if another app took it meanwhile,
+  /// it is gone for this session.
+  func reopen() throws(TransportError) {
+    guard handle != nil, isStillAttached() else {
+      close()
+      throw .deviceDisconnected
+    }
+    close()
+    guard let opened = DeviceOpener.openNow(raw), opened.info.id == info.id else {
+      Self.log.error("reopening the device failed")
+      throw .deviceDisconnected
+    }
+    handle = opened.handle
   }
 
   isolated deinit {
@@ -357,6 +380,11 @@ private actor DeviceOpener {
   }
 
   func open(_ raw: RawDeviceRef) -> OpenedHandle? {
+    Self.openNow(raw)
+  }
+
+  /// Opens `raw` on the calling thread, which must be the device's queue.
+  nonisolated static func openNow(_ raw: RawDeviceRef) -> OpenedHandle? {
     _ = MTPDevice.libraryInitialized
     var raw = raw.raw
     guard let handle = LIBMTP_Open_Raw_Device_Uncached(&raw) else { return nil }

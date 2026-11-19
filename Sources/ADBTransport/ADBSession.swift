@@ -68,6 +68,9 @@ public actor ADBSession: DeviceSession {
     }
   }
 
+  /// Every read goes to the device: nothing is remembered between operations.
+  public func forgetCachedItems() async throws(TransportError) {}
+
   public func close() async {
     await gate.run { () async in
       disconnected = true

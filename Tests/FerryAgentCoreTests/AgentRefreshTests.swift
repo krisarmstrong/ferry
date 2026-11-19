@@ -55,6 +55,19 @@ struct AgentRefreshTests {
     #expect(await harness.manager.calls.dropFirst(signals) == [.signal(domainID(device))])
   }
 
+  /// Refresh has the session forget what it remembers of the device's items before listing
+  /// (MTP reopens the device), once per device, not once per domain.
+  @Test func refreshForgetsTheSessionsCachedItemsFirst() async throws {
+    let device = await makeDevice("A", keys: [internalKey, cardKey])
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(2)
+
+    #expect(await harness.service.handle(.refresh(device.info.id), file: nil) == .done)
+
+    #expect(await device.forgetCount == 1)
+  }
+
   @Test func refreshWithNoChangeDoesNotSignal() async throws {
     let device = await makeDevice("A")
     let harness = try AgentHarness(devices: [device])
