@@ -374,17 +374,13 @@ Menu items:
   the device again.
 - **Send File…** (in a ready device's list): sends files you choose into the device's
   `Download` folder, as **Send to** does in Finder.
+- **Open at Login**: starts the Ferry menu-bar item when you log in. A checkmark shows it is on.
 - **Help** (⌘?): opens Ferry Help.
-- **Settings…** (⌘,): opens Settings.
 - **Quit Ferry** (⌘Q): closes the menu-bar item. The helper keeps running, so devices stay in
   Finder.
 
-Settings:
-
-- **Open at login**: starts the Ferry menu-bar item when you log in.
-- **How to Connect**: opens the setup guide, on file transfer or USB debugging.
-- **Help**: opens Ferry Help.
-- **Remove Ferry…**: see [Uninstall](#uninstall).
+Ferry has no Settings window. **How to Connect** is in the menu while no device is connected,
+and in Help; **Remove Ferry…** is in Help, under Troubleshooting (see [Uninstall](#uninstall)).
 
 ## Tools over USB debugging
 
@@ -527,6 +523,12 @@ checks an app or script with Gatekeeper before it first opens, and may ask you t
 folder on the device named like an app or a document package (`Tool.app`, `Notes.rtfd`) shows
 in Finder as one, and is marked the same way.
 
+### Remove Ferry
+
+In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Ferry removes its
+locations from Finder, stops its helper and quits. Files on your devices are not touched. Use it
+before you move Ferry to the Trash, or to start again from a clean state.
+
 ## Privacy
 
 Ferry has no telemetry, analytics, crash reporting or account, and sends nothing to any server.
@@ -535,7 +537,7 @@ that device on your network and nowhere else.
 
 ## Uninstall
 
-1. Open Ferry's **Settings** and click **Remove Ferry…**, then confirm.
+1. In Ferry Help, under **Troubleshooting**, click **Remove Ferry…**, then confirm.
    Your devices disappear from Finder, Ferry's helper stops and Ferry quits. Files on your
    devices are not touched.
 2. Drag **Ferry** from Applications to the Trash.

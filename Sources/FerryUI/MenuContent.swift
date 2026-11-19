@@ -5,13 +5,13 @@ import SwiftUI
 
 /// The menu-bar window, after Control Center's Wi-Fi and Bluetooth menus: a header with
 /// Refresh, anything that needs the user's attention, the devices (one expanded at a time, with
-/// its actions as rows), the network forms (opening in place), then Help, Settings and Quit.
+/// its actions as rows), the network forms (opening in place), then Open at Login, Help and
+/// Quit.
 ///
 /// While it is open it refreshes every 2 s (see `AppModel.watchWhileMenuOpen()`), and it opens
 /// the setup guide when the model asks for it.
 public struct MenuContent: View {
   @Environment(\.openWindow) private var openWindow
-  @Environment(\.openSettings) private var openSettings
   private let model: AppModel
 
   public init(model: AppModel) {
@@ -28,7 +28,7 @@ public struct MenuContent: View {
         NetworkFormRows(model: model)
         MenuSeparator()
       }
-      footer
+      MenuFooter(model: model)
     }
     .padding(6)
     .frame(width: 320, alignment: .leading)
@@ -187,25 +187,6 @@ public struct MenuContent: View {
           NSApp.activate()
           openWindow(id: window.windowID, value: device.id)
         }))
-  }
-
-  private var footer: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      MenuRow(title: Text("Help", bundle: .module), shortcut: "⌘?") {
-        NSApp.activate()
-        openWindow(id: HelpView.windowID)
-      }
-      .keyboardShortcut("?")
-      MenuRow(title: Text("Settings…", bundle: .module), shortcut: "⌘,") {
-        NSApp.activate()
-        openSettings()
-      }
-      .keyboardShortcut(",")
-      MenuRow(title: Text("Quit Ferry", bundle: .module), shortcut: "⌘Q") {
-        NSApp.terminate(nil)
-      }
-      .keyboardShortcut("q")
-    }
   }
 
   private func openGuide(for device: AttachedDevice?) {

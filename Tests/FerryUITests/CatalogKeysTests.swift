@@ -59,6 +59,15 @@ struct CatalogKeysTests {
     #expect(keys.contains("Remembered · not nearby"))
   }
 
+  /// The menu's footer after Settings went: Open at Login, in title case, and its failure.
+  @Test func theFooterStringsHaveCatalogKeys() throws {
+    let keys = try catalogKeys()
+    #expect(keys.contains(MenuFooter.openAtLoginResource.key))
+    #expect(String(localized: MenuFooter.openAtLoginResource) == "Open at Login")
+    #expect(!keys.contains("Open at login"))
+    #expect(!keys.contains("Settings…"))
+  }
+
   /// The names of a known model's ports, and the word for one with no address.
   @Test func theKnownPortsHaveCatalogKeys() throws {
     let keys = try catalogKeys()

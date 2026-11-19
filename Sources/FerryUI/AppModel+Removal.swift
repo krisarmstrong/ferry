@@ -4,7 +4,7 @@ import Foundation
 
 /// Remove Ferry, and what the app does once an update replaced it while it ran.
 extension AppModel {
-  /// What the menu and Settings say once the agent refuses this copy after an update.
+  /// What the menu and Help say once the agent refuses this copy after an update.
   static var replacedMessage: String {
     String(
       localized: LocalizedStringResource(

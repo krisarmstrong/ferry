@@ -3,7 +3,8 @@ import FerryUI
 import SwiftUI
 
 /// The menu-bar app: registers the agent, shows its devices, and hosts the setup guide, Help
-/// and Settings.
+/// and the developer tools' windows. Ferry has no Settings window: Open at Login is in the menu,
+/// Remove Ferry… in Help.
 @main
 struct FerryApp: App {
   @State private var model: AppModel
@@ -44,9 +45,5 @@ struct FerryApp: App {
     .restorationBehavior(.disabled)
 
     DeveloperScenes(model: model)
-
-    Settings {
-      SettingsView(model: model)
-    }
   }
 }

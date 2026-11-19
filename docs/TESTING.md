@@ -109,7 +109,7 @@ with a note.
 | Unplug mid-copy; replug returns the same location | not run (needs the cable pulled by hand) |
 | Eject from the menu: Finder location removed, device released (`ferryctl` can open it) | pass |
 | Agent restart (`launchctl kickstart -k`): device re-admitted, location back and browsable | pass |
-| Remove Ferry (Settings, confirm): app quits, agent unregistered, all locations gone, device released | pass |
+| Remove Ferry (Help → Troubleshooting, confirm): app quits, agent unregistered, all locations gone, device released | pass |
 | Relaunch after Remove Ferry: agent re-registers, location back, still enabled (no re-enabling) | pass |
 | Phone set to file transfer off ⇒ menu shows "Not sharing files" and the guide | not run live (unit-tested) |
 

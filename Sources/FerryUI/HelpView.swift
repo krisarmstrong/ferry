@@ -101,7 +101,7 @@ struct HelpSectionDetail: View {
   }
 }
 
-/// Paragraphs, numbered steps, definitions, note and link, in that order.
+/// Paragraphs, numbered steps, definitions, note, link and action, in that order.
 private struct HelpBodyView: View {
   @Environment(\.openWindow) private var openWindow
   let blocks: HelpBody
@@ -143,6 +143,48 @@ private struct HelpBodyView: View {
         }
         .buttonStyle(.bordered)
       }
+      if blocks.action == .removeFerry {
+        RemoveFerryButton(model: model)
+      }
+    }
+  }
+}
+
+/// Remove Ferry…: confirms, then removes Ferry's locations and helper and quits. If that fails,
+/// the reason shows here, where the reader asked for it.
+private struct RemoveFerryButton: View {
+  let model: AppModel
+  @State private var confirming = false
+  @State private var asked = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Button(role: .destructive) {
+        confirming = true
+      } label: {
+        Text("Remove Ferry…", bundle: .module)
+      }
+      .buttonStyle(.bordered)
+      if asked, let error = model.actionError {
+        Text(verbatim: error)
+          .font(.callout)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .confirmationDialog(Text("Remove Ferry?", bundle: .module), isPresented: $confirming) {
+      Button(role: .destructive) {
+        asked = true
+        Task { await model.removeFerry() }
+      } label: {
+        Text("Remove Ferry", bundle: .module)
+      }
+    } message: {
+      Text(
+        """
+        Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on \
+        your devices are not touched. You can then move Ferry to the Trash.
+        """, bundle: .module)
     }
   }
 }

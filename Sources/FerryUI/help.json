@@ -307,8 +307,8 @@
               "detail": "Opens this window."
             },
             {
-              "term": "Settings…",
-              "detail": "Open at login, How to Connect, Help and Remove Ferry."
+              "term": "Open at Login",
+              "detail": "Starts Ferry when you log in. A checkmark shows it is on."
             },
             {
               "term": "Quit Ferry",
@@ -432,6 +432,13 @@
           "paragraphs": [
             "Files copied from a device, and folders on it named like an app or a document package, are marked as downloaded, so macOS checks an app or script with Gatekeeper before it first opens, as it does for one from the internet."
           ]
+        },
+        {
+          "title": "Remove Ferry",
+          "paragraphs": [
+            "Removes Ferry's locations from Finder, stops Ferry's helper and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state."
+          ],
+          "action": "removeFerry"
         }
       ]
     },
@@ -448,7 +455,7 @@
       "title": "Uninstall",
       "symbol": "trash",
       "steps": [
-        "In Ferry's Settings, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched.",
+        "In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched.",
         "Drag Ferry from Applications to the Trash."
       ]
     }

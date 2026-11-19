@@ -145,6 +145,30 @@ struct HelpContentTests {
     #expect(throws: DecodingError.self) { try Self.decode(json) }
   }
 
+  /// Remove Ferry… lives in Help, under Troubleshooting, and nowhere else.
+  @Test func removeFerryIsUnderTroubleshooting() throws {
+    let section = try Self.section("troubleshooting")
+    let group = try #require(section.groups.first { $0.body.action == .removeFerry })
+    #expect(group.title == "Remove Ferry")
+    let others = Self.help.sections.flatMap { [$0.body] + $0.groups.map(\.body) }
+      .filter { $0.action != nil }
+    #expect(others.count == 1)
+    // Nothing in Help sends the reader to a Settings window that no longer exists.
+    #expect(
+      !Self.help.sections.contains { section in
+        section.strings.contains { $0.contains("Settings…") || $0.contains("Ferry's Settings") }
+      })
+  }
+
+  @Test func anUnknownActionIsRejected() {
+    let json = """
+      {"version": 1, "title": "T", "sections": [
+        {"id": "a", "title": "A", "symbol": "folder", "action": "reboot"}
+      ]}
+      """
+    #expect(throws: DecodingError.self) { try Self.decode(json) }
+  }
+
   @Test(arguments: ["", "   "])
   func emptySearchShowsEverySection(query: String) {
     #expect(Self.help.sections(matching: query) == Self.help.sections)

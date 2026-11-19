@@ -8,11 +8,13 @@
 ```text
 { version, sections: [Section] }
 
-Section  = { id, title, symbol, paragraphs?, steps?, definitions?, groups?: [Group], note?, link? }
-Group    = { title, paragraphs?, steps?, definitions?, note?, link? }
+Section  = { id, title, symbol, paragraphs?, steps?, definitions?, groups?: [Group], note?, link?,
+             action? }
+Group    = { title, paragraphs?, steps?, definitions?, note?, link?, action? }
 link     = { title, target }    target: "guide", "guide:<DeviceFamily case>", "debugging" or
                                 "debugging:<DeviceFamily case>"
 definitions = [{ term, detail }]
+action   = "removeFerry"
 ```
 
 - `symbol` is an SF Symbol name (all checked to exist on macOS 26).
@@ -21,11 +23,12 @@ definitions = [{ term, detail }]
 - Strings use the same inline Markdown (`**bold**`) as the String Catalog. Step strings for the
   connection sections match the catalog keys in `Sources/FerryUI/Localizable.xcstrings`
   exactly, so the app can render them through `LocalizedStringResource` and share translations.
-- Render order in a section: paragraphs, steps, definitions, groups, note, link.
+- Render order in a block: paragraphs, steps, definitions, note, link, action; a section's
+  groups follow its own blocks.
 
 ## Window layout
 
-A standard macOS window, opened from a **Help** item in the menu and in Settings.
+A standard macOS window, opened from the **Help** item in the menu.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
@@ -60,6 +63,10 @@ Bracketed names stand for each section's SF Symbol (`symbol` in `help.json`).
   guide window with the model picker; `"guide:<case>"` opens it preselected to that
   `DeviceFamily`. `"debugging"` and `"debugging:<case>"` do the same on the USB debugging steps
   instead of the file-transfer steps. This is the "How to Connect" deep link.
+- An `action` renders as a bordered button after the link. `"removeFerry"` is **Remove Ferry…**
+  under Troubleshooting: it asks to confirm, then removes Ferry's locations and helper and quits;
+  if that fails, the reason shows under the button. Ferry has no Settings window, so this is
+  where Remove Ferry lives.
 - The window opens on the section the reader last chose, kept with `@AppStorage`, and on
   **Getting started** the first time (or when the remembered section no longer exists). The
   window itself is not restored at launch. The sidebar's selection and the detail always

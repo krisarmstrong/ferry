@@ -98,9 +98,10 @@ struct HelpBody: Decodable, Sendable, Hashable {
   let definitions: [HelpDefinition]
   let note: String?
   let link: HelpLink?
+  let action: HelpAction?
 
   private enum CodingKeys: String, CodingKey {
-    case paragraphs, steps, definitions, note, link
+    case paragraphs, steps, definitions, note, link, action
   }
 
   init(from decoder: any Decoder) throws {
@@ -110,6 +111,7 @@ struct HelpBody: Decodable, Sendable, Hashable {
     definitions = try container.decodeIfPresent([HelpDefinition].self, forKey: .definitions) ?? []
     note = try container.decodeIfPresent(String.self, forKey: .note)
     link = try container.decodeIfPresent(HelpLink.self, forKey: .link)
+    action = try container.decodeIfPresent(HelpAction.self, forKey: .action)
   }
 
   var strings: [String] {
@@ -122,6 +124,12 @@ struct HelpBody: Decodable, Sendable, Hashable {
 struct HelpDefinition: Decodable, Sendable, Hashable {
   let term: String
   let detail: String
+}
+
+/// Something Help does itself, as a button at the end of the block.
+enum HelpAction: String, Decodable, Sendable {
+  /// Remove Ferry…, after a confirmation.
+  case removeFerry
 }
 
 /// A button that opens the setup guide: with the model picker, or with one family's steps, on

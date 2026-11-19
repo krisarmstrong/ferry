@@ -1,6 +1,21 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Removes Ferry's locations from Finder, stops Ferry's helper and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state." : {
+      "extractionState" : "manual"
+    },
+    "Starts Ferry when you log in. A checkmark shows it is on." : {
+      "extractionState" : "manual"
+    },
+    "In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched." : {
+      "extractionState" : "manual"
+    },
+    "Could not change Open at Login." : {
+
+    },
+    "Open at Login" : {
+
+    },
     "Click **Connect by Address…**, type the device's IP address or name in the field that opens in the menu, and click **Connect** or press Return. Ferry uses adb's usual port unless you add another after a colon. If the device asks, tap **Allow** on it: the menu shows that it is waiting until you do." : {
       "extractionState" : "manual"
     },
@@ -347,9 +362,6 @@
         }
       }
     },
-    "Could not change Open at login." : {
-
-    },
     "Could not remove Ferry. Make sure Ferry is running, then try again." : {
 
     },
@@ -440,9 +452,6 @@
     "Ferry's locations are all off in System Settings. Click **Open System Settings** and turn on Ferry under File Providers. Shown once a device has been connected." : {
       "extractionState" : "manual"
     },
-    "File transfer" : {
-
-    },
     "File transfer is off or the device is locked. Choose **Transfer files** on the device, then **Refresh**." : {
       "extractionState" : "manual"
     },
@@ -511,9 +520,6 @@
     },
     "Ignore" : {
 
-    },
-    "In Ferry's Settings, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched." : {
-      "extractionState" : "manual"
     },
     "In Login Items & Extensions, turn on Ferry under Allow in the Background." : {
       "localizations" : {
@@ -652,12 +658,6 @@
     "Open System Settings" : {
 
     },
-    "Open at login" : {
-
-    },
-    "Open at login, How to Connect, Help and Remove Ferry." : {
-      "extractionState" : "manual"
-    },
     "To turn on this menu, open System Settings, then **General** → **Login Items & Extensions**." : {
       "extractionState" : "manual"
     },
@@ -782,9 +782,6 @@
 
     },
     "Set up" : {
-
-    },
-    "Settings…" : {
 
     },
     "Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds." : {

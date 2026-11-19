@@ -253,7 +253,7 @@ import os
     opensAtLogin = await services.opensAtLogin()
   }
 
-  /// The Open at login switch: shows `enabled` at once, then applies it after any change still
+  /// The Open at Login row: shows `enabled` at once, then applies it after any change still
   /// being applied, so quick toggles reach macOS in order and the switch never snaps back
   /// meanwhile. Once the last change is applied, it shows what macOS reports.
   public func requestOpensAtLogin(_ enabled: Bool) {
@@ -279,7 +279,7 @@ import os
     } catch {
       Self.log.error("open at login: \(error, privacy: .public)")
       actionError = String(
-        localized: LocalizedStringResource("Could not change Open at login.", bundle: .module))
+        localized: LocalizedStringResource("Could not change Open at Login.", bundle: .module))
     }
     let reported = await services.opensAtLogin()
     // A later request shows its own value until it is applied in turn.
