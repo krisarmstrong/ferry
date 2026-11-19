@@ -43,4 +43,14 @@ struct CatalogKeysTests {
     }
     #expect(keys.contains("Remembered · not nearby"))
   }
+
+  /// The names of a known model's ports, and the word for one with no address.
+  @Test func theKnownPortsHaveCatalogKeys() throws {
+    let keys = try catalogKeys()
+    for name in [
+      "Wi-Fi Management", "Wired Management", "Wired Test", "Wi-Fi Test", "Not connected",
+    ] {
+      #expect(keys.contains(name), "\(name)")
+    }
+  }
 }

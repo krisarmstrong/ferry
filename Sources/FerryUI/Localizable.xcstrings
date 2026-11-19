@@ -521,6 +521,21 @@
     "IP addresses" : {
 
     },
+    "Not connected" : {
+
+    },
+    "Wi-Fi Management" : {
+
+    },
+    "Wi-Fi Test" : {
+
+    },
+    "Wired Management" : {
+
+    },
+    "Wired Test" : {
+
+    },
     "Is %@ your %@?" : {
       "localizations" : {
         "en" : {

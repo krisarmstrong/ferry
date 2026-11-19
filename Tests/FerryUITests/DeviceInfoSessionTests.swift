@@ -63,6 +63,71 @@ struct DeviceInfoSessionTests {
     #expect(rows[6].value.contains("used") && rows[6].value.contains("free"))
   }
 
+  /// A model whose ports Ferry knows lists each of them by the name on the unit, with "Not
+  /// connected" for one that has no address; an address on any other interface keeps the
+  /// generic row.
+  @Test(arguments: [
+    (
+      [
+        AndroidDeviceInfo.Address(interface: "wlan0", address: "192.0.2.159"),
+        .init(interface: "eno0", address: "192.0.2.156"),
+        .init(interface: "wax0", address: "192.0.2.160"),
+      ],
+      [
+        "Wi-Fi Management": "192.0.2.159", "Wired Management": "Not connected",
+        "Wired Test": "192.0.2.156", "Wi-Fi Test": "192.0.2.160",
+      ],
+      nil as String?
+    ),
+    (
+      [
+        .init(interface: "wlan0", address: "192.0.2.159"),
+        .init(interface: "wlan0", address: "2001:db8::159"),
+        .init(interface: "eth0", address: "192.0.2.10"),
+        .init(interface: "tun0", address: "10.8.0.2"),
+      ],
+      [
+        "Wi-Fi Management": "192.0.2.159, 2001:db8::159", "Wired Management": "192.0.2.10",
+        "Wired Test": "Not connected", "Wi-Fi Test": "Not connected",
+      ],
+      "10.8.0.2 (tun0)"
+    ),
+    (
+      [],
+      [
+        "Wi-Fi Management": "Not connected", "Wired Management": "Not connected",
+        "Wired Test": "Not connected", "Wi-Fi Test": "Not connected",
+      ], nil
+    ),
+  ])
+  func aKnownModelListsItsPorts(
+    addresses: [AndroidDeviceInfo.Address], ports: [String: String], others: String?
+  ) {
+    let info = AndroidDeviceInfo(
+      model: "EtherScope_nXG", androidVersion: "8.1.0", build: "b", serial: "S", battery: nil,
+      addresses: addresses, storage: nil)
+    let rows = DevicePresentation.infoRows(info)
+    let names = ["Wi-Fi Management", "Wired Management", "Wired Test", "Wi-Fi Test"]
+    var expected = ["Model", "Android version", "Build", "Serial number"] + names
+    if others != nil { expected.append("IP addresses") }
+    #expect(rows.map(\.label) == expected)
+    for name in names {
+      #expect(rows.first { $0.label == name }?.value == ports[name], "\(name)")
+    }
+    #expect(rows.first { $0.label == "IP addresses" }?.value == others)
+  }
+
+  /// A model Ferry does not know keeps the generic labels, matched on the whole model name.
+  @Test(arguments: ["LinkRunner G2", "EtherScope", "etherscope_nxg"])
+  func anyOtherModelKeepsTheGenericLabels(model: String) {
+    let info = AndroidDeviceInfo(
+      model: model, androidVersion: "", build: "", serial: "S", battery: nil,
+      addresses: [.init(interface: "wlan0", address: "192.0.2.159")], storage: nil)
+    let rows = DevicePresentation.infoRows(info)
+    #expect(rows.map(\.label) == ["Model", "Serial number", "IP addresses"])
+    #expect(rows[2].value == "192.0.2.159 (Wi-Fi)")
+  }
+
   /// What the device could not say is left out, not shown as an empty or zero value.
   @Test func whatIsMissingHasNoRow() {
     let bare = AndroidDeviceInfo(

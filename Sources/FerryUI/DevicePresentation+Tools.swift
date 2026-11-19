@@ -121,8 +121,9 @@ extension DevicePresentation {
     return LocalizedStringResource("Remove the forward from port \(local)", bundle: .module)
   }
 
-  /// What the device said about itself, a row each; a part it could not say has no row. Every
-  /// value is the device's, so it is escaped.
+  /// What the device said about itself, a row each; a part it could not say has no row. A model
+  /// whose ports Ferry knows (`KnownPorts`) has a row per port, and "IP addresses" only for any
+  /// other interface. Every value is the device's, so it is escaped.
   static func infoRows(_ info: AndroidDeviceInfo) -> [InfoRow] {
     var rows: [InfoRow] = []
     func add(_ label: LocalizedStringResource, _ value: String) {
@@ -138,9 +139,21 @@ extension DevicePresentation {
     if let battery = info.battery {
       add(LocalizedStringResource("Battery", bundle: .module), batteryLine(battery))
     }
+    var others = info.addresses
+    if let ports = KnownPorts.ports(ofModel: info.model) {
+      for port in ports {
+        let found = info.addresses.filter { $0.interface == port.interface }
+        add(
+          port.name,
+          found.isEmpty
+            ? String(localized: LocalizedStringResource("Not connected", bundle: .module))
+            : found.map { DisplayText.escaped($0.address) }.joined(separator: ", "))
+      }
+      others.removeAll { address in ports.contains { $0.interface == address.interface } }
+    }
     add(
       LocalizedStringResource("IP addresses", bundle: .module),
-      info.addresses.map(addressLine).joined(separator: ", "))
+      others.map(addressLine).joined(separator: ", "))
     if let storage = info.storage {
       add(LocalizedStringResource("Storage", bundle: .module), storageLine(storage))
     }
