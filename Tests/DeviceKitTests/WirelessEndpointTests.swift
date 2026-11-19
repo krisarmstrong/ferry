@@ -87,4 +87,10 @@ struct PairingCodeTests {
     let code = try JSONDecoder().decode(PairingCode.self, from: Data(#""482913""#.utf8))
     #expect(code.digits == "482913")
   }
+
+  /// A NUL ends the text inet_pton reads, not the text Ferry would pass on to adb.
+  @Test(arguments: ["192.0.2.1\0", "192.0.2.1\0x", "١٩٢.0.2.1"])
+  func anAddressWithMoreAfterItIsRefused(text: String) {
+    #expect(WirelessEndpoint(parsing: text) == nil)
+  }
 }

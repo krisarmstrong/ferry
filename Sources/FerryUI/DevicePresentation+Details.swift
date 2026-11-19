@@ -12,17 +12,18 @@ extension DevicePresentation {
     /// The interface, as the device names it: two of one kind of link share a label.
     let id: String
     let label: String
-    /// The address shown and copied; `nil` for a known port with no IPv4 address.
+    /// The address copied, a validated IPv4 address; `nil` for a known port with none.
     let address: String?
 
-    var value: String { address ?? notConnected }
+    /// What the line shows: the address as text, like every value the device supplied.
+    var value: String { address.map(DisplayText.escaped) ?? notConnected }
   }
 
   /// For a model whose ports Ferry knows (`KnownPorts`), every port in the unit's order;
   /// otherwise each interface with an IPv4 address, named for its kind of link, in the order the
   /// device listed them. Each shows its first IPv4 address; IPv6 addresses are left out.
   static func detailLines(_ info: AndroidDeviceInfo) -> [DetailLine] {
-    let ipv4 = info.addresses.filter { isIPv4($0.address) }
+    let ipv4 = info.addresses.filter { NumericAddress.isIPv4($0.address) }
     func firstAddress(on interface: String) -> String? {
       ipv4.first { $0.interface == interface }.map(\.address)
     }
@@ -76,11 +77,6 @@ extension DevicePresentation {
 
   private static var notConnected: String {
     String(localized: LocalizedStringResource("Not connected", bundle: .module))
-  }
-
-  private static func isIPv4(_ text: String) -> Bool {
-    var address = in_addr()
-    return inet_pton(AF_INET, text, &address) == 1
   }
 
   /// What Copy All Details copies: a `Label: value` line per row of `infoRows`.

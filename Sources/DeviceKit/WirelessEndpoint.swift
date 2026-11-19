@@ -102,10 +102,9 @@ public struct WirelessEndpoint: Hashable, Sendable, Codable {
     isIPv4(host) || isIPv6(host) || isHostname(host)
   }
 
+  /// Dotted decimal, four parts, so `10.1` is not an address.
   private static func isIPv4(_ text: String) -> Bool {
-    var address = in_addr()
-    // inet_pton takes only the dotted-decimal form, four parts, so `10.1` is not an address.
-    return text.utf8.count <= 15 && inet_pton(AF_INET, text, &address) == 1
+    NumericAddress.isIPv4(text)
   }
 
   /// Without a zone (`%en0`), which inet_pton accepts but adb's serials do not carry.

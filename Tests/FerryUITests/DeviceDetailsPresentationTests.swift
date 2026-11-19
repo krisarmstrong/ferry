@@ -76,7 +76,10 @@ struct DeviceDetailsPresentationTests {
   }
 
   /// Only a dotted-decimal IPv4 address is shown and copied, never whatever else the device sent.
-  @Test(arguments: ["192.0.2", "192.0.2.256", "::ffff:192.0.2.1", "192.0.2.1\u{202E}", ""])
+  @Test(arguments: [
+    "192.0.2", "192.0.2.256", "::ffff:192.0.2.1", "192.0.2.1\u{202E}", "", "192.0.2.1\0",
+    "192.0.2.1\0tail", "١٩٢.0.2.1", "192.0.2.1 ",
+  ])
   func onlyAnIPv4AddressIsShown(address: String) {
     let lines = DevicePresentation.detailLines(
       info(model: "Box", [.init(interface: "wlan0", address: address)]))

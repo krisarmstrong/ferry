@@ -42,17 +42,12 @@ enum ADBDeviceInfo {
       }
       guard interface != "lo", scope.map({ words[$0] }) != "link",
         let address = words[3].split(separator: "/").first.map(String.init),
-        Self.isAddress(address, family: words[2] == "inet" ? AF_INET : AF_INET6)
+        words[2] == "inet"
+          ? NumericAddress.isIPv4(address) : NumericAddress.isIPv6(address)
       else { continue }
       addresses.append(AndroidDeviceInfo.Address(interface: interface, address: address))
     }
     return addresses
-  }
-
-  /// Whether `text` is a numeric address of `family`, as `inet_pton` reads one.
-  private static func isAddress(_ text: String, family: Int32) -> Bool {
-    var buffer = [UInt8](repeating: 0, count: 16)
-    return inet_pton(family, text, &buffer) == 1
   }
 
   /// `BatteryManager`'s `BATTERY_STATUS_*` constants.

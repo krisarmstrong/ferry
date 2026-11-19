@@ -118,6 +118,21 @@ struct ADBDeviceInfoTests {
       ])
   }
 
+  /// An address with a NUL and more after it, or in another script's digits, is not one, though
+  /// inet_pton reads only up to the NUL.
+  @Test func anAddressWithMoreAfterItIsSkipped() {
+    let text = """
+      6: wlan0    inet 192.0.2.1\0tail/24 scope global wlan0
+      6: wlan0    inet ١٩٢.0.2.2/24 scope global wlan0
+      6: wlan0    inet6 2001:db8::1\0tail/64 scope global
+      6: wlan0    inet 192.0.2.9/24 scope global wlan0
+      """
+    #expect(
+      ADBDeviceInfo.addresses(fromOneLine: text) == [
+        .init(interface: "wlan0", address: "192.0.2.9")
+      ])
+  }
+
   private func read(_ device: FakeAndroid) async throws -> AndroidDeviceInfo {
     let server = try await device.serve(serial: Self.serial)
     defer { server.stop() }
