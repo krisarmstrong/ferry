@@ -99,6 +99,88 @@ struct AppModelRecordingTests {
     #expect(model.recording(on: id) == nil)
   }
 
+  /// A save the device broke off (unplugged, say) is tried again once a status has shown the
+  /// device gone and then back, not while it still looks served.
+  @Test func aRecordingIsCollectedWhenItsDeviceComesBack() async throws {
+    let model = setUp()
+    let folder = try TestScratch.folder("device-back")
+    services.folders = [folder]
+    client.setTool(.failure(.deviceDisconnected))
+    await model.refresh()
+    try await waitForSaves(1)
+    await settle()
+    #expect(model.recordingUnsaved(on: id))
+    await model.refresh()
+    await settle()
+    #expect(saves() == 1)
+
+    client.setStatus([], recordings: [finished])
+    await model.refresh()
+    client.setStatus(
+      [device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB)],
+      recordings: [finished])
+    client.setTool(.done, writes: Data("....ftypmp42".utf8))
+    await model.refresh()
+    try await waitForSaves(2)
+    await settle()
+    #expect(!model.recordingUnsaved(on: id))
+    #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).count == 1)
+  }
+
+  /// A save the agent refused for another reason waits for the user, even across a reconnect.
+  @Test func aRefusedSaveWaitsForTheUser() async throws {
+    let model = setUp()
+    services.folders = [try TestScratch.folder("refused")]
+    client.setTool(.toolFailed(.recordingBusy))
+    await model.refresh()
+    try await waitForSaves(1)
+    client.setStatus([], recordings: [finished])
+    await model.refresh()
+    client.setStatus(
+      [device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB)],
+      recordings: [finished])
+    await model.refresh()
+    await settle()
+    #expect(saves() == 1)
+    #expect(model.recordingUnsaved(on: id))
+  }
+
+  /// Discard the agent refused (the video is being saved) leaves the recording waiting.
+  @Test func aRefusedDiscardKeepsTheRecordingWaiting() async throws {
+    let model = setUp()
+    services.folders = []
+    await model.refresh()
+    await model.collectRecording(on: id)
+    try #require(model.recordingUnsaved(on: id))
+    client.setDiscard(.toolFailed(.recordingBusy))
+    await model.discardRecording(on: id)
+    #expect(model.recordingUnsaved(on: id))
+  }
+
+  /// The writable-folder check creates a file and removes it, so it sees what a permission
+  /// check alone can miss.
+  @Test func theFolderCheckCreatesAndRemovesAFile() throws {
+    let writable = try TestScratch.folder("takes-files")
+    #expect(CaptureFiles.takesNewFiles(writable))
+    #expect(try FileManager.default.contentsOfDirectory(atPath: writable.path).isEmpty)
+    let readOnly = try TestScratch.folder("read-only")
+    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: readOnly.path)
+    defer {
+      try? FileManager.default.setAttributes(
+        [.posixPermissions: 0o755], ofItemAtPath: readOnly.path)
+    }
+    #expect(!CaptureFiles.takesNewFiles(readOnly))
+    #expect(!CaptureFiles.takesNewFiles(writable.appending(path: "missing")))
+  }
+
+  private func waitForSaves(_ count: Int) async throws {
+    let deadline = ContinuousClock.now + .seconds(5)
+    while saves() < count, ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    try #require(saves() == count)
+  }
+
   /// An ejected device's video waits on the device until it is served again.
   @Test func anEjectedDevicesRecordingIsNotCollected() async throws {
     let model = setUp(method: .usbFileTransfer)

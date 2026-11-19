@@ -62,9 +62,10 @@ import os
   var requestedRecordings: [DeviceID: Date] = [:]
   /// Finished recordings being saved, so each is collected once.
   var collectingRecordings: Set<DeviceID> = []
-  /// Finished recordings the app could not save, with the capture folders that were writable
-  /// then.
-  var unsavedRecordings: [DeviceID: Set<URL>] = [:]
+  /// Finished recordings the app could not save, and why.
+  var unsavedRecordings: [DeviceID: UnsavedRecording] = [:]
+  /// Unsaved recordings whose capture folders are being checked, so each is checked once.
+  var probingRecordings: Set<DeviceID> = []
   /// What the last tool request said when it succeeded without a file to show.
   public internal(set) var toolMessage: String?
   /// Where the system saved changes an eject removed before they reached the device. Shown until

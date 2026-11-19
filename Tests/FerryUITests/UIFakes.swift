@@ -24,6 +24,7 @@ final class FakeClient: AgentSending {
   private let ejectResult = Mutex<AgentResponse>(.removed(preserved: []))
   private let wirelessResult = Mutex<AgentResponse>(.wireless(.connected))
   private let toolResult = Mutex<AgentResponse>(.done)
+  private let discardResult = Mutex<AgentResponse>(.done)
   /// What the agent writes into the file a capture request carries.
   private let toolBytes = Mutex(Data())
   /// Progress the agent reports on a tool request before it answers.
@@ -67,6 +68,11 @@ final class FakeClient: AgentSending {
     toolResult.withLock { $0 = response }
     toolProgress.withLock { $0 = progress }
     toolBytes.withLock { $0 = bytes }
+  }
+
+  /// What the agent answers to Discard.
+  func setDiscard(_ response: AgentResponse) {
+    discardResult.withLock { $0 = response }
   }
 
   private func clearRecordings() {
@@ -209,8 +215,9 @@ final class FakeClient: AgentSending {
       return .done
     case .discardRecording(let id):
       log.record("discardRecording \(id.serial)")
-      clearRecordings()
-      return .done
+      let reply = discardResult.withLock { $0 }
+      if reply == .done { clearRecordings() }
+      return reply
     default:
       return developerReply(request)
     }

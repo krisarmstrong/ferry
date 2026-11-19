@@ -65,6 +65,16 @@ enum CaptureFiles {
       && isFolder.boolValue && access(url.path, W_OK) == 0
   }
 
+  /// Whether a new file can be created in `folder`: one is created and removed. Unlike a
+  /// permission check, this sees a folder macOS denies Ferry (Desktop, Documents, Downloads
+  /// without consent). Blocks while macOS asks the user, so never call it on the main thread.
+  static func takesNewFiles(_ folder: URL) -> Bool {
+    guard let (url, handle) = temporary(in: folder) else { return false }
+    try? handle.close()
+    unlink(url.path)
+    return true
+  }
+
   /// The name before any ` 2` and the extension, dated in `timeZone` as macOS dates its own.
   static func baseName(
     _ kind: Kind, model: String, at date: Date, timeZone: TimeZone = .current

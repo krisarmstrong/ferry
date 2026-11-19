@@ -53,15 +53,24 @@ extension AppModel {
     await refresh()
   }
 
+  /// How a capture ended.
+  enum CaptureResult: Equatable {
+    case saved
+    /// No folder took the file, or it could not be named there.
+    case noFolder
+    /// The agent did not fill the file: its answer, or `nil` if it could not be reached.
+    case notSent(AgentResponse?)
+  }
+
   /// Creates the capture's file in the first of `folders` that takes one (where macOS saves
   /// screenshots, then the Desktop), has the agent fill it through its descriptor, then names it
   /// `base` (or the next free name) and shows it in Finder. Any failure removes the file. The
   /// file is created off the main thread: a folder macOS protects can hold the call while it asks
-  /// the user. Returns whether the capture was saved.
+  /// the user.
   @discardableResult
   func capture(
     _ kind: CaptureFiles.Kind, named base: String, in folders: [URL], request: AgentRequest
-  ) async -> Bool {
+  ) async -> CaptureResult {
     let opened = await Task.detached { () -> (url: URL, handle: FileHandle)? in
       for folder in folders {
         if let file = CaptureFiles.temporary(in: folder) { return file }
@@ -70,22 +79,22 @@ extension AppModel {
     }.value
     guard let (temporary, handle) = opened else {
       actionError = DevicePresentation.message(for: .cannotSave)
-      return false
+      return .noFolder
     }
     let response = await sendTool(request, file: handle)
     try? handle.close()
     guard response == .done else {
       unlink(temporary.path)
-      return false
+      return .notSent(response)
     }
     do throws(TransportError) {
       let url = try CaptureFiles.place(temporary, base: base, fileExtension: kind.fileExtension)
       services.reveal([url])
-      return true
+      return .saved
     } catch {
       unlink(temporary.path)
       actionError = DevicePresentation.message(for: error)
-      return false
+      return .noFolder
     }
   }
 

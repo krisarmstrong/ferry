@@ -2,10 +2,23 @@ import DeviceKit
 import FerryIPC
 import Foundation
 
+/// Why a finished recording waits on the device for the user.
+enum UnsavedRecording: Equatable {
+  /// No capture folder could take it: the folders that could take a file then. Tried again
+  /// once another one can.
+  case noFolder(Set<URL>)
+  /// The device was lost during the save. Tried again once a status has shown it gone
+  /// (`away`) and then served again.
+  case deviceLost(away: Bool)
+  /// The agent refused, or the video was broken off for another reason: only the user tries
+  /// again.
+  case refused
+}
+
 /// Screen recordings: Record Screen, the indicator with Stop, then saving the video where
 /// macOS saves screenshots. A video the app could not save waits on the device, with Choose
 /// Folder… and Discard, and is tried again on its own only once a capture folder becomes
-/// writable, never on every refresh.
+/// writable or the device comes back, never on every refresh.
 extension AppModel {
   /// The device's recording: as the agent reports it, or as asked for until the agent answers.
   public func recording(on device: DeviceID) -> ActiveRecording? {
@@ -48,30 +61,46 @@ extension AppModel {
   }
 
   /// Discard: the agent deletes the waiting video from the device, and Record Screen returns.
+  /// A refused discard (the video is being saved) leaves it waiting as it was.
   public func discardRecording(on device: DeviceID) async {
-    _ = await sendTool(.discardRecording(device), file: nil)
-    unsavedRecordings[device] = nil
+    if await sendTool(.discardRecording(device), file: nil) == .done {
+      unsavedRecordings[device] = nil
+    }
     await refresh()
   }
 
   /// Collects each finished recording the status lists: not one being collected already, nor
   /// one on a device not served over ADB now (it was ejected: it waits until it is back), nor
-  /// one the app could not save, until a capture folder that was not writable then is now.
+  /// one the app could not save, until what stopped it changed (see `UnsavedRecording`).
   func collectFinishedRecordings() {
     let listed = Set(recordings.map(\.device))
     unsavedRecordings = unsavedRecordings.filter { listed.contains($0.key) }
-    var writable: Set<URL>?
     for recording in recordings
     where recording.finished && !collectingRecordings.contains(recording.device) {
-      guard let device = devices.first(where: { $0.id == recording.device }),
+      let id = recording.device
+      guard let device = devices.first(where: { $0.id == id }),
         DevicePresentation.offersTools(device)
-      else { continue }
-      if let failedWith = unsavedRecordings[recording.device] {
-        let now = writable ?? writableCaptureFolders()
-        writable = now
-        guard !now.isSubset(of: failedWith) else { continue }
+      else {
+        if case .deviceLost = unsavedRecordings[id] {
+          unsavedRecordings[id] = .deviceLost(away: true)
+        }
+        continue
       }
-      Task { await collectRecording(on: recording.device) }
+      switch unsavedRecordings[id] {
+      case nil, .deviceLost(away: true):
+        Task { await collectRecording(on: id) }
+      case .deviceLost(away: false), .refused:
+        continue
+      case .noFolder(let failedWith):
+        guard probingRecordings.insert(id).inserted else { continue }
+        Task {
+          let now = await writableCaptureFolders()
+          probingRecordings.remove(id)
+          guard !now.isSubset(of: failedWith), unsavedRecordings[id] == .noFolder(failedWith)
+          else { return }
+          await collectRecording(on: id)
+        }
+      }
     }
   }
 
@@ -84,14 +113,37 @@ extension AppModel {
       collectingRecordings.insert(device).inserted
     else { return }
     defer { collectingRecordings.remove(device) }
-    let saved = await capture(
+    let result = await capture(
       .recording, named: name ?? captureName(.recording, of: device, at: recording.started),
       in: folders ?? services.captureFolders(), request: .saveRecording(device))
-    unsavedRecordings[device] = saved ? nil : writableCaptureFolders()
+    switch result {
+    case .saved:
+      unsavedRecordings[device] = nil
+    case .noFolder:
+      unsavedRecordings[device] = .noFolder(await writableCaptureFolders())
+    case .notSent(let response):
+      unsavedRecordings[device] = Self.lostDevice(response) ? .deviceLost(away: false) : .refused
+    }
     await refresh()
   }
 
-  private func writableCaptureFolders() -> Set<URL> {
-    Set(services.captureFolders().filter(CaptureFiles.isWritableFolder))
+  /// Whether a save failed because the device went away (unplugged, USB debugging turned off,
+  /// adb's server gone), which a later try can get past once it is back.
+  private static func lostDevice(_ response: AgentResponse?) -> Bool {
+    switch response {
+    case .failure(.deviceDisconnected), .failure(.deviceNotFound), .failure(.noDeviceConnected),
+      .toolFailed(.notOverADB):
+      true
+    default:
+      false
+    }
+  }
+
+  /// The capture folders that take a new file now. Checked by creating one, off the main
+  /// thread: a folder macOS protects passes a permission check but refuses the file, and can
+  /// hold the call while it asks the user.
+  private func writableCaptureFolders() async -> Set<URL> {
+    let folders = services.captureFolders()
+    return await Task.detached { Set(folders.filter(CaptureFiles.takesNewFiles)) }.value
   }
 }
