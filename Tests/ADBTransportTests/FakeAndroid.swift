@@ -77,11 +77,16 @@ final class FakeAndroid: Sendable {
 
   let state = OSAllocatedUnfairLock(initialState: State())
   static let internalRoot = "/storage/emulated/0"
+  /// Each folder watch's start, end and kill, as they happen. One test reads it.
+  let watchEvents: AsyncStream<WatchEvent>
 
   /// A device with internal shared storage mounted, holding nothing. With `vfat`, lookups on
   /// the volumes also ignore trailing dots, as Linux's vfat driver does.
   init(volumes: [String] = [], vfat: Bool = false) {
+    let (events, sink) = AsyncStream.makeStream(of: WatchEvent.self)
+    watchEvents = events
     state.withLock { state in
+      state.tools.watchEvents = sink
       for folder in ["/storage", "/storage/emulated", Self.internalRoot, "/storage/self"] {
         state.nodes[Self.bytes(folder)] = .folder(mtime: 1_600_000_000)
       }

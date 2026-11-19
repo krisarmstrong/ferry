@@ -44,8 +44,11 @@ extension FakeAndroid {
     /// the client closes.
     var inotify: [Data] = []
     var inotifyEnds = false
-    /// `inotifyd` connections the client has not yet closed.
-    var watching = 0
+    /// The pids of the `inotifyd` processes running, and the pid the next one gets.
+    var watchers: Set<Int> = []
+    var nextWatcher = 7001
+    /// What happens to the watches, in order (see `FakeAndroid.watchEvents`).
+    var watchEvents: AsyncStream<WatchEvent>.Continuation?
     /// The adb server's forwards, for every device it has, as `list-forward` lists them.
     var forwards: [Forward] = []
     /// Local ports the server cannot bind.
@@ -83,8 +86,8 @@ extension FakeAndroid {
       try await logcat(peer)
       return
     }
-    if words.first == "inotifyd" {
-      try await inotifyd(peer)
+    if words.first == "sh", words.dropFirst(2).first == ADBSession.watchScript {
+      try await inotifyd(words, peer)
       return
     }
     guard words == ["screencap", "-p"] else { throw ScriptError.unexpected(command) }
@@ -94,21 +97,6 @@ extension FakeAndroid {
     }
     try await peer.raw(state.withLock { $0.tools.screencap })
     await peer.finish()
-  }
-
-  /// Sends the scripted events, then exits or watches until the client closes.
-  private func inotifyd(_ peer: Peer) async throws {
-    let (chunks, ends) = state.withLock {
-      $0.tools.watching += 1
-      return ($0.tools.inotify, $0.tools.inotifyEnds)
-    }
-    defer { state.withLock { $0.tools.watching -= 1 } }
-    for chunk in chunks { try await peer.raw(chunk) }
-    if ends {
-      await peer.finish()
-    } else {
-      _ = try? await peer.stream.read(exactly: 1)
-    }
   }
 
   /// Sends the scripted log, then follows it (nothing more arrives) or ends it.
@@ -310,6 +298,11 @@ extension FakeAndroid {
 
   /// `kill -2 PID`: interrupts the recording if it is that process.
   static func kill(_ operands: [String], in state: inout State) -> ShellResult {
+    if operands.count == 1, let pid = Int(operands[0]), state.tools.watchers.contains(pid) {
+      state.tools.watchers.remove(pid)
+      state.tools.watchEvents?.yield(.killed(pid))
+      return ShellResult()
+    }
     guard operands.count == 1, let recording = state.tools.recording,
       operands[0] == String(recording.pid)
     else {
