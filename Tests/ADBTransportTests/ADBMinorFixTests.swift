@@ -102,6 +102,26 @@ struct ADBMinorFixTests {
     }
   }
 
+  /// The device reports the size: one at the type's maximum must not overflow the growth check.
+  @Test(.timeLimit(.minutes(1)))
+  func aDownloadDeclaringTheLargestSizeDoesNotTrap() async throws {
+    let server = try await FakeADBServer.start { peer in
+      try await peer.accept(service: "sync:")
+      _ = try await peer.syncPathRequest()
+      try await peer.raw(Peer.sta2(mode: 0o100600, size: .max, mtime: 1))
+      _ = try await peer.syncPathRequest()
+      try await peer.raw(Peer.data(Data("abc".utf8)) + Peer.done())
+      _ = try? await peer.stream.read(exactly: 1)
+    }
+    defer { server.stop() }
+    let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
+    let stream = try await host.connect("S", service: "sync:")
+    let sync = ADBSync(stream: stream, features: ["stat_v2"])
+    let (url, handle) = try SyncFixture.scratchFile()
+    defer { try? FileManager.default.removeItem(at: url) }
+    #expect(try await sync.receive("/x", to: handle, progress: { _, _ in true }) == 3)
+  }
+
   /// A symlink is not a folder, on every protocol: the check never follows it.
   @Test(arguments: ["cmd,shell_v2,stat_v2", "cmd,shell_v2"])
   func aSymlinkToAFolderIsNotAFolder(features: String) async throws {

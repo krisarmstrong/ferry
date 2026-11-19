@@ -232,8 +232,9 @@ public actor ADBSync {
           throw .failed("could not write the received data: \(error.localizedDescription)")
         }
         received += UInt64(length)
-        // A file still being written may grow; one that grows without end is not a file.
-        guard received <= total + growthAllowance else {
+        // A file still being written may grow; one that grows without end is not a file. The
+        // device reports `total`, so it is never added to: the check cannot overflow.
+        guard received <= total || received - total <= growthAllowance else {
           throw await violation("receive passed its size of \(total) bytes")
         }
         guard progress(received, total) else {
