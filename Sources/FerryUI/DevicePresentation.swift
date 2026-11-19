@@ -41,20 +41,6 @@ enum DevicePresentation {
     }
   }
 
-  /// How Ferry reaches the device, as the menu shows it under the device's name.
-  static func method(_ method: ConnectionMethod) -> LocalizedStringResource {
-    switch method {
-    case .usbADB: LocalizedStringResource("USB · ADB", bundle: .module)
-    case .wifiADB: LocalizedStringResource("Wi-Fi · ADB", bundle: .module)
-    case .usbFileTransfer: LocalizedStringResource("USB · File transfer", bundle: .module)
-    }
-  }
-
-  /// The method the menu shows for `device`: only a device Ferry is serving has one.
-  static func shownMethod(of device: AttachedDevice) -> ConnectionMethod? {
-    if case .ready = device.state { device.method } else { nil }
-  }
-
   /// A line the menu adds under a device, with an action where it has one.
   enum Hint: Equatable {
     /// USB debugging is off; the guide turns it on for more tools.

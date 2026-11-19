@@ -275,8 +275,8 @@ folder into the device's location in Finder, or compress it into a .zip first." 
 as an `.rtfd` document or an app, and a symbolic link or alias are refused with the same
 messages Finder shows when you copy them to the device.
 
-When every selected file is an `.apk` and Ferry reaches the device over ADB (**USB · ADB** or
-**Wi-Fi · ADB** in the menu), the menu also has **Install on** the device. It installs each app
+When every selected file is an `.apk` and Ferry reaches the device over ADB (with USB debugging
+on, or over Wi-Fi), the menu also has **Install on** the device. It installs each app
 as **Install App…** in the menu does.
 
 Finder shows no progress for these. A notification says when the files are on the device or
@@ -346,15 +346,7 @@ Above the devices, the menu can also show:
 
 While the menu is open, Ferry checks for devices every 2 seconds.
 
-When you click a ready device, the menu says how Ferry reaches it:
-
-| Shown | Meaning |
-| ----- | ------- |
-| **USB · ADB** | ADB over a USB cable. |
-| **Wi-Fi · ADB** | ADB over your network. |
-| **USB · File transfer** | USB file transfer, with USB debugging off or not yet allowed. |
-
-A device over ADB lists the [tools](#tools-over-usb-debugging) when you click it. A device on
+A device over ADB (with USB debugging on, or over Wi-Fi) lists the [tools](#tools-over-usb-debugging) when you click it. A device on
 file transfer also shows **More Tools with USB Debugging…**, which opens the
 [steps](#usb-debugging-adb), or **Allow USB debugging on the device** once USB debugging is on
 and waits for you to tap **Allow**. When `adb` is not installed and a device is connected, the
@@ -391,10 +383,10 @@ Settings:
 
 ## Tools over USB debugging
 
-Click a device Ferry reaches over ADB (**USB · ADB** or **Wi-Fi · ADB** in the menu) to see
-its tools: **Take Screenshot**, **Record Screen**, **Logcat**, **Device Info**, **Port
-Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows **More Tools
-with USB Debugging…** instead.
+Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its tools:
+**Take Screenshot**, **Record Screen**, **Logcat**, **Device Info**, **Port Forwarding**,
+**Install App…** and **Open Shell**. A device on file transfer shows **More Tools with USB
+Debugging…** instead.
 
 ### Install an app
 

@@ -15,8 +15,8 @@ struct DeviceRowActions {
   let forget: () -> Void
 }
 
-/// One device: its tile, name and summary, and, when expanded, how Ferry reaches it, details
-/// for its state, then its actions as rows. An `.apk` dropped on a device with tools is
+/// One device: its tile, name and summary, and, when expanded, details for its state, then its
+/// actions as rows. An `.apk` dropped on a device with tools is
 /// installed.
 struct DeviceRow: View {
   let device: AttachedDevice
@@ -91,7 +91,7 @@ struct DeviceRow: View {
   }
 }
 
-/// The lines an expanded device shows above its actions: the method, its storage and transfers,
+/// The lines an expanded device shows above its actions: its storages and transfers,
 /// what its state means, an app on its way, the recording, and USB debugging.
 private struct DeviceDetails: View {
   let device: AttachedDevice
@@ -107,10 +107,6 @@ private struct DeviceDetails: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
-      if let method = DevicePresentation.shownMethod(of: device) {
-        Text(DevicePresentation.method(method))
-          .foregroundStyle(.secondary)
-      }
       stateLines
       if let install = tools.install {
         Text(verbatim: DevicePresentation.installingLine(install))
@@ -160,8 +156,8 @@ private struct DeviceDetails: View {
 
   @ViewBuilder private var stateLines: some View {
     switch device.state {
-    case .ready(let storages):
-      ForEach(storages, id: \.id) { storage in
+    case .ready:
+      ForEach(DevicePresentation.listedStorages(of: device), id: \.id) { storage in
         Text(verbatim: DevicePresentation.storageLine(storage))
           .foregroundStyle(.secondary)
       }

@@ -52,6 +52,13 @@ extension DevicePresentation {
       address.port == WirelessEndpoint.defaultPort ? address.host : address.argument)
   }
 
+  /// The storages an expanded device lists. The summary already gives the first one's free
+  /// space, so a single storage is not listed again.
+  static func listedStorages(of device: AttachedDevice) -> [StorageInfo] {
+    guard case .ready(let storages) = device.state, storages.count > 1 else { return [] }
+    return storages
+  }
+
   static var rememberedSummary: String {
     String(localized: LocalizedStringResource("Remembered · not nearby", bundle: .module))
   }

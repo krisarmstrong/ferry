@@ -121,9 +121,6 @@
     "%lld." : {
 
     },
-    "Click a device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) to see its tools: Take Screenshot, Record Screen, Logcat, Device Info, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
-      "extractionState" : "manual"
-    },
     "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device." : {
       "extractionState" : "manual"
     },
@@ -389,15 +386,6 @@
 
     },
     "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check Again** once it is installed." : {
-      "extractionState" : "manual"
-    },
-    "Ferry reaches the device over ADB on a USB cable." : {
-      "extractionState" : "manual"
-    },
-    "Ferry reaches the device over ADB on your network." : {
-      "extractionState" : "manual"
-    },
-    "Ferry reaches the device over USB file transfer. Turn on USB debugging to use ADB instead." : {
       "extractionState" : "manual"
     },
     "Ferry saves them in Documents, in Ferry, then a folder for each device with Screenshots and Screen Recordings in it, named like macOS's own, such as Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png, and shows them in Finder. macOS asks whether Ferry may use Documents the first time it saves one. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device." : {
@@ -849,12 +837,6 @@
     "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **OK** or **Allow**." : {
       "extractionState" : "manual"
     },
-    "USB · ADB" : {
-      "extractionState" : "manual"
-    },
-    "USB · File transfer" : {
-      "extractionState" : "manual"
-    },
     "Under **USB preferences**, choose **File transfer**. Or open **Settings** → **Connected devices** → **USB**." : {
 
     },
@@ -911,12 +893,6 @@
     },
     "Warning" : {
 
-    },
-    "When every selected file is an .apk and Ferry reaches the device over ADB (USB · ADB or Wi-Fi · ADB in the menu), the menu also has **Install on** the device, which installs the apps as Install App… does." : {
-      "extractionState" : "manual"
-    },
-    "Wi-Fi · ADB" : {
-      "extractionState" : "manual"
     },
     "With USB debugging on, Ferry serves the device over ADB, which is faster than file transfer and adds more tools. File transfer keeps working without it." : {
       "extractionState" : "manual"
@@ -1035,6 +1011,12 @@
       "extractionState" : "manual"
     },
     "Sends files you choose into the device's Download folder, as **Send to** does in Finder." : {
+      "extractionState" : "manual"
+    },
+    "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its tools: Take Screenshot, Record Screen, Logcat, Device Info, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
+      "extractionState" : "manual"
+    },
+    "When every selected file is an .apk and Ferry reaches the device over ADB (with USB debugging on, or over Wi-Fi), the menu also has **Install on** the device, which installs the apps as Install App… does." : {
       "extractionState" : "manual"
     }
   },

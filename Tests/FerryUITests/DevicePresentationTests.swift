@@ -17,20 +17,6 @@ struct DevicePresentationTests {
 
   private static let ready = DeviceState.ready([])
 
-  @Test(arguments: [
-    (ConnectionMethod.usbADB, "USB · ADB"), (.wifiADB, "Wi-Fi · ADB"),
-    (.usbFileTransfer, "USB · File transfer"),
-  ])
-  func methodIsNamedInPlainWords(method: ConnectionMethod, text: String) {
-    #expect(String(localized: DevicePresentation.method(method)) == text)
-  }
-
-  @Test func everyMethodHasAName() {
-    for method in ConnectionMethod.allCases {
-      #expect(!String(localized: DevicePresentation.method(method)).isEmpty)
-    }
-  }
-
   /// A file-transfer device is offered USB debugging; one over ADB already has it.
   @Test(arguments: [
     (ConnectionMethod.usbFileTransfer, DevicePresentation.Hint?.some(.moreTools)),
@@ -74,13 +60,6 @@ struct DevicePresentationTests {
       DevicePresentation.hint(
         for: Self.attached(state, .usbFileTransfer), awaitingUSBDebugging: false)
         == nil)
-  }
-
-  @Test func theMethodShowsOnlyForAReadyDevice() {
-    #expect(DevicePresentation.shownMethod(of: Self.attached(Self.ready, .usbADB)) == .usbADB)
-    for state in [DeviceState.notSharingFiles, .ejected, .busy, .failed(.deviceBusy)] {
-      #expect(DevicePresentation.shownMethod(of: Self.attached(state, .usbADB)) == nil)
-    }
   }
 
   /// An unauthorised device only adb lists is waiting for Allow, not for file transfer.

@@ -189,4 +189,18 @@ struct MenuPresentationTests {
       name: name)
     #expect(DevicePresentation.offerName(offer) == shown)
   }
+
+  /// The summary already gives the first storage's free space: the expansion lists storages
+  /// only when there are several.
+  @Test func theExpansionListsStoragesOnlyWhenThereAreSeveral() {
+    let card = StorageInfo(
+      id: StorageID(device: DeviceID(serial: "A"), key: "SD card|1"), description: "SD card",
+      capacity: 64_000_000_000, free: 10_000_000_000)
+    #expect(DevicePresentation.listedStorages(of: Self.attached(Self.ready, .usbADB)).isEmpty)
+    #expect(DevicePresentation.listedStorages(of: Self.attached(.ready([]), .usbADB)).isEmpty)
+    #expect(
+      DevicePresentation.listedStorages(of: Self.attached(.ready([Self.storage, card]), .usbADB))
+        == [Self.storage, card])
+    #expect(DevicePresentation.listedStorages(of: Self.attached(.ejected, .usbADB)).isEmpty)
+  }
 }
