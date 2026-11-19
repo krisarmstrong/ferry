@@ -39,8 +39,10 @@ public struct ADBDeviceTools: Sendable {
   private let captureLimit: Int
   /// `screencap` answers in a second or two; a device that never finishes the image is given up.
   private let captureWait: Duration
-  /// How long a capture waits for the display to come on (see `wakeScreen(route:)`).
+  /// How long a capture waits for the display to come on (see `wakeScreen(route:)`), and the
+  /// wait between two reads of the display's state, on the injected clock.
   let wakeLimit: Duration
+  let pause: @Sendable (Duration) async throws -> Void
 
   public init(host: ADBHost) {
     self.init(
@@ -50,13 +52,17 @@ public struct ADBDeviceTools: Sendable {
 
   init(
     host: ADBHost, answerLimit: Duration, captureLimit: Int, captureWait: Duration,
-    wakeLimit: Duration = .seconds(2)
+    wakeLimit: Duration = .seconds(2),
+    pause: @escaping @Sendable (Duration) async throws -> Void = {
+      try await ContinuousClock().sleep(for: $0)
+    }
   ) {
     self.host = host
     self.answerLimit = answerLimit
     self.captureLimit = captureLimit
     self.captureWait = captureWait
     self.wakeLimit = wakeLimit
+    self.pause = pause
   }
 
   /// A new path for an APK on its way to pm.

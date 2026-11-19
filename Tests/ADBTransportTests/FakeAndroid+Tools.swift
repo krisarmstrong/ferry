@@ -36,6 +36,9 @@ extension FakeAndroid {
     /// After `input keyevent KEYCODE_WAKEUP`, the display comes on once `dumpsys power` has been
     /// read this many times; `nil` never.
     var displayOnAfterPolls: Int?
+    /// What `dumpsys power` prints instead of its display line, as a build that words it
+    /// differently would.
+    var powerText: String?
     /// Whether `input` refuses the key.
     var wakeRefused = false
     /// `dumpsys power` reads since the last wake key.
@@ -286,6 +289,7 @@ extension FakeAndroid {
       if let after = state.tools.displayOnAfterPolls, state.tools.powerPolls >= after {
         state.tools.displayOn = true
       }
+      if let text = state.tools.powerText { return ShellResult(stdout: text) }
       let display = state.tools.displayOn ? "ON" : "OFF"
       return ShellResult(
         stdout: "Power Manager State:\n  mDirty=0x0\nDisplay Power: state=\(display)\n")

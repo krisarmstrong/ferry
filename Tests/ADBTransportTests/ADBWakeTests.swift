@@ -1,5 +1,6 @@
 import DeviceKit
 import Foundation
+import Synchronization
 import Testing
 
 @testable import ADBTransport
@@ -25,26 +26,30 @@ struct ADBWakeTests {
     """
   }
 
-  @Test(arguments: [("ON", true), ("OFF", false), ("DOZE", false), ("UNKNOWN", false)])
-  func theDisplayIsOnOnlyWhenPowerSaysSo(state: String, isOn: Bool) {
-    #expect(ADBWake.displayIsOn(fromDumpsysPower: Self.power(state)) == isOn)
+  @Test(arguments: [
+    ("ON", ADBWake.Display.lit), ("OFF", .dark), ("DOZE", .dark), ("UNKNOWN", .dark),
+  ])
+  func theDisplayIsWhatPowerSays(state: String, display: ADBWake.Display) {
+    #expect(ADBWake.display(fromDumpsysPower: Self.power(state)) == display)
   }
 
-  @Test func textWithoutTheDisplayLineIsNotOn() {
-    #expect(!ADBWake.displayIsOn(fromDumpsysPower: ""))
-    #expect(!ADBWake.displayIsOn(fromDumpsysPower: "Display Power: state=ONLY"))
+  /// No display line, or a state Ferry cannot read, says nothing about the display.
+  @Test func textWithoutTheDisplayLineSaysNothing() {
+    #expect(ADBWake.display(fromDumpsysPower: "") == nil)
+    #expect(ADBWake.display(fromDumpsysPower: "mWakefulness=Awake\n") == nil)
+    #expect(ADBWake.display(fromDumpsysPower: "Display Power: state=") == nil)
   }
 
   private func withTools<T>(
     _ device: FakeAndroid, answerLimit: Duration = .seconds(5), wakeLimit: Duration = .seconds(5),
-    _ body: (ADBDeviceTools) async throws -> T
+    pauses: Pauses = Pauses(), _ body: (ADBDeviceTools) async throws -> T
   ) async throws -> T {
     let server = try await device.serve(serial: Self.serial)
     defer { server.stop() }
     let tools = ADBDeviceTools(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: answerLimit,
       captureLimit: ADBDeviceTools.defaultCaptureLimit, captureWait: .seconds(5),
-      wakeLimit: wakeLimit)
+      wakeLimit: wakeLimit, pause: { pauses.record($0) })
     return try await body(tools)
   }
 
@@ -116,4 +121,53 @@ struct ADBWakeTests {
     #expect(ContinuousClock.now - start < .seconds(5))
     #expect(!device.commands.contains(["dumpsys", "power"]))
   }
+
+  /// Re-reads are paced on the injected clock, 100 ms apart, never back to back.
+  @Test func readsArePaced() async throws {
+    let device = FakeAndroid()
+    device.setTools {
+      $0.displayOn = false
+      $0.displayOnAfterPolls = 3
+    }
+    let pauses = Pauses()
+    let woke = try await withTools(device, pauses: pauses) {
+      await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
+    }
+    #expect(woke)
+    #expect(pauses.all == [.milliseconds(100), .milliseconds(100)])
+  }
+
+  /// A display that stays off is read until the paced waits reach the limit.
+  @Test func aDisplayThatStaysOffIsReadUntilTheLimit() async throws {
+    let device = FakeAndroid()
+    device.setTools { $0.displayOn = false }
+    let pauses = Pauses()
+    let woke = try await withTools(device, wakeLimit: .milliseconds(300), pauses: pauses) {
+      await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
+    }
+    #expect(!woke)
+    #expect(pauses.all == [.milliseconds(100), .milliseconds(100), .milliseconds(100)])
+    #expect(device.commands.filter { $0 == ["dumpsys", "power"] }.count == 4)
+  }
+
+  /// A device whose `dumpsys power` has no display line will never say the display is on, so
+  /// the capture goes ahead after one read.
+  @Test func noDisplayLineStopsAtOnce() async throws {
+    let device = FakeAndroid()
+    device.setTools { $0.powerText = "Power Manager State:\n  mDirty=0x0\n" }
+    let pauses = Pauses()
+    let woke = try await withTools(device, pauses: pauses) {
+      await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
+    }
+    #expect(!woke)
+    #expect(pauses.all.isEmpty)
+    #expect(device.commands.filter { $0 == ["dumpsys", "power"] }.count == 1)
+  }
+}
+
+/// The waits a wake asked for, which return at once.
+final class Pauses: Sendable {
+  private let waits = Mutex<[Duration]>([])
+  var all: [Duration] { waits.withLock { $0 } }
+  func record(_ duration: Duration) { waits.withLock { $0.append(duration) } }
 }
