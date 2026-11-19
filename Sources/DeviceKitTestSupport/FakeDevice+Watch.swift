@@ -11,6 +11,7 @@ public final class FakeWatches: Sendable {
     /// Counts the watches started, so a watch stopped late cannot clear a newer one.
     var generation = 0
     var waiters: [Int: Waiter] = [:]
+    var stopWaiters: [Int: CheckedContinuation<Void, Never>] = [:]
     var nextWaiter = 0
   }
 
@@ -42,6 +43,26 @@ public final class FakeWatches: Sendable {
   /// Ends the running watch, as a device's watcher that exits.
   public func end() {
     state.withLock { $0.current }?.finish()
+  }
+
+  /// Returns once no watch runs, or the calling task is cancelled.
+  public func waitUntilStopped() async {
+    let id = state.withLock { state in
+      state.nextWaiter += 1
+      return state.nextWaiter
+    }
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        let ready = state.withLock { state in
+          guard state.current != nil, !Task.isCancelled else { return true }
+          state.stopWaiters[id] = continuation
+          return false
+        }
+        if ready { continuation.resume() }
+      }
+    } onCancel: {
+      state.withLock { $0.stopWaiters.removeValue(forKey: id) }?.resume()
+    }
   }
 
   /// Returns once `count` watches have been started, or the calling task is cancelled.
@@ -101,9 +122,13 @@ public final class FakeWatches: Sendable {
   }
 
   private func stopped(_ generation: Int) {
-    state.withLock { state in
-      if state.generation == generation { state.current = nil }
+    let ready = state.withLock { state -> [CheckedContinuation<Void, Never>] in
+      guard state.generation == generation else { return [] }
+      state.current = nil
+      defer { state.stopWaiters = [:] }
+      return Array(state.stopWaiters.values)
     }
+    for waiter in ready { waiter.resume() }
   }
 }
 

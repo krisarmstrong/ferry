@@ -116,8 +116,13 @@ public actor ChangeWatch {
       resumeWaiters()
     }
     guard !asleep else { return }
-    let devices = Set(recent.keys).union(await domains.connectedDevices())
-    for device in devices.sorted(by: { $0.serial < $1.serial }) {
+    let connected = await domains.connectedDevices()
+    // A device that went away is forgotten: when it comes back its domains know the folders
+    // clients listed, and the set is filled from those.
+    for device in Set(recent.keys).union(watches.keys).subtracting(connected) {
+      forget(device)
+    }
+    for device in connected.sorted(by: { $0.serial < $1.serial }) {
       let folders = await watched(device)
       guard !folders.isEmpty else {
         stopWatch(device)
@@ -131,7 +136,8 @@ public actor ChangeWatch {
   }
 
   /// The device's recent folders whose domain is connected and that it still has. One the
-  /// device no longer has is dropped; one whose domain is away is kept for its return.
+  /// device no longer has is dropped; one whose domain is away (another storage, unmounted) is
+  /// kept for its return.
   private func live(_ device: DeviceID) async -> [Listed] {
     var live: [Listed] = []
     var gone: [Listed] = []
@@ -187,6 +193,12 @@ public actor ChangeWatch {
       _ = await self?.follow(device, folders, token: token)
     }
     watches[device] = Watch(token: token, folders: folders, task: task)
+  }
+
+  private func forget(_ device: DeviceID) {
+    stopWatch(device)
+    recent[device] = nil
+    pending[device] = nil
   }
 
   private func stopWatch(_ device: DeviceID) {
@@ -258,6 +270,7 @@ public actor ChangeWatch {
 
   // MARK: Waiting, for tests
 
+  func rememberedFolders(of device: DeviceID) -> Int { recent[device]?.count ?? 0 }
   func waitForTicks(_ count: Int) async { await waitUntil { self.ticks >= count } }
   func waitForHints(_ count: Int) async { await waitUntil { self.hintsReceived >= count } }
   func waitForHintWindows(_ count: Int) async { await waitUntil { self.hintWindows >= count } }

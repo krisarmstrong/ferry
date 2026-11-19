@@ -226,6 +226,24 @@ struct ChangeWatchTests {
     #expect(watched.device.watches.requests.count == 2)
   }
 
+  /// A device that goes away is forgotten: its watch stops and its folders are dropped, so the
+  /// set never grows with every device ever seen.
+  @Test func aDeviceThatLeavesIsForgotten() async throws {
+    let watched = try await Watched()
+    defer { watched.finish() }
+    try await watched.list("/Download")
+    await watched.device.watches.waitForRequests(1)
+    #expect(await watched.changes.rememberedFolders(of: watched.device.info.id) == 1)
+    let calls = await watched.harness.manager.calls.count
+    await watched.harness.transport.detach(watched.device.info.id)
+    watched.harness.tick()
+    _ = await watched.harness.manager.waitForCalls(calls + 1)
+    await watched.tick()
+    #expect(await watched.changes.rememberedFolders(of: watched.device.info.id) == 0)
+    await watched.device.watches.waitUntilStopped()
+    #expect(!watched.device.watches.isWatching)
+  }
+
   /// A client's listing through the service reaches the watch.
   @Test func aClientListingIsWatched() async throws {
     let device = await makeDevice("A")
