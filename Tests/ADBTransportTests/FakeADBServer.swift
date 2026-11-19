@@ -43,13 +43,44 @@ final class FakeADBServer: Sendable {
 
   /// Listens on `port`, or on a free one. `script` runs once per connection; errors in it end
   /// that connection, which is how a test sees a client hang up.
+  ///
+  /// A free port is picked outside the kernel's ephemeral range (49152 and up), as the real
+  /// server's 5037 is, and never one `ClosedPort` picks (20000 to 29999). An OS-assigned port
+  /// comes from the ephemeral range, which every outgoing connection's local port comes from
+  /// too, and that made a rare connect fail for 10 s under parallel runs: a listener on port A
+  /// that closed a connection first leaves its socket A ↔ B in TIME_WAIT for 30 s; the OS then
+  /// gives B to another fake listener; a client of that one may be given local port A, which
+  /// makes the very same pair, so the connect fails with EADDRINUSE, and the kernel offers the
+  /// same local port for that destination again on every new attempt until the TIME_WAIT ends.
+  /// Off the ephemeral range, a listener's port is never any client's local port. The bind takes
+  /// no address reuse, so it fails while any socket still holds the port, and another is picked.
   static func start(
     port: UInt16? = nil, script: @escaping @Sendable (Peer) async throws -> Void
   ) async throws -> FakeADBServer {
+    if let port {
+      // Rebinding a port the test had (a server restart): its own TIME_WAIT sockets may hold it.
+      guard let server = try await listen(on: port, reuse: true, script: script) else {
+        throw POSIXError(.EADDRINUSE)
+      }
+      return server
+    }
+    for _ in 0..<1000 {
+      let candidate = UInt16.random(in: 30_000..<40_000)
+      if let server = try await listen(on: candidate, reuse: false, script: script) {
+        return server
+      }
+    }
+    throw POSIXError(.EADDRINUSE)
+  }
+
+  /// Listens on `port`; `nil` if something else holds it.
+  private static func listen(
+    on port: UInt16, reuse: Bool, script: @escaping @Sendable (Peer) async throws -> Void
+  ) async throws -> FakeADBServer? {
     let parameters = NWParameters.tcp
-    parameters.allowLocalEndpointReuse = true
+    parameters.allowLocalEndpointReuse = reuse
     parameters.requiredLocalEndpoint = .hostPort(
-      host: .ipv4(.loopback), port: port.flatMap(NWEndpoint.Port.init(rawValue:)) ?? .any)
+      host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port) ?? .any)
     let listener = try NWListener(using: parameters)
     // `.ready` has been seen to precede the listening socket accepting connections: a client
     // that connected at once was refused. One probe connection, swallowed here, proves it is.
@@ -82,6 +113,10 @@ final class FakeADBServer: Sendable {
         }
         try await server.awaitAccepting(probes: probes)
         return server
+      case .waiting(.posix(.EADDRINUSE)), .failed(.posix(.EADDRINUSE)):
+        listener.stateUpdateHandler = nil
+        listener.cancel()
+        return nil
       case .failed(let error):
         throw error
       default:

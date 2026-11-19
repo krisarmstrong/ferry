@@ -14,8 +14,8 @@ actor Box<Value: Sendable> {
 ///
 /// A socket that is bound but not listening cannot do this: macOS drops the SYN and a connect
 /// hangs for about eight seconds instead of being refused. So the port is picked, not held:
-/// it is outside the kernel's ephemeral range (49152 and up), so neither another test's
-/// `FakeADBServer` (which asks for any port) nor an outgoing connection is ever given it; a
+/// it is outside the kernel's ephemeral range (49152 and up), so no outgoing connection is ever
+/// given it, and outside the range `FakeADBServer` picks from (30000 to 39999); a
 /// process-wide registry hands each caller a different one, so no two tests share it; and a
 /// bind with no address reuse must succeed, which proves nothing else on the machine holds it.
 /// The registry entry is released on `deinit`.
