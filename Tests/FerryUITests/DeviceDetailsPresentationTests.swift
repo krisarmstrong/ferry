@@ -131,7 +131,7 @@ struct DeviceDetailsPresentationTests {
     #expect(line == "Android 8\\u{202E}")
   }
 
-  /// Copy All Details puts the Device Info text on the pasteboard: a `Label: value` line per
+  /// Copy Device Details puts the Device Info text on the pasteboard: a `Label: value` line per
   /// row, every address of every port included.
   @Test func theFullTextHasEveryAddress() {
     let text = DevicePresentation.detailsText(

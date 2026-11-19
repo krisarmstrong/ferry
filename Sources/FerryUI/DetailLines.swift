@@ -2,8 +2,8 @@ import SwiftUI
 
 /// What an expanded device says about itself, after Control Center's Option-click Wi-Fi details:
 /// a line per port or interface, its name on the left and its IPv4 address on the right, then
-/// its Android version and battery. Clicking an address copies it. While the first read runs it
-/// says so in one line; a failed read shows nothing.
+/// its Android version and battery, and Copy Device Details. Clicking an address copies it. While
+/// the first read runs it says so in one line; a failed read shows nothing.
 struct DetailLines: View {
   let tools: ToolActions
 
@@ -40,6 +40,11 @@ struct DetailLines: View {
       }
       .font(.callout)
       .padding(.bottom, 2)
+      MenuRow(
+        title: Text(DevicePresentation.copyDeviceDetailsResource), symbol: "doc.on.doc",
+        indent: MenuMetrics.actionIndent, action: tools.copyDeviceDetails
+      )
+      .deviceAction(DevicePresentation.copyDeviceDetailsResource, on: tools.name)
     }
   }
 
@@ -81,11 +86,5 @@ private struct DetailLineContent: View {
       .monospacedDigit()
     }
     .padding(.leading, MenuMetrics.actionIndent)
-  }
-}
-
-extension DetailsShown {
-  var isLoaded: Bool {
-    if case .loaded = self { true } else { false }
   }
 }

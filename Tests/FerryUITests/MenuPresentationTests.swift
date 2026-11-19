@@ -91,10 +91,9 @@ struct MenuPresentationTests {
 
   typealias Action = DevicePresentation.MenuAction
 
-  /// Copy All Details first, just under the details it copies.
+  /// The tools; Copy Device Details is part of the details above them, not a tool row.
   private static let tools: [Action] = [
-    .copyAllDetails, .takeScreenshot, .recordScreen, .logcat, .portForwarding, .sendFile,
-    .installApp, .openShell,
+    .takeScreenshot, .recordScreen, .logcat, .portForwarding, .sendFile, .installApp, .openShell,
   ]
 
   @Test(
@@ -140,7 +139,7 @@ struct MenuPresentationTests {
 
   @Test(arguments: [
     (Action.takeScreenshot, "Take Screenshot"), (.recordScreen, "Record Screen"),
-    (.stopRecording, "Stop Recording"), (.logcat, "Logcat"), (.copyAllDetails, "Copy All Details"),
+    (.stopRecording, "Stop Recording"), (.logcat, "Logcat"),
     (.portForwarding, "Port Forwarding"), (.sendFile, "Send File…"),
     (.installApp, "Install App…"), (.openShell, "Open Shell"), (.useOverWiFi, "Use over Wi-Fi"),
     (.forget, "Forget"), (.howToTurnOnFileTransfer, "How to Turn On File Transfer"),

@@ -27,7 +27,7 @@ struct ToolActions {
   let details: DetailsShown
   let isCopied: (DevicePresentation.DetailLine) -> Bool
   let copyAddress: (DevicePresentation.DetailLine) -> Void
-  let copyAllDetails: () -> Void
+  let copyDeviceDetails: () -> Void
 
   /// `open` shows one of the developer windows for the device.
   init(model: AppModel, device: DeviceID, open: @escaping (DeveloperWindow) -> Void) {
@@ -50,7 +50,7 @@ struct ToolActions {
     details = model.shownDetails(of: device)
     isCopied = { model.isCopied($0, on: device) }
     copyAddress = { line in Task { await model.copyAddress(line, on: device) } }
-    copyAllDetails = { model.copyAllDetails(of: device) }
+    copyDeviceDetails = { model.copyDeviceDetails(of: device) }
   }
 
   func install(_ url: URL) { installDropped(url) }

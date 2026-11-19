@@ -1,8 +1,14 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Click an address to copy it; the line shows Copied for a moment. Copy All Details copies everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage." : {
+    "Click an address to copy it; the line shows Copied for a moment. Copy Device Details, just under the details, copies everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage." : {
       "extractionState" : "manual"
+    },
+    "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details, Copy Device Details, and its tools: Take Screenshot, Record Screen, Logcat, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
+      "extractionState" : "manual"
+    },
+    "Copy Device Details" : {
+
     },
     "Android %@" : {
 
@@ -14,9 +20,6 @@
 
     },
     "Loading details…" : {
-
-    },
-    "Copy All Details" : {
 
     },
     "Android %@ · Battery %lld%%" : {
@@ -1048,9 +1051,6 @@
       "extractionState" : "manual"
     },
     "Sends files you choose into the device's Download folder, as **Send to** does in Finder." : {
-      "extractionState" : "manual"
-    },
-    "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details and tools: Copy All Details, Take Screenshot, Record Screen, Logcat, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
       "extractionState" : "manual"
     },
     "When every selected file is an .apk and Ferry reaches the device over ADB (with USB debugging on, or over Wi-Fi), the menu also has **Install on** the device, which installs the apps as Install App… does." : {

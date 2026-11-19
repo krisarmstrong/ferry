@@ -386,9 +386,9 @@ Settings:
 
 ## Tools over USB debugging
 
-Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details
-and tools: **Copy All Details**, **Take Screenshot**, **Record Screen**, **Logcat**, **Port
-Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows **More Tools
+Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details,
+**Copy Device Details**, and its tools: **Take Screenshot**, **Record Screen**, **Logcat**,
+**Port Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows **More Tools
 with USB Debugging…** instead.
 
 ### Install an app
@@ -455,8 +455,8 @@ battery. For a model Ferry knows, every port is listed by the name on the unit, 
 connected** for one that has no address. Ferry only reads them, when you open the device and
 every 10 seconds while the menu stays open.
 
-Click an address to copy it; the line shows **Copied** for a moment. **Copy All Details** copies
-everything the device reports: model, Android version, build, serial number, battery, every
+Click an address to copy it; the line shows **Copied** for a moment. **Copy Device Details**,
+just under the details, copies everything the device reports: model, Android version, build, serial number, battery, every
 address on every port including IPv6, and storage.
 
 ## Troubleshooting

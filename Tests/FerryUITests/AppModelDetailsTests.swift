@@ -280,12 +280,12 @@ struct AppModelDetailsTests {
     #expect(!model.isCopied(Self.line, on: id))
   }
 
-  @Test func copyAllDetailsCopiesTheFullText() async {
+  @Test func copyDeviceDetailsCopiesTheFullText() async {
     let model = await expanded(client())
-    model.copyAllDetails(of: id)
+    model.copyDeviceDetails(of: id)
     #expect(!log.all.contains { $0.hasPrefix("copy ") })
     await model.detailsSettled()
-    model.copyAllDetails(of: id)
+    model.copyDeviceDetails(of: id)
     #expect(log.all.contains("copy \(DevicePresentation.detailsText(Self.info))"))
   }
 }

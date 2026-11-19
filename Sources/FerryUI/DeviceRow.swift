@@ -57,8 +57,6 @@ struct DeviceRow: View {
           .deviceAction(action.title, on: name)
           // One app at a time: Install App… waits for the one on its way.
           .disabled(action == .installApp && tools.install != nil)
-          // There is nothing to copy until the device has said it.
-          .disabled(action == .copyAllDetails && !tools.details.isLoaded)
         }
       }
     }
@@ -73,7 +71,6 @@ struct DeviceRow: View {
     case .recordScreen: tools.record
     case .stopRecording: tools.stopRecording
     case .logcat: tools.openLogcat
-    case .copyAllDetails: tools.copyAllDetails
     case .portForwarding: tools.openForwards
     case .sendFile: tools.sendFiles
     case .installApp: tools.chooseAPK

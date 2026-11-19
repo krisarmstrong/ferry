@@ -3,7 +3,7 @@ import FerryText
 import Foundation
 
 /// What a device says about itself, as an expanded device shows it inline (a line per port or
-/// interface with its IPv4 address, then its Android version and battery) and as Copy All
+/// interface with its IPv4 address, then its Android version and battery) and as Copy Device
 /// Details copies it. Every value is the device's, so it is escaped.
 extension DevicePresentation {
   /// One port or interface: its name on the left, its IPv4 address (or "Not connected") on the
@@ -83,13 +83,15 @@ extension DevicePresentation {
   }
 
   static let copiedResource = LocalizedStringResource("Copied", bundle: .module)
+  static let copyDeviceDetailsResource = LocalizedStringResource(
+    "Copy Device Details", bundle: .module)
   static let loadingDetailsResource = LocalizedStringResource("Loading details…", bundle: .module)
 
   private static var notConnected: String {
     String(localized: LocalizedStringResource("Not connected", bundle: .module))
   }
 
-  /// What Copy All Details copies: a `Label: value` line per row of `infoRows`.
+  /// What Copy Device Details copies: a `Label: value` line per row of `infoRows`.
   static func detailsText(_ info: AndroidDeviceInfo) -> String {
     infoRows(info).map { "\($0.label): \($0.value)" }.joined(separator: "\n")
   }

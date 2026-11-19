@@ -139,8 +139,8 @@ extension AppModel {
     copiedAddress?.device == device && copiedAddress?.line == line.id
   }
 
-  /// Copy All Details: what the Device Info window copied, once the details are read.
-  func copyAllDetails(of device: DeviceID) {
+  /// Copy Device Details: everything the device said about itself, once the details are read.
+  func copyDeviceDetails(of device: DeviceID) {
     guard let info = details[device]?.info else { return }
     services.copy(DevicePresentation.detailsText(info))
   }

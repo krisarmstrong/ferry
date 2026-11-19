@@ -84,13 +84,12 @@ extension DevicePresentation {
 
   /// A row in a device's expansion.
   enum MenuAction: Hashable, CaseIterable, Sendable {
-    case copyAllDetails, takeScreenshot, recordScreen, stopRecording, logcat, portForwarding
-    case sendFile, installApp, openShell, useOverWiFi, forget, howToTurnOnFileTransfer, mount
-    case checkAgain, eject, connectAgain, useIt, ignore
+    case takeScreenshot, recordScreen, stopRecording, logcat, portForwarding, sendFile, installApp
+    case openShell, useOverWiFi, forget, howToTurnOnFileTransfer, mount, checkAgain, eject
+    case connectAgain, useIt, ignore
 
     var title: LocalizedStringResource {
       switch self {
-      case .copyAllDetails: LocalizedStringResource("Copy All Details", bundle: .module)
       case .takeScreenshot: LocalizedStringResource("Take Screenshot", bundle: .module)
       case .recordScreen: LocalizedStringResource("Record Screen", bundle: .module)
       case .stopRecording: LocalizedStringResource("Stop Recording", bundle: .module)
@@ -114,7 +113,6 @@ extension DevicePresentation {
 
     var symbol: String {
       switch self {
-      case .copyAllDetails: "doc.on.doc"
       case .takeScreenshot: "camera"
       case .recordScreen: "video"
       case .stopRecording: "stop.circle"
@@ -133,14 +131,14 @@ extension DevicePresentation {
     }
   }
 
-  /// The rows a device's expansion lists, in menu order: Copy All Details under the details it
-  /// copies, the ADB tools, Send File…, the network rows, the one its state needs, then Eject.
+  /// The rows a device's expansion lists under its details, in menu order: the ADB tools, Send
+  /// File…, the network rows, the one its state needs, then Eject.
   static func actions(
     for device: AttachedDevice, isRemembered: Bool, recording: RecordingPhase
   ) -> [MenuAction] {
     var actions: [MenuAction] = []
     if offersTools(device) {
-      actions += [.copyAllDetails, .takeScreenshot]
+      actions.append(.takeScreenshot)
       switch recording {
       case .none: actions.append(.recordScreen)
       case .running: actions.append(.stopRecording)
