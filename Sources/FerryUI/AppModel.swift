@@ -81,6 +81,8 @@ import os
   /// Where the system saved changes an eject removed before they reached the device. Shown until
   /// the next action.
   public internal(set) var preservedChanges: [URL] = []
+  /// Which row of the menu is expanded (see `MenuExpansion`).
+  var expansion = MenuExpansion()
   /// Read from the system once launched (see `launch()`); `false` until then.
   public private(set) var opensAtLogin = false
   /// The login item change being applied, and how many have been requested.
@@ -164,6 +166,7 @@ import os
   public func watchWhileMenuOpen() async {
     // How long the menu has been open since the agent first answered.
     var answeredFor: Duration?
+    resetExpansion()
     while !Task.isCancelled {
       await refresh()
       if agent == .running, answeredFor == nil { answeredFor = .zero }
@@ -298,6 +301,7 @@ import os
     unconfirmed = report.unconfirmed
     recordings = report.recordings
     collectFinishedRecordings()
+    updateExpansion()
     agent = .running
     let states = devices.map { "\(DevicePresentation.kind(of: $0.state))/\($0.method.rawValue)" }
       .joined(separator: ",")
