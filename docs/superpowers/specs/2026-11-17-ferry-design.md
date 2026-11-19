@@ -265,7 +265,9 @@ anchor. An anchor from an earlier agent process is reported expired, so the syst
 re-enumerates. Phone-side changes surface on their own (amended 2026-11-19, owner request after
 the live run): over ADB the agent watches the folders it has listed with the device's `inotifyd`
 and re-lists a folder when it reports any event (events are treated as hints, since shared
-storage reports them incompletely); over MTP it reads the device's object events; and while a
+storage reports them incompletely); over MTP it does not read object events (libmtp 1.1.23
+closes a device without cancelling a pending interrupt transfer, a use-after-free risk in the
+agent), so MTP relies on the re-list below and Refresh catches files rewritten in place; and while a
 device is connected the agent re-lists its most recently listed folders every 30 s (at most 32
 folders, skipped while a transfer is running, paused while the Mac sleeps), signalling only
 when a listing differs. Menu "Refresh" stays as the manual re-list.
