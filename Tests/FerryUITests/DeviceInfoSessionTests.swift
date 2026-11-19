@@ -104,7 +104,7 @@ struct DeviceInfoSessionTests {
     addresses: [AndroidDeviceInfo.Address], ports: [String: String], others: String?
   ) {
     let info = AndroidDeviceInfo(
-      model: "EtherScope_nXG", androidVersion: "8.1.0", build: "b", serial: "S", battery: nil,
+      model: "EtherScope-nXG", androidVersion: "8.1.0", build: "b", serial: "S", battery: nil,
       addresses: addresses, storage: nil)
     let rows = DevicePresentation.infoRows(info)
     let names = ["Wi-Fi Management", "Wired Management", "Wired Test", "Wi-Fi Test"]
