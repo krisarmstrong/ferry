@@ -1,6 +1,34 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Android %@" : {
+
+    },
+    "Battery %lld%%" : {
+
+    },
+    "Copy %@ address" : {
+
+    },
+    "Copied" : {
+
+    },
+    "Loading details…" : {
+
+    },
+    "Copy All Details" : {
+
+    },
+    "Android %@ · Battery %lld%%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Android %1$@ · Battery %2$lld%%"
+          }
+        }
+      }
+    },
     "How to turn on file transfer" : {
       "extractionState" : "manual"
     },

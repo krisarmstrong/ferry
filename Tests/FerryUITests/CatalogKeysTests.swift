@@ -53,4 +53,24 @@ struct CatalogKeysTests {
       #expect(keys.contains(name), "\(name)")
     }
   }
+
+  /// The inline details: the system line in each of its forms, the copy action and the words
+  /// shown while loading and once copied.
+  @Test func theDetailStringsHaveCatalogKeys() throws {
+    let keys = try catalogKeys()
+    for (version, battery) in [
+      ("8.1.0", AndroidDeviceInfo.Battery(level: 87, state: .full)), ("8.1.0", nil),
+      ("", AndroidDeviceInfo.Battery(level: 87, state: .full)),
+    ] {
+      let info = AndroidDeviceInfo(
+        model: "M", androidVersion: version, build: "", serial: "S", battery: battery,
+        addresses: [], storage: nil)
+      let resource = try #require(DevicePresentation.systemLineResource(info))
+      #expect(keys.contains(resource.key), "\(resource.key)")
+    }
+    let line = DevicePresentation.DetailLine(id: "wlan0", label: "Wi-Fi", address: "192.0.2.1")
+    #expect(keys.contains(DevicePresentation.copyAddressResource(line).key))
+    #expect(keys.contains(DevicePresentation.loadingDetailsResource.key))
+    #expect(keys.contains(DevicePresentation.copiedResource.key))
+  }
 }

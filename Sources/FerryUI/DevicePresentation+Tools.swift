@@ -42,11 +42,6 @@ extension DevicePresentation {
 
 /// Text for the developer tools: the log window, Device Info.
 extension DevicePresentation {
-  struct InfoRow: Equatable {
-    let label: String
-    let value: String
-  }
-
   static var logEndedLine: String {
     String(localized: LocalizedStringResource("The device ended the log.", bundle: .module))
   }
@@ -119,82 +114,5 @@ extension DevicePresentation {
   static func removeForwardResource(_ forward: PortForward) -> LocalizedStringResource {
     let local = String(forward.local)
     return LocalizedStringResource("Remove the forward from port \(local)", bundle: .module)
-  }
-
-  /// What the device said about itself, a row each; a part it could not say has no row. A model
-  /// whose ports Ferry knows (`KnownPorts`) has a row per port, and "IP addresses" only for any
-  /// other interface. Every value is the device's, so it is escaped.
-  static func infoRows(_ info: AndroidDeviceInfo) -> [InfoRow] {
-    var rows: [InfoRow] = []
-    func add(_ label: LocalizedStringResource, _ value: String) {
-      guard !value.isEmpty else { return }
-      rows.append(InfoRow(label: String(localized: label), value: value))
-    }
-    add(LocalizedStringResource("Model", bundle: .module), DisplayText.escaped(info.model))
-    add(
-      LocalizedStringResource("Android version", bundle: .module),
-      DisplayText.escaped(info.androidVersion))
-    add(LocalizedStringResource("Build", bundle: .module), DisplayText.escaped(info.build))
-    add(LocalizedStringResource("Serial number", bundle: .module), DisplayText.escaped(info.serial))
-    if let battery = info.battery {
-      add(LocalizedStringResource("Battery", bundle: .module), batteryLine(battery))
-    }
-    var others = info.addresses
-    if let ports = KnownPorts.ports(ofModel: info.model) {
-      for port in ports {
-        let found = info.addresses.filter { $0.interface == port.interface }
-        add(
-          port.name,
-          found.isEmpty
-            ? String(localized: LocalizedStringResource("Not connected", bundle: .module))
-            : found.map { DisplayText.escaped($0.address) }.joined(separator: ", "))
-      }
-      others.removeAll { address in ports.contains { $0.interface == address.interface } }
-    }
-    add(
-      LocalizedStringResource("IP addresses", bundle: .module),
-      others.map(addressLine).joined(separator: ", "))
-    if let storage = info.storage {
-      add(LocalizedStringResource("Storage", bundle: .module), storageLine(storage))
-    }
-    return rows
-  }
-
-  /// The address, then the kind of link it is on, or the interface's own name for any other.
-  private static func addressLine(_ address: AndroidDeviceInfo.Address) -> String {
-    let link =
-      switch address.kind {
-      case .wifi: String(localized: LocalizedStringResource("Wi-Fi", bundle: .module))
-      case .ethernet: String(localized: LocalizedStringResource("Ethernet", bundle: .module))
-      case .mobileData: String(localized: LocalizedStringResource("Mobile data", bundle: .module))
-      case .usb: String(localized: LocalizedStringResource("USB", bundle: .module))
-      case .other(let name): DisplayText.escaped(name)
-      }
-    let value = DisplayText.escaped(address.address)
-    return String(localized: LocalizedStringResource("\(value) (\(link))", bundle: .module))
-  }
-
-  private static func batteryLine(_ battery: AndroidDeviceInfo.Battery) -> String {
-    let level = battery.level
-    return switch battery.state {
-    case .charging:
-      String(localized: LocalizedStringResource("\(level)%, charging", bundle: .module))
-    case .discharging:
-      String(localized: LocalizedStringResource("\(level)%, discharging", bundle: .module))
-    case .notCharging:
-      String(localized: LocalizedStringResource("\(level)%, not charging", bundle: .module))
-    case .full:
-      String(localized: LocalizedStringResource("\(level)%, full", bundle: .module))
-    case .unknown:
-      String(localized: LocalizedStringResource("\(level)%", bundle: .module))
-    }
-  }
-
-  private static func storageLine(_ storage: AndroidDeviceInfo.Storage) -> String {
-    let used = ByteCountFormatter.string(
-      fromByteCount: Int64(clamping: storage.used), countStyle: .file)
-    let free = ByteCountFormatter.string(
-      fromByteCount: Int64(clamping: storage.free), countStyle: .file)
-    return String(localized: LocalizedStringResource("\(used) used, \(free) free", bundle: .module))
   }
 }
