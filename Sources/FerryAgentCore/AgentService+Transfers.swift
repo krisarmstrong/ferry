@@ -79,7 +79,8 @@ extension AgentService {
         // As FileProvider holds it: at the size a download delivered (see `delete`).
         let entry = await route.items.observed(current)
         if entry.item.kind == .file, !ContentVersion(entry.item).matches(base) {
-          return try await ConflictCopy.keepDevice(entry, onConflict, mac: scratch, on: route)
+          return try await ConflictCopy.keepDevice(
+            entry, onConflict, mac: scratch, on: route, transfers: transfers, report: progress)
         }
         checked = current
       }
@@ -96,7 +97,8 @@ extension AgentService {
         // The device replaced the file between the check and the write.
         let entry = await route.items.observed(
           try await route.session.item(at: path, in: route.storage))
-        return try await ConflictCopy.keepDevice(entry, onConflict, mac: scratch, on: route)
+        return try await ConflictCopy.keepDevice(
+          entry, onConflict, mac: scratch, on: route, transfers: transfers, report: progress)
       }
       return .entry(await route.items.changed(item, id: id))
     }

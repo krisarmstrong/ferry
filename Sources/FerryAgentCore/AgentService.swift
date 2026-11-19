@@ -309,7 +309,6 @@ public actor AgentService: AgentHandling {
     return try result.get()
   }
 
-  static let ignoreProgress: ProgressHandler = { _, _ in true }
   static let workingSetPageSize = 500
 }
 

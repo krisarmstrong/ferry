@@ -8,7 +8,7 @@ enum ConflictCopy {
   /// Uploads `scratch` beside `path` under the first free conflict name.
   static func upload(
     _ scratch: URL, beside path: RemotePath, _ route: DomainController.Route,
-    progress: @escaping ProgressHandler = AgentService.ignoreProgress
+    progress: @escaping ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
     let (parent, name) = (path.parent ?? .root, path.name ?? "")
     for attempt in 1...maxAttempts {
@@ -53,17 +53,24 @@ enum ConflictCopy {
   private static let maxAttempts = 99
 
   /// The device's file `entry` is newer than the save: it stays. With `.keepBoth` the Mac's
-  /// contents in `mac` go up beside it as a conflict copy; with `.fail` nothing is written.
+  /// contents in `mac` go up beside it as a conflict copy, listed in `transfers` and stopped by
+  /// the request's cancel like any upload; with `.fail` nothing is written.
   static func keepDevice(
     _ entry: ProviderEntry, _ onConflict: ConflictPolicy, mac: URL,
-    on route: DomainController.Route
+    on route: DomainController.Route, transfers: TransferBoard,
+    report: @escaping TransferProgressHandler
   ) async throws(TransportError) -> AgentResponse {
     switch onConflict {
     case .fail:
       throw .changedOnDevice(entry.item.path)
     case .keepBoth:
-      _ = await route.items.created(
-        try await ConflictCopy.upload(mac, beside: entry.item.path, route))
+      let path = entry.item.path
+      let copy = try await transfers.track(
+        AgentService.transfer(path, .toDevice, on: route), report: report
+      ) { handler throws(TransportError) in
+        try await ConflictCopy.upload(mac, beside: path, route, progress: handler)
+      }
+      _ = await route.items.created(copy)
       return .keptOnDevice(entry)
     }
   }

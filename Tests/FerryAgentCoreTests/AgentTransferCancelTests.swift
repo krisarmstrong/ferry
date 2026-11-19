@@ -67,6 +67,28 @@ struct AgentTransferCancelTests {
       try await device.list(.root, in: storageID(device)).map(\.path) == [try path("/a.txt")])
   }
 
+  /// The device's file changed since the Mac read it, so the Mac's contents would go up beside
+  /// it as a conflict copy; a cancel stops that upload too, leaving no copy and no partial.
+  @Test func aCancelledConflictCopyLeavesNothing() async throws {
+    let setup = try await setUp()
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
+    defer { harness.finish() }
+    let id = try await harness.id(try path("/a.txt"), in: domain)
+    let stale = ContentVersion(
+      RemoteItem(
+        path: try path("/a.txt"), kind: .file, size: 999,
+        modified: Date(timeIntervalSince1970: 1_000_000_000)))
+
+    let response = await cancelled(
+      .replaceContents(domain: domain, id: id, base: stale, onConflict: .keepBoth),
+      file: try harness.readable("new.txt", "newer contents"), on: harness, device: device)
+
+    #expect(response == .failure(.cancelled))
+    let storage = storageID(device)
+    #expect(try await device.list(.root, in: storage).map(\.path) == [try path("/a.txt")])
+    #expect(await device.contents(of: try path("/a.txt"), in: storage) == Data("old".utf8))
+  }
+
   /// A request nobody can cancel runs as before.
   @Test func anUploadWithNoCancellationGoesUp() async throws {
     let setup = try await setUp()
