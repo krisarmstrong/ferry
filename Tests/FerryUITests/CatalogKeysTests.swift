@@ -14,11 +14,27 @@ private struct Catalog: Decodable {
 /// catalog's entry is never found: a `UInt16` makes `%u`, not the `%lld` an `Int` makes. Ports
 /// are text, so they are not grouped (`8,080`).
 struct CatalogKeysTests {
+  private static let catalogURL = URL(filePath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    .appending(path: "Sources/FerryUI/Localizable.xcstrings")
+
   private func catalogKeys() throws -> Set<String> {
-    let url = URL(filePath: #filePath)
-      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-      .appending(path: "Sources/FerryUI/Localizable.xcstrings")
-    return Set(try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: url)).strings.keys)
+    Set(
+      try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: Self.catalogURL)).strings.keys)
+  }
+
+  /// A key written twice decodes as one, so the duplicate goes unseen until Xcode or an export
+  /// trips on it. Xcode writes each key of `strings` on its own line, indented four spaces: the
+  /// raw text must have as many of those as the decoded catalog has keys.
+  @Test func noKeyIsWrittenTwice() throws {
+    let text = try String(contentsOf: Self.catalogURL, encoding: .utf8)
+    let written = text.split(separator: "\n").filter {
+      $0.hasPrefix("    \"") && !$0.hasPrefix("     ") && $0.hasSuffix(" : {")
+    }
+    var seen = Set<Substring>()
+    let repeated = written.filter { !seen.insert($0).inserted }
+    #expect(repeated.isEmpty, "written twice: \(repeated)")
+    #expect(written.count == (try catalogKeys()).count)
   }
 
   @Test func theForwardStringsHaveCatalogKeys() throws {
