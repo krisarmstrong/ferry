@@ -7,7 +7,8 @@ import os
 /// The menu's state: the agent's device list, and the setup guide.
 ///
 /// Nothing polls while the menu is closed. The menu calls `watchWhileMenuOpen()` from a task
-/// that runs while it is open, which refreshes on open and then every 2 s until it closes.
+/// that runs while it is open, which refreshes on open and then every 2 s until it closes, and
+/// reads the expanded device's details at most every 10 s.
 /// Actions refresh when they finish, and the app refreshes once at launch.
 @Observable @MainActor public final class AppModel {
   /// Whether the agent answered the last status request.
@@ -85,6 +86,12 @@ import os
   public internal(set) var preservedChanges: [URL] = []
   /// Which row of the menu is expanded (see `MenuExpansion`).
   var expansion = MenuExpansion()
+  /// What each device said about itself, for its inline details (see `AppModel+Details`).
+  var details: [DeviceID: DetailsRead] = [:]
+  /// The reads running, so a test can wait for them.
+  var detailReads: [DeviceID: Task<Void, Never>] = [:]
+  /// The address line just copied, which shows "Copied" for a moment.
+  var copiedAddress: CopiedAddress?
   /// Read from the system once launched (see `launch()`); `false` until then.
   public private(set) var opensAtLogin = false
   /// The login item change being applied, and how many have been requested.
@@ -101,7 +108,7 @@ import os
 
   let client: any AgentSending
   let services: any SystemServicing
-  private let sleep: @Sendable (Duration) async throws -> Void
+  let sleep: @Sendable (Duration) async throws -> Void
   let now: @Sendable () -> ContinuousClock.Instant
   /// Devices the guide has opened for this app run.
   private var guidedDevices: Set<DeviceID> = []
@@ -171,6 +178,7 @@ import os
     resetExpansion()
     while !Task.isCancelled {
       await refresh()
+      loadExpandedDetailsIfDue()
       if agent == .running, answeredFor == nil { answeredFor = .zero }
       if let answeredFor { considerEmptyGuide(openFor: answeredFor) }
       do {
@@ -305,6 +313,7 @@ import os
     recordings = report.recordings
     collectFinishedRecordings()
     updateExpansion()
+    forgetDetailsOfGoneDevices()
     agent = .running
     let states = devices.map { "\(DevicePresentation.kind(of: $0.state))/\($0.method.rawValue)" }
       .joined(separator: ",")
