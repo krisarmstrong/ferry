@@ -55,10 +55,10 @@ public actor ToolJournal {
   }
 
   /// Removes the device's leftover files over `serial`, keeping any that could not be removed.
-  public func sweep(_ id: DeviceID, serial: String, using tools: any ADBToolDevice) async {
+  public func sweep(_ id: DeviceID, route: ADBRoute, using tools: any ADBToolDevice) async {
     for path in (pending[id] ?? []).subtracting(inUse).sorted() {
       inUse.insert(path)
-      let gone = await tools.removeTemporary(path, serial: serial)
+      let gone = await tools.removeTemporary(path, route: route)
       inUse.remove(path)
       if gone {
         log.info("removed a file a tool left on the device")

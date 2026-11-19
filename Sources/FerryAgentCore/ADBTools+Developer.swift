@@ -9,9 +9,9 @@ extension ADBTools {
   public func forwards(_ id: DeviceID) async throws(TransportError)
     -> Result<[PortForward], ToolFailure>
   {
-    guard let serial = await target(id) else { return .failure(.notOverADB) }
+    guard let route = await target(id) else { return .failure(.notOverADB) }
     do throws(ADBError) {
-      return .success(try await device.forwards(serial: serial))
+      return .success(try await device.forwards(route: route))
     } catch {
       throw Self.transportError(error)
     }
@@ -21,9 +21,9 @@ extension ADBTools {
     -> Outcome
   {
     guard forward.isAllowed else { return .failed(.invalidPort) }
-    guard let serial = await target(id) else { return .failed(.notOverADB) }
+    guard let route = await target(id) else { return .failed(.notOverADB) }
     do throws(ADBError) {
-      try await device.addForward(serial: serial, forward)
+      try await device.addForward(route: route, forward)
       return .done
     } catch {
       return try Self.forwardOutcome(error)
@@ -33,12 +33,12 @@ extension ADBTools {
   /// adb removes a forward by its Mac port whichever device owns it, so one the device's own
   /// list does not show is left alone.
   public func removeForward(_ id: DeviceID, local: UInt16) async throws(TransportError) -> Outcome {
-    guard let serial = await target(id) else { return .failed(.notOverADB) }
+    guard let route = await target(id) else { return .failed(.notOverADB) }
     do throws(ADBError) {
-      guard try await device.forwards(serial: serial).contains(where: { $0.local == local }) else {
+      guard try await device.forwards(route: route).contains(where: { $0.local == local }) else {
         return .failed(.forwardNotFound)
       }
-      try await device.removeForward(serial: serial, local: local)
+      try await device.removeForward(route: route, local: local)
       return .done
     } catch {
       return try Self.forwardOutcome(error)
@@ -61,9 +61,9 @@ extension ADBTools {
   public func deviceInfo(_ id: DeviceID) async throws(TransportError)
     -> Result<AndroidDeviceInfo, ToolFailure>
   {
-    guard let serial = await target(id) else { return .failure(.notOverADB) }
+    guard let route = await target(id) else { return .failure(.notOverADB) }
     do throws(ADBError) {
-      return .success(try await device.deviceInfo(serial: serial))
+      return .success(try await device.deviceInfo(route: route))
     } catch {
       throw Self.transportError(error)
     }
@@ -73,9 +73,9 @@ extension ADBTools {
   public func shellTarget(_ id: DeviceID) async throws(TransportError)
     -> Result<ShellTarget, ToolFailure>
   {
-    guard let serial = await target(id) else { return .failure(.notOverADB) }
+    guard let route = await target(id) else { return .failure(.notOverADB) }
     guard let adb = device.adbPath() else { return .failure(.adbNotFound) }
-    guard let shell = ShellTarget(adb: adb.path, serial: serial) else {
+    guard let shell = ShellTarget(adb: adb.path, serial: route.serial) else {
       throw .unsupported("a shell for this device")
     }
     return .success(shell)

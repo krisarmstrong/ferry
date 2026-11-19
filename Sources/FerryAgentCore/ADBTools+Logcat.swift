@@ -112,10 +112,10 @@ extension ADBTools {
   public func streamLogcat(_ id: DeviceID, stream: UUID, to sink: LogSink)
     async throws(TransportError) -> Outcome
   {
-    guard let serial = await target(id) else { return .failed(.notOverADB) }
+    guard let route = await target(id) else { return .failed(.notOverADB) }
     let source: any LogcatSource
     do throws(ADBError) {
-      source = try await device.logcat(serial: serial)
+      source = try await device.logcat(route: route)
     } catch {
       throw Self.transportError(error)
     }
@@ -131,7 +131,7 @@ extension ADBTools {
     let queue = LogQueue(maxLines: limits.logQueueLines, maxBytes: limits.logQueueBytes)
     let reader = Self.read(source, into: queue)
     let watchdog = watch(
-      id, serial: serial, run, cancellation: RequestCancellation.current, every: limits.routeWatch)
+      id, route: route, run, cancellation: RequestCancellation.current, every: limits.routeWatch)
     let clientLeft = await deliver(queue, run, to: sink)
     // Whether somebody ended it, read before this ends it too.
     let (stopped, lost) = (run.isStopped, run.isRouteLost)
@@ -159,9 +159,9 @@ extension ADBTools {
   }
 
   /// Closes the stream, which ends a read waiting on a silent log, once the device is no longer
-  /// served over ADB by `serial`'s route, or the client has cancelled the request.
+  /// served over ADB by `route` (the same connection), or the client has cancelled the request.
   private func watch(
-    _ id: DeviceID, serial: String, _ run: LogcatRun, cancellation: RequestCancellation?,
+    _ id: DeviceID, route: ADBRoute, _ run: LogcatRun, cancellation: RequestCancellation?,
     every interval: Duration
   ) -> Task<Void, Never> {
     let target = target
@@ -171,7 +171,7 @@ extension ADBTools {
           run.stop()
           return
         }
-        if await target(id) != serial {
+        if await target(id) != route {
           run.routeLost()
           return
         }

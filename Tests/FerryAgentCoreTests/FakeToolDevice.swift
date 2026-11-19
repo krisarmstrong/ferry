@@ -46,63 +46,63 @@ actor FakeToolDevice: ADBToolDevice {
 
   func set(_ body: @Sendable (isolated FakeToolDevice) -> Void) { body(self) }
 
-  func installAPK(_ file: FileHandle, to path: String, serial: String, progress: ProgressHandler)
+  func installAPK(_ file: FileHandle, to path: String, route: ADBRoute, progress: ProgressHandler)
     async throws(ADBError) -> APKInstallResult
   {
     await onCreate?(path)
     if let failure { throw failure }
     installs.append(
-      Install(serial: serial, path: path, contents: (try? file.readToEnd()) ?? Data()))
+      Install(serial: route.serial, path: path, contents: (try? file.readToEnd()) ?? Data()))
     return installResult
   }
 
-  func screenshot(serial: String) async throws(ADBError) -> Data {
+  func screenshot(route: ADBRoute) async throws(ADBError) -> Data {
     if let failure { throw failure }
-    screenshots.append(serial)
+    screenshots.append(route.serial)
     return image
   }
 
-  func recordScreen(serial: String, to path: String) async throws(ADBError)
+  func recordScreen(route: ADBRoute, to path: String) async throws(ADBError)
     -> any ScreenRecordingControl
   {
     await onCreate?(path)
     if let failure { throw failure }
-    recordingsStarted.append((serial, path))
+    recordingsStarted.append((route.serial, path))
     return recording
   }
 
-  func removeTemporary(_ path: String, serial: String) async -> Bool {
+  func removeTemporary(_ path: String, route: ADBRoute) async -> Bool {
     removals.append(path)
     return removes
   }
 
-  func logcat(serial: String) async throws(ADBError) -> any LogcatSource {
+  func logcat(route: ADBRoute) async throws(ADBError) -> any LogcatSource {
     if let failure { throw failure }
-    logcatsOpened.append(serial)
+    logcatsOpened.append(route.serial)
     guard !logcats.isEmpty else { return FakeLogcat() }
     return logcats.removeFirst()
   }
 
-  func deviceInfo(serial: String) async throws(ADBError) -> AndroidDeviceInfo {
+  func deviceInfo(route: ADBRoute) async throws(ADBError) -> AndroidDeviceInfo {
     if let failure { throw failure }
     return info
   }
 
-  func forwards(serial: String) async throws(ADBError) -> [PortForward] {
+  func forwards(route: ADBRoute) async throws(ADBError) -> [PortForward] {
     if let failure { throw failure }
     return forwardList
   }
 
-  func addForward(serial: String, _ forward: PortForward) async throws(ADBError) {
+  func addForward(route: ADBRoute, _ forward: PortForward) async throws(ADBError) {
     if let failure { throw failure }
-    forwardCalls.append("add \(serial) \(forward.local) \(forward.remote)")
+    forwardCalls.append("add \(route.serial) \(forward.local) \(forward.remote)")
     forwardList.append(forward)
   }
 
-  func removeForward(serial: String, local: UInt16) async throws(ADBError) {
+  func removeForward(route: ADBRoute, local: UInt16) async throws(ADBError) {
     if let failure { throw failure }
     if let removeFailure { throw removeFailure }
-    forwardCalls.append("remove \(serial) \(local)")
+    forwardCalls.append("remove \(route.serial) \(local)")
     forwardList.removeAll { $0.local == local }
   }
 
@@ -235,10 +235,10 @@ actor FakeRecording: ScreenRecordingControl {
     end()
   }
 
-  func pull(into file: FileHandle, serial: String, progress: ProgressHandler)
+  func pull(into file: FileHandle, route: ADBRoute, progress: ProgressHandler)
     async throws(ADBError) -> UInt64
   {
-    pulls.append(serial)
+    pulls.append(route.serial)
     if let pullFailure { throw pullFailure }
     switch pullBehaviour {
     case .normal:

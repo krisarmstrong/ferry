@@ -69,7 +69,7 @@ struct ADBToolsLogcatTests {
 
   private func makeTools(
     _ fake: FakeToolDevice,
-    target: @escaping @Sendable (DeviceID) async -> String? = { _ in serial },
+    target: @escaping @Sendable (DeviceID) async -> ADBRoute? = { _ in ADBRoute(serial: serial) },
     limits: ADBTools.Limits = Self.fast
   ) -> ADBTools {
     ADBTools(
@@ -277,7 +277,7 @@ struct ADBToolsLogcatTests {
     let log = FakeLogcat()
     await fake.set { $0.logcats = [log] }
     let route = Mutex<String?>(serial)
-    let tools = makeTools(fake, target: { _ in route.withLock { $0 } })
+    let tools = makeTools(fake, target: { _ in route.withLock { $0 }.map { ADBRoute(serial: $0) } })
     let client = Client()
     let run = start(tools, client)
     await log.send(["one"])

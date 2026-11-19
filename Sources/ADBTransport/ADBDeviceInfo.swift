@@ -41,41 +41,41 @@ enum ADBDeviceInfo {
 extension ADBDeviceTools {
   /// The device's model, Android version, build, battery, addresses and internal storage. The
   /// device not answering at all throws; one command that fails only leaves its part empty.
-  public func deviceInfo(serial: String) async throws(ADBError) -> AndroidDeviceInfo {
-    let model = try await property("ro.product.model", serial)
-    let version = try await property("ro.build.version.release", serial)
-    let build = try await property("ro.build.display.id", serial)
-    let number = try await property("ro.serialno", serial)
-    let battery = try await output("dumpsys", ["battery"], serial).flatMap {
+  public func deviceInfo(route: ADBRoute) async throws(ADBError) -> AndroidDeviceInfo {
+    let model = try await property("ro.product.model", route)
+    let version = try await property("ro.build.version.release", route)
+    let build = try await property("ro.build.display.id", route)
+    let number = try await property("ro.serialno", route)
+    let battery = try await output("dumpsys", ["battery"], route).flatMap {
       ADBDeviceInfo.battery(fromDumpsys: $0)
     }
-    let addresses = try await output("ip", ["-4", "addr"], serial).map {
+    let addresses = try await output("ip", ["-4", "addr"], route).map {
       ADBWireless.networkAddresses(fromIPAddr: $0)
     }
-    let space = try await output("df", ["-k", "--", ADBStorages.internalRoot], serial).flatMap {
+    let space = try await output("df", ["-k", "--", ADBStorages.internalRoot], route).flatMap {
       ADBStorages.space(fromDF: $0)
     }
     return AndroidDeviceInfo(
       model: model, androidVersion: version, build: build,
-      serial: number.isEmpty ? serial : number, battery: battery, addresses: addresses ?? [],
+      serial: number.isEmpty ? route.serial : number, battery: battery, addresses: addresses ?? [],
       storage: space.map {
         AndroidDeviceInfo.Storage(used: $0.capacity - min($0.free, $0.capacity), free: $0.free)
       })
   }
 
-  private func property(_ name: String, _ serial: String) async throws(ADBError) -> String {
-    try await output("getprop", [name], serial)?.trimmingCharacters(in: .whitespacesAndNewlines)
+  private func property(_ name: String, _ route: ADBRoute) async throws(ADBError) -> String {
+    try await output("getprop", [name], route)?.trimmingCharacters(in: .whitespacesAndNewlines)
       ?? ""
   }
 
   /// What `program` printed, or `nil` if it exited with a failure.
-  private func output(_ program: String, _ arguments: [String], _ serial: String)
+  private func output(_ program: String, _ arguments: [String], _ route: ADBRoute)
     async throws(ADBError) -> String?
   {
     let command = try ADBShell.command(program, arguments)
     let (host, limit) = (host, answerLimit)
     let result = try await ADBTransport.within(limit) { () async throws(ADBError) in
-      try await host.run(serial: serial, command: command)
+      try await host.run(route: route, command: command)
     }
     guard result.status == 0 else { return nil }
     return String(bytes: result.stdout, encoding: .utf8) ?? ""

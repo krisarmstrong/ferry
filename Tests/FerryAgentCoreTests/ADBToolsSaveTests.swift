@@ -30,7 +30,8 @@ struct ADBToolsSaveTests {
   {
     let route = route
     let tools = ADBTools(
-      device: fake, target: { _ in route.withLock { $0 } }, journal: journal, scratch: scratch,
+      device: fake, target: { _ in route.withLock { $0 }.map { ADBRoute(serial: $0) } },
+      journal: journal, scratch: scratch,
       limits: limits)
     let recording = Task { try await tools.startRecording(device) }
     let deadline = ContinuousClock.now + .seconds(5)
@@ -192,14 +193,15 @@ struct ADBToolsSaveTests {
     #expect(try await tools.discardRecording(device) == .done)
     #expect(await tools.recordingsRunning().isEmpty)
     #expect(await fake.removals.isEmpty)
-    await journal.sweep(device, serial: device.serial, using: fake)
+    await journal.sweep(device, route: ADBRoute(serial: device.serial), using: fake)
     #expect(await fake.removals.count == 1)
   }
 
   @Test func aRunningRecordingIsNotDiscarded() async throws {
     let fake = FakeToolDevice()
     let tools = ADBTools(
-      device: fake, target: { _ in "0123456789abcdef" }, journal: journal, scratch: scratch)
+      device: fake, target: { _ in ADBRoute(serial: "0123456789abcdef") }, journal: journal,
+      scratch: scratch)
     let recording = Task { try await tools.startRecording(device) }
     let deadline = ContinuousClock.now + .seconds(5)
     while await tools.recordingsRunning().isEmpty, ContinuousClock.now < deadline {

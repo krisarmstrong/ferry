@@ -1,27 +1,28 @@
 import DeviceKit
 import Foundation
 
-/// Port forwards, over the host protocol: `host-serial:<serial>:list-forward`, `forward:` and
+/// Port forwards, over the host protocol: `<route>:list-forward`, `forward:` and
 /// `killforward:`. The server answers a `forward` that worked with two `OKAY`s (the second is
 /// the status), and one that did not with a single `FAIL` and its words, so `expectOkay` twice
 /// reads both.
 extension ADBHost {
   /// The device's TCP forwards. The server lists every device's, and reverse ones with
-  /// `(reverse)` for a serial, so only the lines for `serial` count; a forward to something
+  /// `(reverse)` for a serial, so only the lines for the route's serial count; a forward to something
   /// other than a TCP port (another tool's `localabstract:`) is not Ferry's to show.
-  public func forwards(serial: String) async throws(ADBError) -> [PortForward] {
-    Self.parseForwards(try await query("host-serial:\(serial):list-forward"), serial: serial)
+  public func forwards(route: ADBRoute) async throws(ADBError) -> [PortForward] {
+    Self.parseForwards(
+      try await query("\(Self.prefix(route)):list-forward"), serial: route.serial)
   }
 
   /// `norebind:` makes adb refuse a Mac port it already forwards. Without it adb silently points
   /// the existing forward at this device, even one another device or tool made.
-  public func addForward(serial: String, _ forward: PortForward) async throws(ADBError) {
+  public func addForward(route: ADBRoute, _ forward: PortForward) async throws(ADBError) {
     try await forwardRequest(
-      "host-serial:\(serial):forward:norebind:tcp:\(forward.local);tcp:\(forward.remote)")
+      "\(Self.prefix(route)):forward:norebind:tcp:\(forward.local);tcp:\(forward.remote)")
   }
 
-  public func removeForward(serial: String, local: UInt16) async throws(ADBError) {
-    try await forwardRequest("host-serial:\(serial):killforward:tcp:\(local)")
+  public func removeForward(route: ADBRoute, local: UInt16) async throws(ADBError) {
+    try await forwardRequest("\(Self.prefix(route)):killforward:tcp:\(local)")
   }
 
   private func forwardRequest(_ request: String) async throws(ADBError) {

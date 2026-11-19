@@ -26,7 +26,8 @@ struct ADBToolsRecordingTests {
 
   private func makeTools(_ fake: FakeToolDevice, limits: ADBTools.Limits = .init()) -> ADBTools {
     ADBTools(
-      device: fake, target: { _ in serial }, journal: journal, scratch: scratch, now: { moment },
+      device: fake, target: { _ in ADBRoute(serial: serial) }, journal: journal, scratch: scratch,
+      now: { moment },
       limits: limits)
   }
 
@@ -216,7 +217,7 @@ struct ADBToolsRecordingTests {
     // The video is still on the device and listed, so it is collected once the device is back;
     // a session opening meanwhile does not sweep it.
     #expect(await tools.recordingsRunning().map(\.finished) == [true])
-    await journal.sweep(device, serial: serial, using: fake)
+    await journal.sweep(device, route: ADBRoute(serial: serial), using: fake)
     #expect(await fake.removals.isEmpty)
     await fake.recording.set { $0.pullFailure = nil }
     let (url, retry) = try destination()

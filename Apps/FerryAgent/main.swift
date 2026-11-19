@@ -41,7 +41,7 @@ let vouching = WirelessVouching()
 let toolJournal = ToolJournal(store: toolStore)
 let adb = ADBTransport(
   serving: { vouching.serves($0, as: $1) },
-  opened: { id, serial, tools in Task { await toolJournal.sweep(id, serial: serial, using: tools) }
+  opened: { id, route, tools in Task { await toolJournal.sweep(id, route: route, using: tools) }
   })
 let usbWatch = USBWatchState()
 let hub = DeviceHub(

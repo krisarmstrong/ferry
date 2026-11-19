@@ -33,7 +33,7 @@ struct AgentUseOverWiFiTests {
   ) -> AgentService {
     let serial = serial
     let tools = ADBTools(
-      device: fake, target: { _ in serial },
+      device: fake, target: { _ in ADBRoute(serial: serial) },
       journal: ToolJournal(store: harness.scratch.appending(path: "journal.json")),
       scratch: harness.scratch)
     let wireless = WirelessADB(

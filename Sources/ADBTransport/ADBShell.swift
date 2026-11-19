@@ -79,6 +79,11 @@ extension ADBHost {
       transportID: transportID)
   }
 
+  /// `run` by a tool's route: by its connection, or by serial where adb reports none.
+  public func run(route: ADBRoute, command: String) async throws(ADBError) -> ADBShellResult {
+    try await run(serial: route.serial, command: command, transportID: route.transportID)
+  }
+
   func run(
     serial: String, command: String, token: String, features: Set<String>? = nil,
     transportID: String? = nil

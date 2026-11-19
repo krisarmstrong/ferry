@@ -35,7 +35,7 @@ struct ADBTransportPinningTests {
     #expect(!listed.contains("b.txt"))
     var reached: String?
     do {
-      reached = try await transport.deviceTools.deviceInfo(serial: route).serial
+      reached = try await transport.deviceTools.deviceInfo(route: route).serial
     } catch {}
     #expect(reached != "fedcba9876543210")
     #expect(unitB.state.withLock { $0.tools.services }.isEmpty)
@@ -67,14 +67,39 @@ struct ADBTransportPinningTests {
     let hub = try await Fixture.hub([.init(Self.address, device: unitA, transportID: 1)])
     let transport = Fixture.transport(port: hub.port)
     _ = try await transport.scan()
-    let seen = Box<String?>("unset")
+    let seen = Box<ADBRoute?>(ADBRoute(serial: "unset"))
     unitA.state.withLock {
       $0.beforeFeatures = { await seen.set(await transport.sessionRoute(for: Self.first)) }
     }
     let session = try await transport.open(Self.first)
     #expect(await seen.value == nil)
-    #expect(await transport.sessionRoute(for: Self.first) == Self.address)
+    #expect(
+      await transport.sessionRoute(for: Self.first)
+        == ADBRoute(serial: Self.address, transportID: "1"))
     await session.close()
+    await hub.kill()
+  }
+
+  /// A tool that took the route while A's session was open, and connects only after A is
+  /// released and a scan has seen B at the address, still fails rather than reaching B.
+  @Test func aRouteTakenEarlierNeverReachesTheNextUnit() async throws {
+    let unitA = Fixture.android(serial: "0123456789abcdef")
+    let unitB = Fixture.android(serial: "fedcba9876543210")
+    let hub = try await Fixture.hub([.init(Self.address, device: unitA, transportID: 1)])
+    let transport = Fixture.transport(port: hub.port)
+    _ = try await transport.scan()
+    let session = try await transport.open(Self.first)
+    let route = try #require(await transport.sessionRoute(for: Self.first))
+    await session.close()
+    hub.set([.init(Self.address, device: unitB, transportID: 2)])
+    _ = try await transport.scan()
+    let servicesBefore = unitB.state.withLock { $0.tools.services }
+    var reached: String?
+    do {
+      reached = try await transport.deviceTools.deviceInfo(route: route).serial
+    } catch {}
+    #expect(reached != "fedcba9876543210")
+    #expect(unitB.state.withLock { $0.tools.services } == servicesBefore)
     await hub.kill()
   }
 }

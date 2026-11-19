@@ -30,18 +30,18 @@ extension ADBTools {
     guard recordings[id] == nil else { return .failed(.alreadyRecording) }
     let recording = Recording(started: now())
     recordings[id] = recording
-    guard let serial = await target(id) else {
+    guard let route = await target(id) else {
       recordings[id] = nil
       return .failed(.notOverADB)
     }
-    recordings[id]?.serial = serial
+    recordings[id]?.route = route
     await journal.note(recording.path, on: id)
     let control: any ScreenRecordingControl
     do throws(ADBError) {
-      control = try await device.recordScreen(serial: serial, to: recording.path)
+      control = try await device.recordScreen(route: route, to: recording.path)
     } catch {
       recordings[id] = nil
-      await removeFromDevice(recording.path, of: id, serial: serial)
+      await removeFromDevice(recording.path, of: id, route: route)
       throw Self.transportError(error)
     }
     recordings[id]?.control = control
@@ -91,7 +91,7 @@ extension ADBTools {
     try FileTransfer.requireRegular(file)
     guard let recording = recordings[id] else { return .failed(.notRecording) }
     guard recording.end != nil, !recording.collecting else { return .failed(.recordingBusy) }
-    guard let serial = await target(id) else { return .failed(.notOverADB) }
+    guard let route = await target(id) else { return .failed(.notOverADB) }
     guard let current = recordings[id], current.token == recording.token, !current.collecting,
       let control = current.control, let end = current.end
     else { return .failed(.recordingBusy) }
@@ -101,7 +101,7 @@ extension ADBTools {
     let staged = FileTransfer.scratchURL(in: scratch)
     defer { FileTransfer.remove(staged) }
     let pulled: Result<Pulled, TransportError> = await pull(
-      control, serial: serial, into: staged)
+      control, route: route, into: staged)
     let failure: ToolFailure
     switch pulled {
     case .failure(let error):
@@ -124,10 +124,10 @@ extension ADBTools {
         recordings[id]?.collecting = false
         throw error
       }
-      await finish(id, path: recording.path, serial: serial)
+      await finish(id, path: recording.path, route: route)
       return .done
     }
-    await finish(id, path: recording.path, serial: serial)
+    await finish(id, path: recording.path, route: route)
     return .failed(failure)
   }
 
@@ -137,8 +137,8 @@ extension ADBTools {
     guard let recording = recordings[id] else { return .failed(.notRecording) }
     guard recording.end != nil, !recording.collecting else { return .failed(.recordingBusy) }
     recordings[id]?.collecting = true
-    if let serial = await target(id) {
-      await finish(id, path: recording.path, serial: serial)
+    if let route = await target(id) {
+      await finish(id, path: recording.path, route: route)
     } else {
       recordings[id] = nil
       await journal.release(recording.path)
@@ -147,9 +147,9 @@ extension ADBTools {
   }
 
   /// Removes a recording the app is done with, from the device and from the list.
-  private func finish(_ id: DeviceID, path: String, serial: String) async {
+  private func finish(_ id: DeviceID, path: String, route: ADBRoute) async {
     recordings[id] = nil
-    await removeFromDevice(path, of: id, serial: serial)
+    await removeFromDevice(path, of: id, route: route)
   }
 
   enum Pulled {
@@ -163,7 +163,7 @@ extension ADBTools {
   /// Pulls the recording into the agent's own `staged` file, at most `limits.recordingSize`
   /// bytes, given up once no data has arrived for `limits.pullStall`. Fails when the device went
   /// away or the Mac has no room for it.
-  private func pull(_ control: any ScreenRecordingControl, serial: String, into staged: URL)
+  private func pull(_ control: any ScreenRecordingControl, route: ADBRoute, into staged: URL)
     async -> Result<Pulled, TransportError>
   {
     guard FileManager.default.createFile(atPath: staged.path, contents: nil),
@@ -178,7 +178,7 @@ extension ADBTools {
     }
     let pulling = Task { () -> Result<UInt64, ADBError> in
       do throws(ADBError) {
-        return .success(try await control.pull(into: handle, serial: serial, progress: progress))
+        return .success(try await control.pull(into: handle, route: route, progress: progress))
       } catch {
         return .failure(error)
       }

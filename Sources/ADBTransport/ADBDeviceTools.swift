@@ -83,25 +83,25 @@ public struct ADBDeviceTools: Sendable {
   /// asked once more, with the last values it saw, before `pm` starts, so a cancel that came
   /// after the last block still stops the install; once `pm` runs, the install finishes.
   public func installAPK(
-    _ file: FileHandle, to path: String, serial: String, progress: ProgressHandler
+    _ file: FileHandle, to path: String, route: ADBRoute, progress: ProgressHandler
   ) async throws(ADBError) -> APKInstallResult {
     let last = Mutex<(UInt64, UInt64)>((0, 0))
-    try await push(file, to: path, serial: serial) { done, total in
+    try await push(file, to: path, route: route) { done, total in
       last.withLock { $0 = (done, total) }
       return progress(done, total)
     }
     let (done, total) = last.withLock { $0 }
     guard progress(done, total) else { throw .cancelled }
     let result = try await host.run(
-      serial: serial, command: try ADBShell.command("pm", ["install", "-r", path]))
+      route: route, command: try ADBShell.command("pm", ["install", "-r", path]))
     return Self.installResult(result)
   }
 
   private func push(
-    _ file: FileHandle, to path: String, serial: String, progress: ProgressHandler
+    _ file: FileHandle, to path: String, route: ADBRoute, progress: ProgressHandler
   ) async throws(ADBError) {
-    let features = try await host.features(serial)
-    let sync = ADBSync(stream: try await host.connect(serial, service: "sync:"), features: features)
+    let features = try await host.features(route)
+    let sync = ADBSync(stream: try await host.connect(route, service: "sync:"), features: features)
     do throws(ADBError) {
       try await sync.send(file, to: path, mode: 0o100644, mtime: Date(), progress: progress)
     } catch {
@@ -148,11 +148,11 @@ public struct ADBDeviceTools: Sendable {
   // MARK: Screenshot
 
   /// The screen as `screencap -p` writes it (a PNG), streamed with no file on the device.
-  public func screenshot(serial: String) async throws(ADBError) -> Data {
+  public func screenshot(route: ADBRoute) async throws(ADBError) -> Data {
     let service = "exec:" + (try ADBShell.command("screencap", ["-p"]))
     let (host, limit) = (host, captureLimit)
     return try await ADBTransport.within(captureWait) { () async throws(ADBError) in
-      let stream = try await host.connect(serial, service: service)
+      let stream = try await host.connect(route, service: service)
       defer { stream.cancel() }
       var image = Data()
       while let chunk = try await stream.readSome(upTo: 64 * 1024) {
@@ -170,15 +170,16 @@ public struct ADBDeviceTools: Sendable {
   /// Starts `screenrecord` into `path` and returns once it has printed its pid. The recording
   /// runs until `interrupt()`, its time limit, or the connection closing. The caller removes
   /// `path` afterwards, whatever happened.
-  public func startRecording(serial: String, to path: String) async throws(ADBError)
+  public func startRecording(route: ADBRoute, to path: String) async throws(ADBError)
     -> ADBScreenRecording
   {
     let command = try ADBShell.command("sh", ["-c", Self.recordScript, "sh", path])
     let channel = try await host.openShell(
-      serial, command, token: ADBShell.newToken(), features: nil)
+      route.serial, command, token: ADBShell.newToken(), features: nil,
+      transportID: route.transportID)
     let output = ShellOutput(stream: channel.stream, token: channel.token)
     let recording = ADBScreenRecording(
-      serial: serial, devicePath: path, output: output, tools: self)
+      route: route, devicePath: path, output: output, tools: self)
     do throws(ADBError) {
       try await recording.readPID(within: answerLimit)
       return recording
@@ -190,24 +191,24 @@ public struct ADBDeviceTools: Sendable {
 
   // MARK: Forwards and the program
 
-  public func forwards(serial: String) async throws(ADBError) -> [PortForward] {
+  public func forwards(route: ADBRoute) async throws(ADBError) -> [PortForward] {
     let host = host
     return try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
-      try await host.forwards(serial: serial)
+      try await host.forwards(route: route)
     }
   }
 
-  public func addForward(serial: String, _ forward: PortForward) async throws(ADBError) {
+  public func addForward(route: ADBRoute, _ forward: PortForward) async throws(ADBError) {
     let host = host
     try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
-      try await host.addForward(serial: serial, forward)
+      try await host.addForward(route: route, forward)
     }
   }
 
-  public func removeForward(serial: String, local: UInt16) async throws(ADBError) {
+  public func removeForward(route: ADBRoute, local: UInt16) async throws(ADBError) {
     let host = host
     try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
-      try await host.removeForward(serial: serial, local: local)
+      try await host.removeForward(route: route, local: local)
     }
   }
 
@@ -220,13 +221,13 @@ public struct ADBDeviceTools: Sendable {
 
   /// `rm -f -- path`, run to the end even when the caller was cancelled, bounded in time. True
   /// once the path is gone (or was never there).
-  public func removeTemporary(_ path: String, serial: String) async -> Bool {
-    await runDetached(on: serial, "rm", ["-f", "--", path], what: "removing \(path)")
+  public func removeTemporary(_ path: String, route: ADBRoute) async -> Bool {
+    await runDetached(on: route, "rm", ["-f", "--", path], what: "removing \(path)")
   }
 
   /// Runs a short command on a task of its own, so a cancelled caller cannot stop it, and logs
   /// what went wrong. True when it ran and exited 0.
-  func runDetached(on serial: String, _ program: String, _ args: [String], what: String) async
+  func runDetached(on route: ADBRoute, _ program: String, _ args: [String], what: String) async
     -> Bool
   {
     let host = host
@@ -236,7 +237,7 @@ public struct ADBDeviceTools: Sendable {
         let command = try ADBShell.command(program, args)
         return Result<ADBShellResult, ADBError>.success(
           try await ADBTransport.within(limit) { () async throws(ADBError) in
-            try await host.run(serial: serial, command: command)
+            try await host.run(route: route, command: command)
           })
       } catch {
         return .failure(error)
@@ -273,14 +274,14 @@ public actor ADBScreenRecording {
   }
 
   public nonisolated let devicePath: String
-  let serial: String
+  let route: ADBRoute
   private let output: ShellOutput
   private let tools: ADBDeviceTools
   private(set) var pid: String?
   private var end: End?
 
-  init(serial: String, devicePath: String, output: ShellOutput, tools: ADBDeviceTools) {
-    self.serial = serial
+  init(route: ADBRoute, devicePath: String, output: ShellOutput, tools: ADBDeviceTools) {
+    self.route = route
     self.devicePath = devicePath
     self.output = output
     self.tools = tools
@@ -322,9 +323,9 @@ public actor ADBScreenRecording {
   public func interrupt() async throws(ADBError) {
     guard end == nil, let pid else { return }
     let command = try ADBShell.command("kill", ["-2", pid])
-    let (host, serial) = (tools.host, serial)
+    let (host, route) = (tools.host, route)
     let result = try await ADBTransport.within(tools.answerLimit) { () async throws(ADBError) in
-      try await host.run(serial: serial, command: command)
+      try await host.run(route: route, command: command)
     }
     guard result.status == 0 || end != nil else {
       throw .failed(
@@ -338,14 +339,14 @@ public actor ADBScreenRecording {
     output.stream.cancel()
   }
 
-  /// Copies the recording into `file` over `serial` (the device's route now, which may differ
+  /// Copies the recording into `file` over `route` (the device's route now, which may differ
   /// from the one it was recorded over) and returns its size.
-  public func pull(into file: FileHandle, serial: String, progress: ProgressHandler)
+  public func pull(into file: FileHandle, route: ADBRoute, progress: ProgressHandler)
     async throws(ADBError) -> UInt64
   {
-    let features = try await tools.host.features(serial)
+    let features = try await tools.host.features(route)
     let sync = ADBSync(
-      stream: try await tools.host.connect(serial, service: "sync:"), features: features)
+      stream: try await tools.host.connect(route, service: "sync:"), features: features)
     do throws(ADBError) {
       let size = try await sync.receive(devicePath, to: file, progress: progress)
       await sync.quit()
@@ -358,6 +359,6 @@ public actor ADBScreenRecording {
 
   /// Removes the recording from the device. True once it is gone.
   public func discard() async -> Bool {
-    await tools.removeTemporary(devicePath, serial: serial)
+    await tools.removeTemporary(devicePath, route: route)
   }
 }

@@ -48,9 +48,9 @@ public actor ADBTransport: DeviceTransport {
   /// The server's connection (`transport_id`) behind each listed adb serial, as of the most
   /// recent scan; absent where adb does not report one.
   var transportIDs: [String: String] = [:]
-  /// Pins set on the host (see `ADBHost.pin`), by adb serial. A pin outlives its session until
-  /// the next scan: something that took the serial while the session was open (a tool) still
-  /// fails rather than reaching a unit that took the address since.
+  /// Pins set on the host (see `ADBHost.pin`), by adb serial, lifted at the first scan after
+  /// their session ends. The tools do not depend on them: an `ADBRoute` carries its own
+  /// connection, however long ago it was taken.
   var pinned: [String: String] = [:]
   /// Devices with an open (or opening) session, with what `park` needs, recorded at open: the
   /// device may be missing from every scan by the time it is ejected.
@@ -256,7 +256,12 @@ public actor ADBTransport: DeviceTransport {
     }
     // Only now is there a session for the tools to follow.
     held[id]?.route = serial
-    opened(id, serial, deviceTools)
+    if pin == nil {
+      Self.log.info(
+        "adb lists no connection id for \(serial, privacy: .private); its session and tools use the serial"
+      )
+    }
+    opened(id, ADBRoute(serial: serial, transportID: pin?.transportID), deviceTools)
     return ADBSession(
       host: host, serial: serial, info: info, features: features,
       method: routes.usb == nil ? .wifiADB : .usbADB,
@@ -347,7 +352,11 @@ extension ADBTransport {
 
   /// The adb serial of `id`'s open session, until that session ends, whatever later scans
   /// find: a network route the policy stops serving still carries the session open on it.
-  public func sessionRoute(for id: DeviceID) -> String? { held[id]?.route }
+  public func sessionRoute(for id: DeviceID) -> ADBRoute? {
+    held[id].flatMap { entry in
+      entry.route.map { ADBRoute(serial: $0, transportID: entry.pin?.transportID) }
+    }
+  }
 
   /// The tools (APK install, screenshot, screen recording) over this transport's server.
   public nonisolated var deviceTools: ADBDeviceTools { ADBDeviceTools(host: host) }

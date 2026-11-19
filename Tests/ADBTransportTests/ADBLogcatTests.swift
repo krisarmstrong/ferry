@@ -69,7 +69,7 @@ struct ADBLogcatTests {
     let tools = ADBDeviceTools(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: .seconds(5),
       captureLimit: 1024, captureWait: .seconds(5))
-    return try await body(try await tools.logcat(serial: Self.serial))
+    return try await body(try await tools.logcat(route: ADBRoute(serial: Self.serial)))
   }
 
   @Test func linesComeFromThreadtimeLogcatOverExec() async throws {

@@ -64,11 +64,11 @@ struct ADBTransportServingTests {
     #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
     #expect(await transport.sessionRoute(for: Fixture.linkRunner) == nil)
     let session = try await transport.open(Fixture.linkRunner)
-    #expect(await transport.sessionRoute(for: Fixture.linkRunner) == Fixture.linkRunnerWiFi)
+    #expect(await transport.sessionRoute(for: Fixture.linkRunner)?.serial == Fixture.linkRunnerWiFi)
     serving.withLock { $0 = false }
     _ = try await transport.scan()
     #expect(await transport.routes(for: Fixture.linkRunner) == nil)
-    #expect(await transport.sessionRoute(for: Fixture.linkRunner) == Fixture.linkRunnerWiFi)
+    #expect(await transport.sessionRoute(for: Fixture.linkRunner)?.serial == Fixture.linkRunnerWiFi)
     await session.close()
     #expect(await transport.sessionRoute(for: Fixture.linkRunner) == nil)
     await hub.kill()

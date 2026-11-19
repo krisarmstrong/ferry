@@ -24,7 +24,8 @@ struct ADBToolsDeveloperTests {
 
   private func makeTools(_ fake: FakeToolDevice, served: Bool = true) -> ADBTools {
     ADBTools(
-      device: fake, target: { _ in served ? serial : nil }, journal: journal, scratch: scratch)
+      device: fake, target: { _ in served ? ADBRoute(serial: serial) : nil }, journal: journal,
+      scratch: scratch)
   }
 
   // MARK: Forwards
@@ -145,7 +146,7 @@ struct ADBToolsDeveloperTests {
   func aSerialThatIsNotPlainGetsNoShell(odd: String) async throws {
     let fake = FakeToolDevice()
     let tools = ADBTools(
-      device: fake, target: { _ in odd }, journal: journal, scratch: scratch)
+      device: fake, target: { _ in ADBRoute(serial: odd) }, journal: journal, scratch: scratch)
     await #expect(throws: TransportError.self) { try await tools.shellTarget(device) }
   }
 

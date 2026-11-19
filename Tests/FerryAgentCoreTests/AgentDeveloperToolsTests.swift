@@ -1,3 +1,4 @@
+import ADBTransport
 import DeviceKit
 import DeviceKitTestSupport
 import FerryIPC
@@ -17,7 +18,7 @@ struct AgentDeveloperToolsTests {
     var limits = ADBTools.Limits()
     limits.logInterval = .milliseconds(1)
     let tools = ADBTools(
-      device: fake, target: { _ in "0123456789abcdef" },
+      device: fake, target: { _ in ADBRoute(serial: "0123456789abcdef") },
       journal: ToolJournal(store: harness.scratch.appending(path: "journal.json")),
       scratch: harness.scratch, limits: limits)
     return AgentService(

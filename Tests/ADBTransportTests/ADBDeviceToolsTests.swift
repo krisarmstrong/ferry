@@ -54,7 +54,7 @@ struct ADBDeviceToolsTests {
     let path = ADBDeviceTools.apkPath()
     let result = try await withTools(device) { tools in
       try await tools.installAPK(
-        try apk(), to: path, serial: Self.serial, progress: ADBFixture.noProgress)
+        try apk(), to: path, route: ADBRoute(serial: Self.serial), progress: ADBFixture.noProgress)
     }
     #expect(result == .installed)
     #expect(Self.isAPKCopy(path))
@@ -76,7 +76,7 @@ struct ADBDeviceToolsTests {
     device.setTools { $0.pmResult = FakeAndroid.ShellResult(status: status, stdout: stdout) }
     let result = try await withTools(device) { tools in
       try await tools.installAPK(
-        try apk(), to: ADBDeviceTools.apkPath(), serial: Self.serial,
+        try apk(), to: ADBDeviceTools.apkPath(), route: ADBRoute(serial: Self.serial),
         progress: ADBFixture.noProgress)
     }
     #expect(result == .failed(code))
@@ -88,14 +88,14 @@ struct ADBDeviceToolsTests {
     let path = ADBDeviceTools.apkPath()
     try await withTools(device) { tools in
       _ = try await tools.installAPK(
-        try apk(), to: path, serial: Self.serial, progress: ADBFixture.noProgress)
+        try apk(), to: path, route: ADBRoute(serial: Self.serial), progress: ADBFixture.noProgress)
       let removal = Task {
         withUnsafeCurrentTask { $0?.cancel() }
-        return await tools.removeTemporary(path, serial: Self.serial)
+        return await tools.removeTemporary(path, route: ADBRoute(serial: Self.serial))
       }
       #expect(await removal.value)
       // Already gone: still true.
-      #expect(await tools.removeTemporary(path, serial: Self.serial))
+      #expect(await tools.removeTemporary(path, route: ADBRoute(serial: Self.serial)))
     }
     #expect(device.changes.dropFirst() == [["rm", "-f", "--", path], ["rm", "-f", "--", path]])
     #expect(device.node(absolute: path) == nil)
@@ -105,7 +105,7 @@ struct ADBDeviceToolsTests {
     let device = FakeAndroid()
     device.unplug()
     let removed = try await withTools(device) { tools in
-      await tools.removeTemporary(ADBDeviceTools.apkPath(), serial: Self.serial)
+      await tools.removeTemporary(ADBDeviceTools.apkPath(), route: ADBRoute(serial: Self.serial))
     }
     #expect(!removed)
   }
@@ -169,7 +169,7 @@ struct ADBDeviceToolsTests {
       try await withTools(device) { tools in
         try await tools.installAPK(
           try apk(String(repeating: "a", count: 100_000)), to: ADBDeviceTools.apkPath(),
-          serial: Self.serial, progress: ADBFixture.noProgress)
+          route: ADBRoute(serial: Self.serial), progress: ADBFixture.noProgress)
       }
     }
     #expect(device.changes.isEmpty)
@@ -180,7 +180,7 @@ struct ADBDeviceToolsTests {
   @Test func aScreenshotStreamsScreencap() async throws {
     let device = FakeAndroid()
     let image = try await withTools(device) { tools in
-      try await tools.screenshot(serial: Self.serial)
+      try await tools.screenshot(route: ADBRoute(serial: Self.serial))
     }
     #expect(image == device.state.withLock { $0.tools.screencap })
     #expect(device.services == ["exec:screencap '-p'"])
@@ -192,7 +192,7 @@ struct ADBDeviceToolsTests {
     let device = FakeAndroid()
     await #expect(throws: ADBError.protocolViolation("screenshot exceeds 1000 bytes")) {
       try await withTools(device, captureLimit: 1000) { tools in
-        try await tools.screenshot(serial: Self.serial)
+        try await tools.screenshot(route: ADBRoute(serial: Self.serial))
       }
     }
   }
@@ -203,7 +203,7 @@ struct ADBDeviceToolsTests {
     device.state.withLock { $0.hangingPrograms = ["screencap"] }
     await #expect(throws: ADBError.self) {
       try await withTools(device, captureWait: .milliseconds(200)) { tools in
-        try await tools.screenshot(serial: Self.serial)
+        try await tools.screenshot(route: ADBRoute(serial: Self.serial))
       }
     }
   }
@@ -215,14 +215,14 @@ struct ADBDeviceToolsTests {
     let pulled = try ADBFixture.localFile(Data())
     try await withTools(device) { tools in
       let recording = try await tools.startRecording(
-        serial: Self.serial, to: ADBDeviceTools.recordingPath())
+        route: ADBRoute(serial: Self.serial), to: ADBDeviceTools.recordingPath())
       let path = recording.devicePath
       #expect(Self.isRecording(path))
       #expect(device.commands == [["sh", "-c", ADBDeviceTools.recordScript, "sh", path]])
       try await recording.interrupt()
       #expect(await recording.finished() == .exited(status: 0, detail: ""))
       let size = try await recording.pull(
-        into: try FileHandle(forWritingTo: pulled), serial: Self.serial,
+        into: try FileHandle(forWritingTo: pulled), route: ADBRoute(serial: Self.serial),
         progress: ADBFixture.noProgress)
       #expect(size == UInt64(device.state.withLock { $0.tools.recordingBytes.count }))
       #expect(await recording.discard())
@@ -239,7 +239,7 @@ struct ADBDeviceToolsTests {
     device.setTools { $0.recordingEndsOnItsOwn = true }
     try await withTools(device) { tools in
       let recording = try await tools.startRecording(
-        serial: Self.serial, to: ADBDeviceTools.recordingPath())
+        route: ADBRoute(serial: Self.serial), to: ADBDeviceTools.recordingPath())
       #expect(await recording.finished() == .exited(status: 0, detail: ""))
       try await recording.interrupt()
       #expect(!device.commands.contains { $0.first == "kill" })
@@ -252,7 +252,8 @@ struct ADBDeviceToolsTests {
     device.setTools { $0.pidLine = line }
     await #expect(throws: ADBError.self) {
       try await withTools(device) { tools in
-        try await tools.startRecording(serial: Self.serial, to: ADBDeviceTools.recordingPath())
+        try await tools.startRecording(
+          route: ADBRoute(serial: Self.serial), to: ADBDeviceTools.recordingPath())
       }
     }
     #expect(device.commands.count == 1)
@@ -262,7 +263,7 @@ struct ADBDeviceToolsTests {
     let device = FakeAndroid()
     try await withTools(device) { tools in
       let recording = try await tools.startRecording(
-        serial: Self.serial, to: ADBDeviceTools.recordingPath())
+        route: ADBRoute(serial: Self.serial), to: ADBDeviceTools.recordingPath())
       device.unplug()
       guard case .lost = await recording.finished() else {
         Issue.record("the recording did not report the connection lost")
@@ -278,7 +279,7 @@ struct ADBDeviceToolsTests {
     device.state.withLock { $0.features = "cmd,stat_v2" }
     try await withTools(device) { tools in
       let recording = try await tools.startRecording(
-        serial: Self.serial, to: ADBDeviceTools.recordingPath())
+        route: ADBRoute(serial: Self.serial), to: ADBDeviceTools.recordingPath())
       #expect(device.services.first?.hasPrefix("shell:( sh '-c'") == true)
       try await recording.interrupt()
       #expect(await recording.finished() == .exited(status: 0, detail: ""))
@@ -301,7 +302,7 @@ extension ADBDeviceToolsTests {
       try await withTools(device) { tools in
         try await tools.installAPK(
           try apk(String(repeating: "x", count: 200_000)), to: ADBDeviceTools.apkPath(),
-          serial: Self.serial
+          route: ADBRoute(serial: Self.serial)
         ) { _, _ in false }
       }
     }
@@ -323,7 +324,8 @@ extension ADBDeviceToolsTests {
     await #expect(throws: ADBError.cancelled) {
       try await withTools(device) { tools in
         try await tools.installAPK(
-          try apk(), to: ADBDeviceTools.apkPath(), serial: Self.serial, progress: progress)
+          try apk(), to: ADBDeviceTools.apkPath(), route: ADBRoute(serial: Self.serial),
+          progress: progress)
       }
     }
     #expect(device.installed.isEmpty)

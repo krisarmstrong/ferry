@@ -10,17 +10,17 @@ let toolsLog = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADB
 /// What `ADBTools` needs of a device on adb. `ADBDeviceTools` is the real one; tests script a
 /// fake.
 public protocol ADBToolDevice: Sendable {
-  func installAPK(_ file: FileHandle, to path: String, serial: String, progress: ProgressHandler)
+  func installAPK(_ file: FileHandle, to path: String, route: ADBRoute, progress: ProgressHandler)
     async throws(ADBError) -> APKInstallResult
-  func screenshot(serial: String) async throws(ADBError) -> Data
-  func recordScreen(serial: String, to path: String) async throws(ADBError)
+  func screenshot(route: ADBRoute) async throws(ADBError) -> Data
+  func recordScreen(route: ADBRoute, to path: String) async throws(ADBError)
     -> any ScreenRecordingControl
-  func removeTemporary(_ path: String, serial: String) async -> Bool
-  func logcat(serial: String) async throws(ADBError) -> any LogcatSource
-  func deviceInfo(serial: String) async throws(ADBError) -> AndroidDeviceInfo
-  func forwards(serial: String) async throws(ADBError) -> [PortForward]
-  func addForward(serial: String, _ forward: PortForward) async throws(ADBError)
-  func removeForward(serial: String, local: UInt16) async throws(ADBError)
+  func removeTemporary(_ path: String, route: ADBRoute) async -> Bool
+  func logcat(route: ADBRoute) async throws(ADBError) -> any LogcatSource
+  func deviceInfo(route: ADBRoute) async throws(ADBError) -> AndroidDeviceInfo
+  func forwards(route: ADBRoute) async throws(ADBError) -> [PortForward]
+  func addForward(route: ADBRoute, _ forward: PortForward) async throws(ADBError)
+  func removeForward(route: ADBRoute, local: UInt16) async throws(ADBError)
   /// The `adb` program, if it is installed.
   func adbPath() -> URL?
 }
@@ -40,22 +40,22 @@ public protocol ScreenRecordingControl: Sendable {
   func finished() async -> ADBScreenRecording.End
   func interrupt() async throws(ADBError)
   func abandon() async
-  /// Copies the recording into `file` over `serial`, the route the device is served by now.
-  func pull(into file: FileHandle, serial: String, progress: ProgressHandler)
+  /// Copies the recording into `file` over `route`, the route the device is served by now.
+  func pull(into file: FileHandle, route: ADBRoute, progress: ProgressHandler)
     async throws(ADBError) -> UInt64
 }
 
 extension ADBScreenRecording: ScreenRecordingControl {}
 
 extension ADBDeviceTools: ADBToolDevice {
-  public func recordScreen(serial: String, to path: String) async throws(ADBError)
+  public func recordScreen(route: ADBRoute, to path: String) async throws(ADBError)
     -> any ScreenRecordingControl
   {
-    try await startRecording(serial: serial, to: path)
+    try await startRecording(route: route, to: path)
   }
 
-  public func logcat(serial: String) async throws(ADBError) -> any LogcatSource {
-    let log: ADBLogcat = try await logcat(serial: serial)
+  public func logcat(route: ADBRoute) async throws(ADBError) -> any LogcatSource {
+    let log: ADBLogcat = try await logcat(route: route)
     return log
   }
 }
@@ -151,7 +151,7 @@ public actor ADBTools {
     let token = UUID()
     let started: Date
     let path = ADBDeviceTools.recordingPath()
-    var serial: String?
+    var route: ADBRoute?
     var stopping = false
     var control: (any ScreenRecordingControl)?
     /// How it ended; `nil` while it runs.
@@ -160,8 +160,8 @@ public actor ADBTools {
   }
 
   let device: any ADBToolDevice
-  /// The adb serial the tools use for a device: only a ready device served over ADB has one.
-  let target: @Sendable (DeviceID) async -> String?
+  /// The route the tools use for a device: only a ready device served over ADB has one.
+  let target: @Sendable (DeviceID) async -> ADBRoute?
   let journal: ToolJournal
   let scratch: URL
   let now: @Sendable () -> Date
@@ -172,7 +172,7 @@ public actor ADBTools {
   var pendingStops: Set<UUID> = []
 
   public init(
-    device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> String?,
+    device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> ADBRoute?,
     journal: ToolJournal, scratch: URL = FileManager.default.temporaryDirectory,
     now: @escaping @Sendable () -> Date = Date.init, limits: Limits = Limits()
   ) {
@@ -184,13 +184,13 @@ public actor ADBTools {
     self.limits = limits
   }
 
-  /// The tools' adb serial for `id`: `session`, the route its open session uses, for a ready
+  /// The tools' route for `id`: `session`, the route its open session uses, for a ready
   /// device served over ADB only. The tools follow the session, not the latest scan: a network
   /// route the serving check stopped serving (its device got a Finder location after a terminal
   /// `adb connect`) still carries the files until that session ends, and so the tools too.
   public static func target(
-    for id: DeviceID, devices: [AttachedDevice], session: String?
-  ) -> String? {
+    for id: DeviceID, devices: [AttachedDevice], session: ADBRoute?
+  ) -> ADBRoute? {
     guard let device = devices.first(where: { $0.id == id }), case .ready = device.state,
       [.usbADB, .wifiADB].contains(device.method)
     else { return nil }
@@ -203,7 +203,7 @@ public actor ADBTools {
   public func installAPK(_ source: Int32, on id: DeviceID, progress: ProgressHandler)
     async throws(TransportError) -> Outcome
   {
-    guard let serial = await target(id) else { return .failed(.notOverADB) }
+    guard let route = await target(id) else { return .failed(.notOverADB) }
     guard try Self.size(of: source) <= limits.apkSize else { return .failed(.apkTooLarge) }
     // The source may grow after it was measured: the copy stops at the cap.
     guard let copy = try await FileTransfer.copyIn(source, into: scratch, atMost: limits.apkSize)
@@ -222,11 +222,11 @@ public actor ADBTools {
     let result: Result<APKInstallResult, ADBError>
     do throws(ADBError) {
       result = .success(
-        try await device.installAPK(handle, to: path, serial: serial, progress: progress))
+        try await device.installAPK(handle, to: path, route: route, progress: progress))
     } catch {
       result = .failure(error)
     }
-    await removeFromDevice(path, of: id, serial: serial)
+    await removeFromDevice(path, of: id, route: route)
     switch result {
     case .success(.installed): return .done
     case .success(.failed(let reason)): return .failed(.installFailed(reason))
@@ -239,10 +239,10 @@ public actor ADBTools {
   /// Streams a screenshot into `target`, a writable descriptor from the client.
   public func screenshot(_ id: DeviceID, into file: Int32) async throws(TransportError) -> Outcome {
     try FileTransfer.requireRegular(file)
-    guard let serial = await target(id) else { return .failed(.notOverADB) }
+    guard let route = await target(id) else { return .failed(.notOverADB) }
     let image: Data
     do throws(ADBError) {
-      image = try await device.screenshot(serial: serial)
+      image = try await device.screenshot(route: route)
     } catch {
       throw Self.transportError(error)
     }
@@ -275,8 +275,8 @@ public actor ADBTools {
 
   /// Removes a tool's file from the device and drops it from the journal once it is gone; one
   /// that stays is swept when the device's next session opens.
-  func removeFromDevice(_ path: String, of id: DeviceID, serial: String) async {
-    if await device.removeTemporary(path, serial: serial) {
+  func removeFromDevice(_ path: String, of id: DeviceID, route: ADBRoute) async {
+    if await device.removeTemporary(path, route: route) {
       await journal.removed(path, on: id)
     } else {
       await journal.release(path)

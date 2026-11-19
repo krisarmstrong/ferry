@@ -47,7 +47,7 @@ struct ToolJournalTests {
     await journal.note(left, on: device)
     await journal.release(left)
     let fake = FakeToolDevice()
-    await journal.sweep(device, serial: device.serial, using: fake)
+    await journal.sweep(device, route: ADBRoute(serial: device.serial), using: fake)
     #expect(await fake.removals == [left])
     #expect(await journal.paths(on: device) == [busy])
   }
@@ -59,7 +59,7 @@ struct ToolJournalTests {
     await journal.release(left)
     let fake = FakeToolDevice()
     await fake.set { $0.removes = false }
-    await journal.sweep(device, serial: device.serial, using: fake)
+    await journal.sweep(device, route: ADBRoute(serial: device.serial), using: fake)
     #expect(await journal.paths(on: device) == [left])
   }
 }

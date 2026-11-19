@@ -73,7 +73,7 @@ struct ADBDeviceInfoTests {
     let tools = ADBDeviceTools(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: .seconds(5),
       captureLimit: 1024, captureWait: .seconds(5))
-    return try await tools.deviceInfo(serial: Self.serial)
+    return try await tools.deviceInfo(route: ADBRoute(serial: Self.serial))
   }
 
   private func device() -> FakeAndroid {

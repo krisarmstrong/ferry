@@ -99,8 +99,8 @@ public actor ADBLogcat {
 extension ADBDeviceTools {
   /// Starts logcat over `exec:`, which carries the bytes as they are, with no terminal and no
   /// framing, as for a screenshot.
-  public func logcat(serial: String) async throws(ADBError) -> ADBLogcat {
+  public func logcat(route: ADBRoute) async throws(ADBError) -> ADBLogcat {
     let service = "exec:" + (try ADBShell.command("logcat", ["-v", "threadtime"]))
-    return ADBLogcat(stream: try await host.connect(serial, service: service))
+    return ADBLogcat(stream: try await host.connect(route, service: service))
   }
 }

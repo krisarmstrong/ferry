@@ -171,6 +171,21 @@ public actor ADBHost {
     }
   }
 
+  /// `connect` by a tool's route: by its connection, or by serial where adb reports none.
+  public func connect(_ route: ADBRoute, service: String) async throws(ADBError) -> ADBStream {
+    try await connect(route.serial, service: service, transportID: route.transportID)
+  }
+
+  public func features(_ route: ADBRoute) async throws(ADBError) -> Set<String> {
+    try await features(route.serial, transportID: route.transportID)
+  }
+
+  /// How a host query names the route's device: `host-transport-id:<id>` or
+  /// `host-serial:<serial>`.
+  static func prefix(_ route: ADBRoute) -> String {
+    route.transportID.map { "host-transport-id:\($0)" } ?? "host-serial:\(route.serial)"
+  }
+
   public func startServer() async throws(ADBError) {
     guard let adb = locator.adbURL() else { throw .adbNotInstalled }
     try await launcher(adb)

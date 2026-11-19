@@ -1,3 +1,4 @@
+import ADBTransport
 import DeviceKit
 import DeviceKitTestSupport
 import FerryIPC
@@ -13,7 +14,7 @@ struct AgentToolsTests {
 
   private func service(_ harness: AgentHarness, _ fake: FakeToolDevice) -> AgentService {
     let tools = ADBTools(
-      device: fake, target: { _ in "0123456789abcdef" },
+      device: fake, target: { _ in ADBRoute(serial: "0123456789abcdef") },
       journal: ToolJournal(store: harness.scratch.appending(path: "journal.json")),
       scratch: harness.scratch)
     return AgentService(

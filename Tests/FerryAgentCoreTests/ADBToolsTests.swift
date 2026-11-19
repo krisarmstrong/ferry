@@ -26,7 +26,8 @@ struct ADBToolsTests {
     _ fake: FakeToolDevice, served: Bool = true, limits: ADBTools.Limits = .init()
   ) -> ADBTools {
     ADBTools(
-      device: fake, target: { _ in served ? serial : nil }, journal: journal, scratch: scratch,
+      device: fake, target: { _ in served ? ADBRoute(serial: serial) : nil }, journal: journal,
+      scratch: scratch,
       limits: limits)
   }
 
@@ -57,9 +58,12 @@ struct ADBToolsTests {
     let storage = StorageInfo(
       id: StorageID(device: device, key: "internal"), description: "Internal", capacity: 1, free: 1)
     let ready = AttachedDevice(info: info, state: .ready([storage]), method: method)
-    #expect((ADBTools.target(for: device, devices: [ready], session: serial) != nil) == has)
+    #expect(
+      (ADBTools.target(for: device, devices: [ready], session: ADBRoute(serial: serial)) != nil)
+        == has)
     let ejected = AttachedDevice(info: info, state: .ejected, method: method)
-    #expect(ADBTools.target(for: device, devices: [ejected], session: serial) == nil)
+    #expect(
+      ADBTools.target(for: device, devices: [ejected], session: ADBRoute(serial: serial)) == nil)
     #expect(ADBTools.target(for: device, devices: [ready], session: nil) == nil)
   }
 
@@ -67,9 +71,8 @@ struct ADBToolsTests {
   @Test func toolsUseTheSessionsRoute() {
     let info = DeviceInfo(id: device, manufacturer: "", model: "LinkRunner-100G")
     let ready = AttachedDevice(info: info, state: .ready([]), method: .wifiADB)
-    #expect(
-      ADBTools.target(for: device, devices: [ready], session: "192.0.2.5:5555")
-        == "192.0.2.5:5555")
+    let route = ADBRoute(serial: "192.0.2.5:5555", transportID: "3")
+    #expect(ADBTools.target(for: device, devices: [ready], session: route) == route)
   }
 
   // MARK: Screenshot
@@ -220,7 +223,7 @@ struct ADBToolsTests {
     let restarted = ToolJournal(store: scratch.appending(path: "journal.json"))
     #expect(await restarted.paths(on: device) == [left])
     await fake.set { $0.removes = true }
-    await restarted.sweep(device, serial: serial, using: fake)
+    await restarted.sweep(device, route: ADBRoute(serial: serial), using: fake)
     #expect(await fake.removals == [left, left])
     #expect(await restarted.paths(on: device).isEmpty)
     #expect(

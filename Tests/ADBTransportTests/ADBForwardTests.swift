@@ -29,7 +29,9 @@ struct ADBForwardTests {
         .init(serial: Self.serial, local: "tcp:2222", remote: "tcp:22"),
       ]
     }
-    let listed = try await withHost(device) { try await $0.forwards(serial: Self.serial) }
+    let listed = try await withHost(device) {
+      try await $0.forwards(route: ADBRoute(serial: Self.serial))
+    }
     #expect(
       listed == [PortForward(local: 8080, remote: 80), PortForward(local: 2222, remote: 22)])
   }
@@ -54,9 +56,12 @@ struct ADBForwardTests {
   @Test func aForwardIsAddedWithTheHostRequest() async throws {
     let device = FakeAndroid()
     try await withHost(device) { host in
-      try await host.addForward(serial: Self.serial, PortForward(local: 8080, remote: 80))
+      try await host.addForward(
+        route: ADBRoute(serial: Self.serial), PortForward(local: 8080, remote: 80))
       #expect(
-        try await host.forwards(serial: Self.serial) == [PortForward(local: 8080, remote: 80)])
+        try await host.forwards(route: ADBRoute(serial: Self.serial)) == [
+          PortForward(local: 8080, remote: 80)
+        ])
     }
     #expect(
       device.state.withLock { $0.tools.forwards }
@@ -68,7 +73,8 @@ struct ADBForwardTests {
     device.setTools { $0.takenPorts = [8080] }
     await #expect(throws: ADBError.failed("cannot bind listener: Address already in use")) {
       try await withHost(device) { host in
-        try await host.addForward(serial: Self.serial, PortForward(local: 8080, remote: 80))
+        try await host.addForward(
+          route: ADBRoute(serial: Self.serial), PortForward(local: 8080, remote: 80))
       }
     }
   }
@@ -81,7 +87,8 @@ struct ADBForwardTests {
     device.setTools { $0.forwards = [theirs] }
     await #expect(throws: ADBError.failed("cannot rebind existing socket")) {
       try await withHost(device) { host in
-        try await host.addForward(serial: Self.serial, PortForward(local: 8080, remote: 80))
+        try await host.addForward(
+          route: ADBRoute(serial: Self.serial), PortForward(local: 8080, remote: 80))
       }
     }
     #expect(device.state.withLock { $0.tools.forwards } == [theirs])
@@ -94,7 +101,8 @@ struct ADBForwardTests {
     }
     await #expect(throws: ADBError.failed("cannot rebind existing socket")) {
       try await withHost(device) { host in
-        try await host.addForward(serial: Self.serial, PortForward(local: 8080, remote: 81))
+        try await host.addForward(
+          route: ADBRoute(serial: Self.serial), PortForward(local: 8080, remote: 81))
       }
     }
     #expect(device.state.withLock { $0.tools.forwards.map(\.remote) } == ["tcp:80"])
@@ -106,15 +114,15 @@ struct ADBForwardTests {
       $0.forwards = [.init(serial: Self.serial, local: "tcp:8080", remote: "tcp:80")]
     }
     try await withHost(device) { host in
-      try await host.removeForward(serial: Self.serial, local: 8080)
-      #expect(try await host.forwards(serial: Self.serial) == [])
+      try await host.removeForward(route: ADBRoute(serial: Self.serial), local: 8080)
+      #expect(try await host.forwards(route: ADBRoute(serial: Self.serial)) == [])
     }
   }
 
   @Test func removingAForwardThatIsNotThereReportsAdbsWords() async throws {
     await #expect(throws: ADBError.failed("listener 'tcp:8080' not found")) {
       try await withHost(FakeAndroid()) { host in
-        try await host.removeForward(serial: Self.serial, local: 8080)
+        try await host.removeForward(route: ADBRoute(serial: Self.serial), local: 8080)
       }
     }
   }
@@ -125,10 +133,13 @@ struct ADBForwardTests {
     let wifi = "192.0.2.31:5555"
     let device = FakeAndroid()
     try await withHost(device, serial: wifi) { host in
-      try await host.addForward(serial: wifi, PortForward(local: 8080, remote: 80))
-      #expect(try await host.forwards(serial: wifi) == [PortForward(local: 8080, remote: 80)])
-      try await host.removeForward(serial: wifi, local: 8080)
-      #expect(try await host.forwards(serial: wifi) == [])
+      try await host.addForward(route: ADBRoute(serial: wifi), PortForward(local: 8080, remote: 80))
+      #expect(
+        try await host.forwards(route: ADBRoute(serial: wifi)) == [
+          PortForward(local: 8080, remote: 80)
+        ])
+      try await host.removeForward(route: ADBRoute(serial: wifi), local: 8080)
+      #expect(try await host.forwards(route: ADBRoute(serial: wifi)) == [])
     }
   }
 
