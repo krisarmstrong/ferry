@@ -38,7 +38,7 @@ extension ADBDeviceTools {
         }
       }
     } catch {
-      Self.log.info("waking the screen: \(String(describing: error), privacy: .public)")
+      Self.log.info("waking the screen: \(String(describing: error), privacy: .private)")
       return false
     }
   }
