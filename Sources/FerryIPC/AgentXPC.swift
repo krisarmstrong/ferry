@@ -58,6 +58,8 @@ public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Senda
   /// requirement; `nil` refuses the connection. A role of `nil` inside admits a test peer with
   /// every request allowed.
   private let admit: @Sendable (NSXPCConnection) -> ClientRole??
+  /// Runs once a lost connection has been dealt with, for tests.
+  private let lost: (@Sendable () -> Void)?
 
   /// Admits only the Ferry app and its extension signed by `identity`'s team.
   ///
@@ -76,14 +78,18 @@ public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Senda
 
   /// Admits any peer in `role`, or with every request allowed for `nil`, which only an anonymous
   /// listener in tests may use.
-  convenience init(handler: any AgentHandling, role: ClientRole?) {
-    self.init(handler: handler) { _ in .some(role) }
+  convenience init(
+    handler: any AgentHandling, role: ClientRole?, lost: (@Sendable () -> Void)? = nil
+  ) {
+    self.init(handler: handler, lost: lost) { _ in .some(role) }
   }
 
   private init(
-    handler: any AgentHandling, admit: @escaping @Sendable (NSXPCConnection) -> ClientRole??
+    handler: any AgentHandling, lost: (@Sendable () -> Void)? = nil,
+    admit: @escaping @Sendable (NSXPCConnection) -> ClientRole??
   ) {
     self.handler = handler
+    self.lost = lost
     self.admit = admit
   }
 
@@ -94,9 +100,17 @@ public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Senda
     let service = AgentService(handler: handler, role: role)
     connection.exportedInterface = NSXPCInterface(with: AgentXPC.self)
     connection.exportedObject = service
-    // A client that went away (quit, crashed, relaunched) waits for nothing it sent.
-    connection.invalidationHandler = { service.cancelAll() }
-    connection.interruptionHandler = { service.cancelAll() }
+    // A client that went away (quit, crashed, relaunched) waits for nothing it sent. The Finder
+    // Sync extension's Send and Install are fire-and-forget: macOS may end the extension once
+    // Finder closes its menu, and the file must still arrive.
+    let cancelsOnLoss = role != .finderSync
+    let lost = lost
+    let onLoss: @Sendable () -> Void = {
+      if cancelsOnLoss { service.cancelAll() }
+      lost?()
+    }
+    connection.invalidationHandler = onLoss
+    connection.interruptionHandler = onLoss
     connection.remoteObjectInterface = NSXPCInterface(with: AgentClientXPC.self)
     connection.resume()
     return true
@@ -140,8 +154,8 @@ final class AgentService: NSObject, AgentXPC, Sendable {
       return
     }
     // Registered before this call returns, so a cancel, which XPC delivers after it, finds it.
-    let cancellation = decoded.isCancellable ? RequestCancellation() : nil
-    if let cancellation {
+    let cancellation = RequestCancellation { client?.started(id) }
+    if decoded.isCancellable {
       running.withLock { $0[id] = cancellation }
     }
     let reported = Reported()
@@ -162,9 +176,7 @@ final class AgentService: NSObject, AgentXPC, Sendable {
             client?.progress(id, completed: completed, total: total)
           }, logs: sink)
       }
-      if cancellation != nil {
-        self.running.withLock { $0[id] = nil }
-      }
+      self.running.withLock { $0[id] = nil }
       if reported.any, let connection {
         await Self.flush(id, on: connection)
       }

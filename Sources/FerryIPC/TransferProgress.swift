@@ -16,6 +16,9 @@ public typealias TransferProgressHandler = @Sendable (_ completed: UInt64, _ tot
   /// Answered once every report sent before it has been received. The agent sends it before
   /// replying to a request that reported progress, so its reports never trail the reply.
   func flush(_ request: String, reply: @escaping @Sendable () -> Void)
+  /// The request `request` has its turn at the device: its reply deadline starts now (see
+  /// `RequestCancellation.markStarted()`).
+  func started(_ request: String)
   /// A batch of log lines (a JSON `LogBatch`) for the request `request`. The client answers once
   /// it has taken the batch, which is when the agent sends the next one: `true` to go on, `false`
   /// when the client has nothing waiting for lines (its request ended), which ends the stream.
@@ -95,10 +98,16 @@ final class ProgressReceiver: NSObject, AgentClientXPC {
   private let events: AsyncStream<Event>.Continuation
   private let count = Atomic<UInt64>(0)
   private let logs: LogRouter
+  /// The reply deadline of each request in flight that has one.
+  let deadlines = Mutex<[String: ReplyDeadline]>([:])
 
   init(_ events: AsyncStream<Event>.Continuation, logs: LogRouter) {
     self.events = events
     self.logs = logs
+  }
+
+  func started(_ request: String) {
+    deadlines.withLock { $0[request] }?.start()
   }
 
   /// The number of the last report received.

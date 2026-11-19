@@ -62,6 +62,8 @@ public actor AgentService: AgentHandling {
   ) async -> AgentResponse {
     do throws(TransportError) {
       guard Self.takesFile(request) == (file != nil) else { throw .io("bad request") }
+      // A request on a Finder location starts when it has its domain's gate (see `gated`).
+      if !Self.waitsForDomainGate(request) { RequestCancellation.current?.markStarted() }
       return try await perform(request, file: file?.fileDescriptor, progress: progress, logs: logs)
     } catch {
       log.log(
@@ -281,13 +283,19 @@ public actor AgentService: AgentHandling {
   }
 
   /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
-  /// `body` recorded a change, even one followed by a failure.
+  /// `body` recorded a change, even one followed by a failure. A request its client cancelled
+  /// while it waited for the gate is dropped there: `body` never runs. Otherwise the client hears
+  /// it has started, and its reply deadline runs from then.
   func gated<T: Sendable>(
     _ domain: String, _ body: (DomainController.Route) async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
     let route = try await domains.route(domain)
     let (result, changed) = await route.items.gate.run {
       () async -> (Result<T, TransportError>, Bool) in
+      if let request = RequestCancellation.current {
+        guard !request.isCancelled else { return (.failure(.cancelled), false) }
+        request.markStarted()
+      }
       let before = await route.items.changeCount
       let result: Result<T, TransportError>
       do throws(TransportError) {
@@ -326,5 +334,23 @@ extension AgentService {
       unconfirmed: await wireless?.unconfirmed() ?? [],
       recordings: await tools?.recordingsRunning() ?? [],
       usbWatchFailed: usbWatch?.failed ?? false)
+  }
+}
+
+extension AgentService {
+  /// Whether the request runs inside a domain's gate (see `gated`), behind whatever runs on that
+  /// Finder location, a transfer included.
+  static func waitsForDomainGate(_ request: AgentRequest) -> Bool {
+    switch request {
+    case .item, .list, .fetch, .create, .rename, .move, .replaceContents, .delete, .workingSet,
+      .sendFile:
+      true
+    case .status, .devices, .recheck, .recheckADB, .connectAddress, .pair, .connectWireless,
+      .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless, .installAPK,
+      .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording,
+      .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward, .deviceInfo,
+      .shellTarget, .refresh, .eject, .removeAllDomains, .changes:
+      false
+    }
   }
 }

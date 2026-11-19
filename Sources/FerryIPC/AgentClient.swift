@@ -41,14 +41,14 @@ extension AgentSending {
 /// `send`. Calls in flight when it is lost throw `.deviceDisconnected`; the agent's own
 /// failures come back as `.failure` responses.
 ///
-/// A cancelled call throws `.cancelled` at once and tells the agent, which stops a transfer at
-/// its next block (see `RequestCancellation`); anything else it finishes, and its reply is
-/// dropped. A metadata call (see `AgentRequest.mayTakeLong`) that has no reply within
-/// `replyDeadline` throws `.agentNotResponding`, so a wedged device does not hold FileProvider's
-/// request until its own watchdog. The agent keeps running it (it moves no file contents, so
-/// nothing can stop it) and its reply is dropped.
+/// A cancelled call throws `.cancelled` at once and tells the agent (see `RequestCancellation`):
+/// a request still waiting for the device is dropped there, a transfer stops at its next block,
+/// and anything else finishes and its reply is dropped. A metadata call (see
+/// `AgentRequest.mayTakeLong`) with no reply `replyDeadline` after the agent said it started
+/// throws `.agentNotResponding` and is cancelled the same way, so a wedged device does not hold
+/// FileProvider's request until its own watchdog, while one queued behind a transfer waits.
 public actor AgentClient: AgentSending {
-  /// How long a metadata call may wait for its reply.
+  /// How long a metadata call may wait for its reply once the agent has started it.
   public static let replyDeadline = Duration.seconds(120)
 
   private enum Target {
@@ -123,7 +123,9 @@ public actor AgentClient: AgentSending {
     }
     if Task.isCancelled { throw .cancelled }
     let connection = currentConnection()
-    let deadline = request.mayTakeLong ? nil : replyDeadline
+    let deadline = request.mayTakeLong ? nil : ReplyDeadline(replyDeadline)
+    if let deadline { receiver.deadlines.withLock { $0[id] = deadline } }
+    defer { receiver.deadlines.withLock { $0[id] = nil } }
     let reply = await awaitReply(deadline: deadline) { reply, failed in
       guard let proxy = connection.remoteObjectProxyWithErrorHandler(failed) as? any AgentXPC
       else {
@@ -142,6 +144,7 @@ public actor AgentClient: AgentSending {
       throw .cancelled
     case .failure(is ReplyOverdue):
       Self.log.error("the agent did not answer a request in time")
+      Self.cancel(id, on: connection)
       throw .agentNotResponding
     case .failure(let error):
       // An interrupted connection stays usable: launchd relaunches the agent on the next

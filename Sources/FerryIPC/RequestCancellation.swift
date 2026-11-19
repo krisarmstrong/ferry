@@ -1,21 +1,31 @@
 import Synchronization
 
-/// A client's cancel of one request, as the agent's transfers see it.
+/// What a request's client can say to the agent while it runs, and what the agent tells it.
 ///
-/// The client sends `AgentXPC.cancel(_:)` under the request's identifier when the caller stops
-/// waiting (FileProvider cancelled the operation's `Progress`, the user pressed Cancel) or the
-/// reply is overdue, and the agent cancels every request of a client whose connection goes away.
-/// The handler runs with the request's cancellation as `current`; a transfer reads it from its
-/// progress handler, which then answers "stop", so libmtp or the sync service ends the transfer
-/// at its next block and the session cleans up as for any failed write.
+/// - Cancel: the client sends `AgentXPC.cancel(_:)` under the request's identifier when its
+///   caller stops waiting (FileProvider cancelled the operation's `Progress`, the user pressed
+///   Cancel) or the reply is overdue. The agent also cancels a client's requests when its
+///   connection goes away, unless the client is the Finder Sync extension, whose Send and Install
+///   must finish after Finder closes its menu.
+/// - Started: the agent calls `markStarted()` once the request has its turn at the device (the
+///   domain's gate, for requests on a Finder location; at once for the rest), which tells the
+///   client over `AgentClientXPC.started(_:)`; the client's reply deadline runs from then, so
+///   waiting behind a transfer is never mistaken for a wedged device.
 ///
-/// A flag rather than cancelling the handler's task: the cleanup after a stopped transfer (the
-/// partial file's delete, the temporary APK's `rm`) talks to the device, and in a cancelled task
-/// that I/O would itself be cancelled.
+/// A request cancelled while it waits for the gate is dropped when it gets it: it touches no
+/// device and answers `.cancelled`. Once it runs, only a transfer stops: its progress handler
+/// reads the flag and answers "stop", so libmtp or the sync service ends it at its next block and
+/// the session cleans up as for any failed write. A flag rather than cancelling the handler's
+/// task: that cleanup (the partial file's delete, the temporary APK's `rm`) talks to the device,
+/// and in a cancelled task that I/O would itself be cancelled.
 public final class RequestCancellation: Sendable {
   private let cancelled = Atomic(false)
+  private let started = Atomic(false)
+  private let onStart: @Sendable () -> Void
 
-  public init() {}
+  public init(onStart: @escaping @Sendable () -> Void = {}) {
+    self.onStart = onStart
+  }
 
   public var isCancelled: Bool { cancelled.load(ordering: .acquiring) }
 
@@ -23,27 +33,30 @@ public final class RequestCancellation: Sendable {
     cancelled.store(true, ordering: .releasing)
   }
 
-  /// The cancellation of the request the current task is handling; `nil` outside one, or for a
-  /// request that cannot be cancelled (see `AgentRequest.isCancellable`).
+  /// The request has its turn at the device; the client hears it once.
+  public func markStarted() {
+    guard !started.exchange(true, ordering: .acquiringAndReleasing) else { return }
+    onStart()
+  }
+
+  /// The request the current task is handling; `nil` outside one.
   @TaskLocal public static var current: RequestCancellation?
 }
 
 extension AgentRequest {
-  /// Whether a client can stop the request once the agent has started it: the transfers, whose
-  /// progress handlers read the cancel. A recording runs until Stop or its time limit, even if
-  /// the app that started it quits; everything else is answered without moving file contents.
+  /// Whether a client's cancel reaches the request. Every request but a recording: one runs
+  /// until Stop or its time limit, even if the app that started it quits.
   public var isCancellable: Bool {
     switch self {
-    case .fetch, .replaceContents, .sendFile, .installAPK, .saveRecording:
-      true
-    case .create(_, _, _, let isFolder):
-      !isFolder
-    case .status, .devices, .recheck, .recheckADB, .connectAddress, .pair, .connectWireless,
-      .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless, .screenshot,
-      .startRecording, .stopRecording, .discardRecording, .startLogcat, .stopLogcat, .forwards,
-      .addForward, .removeForward, .deviceInfo, .shellTarget, .refresh, .eject,
-      .removeAllDomains, .item, .list, .rename, .move, .delete, .changes, .workingSet:
+    case .startRecording:
       false
+    case .fetch, .replaceContents, .sendFile, .installAPK, .saveRecording, .create, .status,
+      .devices, .recheck, .recheckADB, .connectAddress, .pair, .connectWireless, .enableWireless,
+      .forgetWireless, .confirmWireless, .ignoreWireless, .screenshot, .stopRecording,
+      .discardRecording, .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward,
+      .deviceInfo, .shellTarget, .refresh, .eject, .removeAllDomains, .item, .list, .rename,
+      .move, .delete, .changes, .workingSet:
+      true
     }
   }
 
@@ -52,7 +65,8 @@ extension AgentRequest {
   /// a log stream); one that waits for transfers to finish (an eject, Remove Ferry) or walks
   /// whole folder trees (Refresh, a recursive delete); and a network connect, which tries each
   /// address with adb's own 30 s limit, one after another. The rest are metadata calls, answered
-  /// within `AgentClient.replyDeadline` or taken as an agent that stopped answering.
+  /// within `AgentClient.replyDeadline` of starting (see `RequestCancellation.markStarted()`) or
+  /// taken as an agent that stopped answering.
   public var mayTakeLong: Bool {
     switch self {
     case .fetch, .replaceContents, .sendFile, .installAPK, .saveRecording, .startRecording,
