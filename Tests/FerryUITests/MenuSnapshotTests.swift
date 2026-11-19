@@ -9,10 +9,11 @@ import Testing
 @testable import FerryUI
 
 /// Draws the menu offscreen, in light and dark, with a device on USB (expanded, with its known
-/// ports' details, one not connected) and one on Wi-Fi: it must come out 320 pt wide and show
-/// something besides its background. With
-/// `FERRY_MENU_SNAPSHOTS` naming a folder, the images are also written there as
-/// `menu-light.png` and `menu-dark.png`.
+/// ports' details, one not connected, Copy Device Details and Port Forwarding open on one
+/// forward) and one on Wi-Fi; and once more with Pair with Code open. It must come out 320 pt
+/// wide and show something besides its background. With `FERRY_MENU_SNAPSHOTS` naming a
+/// folder, the images are also written there as `menu-light.png`, `menu-dark.png` and
+/// `menu-pair.png`.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct MenuSnapshotTests {
@@ -42,17 +43,28 @@ struct MenuSnapshotTests {
       .init(interface: "wax0", address: "192.0.2.160"),
     ], storage: nil)
 
-  private func drawnMenu(_ scheme: ColorScheme) async throws -> NSBitmapImageRep {
+  /// What the menu shows besides the expanded device's details.
+  private enum Shown {
+    case forwards
+    case pairForm
+  }
+
+  private func drawnMenu(
+    _ scheme: ColorScheme, showing shown: Shown = .forwards
+  ) async throws -> NSBitmapImageRep {
     let client = FakeClient(log: CallLog())
     client.setStatus(
       [Self.usb, Self.wifi], adb: .available,
       connectedAddresses: [Self.wifi.id: try #require(WirelessEndpoint(parsing: "192.0.2.42"))])
     client.infoReply.withLock { $0 = .deviceInfo(Self.details) }
+    client.forwardList.withLock { $0 = [PortForward(local: 8080, remote: 80)] }
     // The menu stays open while it is drawn: a sleep that throws would close it, and closing
     // cancels the details read the drawing waits for.
     let model = AppModel(
       client: client, services: FakeServices(log: CallLog()), sleep: HeldSleeps().sleep)
-    await model.refresh()
+    // Launching reads the login item, which the fake has on: Open at Login shows its checkmark.
+    await model.launch()
+    #expect(model.opensAtLogin)
     let appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
     let view = NSHostingView(
       rootView: MenuContent(model: model)
@@ -69,6 +81,16 @@ struct MenuSnapshotTests {
     while model.shownDetails(of: Self.usb.id) != .loaded(Self.details) {
       await Self.change(of: model) { _ = $0.details }
     }
+    switch shown {
+    case .forwards:
+      await model.toggleForwards(of: Self.usb.id)
+      #expect(model.openForwards(of: Self.usb.id)?.forwards.count == 1)
+    case .pairForm:
+      model.toggleNetworkForm(.code)
+      model.networkForm?.address = "192.0.2.31:37123"
+    }
+    // Lets the main actor turn over, so the view takes in what changed, without waiting.
+    for _ in 0..<5 { await Task.yield() }
     view.frame = CGRect(origin: .zero, size: view.fittingSize)
     view.layoutSubtreeIfNeeded()
     let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
@@ -113,5 +135,14 @@ struct MenuSnapshotTests {
     let png = try #require(bitmap.representation(using: .png, properties: [:]))
     let name = scheme == .dark ? "menu-dark.png" : "menu-light.png"
     try png.write(to: URL(filePath: folder).appending(path: name))
+  }
+
+  @Test func theMenuDrawsWithPairWithCodeOpen() async throws {
+    let bitmap = try await drawnMenu(.light, showing: .pairForm)
+    #expect(bitmap.size.width == 320)
+    #expect(drawnPixels(bitmap) > 1_000)
+    guard let folder = ProcessInfo.processInfo.environment["FERRY_MENU_SNAPSHOTS"] else { return }
+    let png = try #require(bitmap.representation(using: .png, properties: [:]))
+    try png.write(to: URL(filePath: folder).appending(path: "menu-pair.png"))
   }
 }
