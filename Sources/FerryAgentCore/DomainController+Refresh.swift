@@ -44,6 +44,14 @@ extension DomainController {
   func relistKnownFolders(of identifier: String) async -> (
     changed: Bool, failure: TransportError?
   ) {
+    await relistFolders(nil, of: identifier)
+  }
+
+  /// Lists `folders` of the domain again, or every folder it knows for `nil`, parents first, as
+  /// `relistKnownFolders(of:)` does.
+  func relistFolders(_ folders: [RemotePath]?, of identifier: String) async -> (
+    changed: Bool, failure: TransportError?
+  ) {
     let route: Route
     do throws(TransportError) {
       route = try await self.route(identifier)
@@ -52,7 +60,13 @@ extension DomainController {
     }
     let before = await route.items.changeCount
     var failure: TransportError?
-    for folder in await route.items.knownFolders() {
+    let listing: [RemotePath]
+    if let folders {
+      listing = Self.parentsFirst(folders)
+    } else {
+      listing = await route.items.knownFolders()
+    }
+    for folder in listing {
       do throws(TransportError) {
         try await relist(folder, on: route)
       } catch {
@@ -65,6 +79,12 @@ extension DomainController {
     }
     await route.release()
     return (await route.items.changeCount != before, failure)
+  }
+
+  static func parentsFirst(_ folders: [RemotePath]) -> [RemotePath] {
+    folders.sorted {
+      ($0.components.count, $0.description) < ($1.components.count, $1.description)
+    }
   }
 
   private func relist(_ folder: RemotePath, on route: Route) async throws(TransportError) {

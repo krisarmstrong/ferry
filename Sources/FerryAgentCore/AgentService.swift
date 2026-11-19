@@ -27,7 +27,7 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 public actor AgentService: AgentHandling {
   let hub: DeviceHub
   let domains: DomainController
-  let transfers = TransferBoard()
+  let transfers: TransferBoard
   /// Where the agent keeps its scratch copies of clients' files (see `FileTransfer`).
   let scratchFolder: URL
   /// adb over the network; `nil` where adb is not used.
@@ -36,13 +36,18 @@ public actor AgentService: AgentHandling {
   let tools: ADBTools?
   /// Whether the USB notifications are armed; `nil` where nothing watches USB.
   let usbWatch: USBWatchState?
+  /// Follows the folders clients list for changes made on the device; `nil` where nothing does.
+  let changes: ChangeWatch?
 
   public init(
     hub: DeviceHub, domains: DomainController,
     scratch: URL = FileManager.default.temporaryDirectory, wireless: WirelessADB? = nil,
-    tools: ADBTools? = nil, usbWatch: USBWatchState? = nil
+    tools: ADBTools? = nil, usbWatch: USBWatchState? = nil,
+    transfers: TransferBoard = TransferBoard(), changes: ChangeWatch? = nil
   ) {
+    self.transfers = transfers
     self.usbWatch = usbWatch
+    self.changes = changes
     self.hub = hub
     self.domains = domains
     scratchFolder = scratch
@@ -174,11 +179,14 @@ public actor AgentService: AgentHandling {
   private func list(_ folder: ItemID, in domain: String) async throws(TransportError)
     -> [ProviderEntry]
   {
-    try await gated(domain) { route throws(TransportError) in
+    let (path, entries) = try await gated(domain) { route throws(TransportError) in
       let path = try await route.path(of: folder)
       let items = try await route.writer.visibleList(path, in: route.storage)
-      return await route.items.listed(path, children: items)
+      return (path, await route.items.listed(path, children: items))
     }
+    // Outside the gate: the watch reads the domain's table.
+    await changes?.listed(path, in: domain)
+    return entries
   }
 
   /// One page of the working set. The page token is the last identifier served, as UTF-8.

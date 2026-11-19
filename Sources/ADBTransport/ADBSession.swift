@@ -35,7 +35,9 @@ public actor ADBSession: DeviceSession {
   private var knownStorages: Set<String> = []
   /// The device's own spelling of each name, by folder (see `ADBSession+Names.swift`).
   var rawNames: [[UInt8]: [String: String]] = [:]
-  private var disconnected = false
+  private(set) var disconnected = false
+  /// The folder watches running (see `watch(_:)`), closed when the session ends.
+  let watches = WatchConnections()
   /// Tells the transport the device is free again; runs once, when the session ends.
   private var onRelease: (@Sendable () async -> Void)?
 
@@ -132,6 +134,7 @@ public actor ADBSession: DeviceSession {
   }
 
   private func released() async {
+    watches.closeAll()
     guard let onRelease else { return }
     self.onRelease = nil
     await onRelease()

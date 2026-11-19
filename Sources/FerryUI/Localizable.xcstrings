@@ -846,7 +846,7 @@
     "This Mac port %@ → device port %@" : {
 
     },
-    "To see files added on the device while it is connected, choose **Refresh** in the Ferry menu." : {
+    "Files added or changed on the device while it is connected show up on their own, usually within 30 seconds. To see them at once, choose **Refresh** in the Ferry menu." : {
       "extractionState" : "manual"
     },
     "Tools over USB debugging" : {

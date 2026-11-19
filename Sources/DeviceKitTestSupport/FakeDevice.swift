@@ -25,6 +25,7 @@ public actor FakeDevice: DeviceSession {
 
   public nonisolated let info: DeviceInfo
   public nonisolated let partials = PartialRegistry()
+  public nonisolated let watches = FakeWatches()
   /// How the transport that opened it reaches it.
   public internal(set) var method = ConnectionMethod.usbFileTransfer
   var storageInfos: [StorageInfo]

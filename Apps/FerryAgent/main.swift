@@ -71,10 +71,18 @@ let tools = ADBTools(
     ADBTools.target(for: id, devices: await hub.devices(), session: await adb.sessionRoute(for: id))
   }, journal: toolJournal)
 
+// Changes made on a device reach Finder by themselves: the folders clients listed are watched
+// where the device can, and listed again every 30 s, except during transfers or while the Mac
+// sleeps.
+let transfers = TransferBoard()
+let changes = ChangeWatch(domains: domains, transfers: transfers, sleeps: SystemSleep.states())
+Task { await changes.run() }
+
 // The listener holds its delegate weakly; both live for the whole process.
 let delegate = AgentListenerDelegate(
   handler: AgentService(
-    hub: hub, domains: domains, wireless: wireless, tools: tools, usbWatch: usbWatch),
+    hub: hub, domains: domains, wireless: wireless, tools: tools, usbWatch: usbWatch,
+    transfers: transfers, changes: changes),
   identity: identity)
 let listener = NSXPCListener(machServiceName: identity.machServiceName)
 listener.delegate = delegate

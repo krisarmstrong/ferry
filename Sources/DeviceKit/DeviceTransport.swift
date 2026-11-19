@@ -66,6 +66,11 @@ public protocol DeviceSession: Sendable {
   /// libmtp keeps the object info it first read for an object, and so never sees a file an app
   /// rewrote in place or renamed; ADB reads everything fresh and has nothing to forget.
   func forgetCachedItems() async throws(TransportError)
+  /// Watches `folders` on the device and reports each one it says changed, until the device's
+  /// watcher ends, the session closes, or the caller stops iterating. Reports are hints: a
+  /// device may miss changes or report ones that changed nothing. `nil` when the session cannot
+  /// watch now (unsupported, closed, or the watcher would not start).
+  func watch(_ folders: [FolderHint]) async -> AsyncStream<FolderHint>?
   func close() async
 }
 

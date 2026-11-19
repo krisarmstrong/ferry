@@ -40,6 +40,12 @@ extension FakeAndroid {
     var wakeRefused = false
     /// `dumpsys power` reads since the last wake key.
     var powerPolls = 0
+    /// What `inotifyd -` prints, chunk by chunk, then whether it exits or keeps watching until
+    /// the client closes.
+    var inotify: [Data] = []
+    var inotifyEnds = false
+    /// `inotifyd` connections the client has not yet closed.
+    var watching = 0
     /// The adb server's forwards, for every device it has, as `list-forward` lists them.
     var forwards: [Forward] = []
     /// Local ports the server cannot bind.
@@ -77,6 +83,10 @@ extension FakeAndroid {
       try await logcat(peer)
       return
     }
+    if words.first == "inotifyd" {
+      try await inotifyd(peer)
+      return
+    }
     guard words == ["screencap", "-p"] else { throw ScriptError.unexpected(command) }
     if state.withLock({ $0.hangingPrograms.contains("screencap") }) {
       _ = try? await peer.stream.read(exactly: 1)
@@ -84,6 +94,21 @@ extension FakeAndroid {
     }
     try await peer.raw(state.withLock { $0.tools.screencap })
     await peer.finish()
+  }
+
+  /// Sends the scripted events, then exits or watches until the client closes.
+  private func inotifyd(_ peer: Peer) async throws {
+    let (chunks, ends) = state.withLock {
+      $0.tools.watching += 1
+      return ($0.tools.inotify, $0.tools.inotifyEnds)
+    }
+    defer { state.withLock { $0.tools.watching -= 1 } }
+    for chunk in chunks { try await peer.raw(chunk) }
+    if ends {
+      await peer.finish()
+    } else {
+      _ = try? await peer.stream.read(exactly: 1)
+    }
   }
 
   /// Sends the scripted log, then follows it (nothing more arrives) or ends it.

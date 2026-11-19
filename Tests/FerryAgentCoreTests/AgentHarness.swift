@@ -177,7 +177,8 @@ struct AgentHarness {
 
   init(
     devices: [FakeDevice] = [], existing: [String] = [], store: URL = itemStore(),
-    manager: FakeDomainManager? = nil, adb: FakeTransport? = nil
+    manager: FakeDomainManager? = nil, adb: FakeTransport? = nil,
+    changes: ((DomainController) -> ChangeWatch)? = nil
   ) throws {
     self.store = store
     self.manager = manager ?? FakeDomainManager(existing: existing)
@@ -194,7 +195,8 @@ struct AgentHarness {
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
     // The agent's scratch copies go under the test scratch folder, so its size guard covers them.
-    service = AgentService(hub: hub, domains: controller, scratch: scratch)
+    service = AgentService(
+      hub: hub, domains: controller, scratch: scratch, changes: changes?(controller))
     runner = Task { [controller] in await controller.run() }
   }
 

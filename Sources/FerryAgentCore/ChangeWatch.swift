@@ -1,0 +1,266 @@
+import DeviceKit
+import Foundation
+import os
+
+private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ChangeWatch")
+
+/// Finds changes made on a device without the user asking (spec "Change detection").
+///
+/// Each device keeps the 32 folders clients listed most recently. The device watches them, if
+/// its session can (ADB's `inotifyd`), and a folder it reports is listed again at once. The
+/// reports are hints, and shared storage misses some, so every 30 s the folders are listed again
+/// anyway. Each listing records what differs in the domain's change log, and the domain is
+/// signalled only then. Nothing is listed while a transfer runs on the device (a hint waits for
+/// the next pass that finds none), nor while the Mac sleeps. A watch that ends is started again
+/// by the next pass or listing, so a device whose watcher exits at once is tried every 30 s, not
+/// in a loop.
+public actor ChangeWatch {
+  public static let interval = Duration.seconds(30)
+  public static let folderLimit = 32
+
+  /// A folder a client listed, in its domain.
+  private struct Listed: Equatable {
+    let domain: String
+    let hint: FolderHint
+  }
+
+  private struct Watch {
+    let token: UUID
+    let folders: [FolderHint]
+    let task: Task<Void, Never>
+    var ended = false
+  }
+
+  let domains: DomainController
+  let busy: @Sendable (DeviceID) async -> Bool
+  let clock: any Clock<Duration>
+  let sleeps: AsyncStream<Bool>
+  /// Oldest first.
+  private var recent: [DeviceID: [Listed]] = [:]
+  private var watches: [DeviceID: Watch] = [:]
+  /// Hints not acted on yet: a transfer was running, or a listing was under way.
+  private var pending: [DeviceID: Set<FolderHint>] = [:]
+  private var draining: Set<DeviceID> = []
+  private var asleep = false
+  /// Passes finished, hints taken in, and watches ended, for tests to wait on.
+  private(set) var ticks = 0
+  private(set) var hints = 0
+  private(set) var endedWatches = 0
+  private var waiters: [Int: (ready: () -> Bool, continuation: CheckedContinuation<Void, Never>)] =
+    [:]
+  private var nextWaiter = 0
+
+  /// `sleeps` says `true` when the Mac goes to sleep and `false` when it wakes.
+  public init(
+    domains: DomainController, transfers: TransferBoard,
+    clock: any Clock<Duration> = SuspendingClock(), sleeps: AsyncStream<Bool>
+  ) {
+    self.init(
+      domains: domains, busy: { await transfers.isBusy($0) }, clock: clock, sleeps: sleeps)
+  }
+
+  init(
+    domains: DomainController, busy: @escaping @Sendable (DeviceID) async -> Bool,
+    clock: any Clock<Duration>, sleeps: AsyncStream<Bool>
+  ) {
+    self.domains = domains
+    self.busy = busy
+    self.clock = clock
+    self.sleeps = sleeps
+  }
+
+  /// Lists the folders again every `interval` until the calling task is cancelled. Call it once,
+  /// from a task that belongs to no request (`requestFreeTask`).
+  public func run() async {
+    let follower = requestFreeTask { [weak self, sleeps] in
+      for await asleep in sleeps { await self?.setAsleep(asleep) }
+    }
+    defer { follower.cancel() }
+    while !Task.isCancelled {
+      do {
+        try await clock.sleep(for: Self.interval)
+      } catch {
+        return
+      }
+      await pass()
+    }
+  }
+
+  /// A client listed `folder` of `domain`: it becomes the device's newest watched folder.
+  func listed(_ folder: RemotePath, in domain: String) async {
+    guard let storage = await domains.connectedStorage(of: domain) else { return }
+    let entry = Listed(domain: domain, hint: FolderHint(storage: storage, folder: folder))
+    var list = recent[storage.device, default: []]
+    list.removeAll { $0 == entry }
+    list.append(entry)
+    list.removeFirst(max(0, list.count - Self.folderLimit))
+    recent[storage.device] = list
+    await rewatch(storage.device)
+  }
+
+  // MARK: Passes
+
+  private func pass() async {
+    defer {
+      ticks += 1
+      resumeWaiters()
+    }
+    guard !asleep else { return }
+    let devices = Set(recent.keys).union(await domains.connectedDevices())
+    for device in devices.sorted(by: { $0.serial < $1.serial }) {
+      let folders = await watched(device)
+      guard !folders.isEmpty else {
+        stopWatch(device)
+        continue
+      }
+      guard await !busy(device) else { continue }
+      let hinted = pending.removeValue(forKey: device) ?? []
+      await relist(Array(Set(folders.map(\.hint)).union(hinted)), of: device)
+      await rewatch(device)
+    }
+  }
+
+  /// The device's recent folders whose domain is connected and that it still has. One the
+  /// device no longer has is dropped; one whose domain is away is kept for its return.
+  private func live(_ device: DeviceID) async -> [Listed] {
+    var live: [Listed] = []
+    var gone: [Listed] = []
+    for entry in recent[device] ?? [] {
+      guard await domains.connectedStorage(of: entry.domain) == entry.hint.storage else {
+        continue
+      }
+      if await domains.knows(entry.hint.folder, in: entry.domain) {
+        live.append(entry)
+      } else {
+        gone.append(entry)
+      }
+    }
+    recent[device]?.removeAll { gone.contains($0) }
+    return live
+  }
+
+  /// The device's live recent folders, then, while there is room, the folders its connected
+  /// domains know clients listed: after an agent restart no client has listed anything yet, and
+  /// Finder lists a folder it already holds only when the system asks it to.
+  private func watched(_ device: DeviceID) async -> [Listed] {
+    var folders = await live(device)
+    for domain in await domains.connectedDomains(of: device) {
+      guard let storage = await domains.connectedStorage(of: domain) else { continue }
+      for folder in await domains.knownFolders(of: domain) {
+        guard folders.count < Self.folderLimit else { return folders }
+        let entry = Listed(domain: domain, hint: FolderHint(storage: storage, folder: folder))
+        if !folders.contains(entry) { folders.insert(entry, at: 0) }
+      }
+    }
+    return folders
+  }
+
+  /// Lists the folders again, each in the domain its storage is connected as.
+  private func relist(_ folders: [FolderHint], of device: DeviceID) async {
+    for (storage, hints) in Dictionary(grouping: folders, by: \.storage) {
+      guard let domain = await domains.connectedDomain(of: storage) else { continue }
+      await domains.relistAndSignal(hints.map(\.folder), in: domain)
+    }
+  }
+
+  // MARK: Watches
+
+  /// Starts the device's watch over its live recent folders, unless one already runs over the
+  /// same folders.
+  private func rewatch(_ device: DeviceID) async {
+    let folders = await watched(device).map(\.hint)
+    if let watch = watches[device], !watch.ended, Set(watch.folders) == Set(folders) { return }
+    stopWatch(device)
+    guard !folders.isEmpty else { return }
+    let token = UUID()
+    let task = requestFreeTask { [weak self] in
+      _ = await self?.follow(device, folders, token: token)
+    }
+    watches[device] = Watch(token: token, folders: folders, task: task)
+  }
+
+  private func stopWatch(_ device: DeviceID) {
+    watches.removeValue(forKey: device)?.task.cancel()
+  }
+
+  /// Opens the watch on the device's current session and takes in its hints until it ends.
+  private func follow(_ device: DeviceID, _ folders: [FolderHint], token: UUID) async {
+    var stream: AsyncStream<FolderHint>?
+    do throws(TransportError) {
+      let lease = try await domains.leaseSession(of: device)
+      stream = await lease.session.watch(folders)
+      await domains.hub.release(lease)
+    } catch {
+      log.info(
+        "no session to watch \(device.serial, privacy: .private): \(String(describing: error), privacy: .public)"
+      )
+    }
+    if let stream {
+      for await hint in stream { await hinted(device, hint) }
+    }
+    guard watches[device]?.token == token, !Task.isCancelled else { return }
+    watches[device]?.ended = true
+    endedWatches += 1
+    resumeWaiters()
+  }
+
+  private func hinted(_ device: DeviceID, _ hint: FolderHint) async {
+    pending[device, default: []].insert(hint)
+    await drain(device)
+    hints += 1
+    resumeWaiters()
+  }
+
+  /// Lists the folders hinted so far, unless a transfer runs or the Mac sleeps: they then wait
+  /// for the next pass. Hints that arrive meanwhile are taken by the same drain.
+  private func drain(_ device: DeviceID) async {
+    guard !asleep, draining.insert(device).inserted else { return }
+    defer { draining.remove(device) }
+    while let batch = pending[device], !batch.isEmpty {
+      guard await !busy(device) else { return }
+      pending[device] = nil
+      await relist(Array(batch), of: device)
+    }
+  }
+
+  private func setAsleep(_ asleep: Bool) {
+    self.asleep = asleep
+    resumeWaiters()
+  }
+
+  // MARK: Waiting, for tests
+
+  func waitForTicks(_ count: Int) async { await waitUntil { self.ticks >= count } }
+  func waitForHints(_ count: Int) async { await waitUntil { self.hints >= count } }
+  func waitForEndedWatches(_ count: Int) async { await waitUntil { self.endedWatches >= count } }
+  func waitForSleepState(_ asleep: Bool) async { await waitUntil { self.asleep == asleep } }
+
+  /// Returns once `ready` holds, or the calling task is cancelled, as a test's time limit does.
+  private func waitUntil(_ ready: @escaping () -> Bool) async {
+    guard !ready() else { return }
+    nextWaiter += 1
+    let id = nextWaiter
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if Task.isCancelled {
+          continuation.resume()
+        } else {
+          waiters[id] = (ready, continuation)
+        }
+      }
+    } onCancel: {
+      Task { await self.stopWaiting(id) }
+    }
+  }
+
+  private func stopWaiting(_ id: Int) {
+    waiters.removeValue(forKey: id)?.continuation.resume()
+  }
+
+  private func resumeWaiters() {
+    for (id, waiter) in waiters where waiter.ready() {
+      waiters[id] = nil
+      waiter.continuation.resume()
+    }
+  }
+}

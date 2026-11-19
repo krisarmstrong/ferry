@@ -13,7 +13,7 @@ import os
 /// it to the client, and a transfer that succeeds reports its whole size last, so the client
 /// sees it complete before the reply. The handler answers "stop" once the client has cancelled
 /// the request (`RequestCancellation`), so the transfer ends at its next block.
-actor TransferBoard {
+public actor TransferBoard {
   private static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "Transfers")
 
@@ -22,6 +22,13 @@ actor TransferBoard {
   private var restarting: [DeviceID: [UUID: CheckedContinuation<Void, Never>]] = [:]
 
   static let interval = Duration.milliseconds(250)
+
+  public init() {}
+
+  /// Whether a transfer runs on `device`.
+  func isBusy(_ device: DeviceID) -> Bool {
+    active.contains { $0.transfer.device == device }
+  }
 
   /// Running transfers, oldest first.
   func list() -> [ActiveTransfer] {
