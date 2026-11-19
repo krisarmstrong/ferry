@@ -4,14 +4,18 @@ import os
 
 /// What a scan reads from the server and the devices, each answer bounded in time.
 extension ADBTransport {
-  /// The device behind an adb serial, or `nil` if it reports no serial number.
-  static func info(of serial: String, on host: ADBHost) async throws(ADBError)
-    -> DeviceInfo?
+  /// The device behind an adb serial, or `nil` if it reports no serial number. A scan names the
+  /// `transportID` it listed, so it reads that unit even while a session's pin selects another.
+  static func info(of serial: String, on host: ADBHost, transportID: String? = nil)
+    async throws(ADBError) -> DeviceInfo?
   {
-    let serialNumber = try await property("ro.serialno", of: serial, on: host)
+    func read(_ name: String) async throws(ADBError) -> String {
+      try await property(name, of: serial, on: host, transportID: transportID)
+    }
+    let serialNumber = try await read("ro.serialno")
     guard !serialNumber.isEmpty else { return nil }
-    let manufacturer = try await property("ro.product.manufacturer", of: serial, on: host)
-    let model = try await property("ro.product.model", of: serial, on: host)
+    let manufacturer = try await read("ro.product.manufacturer")
+    let model = try await read("ro.product.model")
     return DeviceInfo(
       id: DeviceID(serial: serialNumber),
       manufacturer: isPlatformVendor(manufacturer) ? "" : manufacturer,
@@ -56,11 +60,11 @@ extension ADBTransport {
     return try result.get()
   }
 
-  static func property(_ name: String, of serial: String, on host: ADBHost)
-    async throws(ADBError) -> String
-  {
+  static func property(
+    _ name: String, of serial: String, on host: ADBHost, transportID: String? = nil
+  ) async throws(ADBError) -> String {
     let result = try await host.run(
-      serial: serial, command: try ADBShell.command("getprop", [name]))
+      serial: serial, command: try ADBShell.command("getprop", [name]), transportID: transportID)
     guard result.status == 0 else {
       throw .failed("getprop \(name) exited with status \(result.status)")
     }
@@ -105,7 +109,8 @@ extension ADBTransport {
               listing,
               .success(
                 try await Self.within(limit) { () async throws(ADBError) in
-                  try await Self.info(of: listing.serial, on: host)
+                  try await Self.info(
+                    of: listing.serial, on: host, transportID: listing.transportID)
                 })
             )
           } catch {

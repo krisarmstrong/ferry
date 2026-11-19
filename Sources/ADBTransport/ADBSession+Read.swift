@@ -101,7 +101,8 @@ extension ADBSession {
       throw .io("could not create \(partial.path)")
     }
     do throws(TransportError) {
-      let received = try await receive(location, of: listed.path, into: partial, progress: progress)
+      let received = try await receive(
+        location, of: listed.path, listedSize: listed.size, into: partial, progress: progress)
       guard received >= listed.size else {
         throw .downloadSizeMismatch(listed: listed.size, received: received)
       }
@@ -114,7 +115,8 @@ extension ADBSession {
   }
 
   private func receive(
-    _ location: String, of path: RemotePath, into partial: URL, progress: ProgressHandler
+    _ location: String, of path: RemotePath, listedSize: UInt64, into partial: URL,
+    progress: ProgressHandler
   ) async throws(TransportError) -> UInt64 {
     let handle: FileHandle
     do {
@@ -125,7 +127,7 @@ extension ADBSession {
     defer { try? handle.close() }
     return try await adb(Step("download", path)) { () async throws(ADBError) in
       try await syncing { (sync) async throws(ADBError) in
-        try await sync.receive(location, to: handle, progress: progress)
+        try await sync.receive(location, to: handle, listedSize: listedSize, progress: progress)
       }
     }
   }

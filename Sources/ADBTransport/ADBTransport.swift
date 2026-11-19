@@ -34,7 +34,7 @@ public actor ADBTransport: DeviceTransport {
   /// What the most recent scan found of adb itself; `nil` until the first scan.
   public private(set) var status: ADBStatus?
 
-  private let host: ADBHost
+  let host: ADBHost
   private let locator: ADBLocator
   /// Scans take turns, so one never commits what it read over a later one's.
   private let scans = OperationGate()
@@ -45,9 +45,16 @@ public actor ADBTransport: DeviceTransport {
   private var named: [Listing: DeviceInfo] = [:]
   /// The routes of each usable device, as of the most recent scan.
   private var routes: [DeviceID: ADBRoutes] = [:]
+  /// The server's connection (`transport_id`) behind each listed adb serial, as of the most
+  /// recent scan; absent where adb does not report one.
+  var transportIDs: [String: String] = [:]
+  /// Pins set on the host (see `ADBHost.pin`), by adb serial. A pin outlives its session until
+  /// the next scan: something that took the serial while the session was open (a tool) still
+  /// fails rather than reaching a unit that took the address since.
+  var pinned: [String: String] = [:]
   /// Devices with an open (or opening) session, with what `park` needs, recorded at open: the
   /// device may be missing from every scan by the time it is ejected.
-  private var held: [DeviceID: Held] = [:]
+  var held: [DeviceID: Held] = [:]
   /// Devices left alone after an eject, until `unpark(_:)` or until adb has not listed them, in
   /// any state, for `settleTime`.
   private var parked: [DeviceID: Parked] = [:]
@@ -58,11 +65,19 @@ public actor ADBTransport: DeviceTransport {
   private var unnamedTries: [Listing: Int] = [:]
   private let now: @Sendable () -> ContinuousClock.Instant
 
-  private struct Held {
+  struct Pin {
+    let serial: String
+    let transportID: String
+  }
+
+  struct Held {
     let info: DeviceInfo
     let serials: Set<String>
-    /// The adb serial the session was opened on; `nil` for what was last seen of a device.
+    /// The adb serial the session was opened on, once it is open; `nil` while it opens and for
+    /// what was last seen of a device.
     var route: String?
+    /// The adb serial the session is pinned by, and the connection (see `ADBHost.pin`).
+    var pin: Pin?
   }
 
   private struct Parked {
@@ -157,6 +172,7 @@ public actor ADBTransport: DeviceTransport {
       let onUSB = Set(listed.filter { !$0.isWireless }.map { DeviceID(serial: $0.serial) })
       let found = assemble(usable).filter { $0.value.usb != nil || !onUSB.contains($0.key) }
       routes = found.mapValues { ADBRoutes(usb: $0.usb, wireless: $0.wireless.sorted()) }
+      await notePins(listed)
       for (id, device) in found {
         lastKnown[id] = Held(
           info: device.info, serials: Set(device.wireless + [device.usb].compactMap { $0 }))
@@ -213,15 +229,21 @@ public actor ADBTransport: DeviceTransport {
     guard parked[id] == nil, let routes = routes[id], let serial = routes.preferred,
       let info = named.first(where: { $0.key.serial == serial })?.value
     else { throw .deviceNotFound(id) }
-    // Held from here, so a second open while this one waits is busy.
-    held[id] = Held(info: info, serials: routes.serials, route: serial)
+    // Held from here, so a second open while this one waits is busy. Pinned to the connection
+    // the scan saw, so the open itself cannot reach a unit that took the address since.
+    let pin = transportIDs[serial].map { Pin(serial: serial, transportID: $0) }
+    held[id] = Held(info: info, serials: routes.serials, pin: pin)
+    if let pin {
+      pinned[pin.serial] = pin.transportID
+      await host.pin(pin.serial, to: pin.transportID)
+    }
     let features: Set<String>
     do throws(ADBError) {
       features = try await Self.within(answerLimit) { [host] () async throws(ADBError) in
         try await host.features(serial)
       }
     } catch {
-      held[id] = nil
+      release(id)
       if error == .cancelled { throw .cancelled }
       // Gone since the scan, or the server with it: the next scan says which.
       Self.log.info("not opening \(serial, privacy: .private): \(String(describing: error))")
@@ -229,9 +251,11 @@ public actor ADBTransport: DeviceTransport {
     }
     // Ejected while the device answered: no session for it.
     guard parked[id] == nil else {
-      held[id] = nil
+      release(id)
       throw .deviceNotFound(id)
     }
+    // Only now is there a session for the tools to follow.
+    held[id]?.route = serial
     opened(id, serial, deviceTools)
     return ADBSession(
       host: host, serial: serial, info: info, features: features,

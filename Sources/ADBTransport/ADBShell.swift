@@ -72,15 +72,19 @@ extension ADBHost {
   /// `features` is the device's feature set when the caller already has it; otherwise it is
   /// asked for.
   public func run(
-    serial: String, command: String, features: Set<String>? = nil
+    serial: String, command: String, features: Set<String>? = nil, transportID: String? = nil
   ) async throws(ADBError) -> ADBShellResult {
-    try await run(serial: serial, command: command, token: ADBShell.newToken(), features: features)
+    try await run(
+      serial: serial, command: command, token: ADBShell.newToken(), features: features,
+      transportID: transportID)
   }
 
   func run(
-    serial: String, command: String, token: String, features: Set<String>? = nil
+    serial: String, command: String, token: String, features: Set<String>? = nil,
+    transportID: String? = nil
   ) async throws(ADBError) -> ADBShellResult {
-    let channel = try await openShell(serial, command, token: token, features: features)
+    let channel = try await openShell(
+      serial, command, token: token, features: features, transportID: transportID)
     defer { channel.stream.cancel() }
     guard let token = channel.token else { return try await Self.collectPackets(channel.stream) }
     return try await Self.collectLegacy(channel.stream, token: token)
@@ -90,22 +94,25 @@ extension ADBHost {
   /// is ever typed in, and a command that reads it then ends), else through the legacy wrapper
   /// that carries the status on a final line. The token is the wrapper's, `nil` over `shell,v2`.
   func openShell(
-    _ serial: String, _ command: String, token: String, features: Set<String>?
+    _ serial: String, _ command: String, token: String, features: Set<String>?,
+    transportID: String? = nil
   ) async throws(ADBError) -> (stream: ADBStream, token: String?) {
     let known: Set<String>
     if let features {
       known = features
     } else {
-      known = try await self.features(serial)
+      known = try await self.features(serial, transportID: transportID)
     }
     if known.contains("shell_v2") {
-      let stream = try await connect(serial, service: "shell,v2,raw:\(command)")
+      let stream = try await connect(
+        serial, service: "shell,v2,raw:\(command)", transportID: transportID)
       // A failed write means the command already finished; the reads report what happened.
       try? await stream.write(Data([ShellPacket.closeStdin]) + ADBWire.le32(0))
       return (stream, nil)
     }
     let stream = try await connect(
-      serial, service: "shell:" + ADBShell.legacyWrapper(command, token: token))
+      serial, service: "shell:" + ADBShell.legacyWrapper(command, token: token),
+      transportID: transportID)
     return (stream, token)
   }
 

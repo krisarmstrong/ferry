@@ -102,6 +102,21 @@ final class FakeADBHub: Sendable {
     case "host:track-devices-l":
       try await track(peer)
     default:
+      if let (transportID, rest) = Self.transportID(in: first) {
+        // Selected by its connection: only the entry with that transport id answers.
+        let entry = state.withLock { state in
+          state.entries.first { $0.transportID == transportID && $0.state == "device" }
+        }
+        guard let entry, let device = entry.device else {
+          try await peer.fail("no device with transport id '\(transportID)'")
+          return
+        }
+        let request =
+          rest == "features"
+          ? "host-serial:\(entry.serial):features" : "host:transport:\(entry.serial)"
+        try await device.handle(peer, serial: entry.serial, first: request)
+        return
+      }
       let serial = Self.serial(in: first)
       let device = state.withLock { state in
         state.entries.first { $0.serial == serial && $0.state == "device" }?.device
@@ -127,6 +142,19 @@ final class FakeADBHub: Sendable {
     for await listing in updates {
       try await peer.send(String(data: try ADBWire.frame(listing), encoding: .utf8) ?? "")
     }
+  }
+
+  /// The transport id a request selects by, `host:transport-id:<id>` (rest "transport") or
+  /// `host-transport-id:<id>:features` (rest "features").
+  private static func transportID(in request: String) -> (Int, String)? {
+    if request.hasPrefix("host:transport-id:") {
+      return Int(request.dropFirst("host:transport-id:".count)).map { ($0, "transport") }
+    }
+    if request.hasPrefix("host-transport-id:"), request.hasSuffix(":features") {
+      let id = request.dropFirst("host-transport-id:".count).dropLast(":features".count)
+      return Int(id).map { ($0, "features") }
+    }
+    return nil
   }
 
   /// The serial a routed request names: `host-serial:<serial>:features` or

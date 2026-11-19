@@ -112,10 +112,10 @@ public actor ADBSync {
   /// Streams the file into `file`. `progress` is told the bytes received and the size `stat`
   /// reported; returning false stops the transfer with `.cancelled` and closes the connection.
   public func receive(
-    _ path: String, to file: FileHandle, progress: ProgressHandler
+    _ path: String, to file: FileHandle, listedSize: UInt64? = nil, progress: ProgressHandler
   ) async throws(ADBError) -> UInt64 {
     try await perform { () async throws(ADBError) in
-      try await receiveLocked(path, to: file, progress: progress)
+      try await receiveLocked(path, to: file, listedSize: listedSize, progress: progress)
     }
   }
 
@@ -210,10 +210,14 @@ public actor ADBSync {
     return listing
   }
 
+  /// `listedSize` is what the caller checked the Mac's room against: the growth cap runs from
+  /// the smaller of it and the size the device reports now, so a stat that answers larger at
+  /// download time does not lift it.
   private func receiveLocked(
-    _ path: String, to file: FileHandle, progress: ProgressHandler
+    _ path: String, to file: FileHandle, listedSize: UInt64?, progress: ProgressHandler
   ) async throws(ADBError) -> UInt64 {
     let total = try await statLocked(path, follow: true)?.size ?? 0
+    let capped = min(total, listedSize ?? total)
     try await request("RECV", path)
     var received: UInt64 = 0
     while true {
@@ -234,8 +238,8 @@ public actor ADBSync {
         received += UInt64(length)
         // A file still being written may grow; one that grows without end is not a file. The
         // device reports `total`, so it is never added to: the check cannot overflow.
-        guard received <= total || received - total <= growthAllowance else {
-          throw await violation("receive passed its size of \(total) bytes")
+        guard received <= capped || received - capped <= growthAllowance else {
+          throw await violation("receive passed its size of \(capped) bytes")
         }
         guard progress(received, total) else {
           await stream.close()

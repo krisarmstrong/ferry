@@ -122,6 +122,36 @@ struct ADBMinorFixTests {
     #expect(try await sync.receive("/x", to: handle, progress: { _, _ in true }) == 3)
   }
 
+  /// The cap runs from the smaller of the listed size and the size the device gives at
+  /// download time: a stat of `UInt64.max` after a small listing does not turn it off.
+  @Test(.timeLimit(.minutes(1)))
+  func aLargerDownloadTimeStatDoesNotLiftTheCap() async throws {
+    let server = try await FakeADBServer.start { peer in
+      try await peer.accept(service: "sync:")
+      _ = try await peer.syncPathRequest()
+      try await peer.raw(Peer.sta2(mode: 0o100600, size: .max, mtime: 1))
+      _ = try await peer.syncPathRequest()
+      let chunk = Peer.data(Data(repeating: 7, count: 1024))
+      for _ in 0..<16 { try await peer.raw(chunk) }
+      try await peer.raw(Peer.done())
+      _ = try? await peer.stream.read(exactly: 1)
+    }
+    defer { server.stop() }
+    let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
+    let stream = try await host.connect("S", service: "sync:")
+    let sync = ADBSync(
+      stream: stream, features: ["stat_v2"], entryLimit: ADBSync.defaultEntryLimit,
+      growthAllowance: 4096)
+    let (url, handle) = try SyncFixture.scratchFile()
+    defer { try? FileManager.default.removeItem(at: url) }
+    await #expect {
+      _ = try await sync.receive("/x", to: handle, listedSize: 10, progress: { _, _ in true })
+    } throws: { error in
+      if case .protocolViolation = error as? ADBError { return true }
+      return false
+    }
+  }
+
   /// A symlink is not a folder, on every protocol: the check never follows it.
   @Test(arguments: ["cmd,shell_v2,stat_v2", "cmd,shell_v2"])
   func aSymlinkToAFolderIsNotAFolder(features: String) async throws {
