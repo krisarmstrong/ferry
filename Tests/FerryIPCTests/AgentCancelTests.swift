@@ -50,6 +50,16 @@ private struct ParkingHandler: AgentHandling {
   }
 }
 
+/// A client that takes the agent's messages and does nothing with them.
+private final class SilentClient: NSObject, AgentClientXPC {
+  func progress(_ request: String, completed: UInt64, total: UInt64) {}
+  func flush(_ request: String, reply: @escaping @Sendable () -> Void) { reply() }
+  func started(_ request: String) {}
+  func logBatch(_ request: String, batch: Data, reply: @escaping @Sendable (Bool) -> Void) {
+    reply(false)
+  }
+}
+
 private struct CancelHarness {
   let listener = NSXPCListener.anonymous()
   let delegate: AgentListenerDelegate
@@ -77,13 +87,29 @@ private struct CancelHarness {
     AgentClient(endpoint: listener.endpoint, replyDeadline: deadline)
   }
 
-  /// A bare connection, to send requests and lose it as a client process would.
+  /// A bare connection, to send requests and lose it as a client process would. It exports
+  /// `AgentClientXPC` as every client does: the agent says a request has started over it, and a
+  /// connection that exports nothing is invalidated by that message.
   func connection() throws -> (NSXPCConnection, any AgentXPC) {
     let connection = NSXPCConnection(listenerEndpoint: listener.endpoint)
     connection.remoteObjectInterface = NSXPCInterface(with: AgentXPC.self)
+    connection.exportedInterface = NSXPCInterface(with: AgentClientXPC.self)
+    connection.exportedObject = SilentClient()
     connection.resume()
     let proxy = try #require(connection.remoteObjectProxy as? any AgentXPC)
     return (connection, proxy)
+  }
+
+  /// Ends the test's waits on the agent if `connection` is lost, so a message it never delivers
+  /// fails the test at once rather than at its time limit. Only for a connection the test keeps.
+  func endsOnLoss(of connection: NSXPCConnection) {
+    let handler = handler
+    let end: @Sendable () -> Void = {
+      handler.started.finish()
+      handler.seen.finish()
+    }
+    connection.invalidationHandler = end
+    connection.interruptionHandler = end
   }
 
   func release() {
@@ -173,12 +199,13 @@ struct AgentCancelTests {
     var started = harness.started.makeAsyncIterator()
     var seen = harness.seen.makeAsyncIterator()
     let (connection, proxy) = try harness.connection()
+    harness.endsOnLoss(of: connection)
     defer { connection.invalidate() }
 
     proxy.send(try JSONEncoder().encode(send), id: "send", file: file) { _ in }
-    #expect(await started.next() == send)
+    #expect(await started.next() == send, "the client's connection was lost")
     proxy.cancel("send")
-    #expect(await seen.next() == .cancelled)
+    #expect(await seen.next() == .cancelled, "the client's connection was lost")
   }
 
   /// A recording outlives the app that started it: its cancel does not reach it.
