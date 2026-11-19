@@ -2,8 +2,9 @@ import DeviceKit
 import FerryIPC
 
 /// Which row of the menu is expanded, as in Control Center: one at most. Until the user expands
-/// or collapses a row, the first ready device is expanded, so a device plugged in while the menu
-/// is open shows its actions too.
+/// or collapses a row, the first ready device as the latest status lists it is expanded, so the
+/// status read on opening decides it, and a device plugged in while the menu is open shows its
+/// actions too.
 struct MenuExpansion: Equatable, Sendable {
   /// A row that expands. A remembered device and an address offered for a known device have
   /// rows of their own, apart from that device's.
@@ -30,8 +31,11 @@ struct MenuExpansion: Equatable, Sendable {
 
   /// The rows changed: a row that went away is no longer expanded.
   mutating func update(rows: [Row], firstReady: Row?) {
-    if let expanded, !rows.contains(expanded) { self.expanded = nil }
-    if followsDefault, expanded == nil { expanded = firstReady }
+    if followsDefault {
+      expanded = firstReady
+    } else if let expanded, !rows.contains(expanded) {
+      self.expanded = nil
+    }
   }
 }
 

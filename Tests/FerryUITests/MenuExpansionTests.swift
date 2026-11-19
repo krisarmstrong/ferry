@@ -100,6 +100,19 @@ struct MenuExpansionTests {
     #expect(model.expansion.expanded == .device(Self.first.id))
   }
 
+  /// Nothing refreshes while the menu is closed: on opening, the default follows the status the
+  /// open reads, not the list from the last open.
+  @Test func theDefaultFollowsTheStatusReadOnOpening() async {
+    let client = FakeClient(log: log)
+    client.setStatus([Self.waiting, Self.first])
+    let model = await openMenu(client)
+    #expect(model.expansion.expanded == .device(Self.first.id))
+    let nowReady = device("A", model: "Pixel 8", .ready([]), method: .usbADB)
+    client.setStatus([nowReady, Self.first])
+    await model.watchWhileMenuOpen()
+    #expect(model.expansion.expanded == .device(nowReady.id))
+  }
+
   /// A remembered device and an offer that names a known device are rows of their own, apart
   /// from that device's row.
   @Test func rememberedAndOfferRowsExpandApartFromTheDevice() async throws {
