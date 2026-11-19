@@ -17,6 +17,9 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 public actor ChangeWatch {
   public static let interval = Duration.seconds(30)
   public static let folderLimit = 32
+  /// How long hints are gathered before their folders are listed: a burst (Ferry's own delete
+  /// of many files, which the device reports one by one) costs one listing.
+  static let hintWindow = Duration.seconds(1)
 
   /// A folder a client listed, in its domain.
   private struct Listed: Equatable {
@@ -33,7 +36,9 @@ public actor ChangeWatch {
 
   let domains: DomainController
   let busy: @Sendable (DeviceID) async -> Bool
-  let clock: any Clock<Duration>
+  /// A wait on the clock that ends `delay` after the moment it is made, however late it starts:
+  /// a timer made when a hint arrives still ends on time.
+  let timer: @Sendable (_ delay: Duration) -> @Sendable () async throws -> Void
   let sleeps: AsyncStream<Bool>
   /// Oldest first.
   private var recent: [DeviceID: [Listed]] = [:]
@@ -42,9 +47,11 @@ public actor ChangeWatch {
   private var pending: [DeviceID: Set<FolderHint>] = [:]
   private var draining: Set<DeviceID> = []
   private var asleep = false
-  /// Passes finished, hints taken in, and watches ended, for tests to wait on.
+  /// Passes finished, hints taken in, hint windows closed, and watches ended, for tests to
+  /// wait on.
   private(set) var ticks = 0
-  private(set) var hints = 0
+  private(set) var hintsReceived = 0
+  private(set) var hintWindows = 0
   private(set) var endedWatches = 0
   private var waiters: [Int: (ready: () -> Bool, continuation: CheckedContinuation<Void, Never>)] =
     [:]
@@ -53,7 +60,7 @@ public actor ChangeWatch {
   /// `sleeps` says `true` when the Mac goes to sleep and `false` when it wakes.
   public init(
     domains: DomainController, transfers: TransferBoard,
-    clock: any Clock<Duration> = SuspendingClock(), sleeps: AsyncStream<Bool>
+    clock: some Clock<Duration>, sleeps: AsyncStream<Bool>
   ) {
     self.init(
       domains: domains, busy: { await transfers.isBusy($0) }, clock: clock, sleeps: sleeps)
@@ -61,11 +68,14 @@ public actor ChangeWatch {
 
   init(
     domains: DomainController, busy: @escaping @Sendable (DeviceID) async -> Bool,
-    clock: any Clock<Duration>, sleeps: AsyncStream<Bool>
+    clock: some Clock<Duration>, sleeps: AsyncStream<Bool>
   ) {
     self.domains = domains
     self.busy = busy
-    self.clock = clock
+    timer = { delay in
+      let deadline = clock.now.advanced(by: delay)
+      return { try await clock.sleep(until: deadline, tolerance: nil) }
+    }
     self.sleeps = sleeps
   }
 
@@ -78,7 +88,7 @@ public actor ChangeWatch {
     defer { follower.cancel() }
     while !Task.isCancelled {
       do {
-        try await clock.sleep(for: Self.interval)
+        try await timer(Self.interval)()
       } catch {
         return
       }
@@ -192,11 +202,11 @@ public actor ChangeWatch {
       await domains.hub.release(lease)
     } catch {
       log.info(
-        "no session to watch \(device.serial, privacy: .private): \(String(describing: error), privacy: .public)"
+        "no session to watch \(device.serial, privacy: .private): \(String(describing: error), privacy: .private)"
       )
     }
     if let stream {
-      for await hint in stream { await hinted(device, hint) }
+      for await hint in stream { hinted(device, hint) }
     }
     guard watches[device]?.token == token, !Task.isCancelled else { return }
     watches[device]?.ended = true
@@ -204,22 +214,40 @@ public actor ChangeWatch {
     resumeWaiters()
   }
 
-  private func hinted(_ device: DeviceID, _ hint: FolderHint) async {
+  /// Takes in a hint at once, so the watch is never held up: the first of a burst opens the
+  /// device's window, on a task of its own, and the rest join it.
+  private func hinted(_ device: DeviceID, _ hint: FolderHint) {
     pending[device, default: []].insert(hint)
-    await drain(device)
-    hints += 1
+    if draining.insert(device).inserted {
+      // The window starts now, whenever its task first runs.
+      let window = timer(Self.hintWindow)
+      requestFreeTask { [weak self] in await self?.drain(device, after: window) }
+    }
+    hintsReceived += 1
     resumeWaiters()
   }
 
-  /// Lists the folders hinted so far, unless a transfer runs or the Mac sleeps: they then wait
-  /// for the next pass. Hints that arrive meanwhile are taken by the same drain.
-  private func drain(_ device: DeviceID) async {
-    guard !asleep, draining.insert(device).inserted else { return }
-    defer { draining.remove(device) }
-    while let batch = pending[device], !batch.isEmpty {
-      guard await !busy(device) else { return }
-      pending[device] = nil
-      await relist(Array(batch), of: device)
+  /// Lists the folders hinted once the window closes, unless a transfer runs or the Mac sleeps:
+  /// they then wait for the next pass. Hints that arrived during the listing open a new window.
+  private func drain(_ device: DeviceID, after window: @Sendable () async throws -> Void) async {
+    var window = window
+    while true {
+      do {
+        try await window()
+      } catch {
+        draining.remove(device)
+        return
+      }
+      if !asleep, await !busy(device), let batch = pending.removeValue(forKey: device) {
+        await relist(Array(batch), of: device)
+      }
+      hintWindows += 1
+      resumeWaiters()
+      guard pending[device]?.isEmpty == false, !asleep, await !busy(device) else {
+        draining.remove(device)
+        return
+      }
+      window = timer(Self.hintWindow)
     }
   }
 
@@ -231,7 +259,8 @@ public actor ChangeWatch {
   // MARK: Waiting, for tests
 
   func waitForTicks(_ count: Int) async { await waitUntil { self.ticks >= count } }
-  func waitForHints(_ count: Int) async { await waitUntil { self.hints >= count } }
+  func waitForHints(_ count: Int) async { await waitUntil { self.hintsReceived >= count } }
+  func waitForHintWindows(_ count: Int) async { await waitUntil { self.hintWindows >= count } }
   func waitForEndedWatches(_ count: Int) async { await waitUntil { self.endedWatches >= count } }
   func waitForSleepState(_ asleep: Bool) async { await waitUntil { self.asleep == asleep } }
 

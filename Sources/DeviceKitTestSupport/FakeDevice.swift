@@ -75,6 +75,8 @@ public actor FakeDevice: DeviceSession {
   /// Calls to `forgetCachedItems()`.
   public private(set) var forgetCount = 0
   public private(set) var storagesCallCount = 0
+  /// Calls to `list`, by folder.
+  public internal(set) var listCalls: [RemotePath: Int] = [:]
 
   // MARK: DeviceSession
 

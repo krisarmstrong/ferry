@@ -50,7 +50,7 @@ extension ADBSession {
       stream = try await host.connect(
         route, service: "exec:" + (try ADBShell.command("inotifyd", arguments)))
     } catch {
-      Self.log.info("watching folders: \(String(describing: error), privacy: .public)")
+      Self.log.info("watching folders: \(String(describing: error), privacy: .private)")
       return nil
     }
     guard !disconnected else {
@@ -70,7 +70,7 @@ extension ADBSession {
             }
           }
         } catch {
-          Self.log.info("folder watch ended: \(String(describing: error), privacy: .public)")
+          Self.log.info("folder watch ended: \(String(describing: error), privacy: .private)")
         }
         continuation.finish()
       }

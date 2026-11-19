@@ -36,7 +36,8 @@ extension FakeDevice {
   public func list(_ folder: RemotePath, in storage: StorageID) async throws(TransportError)
     -> [RemoteItem]
   {
-    try await turn { () async throws(TransportError) in
+    listCalls[folder, default: 0] += 1
+    return try await turn { () async throws(TransportError) in
       try await listOnDevice(folder, in: storage)
     }
   }

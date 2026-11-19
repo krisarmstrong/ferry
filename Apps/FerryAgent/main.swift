@@ -75,7 +75,8 @@ let tools = ADBTools(
 // where the device can, and listed again every 30 s, except during transfers or while the Mac
 // sleeps.
 let transfers = TransferBoard()
-let changes = ChangeWatch(domains: domains, transfers: transfers, sleeps: SystemSleep.states())
+let changes = ChangeWatch(
+  domains: domains, transfers: transfers, clock: SuspendingClock(), sleeps: SystemSleep.states())
 Task { await changes.run() }
 
 // The listener holds its delegate weakly; both live for the whole process.
