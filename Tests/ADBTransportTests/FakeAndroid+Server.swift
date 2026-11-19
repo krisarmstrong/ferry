@@ -77,6 +77,8 @@ extension FakeAndroid {
   private static let enoent: UInt32 = 2
 
   private func sync(_ peer: Peer) async throws {
+    state.withLock { $0.openSyncs += 1 }
+    defer { state.withLock { $0.openSyncs -= 1 } }
     while true {
       let (id, length) = try await peer.syncHeader()
       if id == "QUIT" { return }

@@ -174,7 +174,12 @@ public actor ADBSession: DeviceSession {
     do throws(ADBError) {
       return try await body(open)
     } catch {
-      if case .invalidArgument = error {} else { sync = nil }
+      if case .invalidArgument = error {
+      } else {
+        // A request cancelled before its turn leaves the connection open: close it here.
+        sync = nil
+        await open.quit()
+      }
       if kept, error == .connectionClosed { throw .deviceGone(serial) }
       throw error
     }

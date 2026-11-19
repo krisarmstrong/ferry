@@ -14,12 +14,18 @@ final class FakeADBHub: Sendable {
     let state: String
     let model: String?
     let device: FakeAndroid?
+    /// adb's number for this connection to the device, new each time it connects.
+    let transportID: Int?
 
-    init(_ serial: String, _ state: String = "device", model: String? = nil, device: FakeAndroid?) {
+    init(
+      _ serial: String, _ state: String = "device", model: String? = nil, device: FakeAndroid?,
+      transportID: Int? = nil
+    ) {
       self.serial = serial
       self.state = state
       self.model = model
       self.device = device
+      self.transportID = transportID
     }
   }
 
@@ -77,8 +83,10 @@ final class FakeADBHub: Sendable {
     entries.map { entry in
       // adb gives a USB device its USB path; a network one has none.
       let usb = entry.serial.contains(":") ? nil : "usb:1-1"
-      return [entry.serial, entry.state, usb, entry.model.map { "model:\($0)" }].compactMap { $0 }
-        .joined(separator: " ") + "\n"
+      return [
+        entry.serial, entry.state, usb, entry.model.map { "model:\($0)" },
+        entry.transportID.map { "transport_id:\($0)" },
+      ].compactMap { $0 }.joined(separator: " ") + "\n"
     }.joined()
   }
 

@@ -49,6 +49,17 @@ struct ADBDeviceInfoTests {
     #expect(ADBDeviceInfo.battery(fromDumpsys: "status: 3\nlevel: 250\nscale: 100\n")?.level == 100)
   }
 
+  /// The device prints these numbers; none of them can overflow the arithmetic.
+  @Test func extremeNumbersAreBounded() {
+    let max = Int.max
+    #expect(ADBDeviceInfo.battery(fromDumpsys: "status: 3\nlevel: \(max)\n")?.level == 100)
+    #expect(
+      ADBDeviceInfo.battery(fromDumpsys: "status: 3\nlevel: \(max)\nscale: \(max)\n")?.level == 100)
+    #expect(
+      ADBDeviceInfo.battery(fromDumpsys: "status: 3\nlevel: \(max / 2)\nscale: \(max)\n")?.level
+        == 49)
+  }
+
   @Test func noBatteryIsNoBatteryNotAZero() {
     #expect(ADBDeviceInfo.battery(fromDumpsys: "") == nil)
     #expect(ADBDeviceInfo.battery(fromDumpsys: "Can't find service: battery") == nil)

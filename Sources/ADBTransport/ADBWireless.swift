@@ -40,10 +40,15 @@ public struct ADBMDNSService: Sendable, Equatable {
 public struct ADBWireless: Sendable {
   private let host: ADBHost
   private let run: ADBCommandRunner
+  private let answerLimit: Duration
 
-  public init(host: ADBHost, run: @escaping ADBCommandRunner) {
+  public init(
+    host: ADBHost, run: @escaping ADBCommandRunner,
+    answerLimit: Duration = ADBTransport.defaultAnswerLimit
+  ) {
     self.host = host
     self.run = run
+    self.answerLimit = answerLimit
   }
 
   /// The real server and the user's `adb`.
@@ -54,7 +59,7 @@ public struct ADBWireless: Sendable {
   public func connect(_ endpoint: WirelessEndpoint) async throws(ADBError) -> ADBConnectOutcome {
     try await requireServer()
     let result = try await run(ADBCommand.connect(endpoint))
-    let listed = try await host.devices().first { $0.serial == endpoint.argument }
+    let listed = try await devices().first { $0.serial == endpoint.argument }
     switch listed?.state {
     case .device: return .connected(serial: endpoint.argument)
     case .unauthorized: return .awaitingAllow
@@ -86,7 +91,9 @@ public struct ADBWireless: Sendable {
 
   /// `name \t type \t address` per line. An address that is not one is skipped.
   public func mdnsServices() async throws(ADBError) -> [ADBMDNSService] {
-    let reply = try await host.query("host:mdns:services")
+    let reply = try await bounded { [host] () async throws(ADBError) in
+      try await host.query("host:mdns:services")
+    }
     return reply.split(whereSeparator: \.isNewline).compactMap { line in
       let fields = line.split(separator: "\t").map {
         $0.trimmingCharacters(in: .whitespaces)
@@ -100,7 +107,7 @@ public struct ADBWireless: Sendable {
   }
 
   public func devices() async throws(ADBError) -> [ADBDevice] {
-    try await host.devices()
+    try await bounded { [host] () async throws(ADBError) in try await host.devices() }
   }
 
   public nonisolated func trackServer() -> AsyncStream<ADBServerEvent> {
@@ -109,19 +116,25 @@ public struct ADBWireless: Sendable {
 
   /// The device behind an adb serial, from its properties, as a scan names it.
   public func device(at adbSerial: String) async throws(ADBError) -> DeviceInfo? {
-    try await ADBTransport.info(of: adbSerial, on: host)
+    try await bounded { [host] () async throws(ADBError) in
+      try await ADBTransport.info(of: adbSerial, on: host)
+    }
   }
 
   /// The port adbd listens on over TCP, if it does (`service.adb.tcp.port`).
   public func tcpPort(of adbSerial: String) async throws(ADBError) -> UInt16? {
-    let value = try await ADBTransport.property("service.adb.tcp.port", of: adbSerial, on: host)
+    let value = try await bounded { [host] () async throws(ADBError) in
+      try await ADBTransport.property("service.adb.tcp.port", of: adbSerial, on: host)
+    }
     return UInt16(value).flatMap { $0 > 0 ? $0 : nil }
   }
 
   /// The device's IPv4 addresses on Ethernet and Wi-Fi, in the order `ip` lists them.
   public func networkAddresses(of adbSerial: String) async throws(ADBError) -> [String] {
-    let result = try await host.run(
-      serial: adbSerial, command: try ADBShell.command("ip", ["-4", "addr"]))
+    let command = try ADBShell.command("ip", ["-4", "addr"])
+    let result = try await bounded { [host] () async throws(ADBError) in
+      try await host.run(serial: adbSerial, command: command)
+    }
     guard result.status == 0 else { throw .failed("ip exited with status \(result.status)") }
     return Self.networkAddresses(fromIPAddr: String(bytes: result.stdout, encoding: .utf8) ?? "")
   }
@@ -129,18 +142,29 @@ public struct ADBWireless: Sendable {
   /// `adb tcpip <port>`: adbd restarts listening on the network as well. Its USB route drops
   /// while it restarts.
   public func restartInTCPMode(_ adbSerial: String, port: UInt16) async throws(ADBError) {
-    let stream = try await host.connect(adbSerial, service: "tcpip:\(port)")
-    defer { stream.cancel() }
-    var reply = Data()
-    while let chunk = try await stream.readSome(upTo: 4096), reply.count < 4096 {
-      reply.append(chunk)
+    let reply = try await bounded { [host] () async throws(ADBError) in
+      let stream = try await host.connect(adbSerial, service: "tcpip:\(port)")
+      defer { stream.cancel() }
+      var reply = Data()
+      while let chunk = try await stream.readSome(upTo: 4096), reply.count < 4096 {
+        reply.append(chunk)
+      }
+      return reply
     }
     let text = String(bytes: reply, encoding: .utf8) ?? ""
     guard text.contains("restarting in TCP mode") else { throw .failed(Self.detail(text)) }
   }
 
   private func requireServer() async throws(ADBError) {
-    _ = try await host.version()
+    _ = try await bounded { [host] () async throws(ADBError) in try await host.version() }
+  }
+
+  /// Every answer from the server or a device is bounded, as a scan's are: the agent waits on
+  /// these under its Wi-Fi gate, and a wedged adbd must not hold that gate forever.
+  private func bounded<T: Sendable>(
+    _ body: @escaping @Sendable () async throws(ADBError) -> T
+  ) async throws(ADBError) -> T {
+    try await ADBTransport.within(answerLimit, body)
   }
 
   /// The first line of adb's output, at most 200 characters: enough to say what went wrong.

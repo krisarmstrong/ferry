@@ -1,5 +1,6 @@
 import DeviceKit
 import Foundation
+import os
 
 /// What a scan reads from the server and the devices, each answer bounded in time.
 extension ADBTransport {
@@ -73,5 +74,64 @@ extension ADBTransport {
     DeviceInfo(
       id: DeviceID(serial: device.serial), manufacturer: "Unknown",
       model: device.model.map { $0.replacing("_", with: " ") } ?? "Android device")
+  }
+}
+
+extension ADBTransport {
+  /// One connection adb lists. A name is kept per connection, not per serial: adb reconnects a
+  /// network address by itself, and the unit answering there may be another one (DHCP gave it
+  /// the address) without the serial ever leaving the list between two scans.
+  struct Listing: Hashable {
+    let serial: String
+    let transportID: String?
+
+    init(_ device: ADBDevice) {
+      serial = device.serial
+      transportID = device.transportID
+    }
+  }
+
+  /// Reads the devices behind `listings` from their properties, all at once, each bounded by
+  /// `answerLimit`. One whose serial cannot be read in time is left out, uncached, and asked
+  /// again next scan; a cancelled scan throws.
+  static func read(
+    _ listings: Set<Listing>, on host: ADBHost, within limit: Duration
+  ) async throws(TransportError) -> [Listing: DeviceInfo] {
+    let results = await withTaskGroup(of: (Listing, Result<DeviceInfo?, ADBError>).self) { group in
+      for listing in listings {
+        group.addTask {
+          do throws(ADBError) {
+            return (
+              listing,
+              .success(
+                try await Self.within(limit) { () async throws(ADBError) in
+                  try await Self.info(of: listing.serial, on: host)
+                })
+            )
+          } catch {
+            return (listing, .failure(error))
+          }
+        }
+      }
+      var results: [(Listing, Result<DeviceInfo?, ADBError>)] = []
+      for await result in group { results.append(result) }
+      return results
+    }
+    if Task.isCancelled { throw .cancelled }
+    var named: [Listing: DeviceInfo] = [:]
+    for (listing, result) in results {
+      let serial = listing.serial
+      switch result {
+      case .success(let info?):
+        named[listing] = info
+      case .success(nil):
+        Self.log.info("\(serial, privacy: .private) reports no ro.serialno; leaving it out")
+      case .failure(let error):
+        Self.log.info(
+          "reading \(serial, privacy: .private) failed: \(String(describing: error), privacy: .public)"
+        )
+      }
+    }
+    return named
   }
 }

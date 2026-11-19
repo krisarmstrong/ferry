@@ -13,6 +13,12 @@ public actor ADBStream {
     self.connection = connection
   }
 
+  /// A stream dropped without `close()` (a sync connection let go after a cancelled request, a
+  /// log stream whose reader went away) still closes its socket.
+  deinit {
+    connection.cancel()
+  }
+
   /// Connects to the server on loopback. A refused connection is a server that is not running.
   static func open(port: UInt16, timeout: Duration = .seconds(10)) async throws(ADBError)
     -> ADBStream

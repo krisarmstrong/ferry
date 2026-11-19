@@ -44,6 +44,24 @@ struct ADBTransportScanTests {
     await hub.kill()
   }
 
+  /// adb reconnects a network address by itself, and DHCP may have given that address to
+  /// another unit in between. adb numbers each connection anew, so a new number is a new
+  /// device until its properties say otherwise.
+  @Test func aReconnectedAddressIsNamedAgain() async throws {
+    let first = Fixture.android(serial: "0123456789ABCDEF", model: "LinkRunner G2")
+    let second = Fixture.android(serial: "FEDCBA9876543210", model: "LinkRunner G2")
+    let address = "192.0.2.5:5555"
+    let hub = try await Fixture.hub([.init(address, device: first, transportID: 1)])
+    let transport = Fixture.transport(port: hub.port)
+    #expect(try await transport.scan().devices.map(\.id) == [DeviceID(serial: "0123456789ABCDEF")])
+    hub.set([.init(address, device: second, transportID: 2)])
+    #expect(try await transport.scan().devices.map(\.id) == [DeviceID(serial: "FEDCBA9876543210")])
+    // The same connection is not asked again.
+    _ = try await transport.scan()
+    #expect(Fixture.lookups(of: "ro.serialno", on: second) == 1)
+    await hub.kill()
+  }
+
   /// The scan says how each device is reached: USB while the cable is in, else the network.
   @Test func eachDeviceIsReportedWithItsRoute() async throws {
     let android = Fixture.android(serial: Fixture.linkRunnerSerial)

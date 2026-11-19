@@ -19,8 +19,11 @@ enum ADBDeviceInfo {
       return nil
     }
     let scale = values["scale"].flatMap { $0 > 0 ? $0 : nil } ?? 100
-    return AndroidDeviceInfo.Battery(
-      level: min(level * 100 / scale, 100), state: state(ofStatus: status))
+    // The device prints these numbers: bound the level to its scale and multiply at full width,
+    // so no value can overflow. The quotient is then at most 100.
+    let product = min(level, scale).multipliedFullWidth(by: 100)
+    let percent = scale.dividingFullWidth((high: product.high, low: product.low)).quotient
+    return AndroidDeviceInfo.Battery(level: percent, state: state(ofStatus: status))
   }
 
   /// `BatteryManager`'s `BATTERY_STATUS_*` constants.

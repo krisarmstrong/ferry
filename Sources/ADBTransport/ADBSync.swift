@@ -126,10 +126,11 @@ public actor ADBSync {
   /// the request, which then fails. Either way later calls throw `.connectionClosed`.
   public func quit() async {
     let busy = active
+    let wasDead = dead
     dead = true
     if busy { stream.cancel() }
     try? await gate.run { () async throws(ADBError) in
-      if !busy { try? await stream.write(Data("QUIT".utf8) + ADBWire.le32(0)) }
+      if !busy, !wasDead { try? await stream.write(Data("QUIT".utf8) + ADBWire.le32(0)) }
       await stream.close()
     }
   }
@@ -365,10 +366,12 @@ extension ADBSync {
   }
 
   /// nil for a name that is not UTF-8: it could not be addressed again, so it is not listed.
+  /// `String(validating:)` keeps every scalar, a leading byte order mark included, where
+  /// Foundation's UTF-8 decoding drops one and so would name another file.
   private func readName() async throws(ADBError) -> String? {
     let length = Int(ADBWire.u32(try await stream.read(exactly: 4)))
     guard length <= Self.nameLimit else { throw await violation("name of \(length) bytes") }
-    return String(bytes: try await stream.read(exactly: length), encoding: .utf8)
+    return String(validating: try await stream.read(exactly: length), as: UTF8.self)
   }
 
   /// Skips `.` and `..`, counts names that are not UTF-8, and enforces the entry cap.

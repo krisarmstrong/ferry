@@ -30,15 +30,20 @@ public struct ADBDevice: Sendable, Equatable {
   public let isWireless: Bool
   public let model: String?
   public let product: String?
+  /// The server's number for this connection to the device (`transport_id:`). adb gives every
+  /// connection a new one, including its own reconnects of a network address.
+  public let transportID: String?
 
   public init(
-    serial: String, state: State, isWireless: Bool, model: String? = nil, product: String? = nil
+    serial: String, state: State, isWireless: Bool, model: String? = nil, product: String? = nil,
+    transportID: String? = nil
   ) {
     self.serial = serial
     self.state = state
     self.isWireless = isWireless
     self.model = model
     self.product = product
+    self.transportID = transportID
   }
 }
 
@@ -95,7 +100,8 @@ enum ADBWire {
         serial: serial, state: state(String(fields[1])),
         isWireless: properties["usb"] == nil || isWireless(serial),
         model: properties["model"].map(String.init),
-        product: properties["product"].map(String.init))
+        product: properties["product"].map(String.init),
+        transportID: properties["transport_id"].map(String.init))
     }
   }
 

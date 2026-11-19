@@ -25,7 +25,7 @@ import os
 /// starts the server once per outage and `arrivals` ticks when it is back, so devices return
 /// without restarting Ferry.
 public actor ADBTransport: DeviceTransport {
-  private static let log = Logger(
+  static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "ADBTransport")
 
   /// Ticks on every change adb reports, including the server going away and coming back. Ticks
@@ -41,8 +41,8 @@ public actor ADBTransport: DeviceTransport {
   private let answerLimit: Duration
   private let serving: ADBNetworkPolicy
   private let opened: ADBOpenHandler
-  /// Each listed adb serial's device, read from its properties.
-  private var named: [String: DeviceInfo] = [:]
+  /// Each listed connection's device, read from its properties.
+  private var named: [Listing: DeviceInfo] = [:]
   /// The routes of each usable device, as of the most recent scan.
   private var routes: [DeviceID: ADBRoutes] = [:]
   /// Devices with an open (or opening) session, with what `park` needs, recorded at open: the
@@ -54,8 +54,8 @@ public actor ADBTransport: DeviceTransport {
   /// What each device was last seen as, so a device parked after its session ended (or never
   /// opened) is still reported by name and recognised under its adb serials.
   private var lastKnown: [DeviceID: Held] = [:]
-  /// How many scans in a row each listed adb serial has stayed unnamed.
-  private var unnamedTries: [String: Int] = [:]
+  /// How many scans in a row each listed connection has stayed unnamed.
+  private var unnamedTries: [Listing: Int] = [:]
   private let now: @Sendable () -> ContinuousClock.Instant
 
   private struct Held {
@@ -92,7 +92,7 @@ public actor ADBTransport: DeviceTransport {
   /// tens of milliseconds over USB and well under a second over Wi-Fi; three seconds leaves a
   /// wide margin for a slow link. Devices are read at once, so a scan waits about one limit for
   /// the list and one for names, however many devices are wedged.
-  static let defaultAnswerLimit = Duration.seconds(3)
+  public static let defaultAnswerLimit = Duration.seconds(3)
 
   /// When to scan again for a listed device that could not be named. adb sends no event for a
   /// list that has not changed, so a slow but healthy device (a Wi-Fi device waking up) would
@@ -141,12 +141,12 @@ public actor ADBTransport: DeviceTransport {
       }
       status = .available
       let usable = listed.filter { $0.state == .device }
-      let serials = Set(usable.map(\.serial))
+      let listings = Set(usable.map(Listing.init))
       // An address can belong to another device next time: forget what is not listed.
-      named = named.filter { serials.contains($0.key) }
-      let unnamed = usable.map(\.serial).filter { named[$0] == nil }
-      named.merge(try await read(unnamed)) { _, new in new }
-      let stillUnnamed = usable.map(\.serial).filter { named[$0] == nil }
+      named = named.filter { listings.contains($0.key) }
+      let unnamed = listings.filter { named[$0] == nil }
+      named.merge(try await Self.read(unnamed, on: host, within: answerLimit)) { _, new in new }
+      let stillUnnamed = listings.filter { named[$0] == nil }
       unnamedTries = Dictionary(
         uniqueKeysWithValues: stillUnnamed.map { ($0, (unnamedTries[$0] ?? 0) + 1) })
       let retry = unnamedTries.values.max().map { Self.unnamedDelay(afterTries: $0) }
@@ -184,7 +184,7 @@ public actor ADBTransport: DeviceTransport {
   private func assemble(_ usable: [ADBDevice]) -> [DeviceID: Found] {
     var found: [DeviceID: Found] = [:]
     for device in usable {
-      guard let info = named[device.serial],
+      guard let info = named[Listing(device)],
         !device.isWireless || serving(device.serial, info.id)
       else { continue }
       var entry = found[info.id] ?? Found(info: info)
@@ -209,7 +209,7 @@ public actor ADBTransport: DeviceTransport {
   public func open(_ id: DeviceID) async throws(TransportError) -> any DeviceSession {
     if held[id] != nil { throw .deviceBusy }
     guard parked[id] == nil, let routes = routes[id], let serial = routes.preferred,
-      let info = named[serial]
+      let info = named.first(where: { $0.key.serial == serial })?.value
     else { throw .deviceNotFound(id) }
     // Held from here, so a second open while this one waits is busy.
     held[id] = Held(info: info, serials: routes.serials)
@@ -301,47 +301,6 @@ public actor ADBTransport: DeviceTransport {
     lhs.id.serial < rhs.id.serial
   }
 
-  /// Reads the devices behind `serials` from their properties, all at once, each bounded by
-  /// `answerLimit`. One whose serial cannot be read in time is left out, uncached, and asked
-  /// again next scan; a cancelled scan throws.
-  private func read(_ serials: [String]) async throws(TransportError) -> [String: DeviceInfo] {
-    let limit = answerLimit
-    let results = await withTaskGroup(of: (String, Result<DeviceInfo?, ADBError>).self) { group in
-      for serial in serials {
-        group.addTask { [host] in
-          do throws(ADBError) {
-            return (
-              serial,
-              .success(
-                try await Self.within(limit) { () async throws(ADBError) in
-                  try await Self.info(of: serial, on: host)
-                })
-            )
-          } catch {
-            return (serial, .failure(error))
-          }
-        }
-      }
-      var results: [(String, Result<DeviceInfo?, ADBError>)] = []
-      for await result in group { results.append(result) }
-      return results
-    }
-    if Task.isCancelled { throw .cancelled }
-    var named: [String: DeviceInfo] = [:]
-    for (serial, result) in results {
-      switch result {
-      case .success(let info?):
-        named[serial] = info
-      case .success(nil):
-        Self.log.info("\(serial, privacy: .private) reports no ro.serialno; leaving it out")
-      case .failure(let error):
-        Self.log.info(
-          "reading \(serial, privacy: .private) failed: \(String(describing: error), privacy: .public)"
-        )
-      }
-    }
-    return named
-  }
 }
 
 extension ADBTransport {

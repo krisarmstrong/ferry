@@ -84,6 +84,28 @@ struct ADBSessionRawNameTests {
       device.rawNames(in: "/F") == [Self.nfd, Self.nfc].sorted { $0.lexicographicallyPrecedes($1) })
   }
 
+  /// A name that starts with a byte order mark keeps it: Foundation's UTF-8 decoding drops a
+  /// leading `EF BB BF`, which would list `a` and then act on the file named `a`.
+  @Test func aLeadingByteOrderMarkStaysInTheName() async throws {
+    let device = FakeAndroid()
+    device.addRaw("/", name: [0xEF, 0xBB, 0xBF, 0x61], node: .file(Data("bom".utf8), mtime: 1))
+    device.addFile("/a", Data("plain".utf8))
+    let folder = try ADBFixture.downloadFolder()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let path = try RemotePath("/\u{FEFF}a")
+    try await ADBFixture.withSession(device) { session in
+      let listed = try await session.list(.root, in: storage)
+      #expect(Set(listed.map(\.path)) == [path, try RemotePath("/a")])
+      #expect(try await session.item(at: path, in: storage).size == 3)
+      let file = folder.appending(path: "x")
+      try await session.download(
+        path, in: storage, to: file, replacing: false, progress: ADBFixture.noProgress)
+      #expect(try Data(contentsOf: file) == Data("bom".utf8))
+      try await session.delete(path, in: storage)
+    }
+    #expect(device.rawNames(in: "/") == [Array("a".utf8)])
+  }
+
   // MARK: Exact names
 
   /// Case-insensitive storage would find `A.txt` for `a.txt`; Ferry acts only on the exact name.

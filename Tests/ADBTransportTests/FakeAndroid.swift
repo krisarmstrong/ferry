@@ -58,6 +58,8 @@ final class FakeAndroid: Sendable {
     /// What `ip -4 addr` prints.
     var addresses = ""
     var peers: [ADBStream] = []
+    /// `sync:` connections the client has not yet closed.
+    var openSyncs = 0
     var clock: Int64 = 1_700_000_000
     var tools = Tools()
   }
@@ -153,6 +155,7 @@ final class FakeAndroid: Sendable {
   /// The commands that change something: all but `df`, which reading storages runs.
   var changes: [[String]] { commands.filter { $0.first != "df" } }
   var syncRequests: [(id: String, path: String)] { state.withLock { $0.syncRequests } }
+  var openSyncs: Int { state.withLock { $0.openSyncs } }
 
   func failNextShell(_ program: String, status: Int32 = 1, stderr: String) {
     state.withLock {

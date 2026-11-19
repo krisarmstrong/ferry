@@ -167,18 +167,22 @@ struct ADBHostTests {
       devices == [
         ADBDevice(
           serial: "0123456789abcdef", state: .device, isWireless: false,
-          model: "LinkRunner_100G", product: "LinkRunner-100G"),
-        ADBDevice(serial: "R58M12ABCDE", state: .unauthorized, isWireless: false),
+          model: "LinkRunner_100G", product: "LinkRunner-100G", transportID: "1"),
+        ADBDevice(
+          serial: "R58M12ABCDE", state: .unauthorized, isWireless: false, transportID: "2"),
         ADBDevice(
           serial: "192.168.1.20:5555", state: .device, isWireless: true, model: "Pixel_4a",
-          product: "sunfish"),
-        ADBDevice(serial: "emulator-5554", state: .offline, isWireless: true),
+          product: "sunfish", transportID: "3"),
+        ADBDevice(serial: "emulator-5554", state: .offline, isWireless: true, transportID: "4"),
       ])
   }
 
   @Test func unfamiliarStateIsKept() {
     let devices = ADBWire.devices(from: "abc recovery usb:1-1 transport_id:1\n")
-    #expect(devices == [ADBDevice(serial: "abc", state: .other("recovery"), isWireless: false)])
+    #expect(
+      devices == [
+        ADBDevice(serial: "abc", state: .other("recovery"), isWireless: false, transportID: "1")
+      ])
   }
 
   /// adb marks a USB device with `usb:`; anything without it (network, mDNS, an emulator) is not
