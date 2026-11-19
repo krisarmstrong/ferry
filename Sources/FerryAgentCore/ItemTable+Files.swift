@@ -18,7 +18,8 @@ extension ItemTable {
     remove(file(for: domain, in: store))
   }
 
-  /// Deletes every table file in `store`, including ones no table in this process loaded.
+  /// Deletes every table file in `store`, including ones no table in this process loaded, and
+  /// the SD card alias file that builds before 2026-11-18 kept there.
   static func discardAll(in store: URL) {
     let files: [URL]
     do {
@@ -30,7 +31,8 @@ extension ItemTable {
       log.error("listing item tables failed: \(error, privacy: .private)")
       return
     }
-    for file in files where file.pathExtension == "json" {
+    for file in files
+    where file.pathExtension == "json" || file.lastPathComponent == "storage-aliases.plist" {
       remove(file)
     }
   }

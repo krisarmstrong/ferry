@@ -245,6 +245,9 @@ public actor DomainController {
     // so its old session is never kept for the new one.
     switch event {
     case .detached(let id):
+      // A device that comes back, over whatever method, is new: its domains reconnect and list
+      // their folders then, so no method change is noticed against its time before.
+      lastMethods[id] = nil
       await disconnectDomains(of: id)
     case .attached(let device), .changed(let device):
       if case .ready = device.state { break }
@@ -290,10 +293,6 @@ public actor DomainController {
       existing.storage = storage
       existing.spec = spec
       domains[identifier] = existing
-    } else if existing.storage != storage {
-      // Another method serves the storage, under its own name for it (an SD card MTP knows by
-      // description): requests go to that name from now on.
-      domains[identifier]?.storage = storage
     }
     if !existing.connected {
       guard await isServed(storage.device) else { return }
