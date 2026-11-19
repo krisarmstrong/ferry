@@ -142,9 +142,6 @@ public struct StatusReport: Codable, Sendable, Equatable {
   /// Devices with USB debugging on that wait for the user to allow this Mac on them. A device
   /// listed here may still be served another way, over file transfer.
   public let awaitingUSBDebugging: [DeviceID]
-  /// Where the system saved unsent changes of domains the agent retired on its own (a storage's
-  /// domain replaced under its method-neutral key), as `.removed` reports for an eject.
-  public let preservedChanges: [URL]
   /// Devices the agent reconnects over the network, attached or not.
   public let remembered: [RememberedDevice]
   /// New addresses for known devices, waiting for the user to confirm them.
@@ -161,7 +158,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
     awaitingAuthorization: [String] = [], adbStatus: ADBStatus? = nil,
-    awaitingUSBDebugging: [DeviceID] = [], preservedChanges: [URL] = [],
+    awaitingUSBDebugging: [DeviceID] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
     sessions: [DeviceID: UInt64] = [:]
@@ -172,7 +169,6 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.awaitingAuthorization = awaitingAuthorization
     self.adbStatus = adbStatus
     self.awaitingUSBDebugging = awaitingUSBDebugging
-    self.preservedChanges = preservedChanges
     self.remembered = remembered
     self.unconfirmed = unconfirmed
     self.recordings = recordings

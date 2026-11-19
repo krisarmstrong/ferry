@@ -20,14 +20,7 @@ public enum DomainNaming {
     let spec: DomainSpec
     /// The storage as the session serving it names it.
     let storage: StorageID
-    /// Keys the storage's domain was named by before, whose domains it supersedes.
-    let formers: [StorageID]
   }
-
-  /// What MTP calls Android's primary storage, in English: the key ADB's `internal` had when
-  /// MTP keyed storages by description. A device served over ADB from the start has no MTP
-  /// reading to say so, so its old domain is found by this.
-  static let androidInternalDescription = "Internal shared storage|"
 
   /// The domain identifier of a storage: SHA-256, in lowercase hex, of `"<serial>|<key>"`.
   /// Stable across reconnects, and free of the serial, which FileProvider would otherwise write
@@ -53,7 +46,7 @@ public enum DomainNaming {
     domains(for: devices).map(\.spec)
   }
 
-  /// Each wanted domain with the storage that serves it, and the keys it was named by before.
+  /// Each wanted domain with the storage that serves it.
   ///
   /// An SD card is never matched across methods: MTP knows it only by its description, which
   /// every card of a vendor shares, and ADB by its volume ID. It has a location per method, so
@@ -67,14 +60,7 @@ public enum DomainNaming {
         let spec = DomainSpec(
           identifier: identifier(for: storage.id),
           displayName: index == 0 ? base : base + " – SD card")
-        var formers = [storage.formerKey].compactMap { $0 }
-        if storage.id.key == StorageKey.internal {
-          formers.append(androidInternalDescription)
-        }
-        let superseded = Set(formers).subtracting([storage.id.key]).sorted()
-        return Wanted(
-          spec: spec, storage: storage.id,
-          formers: superseded.map { StorageID(device: device.id, key: $0) })
+        return Wanted(spec: spec, storage: storage.id)
       }
     }
   }

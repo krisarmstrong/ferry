@@ -63,11 +63,10 @@ struct AppModelADBTests {
     try Data("x".utf8).write(to: folder.appending(path: "file"))
     defer { try? FileManager.default.removeItem(at: folder) }
     let client = FakeClient(log: log)
-    client.setStatus([], preserved: [folder])
+    client.setStatus([])
     let model = model(client)
     await model.refresh()
-    #expect(model.preservedChanges == [folder])
-    client.setStatus([])
+    model.preservedChanges = [folder]
     await model.recheckADB()
     #expect(model.preservedChanges == [folder])
   }

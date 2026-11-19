@@ -101,16 +101,15 @@ struct StorageKeysTests {
     #expect(keys[0x0003_0001] == "SD card|1234-ABCD|#00030001")
   }
 
-  /// What MTP keyed each storage before keys were method-neutral, so a domain from then can be
-  /// recognised as the storage's own.
-  @Test func formerKeysAreTheDescriptionAndVolume() {
+  /// A storage only MTP serves is keyed by its description and volume.
+  @Test func describedKeysAreTheDescriptionAndVolume() {
     let storages = [
       android(0x0001_0001, "Internal shared storage", "", type: Self.fixedRAM),
       android(0x0002_0001, "SD card", "1234-ABCD", type: Self.removableRAM),
       android(0x0003_0001, nil, nil, type: Self.removableRAM),
     ]
     #expect(
-      formerStorageKeys(for: storages) == [
+      describedStorageKeys(for: storages) == [
         0x0001_0001: "Internal shared storage|", 0x0002_0001: "SD card|1234-ABCD",
         0x0003_0001: "||#00030001",
       ])

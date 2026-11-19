@@ -49,7 +49,7 @@ final class FakeClient: AgentSending {
 
   func setStatus(
     _ devices: [AttachedDevice], provider: ProviderState = .enabled,
-    transfers: [ActiveTransfer] = [], preserved: [URL] = [], adb: ADBStatus? = nil,
+    transfers: [ActiveTransfer] = [], adb: ADBStatus? = nil,
     awaitingUSBDebugging: [DeviceID] = [], awaitingAuthorization: [String] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
@@ -60,7 +60,7 @@ final class FakeClient: AgentSending {
         StatusReport(
           devices: devices, provider: provider, transfers: transfers,
           awaitingAuthorization: awaitingAuthorization, adbStatus: adb,
-          awaitingUSBDebugging: awaitingUSBDebugging, preservedChanges: preserved,
+          awaitingUSBDebugging: awaitingUSBDebugging,
           remembered: remembered, unconfirmed: unconfirmed, recordings: recordings,
           usbWatchFailed: usbWatchFailed, sessions: sessions))
     }

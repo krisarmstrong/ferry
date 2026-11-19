@@ -79,8 +79,6 @@ public actor DomainController {
   var domains: [String: Domain] = [:]
   /// Each ready device's method when last reconciled, to notice a change.
   var lastMethods: [DeviceID: ConnectionMethod] = [:]
-  /// Where unsent changes of domains retired on their own went, for the app to show.
-  var preservedByRetirement: [URL] = []
   /// The item table of each domain used since it was added or adopted.
   private var tables: [String: ItemTable] = [:]
   /// The operation most recently queued; the next one waits for it.
@@ -265,7 +263,6 @@ public actor DomainController {
       await disconnect(identifier)
     }
     for domain in wanted where !ejecting.contains(domain.storage.device) {
-      for former in domain.formers { await retire(former, live: live) }
       await connect(domain.spec, domain.storage)
     }
     for device in moved {

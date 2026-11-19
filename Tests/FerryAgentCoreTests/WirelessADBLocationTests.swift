@@ -29,8 +29,8 @@ struct WirelessADBLocationTests {
   }
 
   /// After a restart the agent knows its domains only by identifier, a hash of serial and
-  /// storage key: a claimed serial is checked by hashing it with the internal storage's keys.
-  @Test(.timeLimit(.minutes(1)), arguments: ["internal", "Internal shared storage|"])
+  /// storage key: a claimed serial is checked by hashing it with the internal storage's key.
+  @Test(.timeLimit(.minutes(1)), arguments: ["internal"])
   func aDomainFromBeforeTheRestartIsFoundByItsInternalStorage(key: String) async throws {
     let id = DeviceID(serial: "0123456789abcdef")
     let existing = DomainNaming.identifier(for: StorageID(device: id, key: key))

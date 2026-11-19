@@ -17,7 +17,7 @@ import Foundation
 /// also carry the raw ID as `|#XXXXXXXX` so they stay distinct. Two storages claiming one volume
 /// are keyed this way too.
 func storageKeys(for storages: [RawStorage]) -> [UInt32: String] {
-  let former = formerStorageKeys(for: storages)
+  let described = describedStorageKeys(for: storages)
   let neutral = storages.map(neutralKey)
   var neutralCounts: [String: Int] = [:]
   for key in neutral.compactMap({ $0 }) {
@@ -30,16 +30,15 @@ func storageKeys(for storages: [RawStorage]) -> [UInt32: String] {
     } else if neutral != nil {
       keys[storage.raw] = withRawID(storage)
     } else {
-      keys[storage.raw] = former[storage.raw]
+      keys[storage.raw] = described[storage.raw]
     }
   }
   return keys
 }
 
-/// The keys MTP gave storages before keys were method-neutral: `"<description>|<volume>"`, with
-/// `|#XXXXXXXX` added where that pair says nothing or is shared. A domain named after one of
-/// these belongs to the storage, superseded by its method-neutral key.
-func formerStorageKeys(for storages: [RawStorage]) -> [UInt32: String] {
+/// Each storage keyed by what it says of itself, `"<description>|<volume>"`, with `|#XXXXXXXX`
+/// added where that pair says nothing or is shared: the key of a storage only MTP serves.
+func describedStorageKeys(for storages: [RawStorage]) -> [UInt32: String] {
   var counts: [String: Int] = [:]
   for storage in storages {
     counts[base(storage), default: 0] += 1

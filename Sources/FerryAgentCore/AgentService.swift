@@ -326,7 +326,6 @@ extension AgentService {
       transfers: await transfers.list(),
       awaitingAuthorization: await hub.awaitingAuthorization(),
       adbStatus: await hub.adbStatus(), awaitingUSBDebugging: await hub.awaitingUSBDebugging(),
-      preservedChanges: await domains.preservedByRetirement,
       remembered: await wireless?.remembered() ?? [],
       unconfirmed: await wireless?.unconfirmed() ?? [],
       recordings: await tools?.recordingsRunning() ?? [],

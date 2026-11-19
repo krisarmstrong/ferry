@@ -88,10 +88,8 @@ public final class WirelessVouching: Sendable {
   /// (see `DomainController.location(of:)`).
   private static func isLocated(_ id: DeviceID, in locations: Locations) -> Bool {
     locations.devices.contains(id)
-      || DomainController.internalKeys.contains {
-        locations.identifiers.contains(
-          DomainNaming.identifier(for: StorageID(device: id, key: $0)))
-      }
+      || locations.identifiers.contains(
+        DomainNaming.identifier(for: StorageID(device: id, key: StorageKey.internal)))
   }
 
   /// The domain controller's current locations. The hub scans again on every change, and the

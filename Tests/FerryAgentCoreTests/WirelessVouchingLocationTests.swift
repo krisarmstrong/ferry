@@ -31,7 +31,7 @@ struct WirelessVouchingLocationTests {
     #expect(!vouching.remember([:]))
   }
 
-  @Test(arguments: ["internal", "Internal shared storage|"])
+  @Test(arguments: ["internal"])
   func aLocationFromBeforeTheRestartIsFoundByHashingTheClaimedSerial(key: String) {
     let located = DeviceID(serial: "0123456789abcdef")
     let vouching = WirelessVouching()

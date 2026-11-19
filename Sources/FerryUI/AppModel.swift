@@ -328,12 +328,6 @@ import os
     recordings = report.recordings
     collectFinishedRecordings()
     agent = .running
-    // The agent replaced a domain on its own and the system kept its unsent changes: shown as an
-    // eject's are.
-    for location in report.preservedChanges.filter(Self.holdsSomething)
-    where !preservedChanges.contains(location) {
-      preservedChanges.append(location)
-    }
     let states = devices.map { "\(DevicePresentation.kind(of: $0.state))/\($0.method.rawValue)" }
       .joined(separator: ",")
     let adb = report.adbStatus.map { String(describing: $0) } ?? "unknown"
