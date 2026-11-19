@@ -53,6 +53,12 @@ public struct USBWatcher: Sendable {
     ticks(state: state, retryInterval: retryInterval) { USBMonitor(continuation: $0) }
   }
 
+  /// The first failure is a fault; the retries every 30 s after it are only information, so a
+  /// Mac whose IOKit keeps refusing does not log a fault twice a minute.
+  static func logType(afterFailures failures: Int) -> OSLogType {
+    failures == 1 ? .fault : .info
+  }
+
   static func ticks(
     state: USBWatchState, retryInterval: Duration,
     monitor make: (AsyncStream<Void>.Continuation) -> some USBArming
@@ -61,12 +67,15 @@ public struct USBWatcher: Sendable {
       of: Void.self, bufferingPolicy: .bufferingNewest(1))
     let monitor = make(continuation)
     let arming = Task {
+      var failures = 0
       while !Task.isCancelled {
         if await monitor.arm() {
           state.set(failed: false)
           return
         }
-        log.fault(
+        failures += 1
+        log.log(
+          level: logType(afterFailures: failures),
           "USB notifications could not be armed; trying again in \(retryInterval, privacy: .public)"
         )
         state.set(failed: true)

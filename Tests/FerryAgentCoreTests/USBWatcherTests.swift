@@ -1,6 +1,7 @@
 import FerryIPC
 import Synchronization
 import Testing
+import os
 
 @testable import FerryAgentCore
 
@@ -94,5 +95,12 @@ struct USBWatcherTests {
       return
     }
     #expect(unwatched.usbWatchFailed)
+  }
+
+  /// A fault once, then information on each retry.
+  @Test func onlyTheFirstFailureIsAFault() {
+    #expect(USBWatcher.logType(afterFailures: 1) == .fault)
+    #expect(USBWatcher.logType(afterFailures: 2) == .info)
+    #expect(USBWatcher.logType(afterFailures: 40) == .info)
   }
 }
