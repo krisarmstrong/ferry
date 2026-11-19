@@ -1021,6 +1021,21 @@
     },
     "Relaunch" : {
 
+    },
+    "Take Screenshot" : {
+
+    },
+    "Stop Recording" : {
+
+    },
+    "Send File…" : {
+
+    },
+    "Connect Again" : {
+
+    },
+    "Remembered · not nearby" : {
+
     }
   },
   "version" : "1.0"

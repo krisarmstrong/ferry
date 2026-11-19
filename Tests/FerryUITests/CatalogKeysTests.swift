@@ -34,4 +34,13 @@ struct CatalogKeysTests {
     #expect(
       DevicePresentation.removeForwardLabel(forward) == "Remove the forward from port 8080")
   }
+
+  /// Every row the menu lists, and the summary of a remembered device, has its catalog entry.
+  @Test func theMenuRowsHaveCatalogKeys() throws {
+    let keys = try catalogKeys()
+    for action in DevicePresentation.MenuAction.allCases {
+      #expect(keys.contains(action.title.key), "\(action)")
+    }
+    #expect(keys.contains("Remembered · not nearby"))
+  }
 }
