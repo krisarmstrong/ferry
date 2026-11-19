@@ -335,8 +335,13 @@ extension MTPDevice {
       throw .deviceDisconnected
     }
     close()
-    guard let opened = DeviceOpener.openNow(raw), opened.info.id == info.id else {
+    guard let opened = DeviceOpener.openNow(raw) else {
       Self.log.error("reopening the device failed")
+      throw .deviceDisconnected
+    }
+    guard opened.info.id == info.id else {
+      Self.log.error("the device answered as another device when opened again")
+      LIBMTP_Release_Device(opened.handle)
       throw .deviceDisconnected
     }
     handle = opened.handle
