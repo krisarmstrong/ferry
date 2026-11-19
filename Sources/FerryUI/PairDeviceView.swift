@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Which network form the window shows.
 public enum WirelessForm: Hashable, Sendable, CaseIterable {
-  /// Connect by Address: the device already listens for adb (NetAlly units on 5555).
+  /// Connect by Address: for devices that accept ADB over the network.
   case address
   /// Pair with Code: Android 11+ Wireless debugging.
   case code

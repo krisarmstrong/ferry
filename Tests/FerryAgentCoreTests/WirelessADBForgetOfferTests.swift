@@ -83,4 +83,26 @@ struct WirelessADBForgetOfferTests {
     await wireless.ignore(WirelessADBTests.endpoint("192.0.2.60"))
     #expect(await wireless.unconfirmed().isEmpty)
   }
+
+  /// A refusal raised before a forget and taken off the stream only after the forget has
+  /// finished is dropped too; the route may be raised, and offered, again on a later scan.
+  @Test func aRefusalReadAfterAWholeForgetIsDropped() async throws {
+    let adb = FakeWirelessADB()
+    let (wireless, vouching) = try await remembered(adb)
+    let claimant = "192.0.2.41:5555"
+    #expect(!vouching.serves(claimant, as: Self.linkRunner.id))
+    await wireless.forget(Self.linkRunner.id)
+    // Raised after the forget, so offered: refusals are handled in order, so once it is on
+    // offer the first has been handled.
+    let marker = "192.0.2.42:5555"
+    #expect(!vouching.serves(marker, as: Self.linkRunner.id))
+    let offering = Task { await wireless.offerRefusedRoutes() }
+    defer { offering.cancel() }
+    #expect(try await eventually { await !wireless.unconfirmed().isEmpty })
+    #expect(await wireless.unconfirmed().map(\.address.argument) == [marker])
+    // Not reported for good: a later scan raises it again, and it is offered.
+    #expect(!vouching.serves(claimant, as: Self.linkRunner.id))
+    #expect(
+      try await eventually { await wireless.unconfirmed().map(\.address.argument).count == 2 })
+  }
 }

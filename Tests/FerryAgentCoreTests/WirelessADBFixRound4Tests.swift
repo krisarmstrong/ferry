@@ -37,6 +37,13 @@ struct WirelessADBFixRound4Tests {
     // `location(of:)` waits for adoption, so the locations are published by then.
     #expect(await harness.controller.location(of: Self.stranger) != nil)
     #expect(!vouching.serves(Self.address, as: Self.stranger))
+    // A route Ferry vouched for is still served meanwhile.
+    let known = DeviceID(serial: "VOUCHED1")
+    let vouched = try #require(WirelessEndpoint(parsing: "192.0.2.50:5555"))
+    vouching.remember([
+      known: WirelessADB.Entry(name: "Known", addresses: [.init(endpoint: vouched, learnt: .user)])
+    ])
+    #expect(vouching.serves(vouched.argument, as: known))
     // The retry removes it.
     #expect(
       try await eventually(timeout: .seconds(20)) {

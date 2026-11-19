@@ -18,6 +18,8 @@ actor TransferBoard {
     subsystem: "io.github.krisarmstrong.ferry", category: "Transfers")
 
   private var active: [(id: UUID, transfer: ActiveTransfer)] = []
+  /// Devices whose adb is restarting (Use over Wi-Fi), with the transfers waiting for it.
+  private var restarting: [DeviceID: [CheckedContinuation<Void, Never>]] = [:]
 
   static let interval = Duration.milliseconds(250)
 
@@ -67,7 +69,24 @@ actor TransferBoard {
     return try result.get()
   }
 
-  private func begin(_ id: UUID, _ transfer: ActiveTransfer) {
+  /// Marks the device's adb as restarting, if no transfer runs on it: one that starts meanwhile
+  /// waits for `endRestart`, so the restart never cuts one off. The check and the mark are one
+  /// step on this actor. False if a transfer runs, or a restart is already under way.
+  func beginRestart(_ device: DeviceID) -> Bool {
+    guard restarting[device] == nil, !active.contains(where: { $0.transfer.device == device })
+    else { return false }
+    restarting[device] = []
+    return true
+  }
+
+  func endRestart(_ device: DeviceID) {
+    for waiter in restarting.removeValue(forKey: device) ?? [] { waiter.resume() }
+  }
+
+  private func begin(_ id: UUID, _ transfer: ActiveTransfer) async {
+    while restarting[transfer.device] != nil {
+      await withCheckedContinuation { restarting[transfer.device, default: []].append($0) }
+    }
     active.append((id, transfer))
   }
 

@@ -25,8 +25,8 @@ extension ADBWireless: WirelessADBControl {}
 
 /// The three ways onto the network, and the devices reached that way, remembered.
 ///
-/// - **Connect by address:** `adb connect` to what the user typed (NetAlly units listen on 5555
-///   once ADB is on).
+/// - **Connect by address:** `adb connect` to what the user typed, for devices that accept ADB
+///   over the network.
 /// - **Pair with code** (Android 11+): `adb pair` with the address and code the device shows,
 ///   then `adb connect` to the `_adb-tls-connect` service adb's mDNS lists for that device.
 /// - **Use over Wi-Fi** (Android 8–10, from USB): the device's own Ethernet and Wi-Fi
@@ -292,6 +292,7 @@ public actor WirelessADB {
     await gate.run {
       forgets += 1
       forgotten[id] = forgets
+      vouching.forgot(id)
       let addresses = Set(entries.removeValue(forKey: id)?.addresses.map(\.endpoint) ?? [])
       let revoked = pending.filter {
         $0.value.expected == id || addresses.contains($0.key)

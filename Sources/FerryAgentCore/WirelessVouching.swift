@@ -41,12 +41,17 @@ public final class WirelessVouching: Sendable {
     var unsettled: [String: Int] = [:]
     /// Routes already reported as refused for a located device.
     var reported: Set<String> = []
+    /// How many times each device has been forgotten; a refusal carries the count it was raised
+    /// under.
+    var forgets: [DeviceID: UInt64] = [:]
   }
 
   /// A route refused because the device it claims has a Finder location.
   struct Refusal: Sendable {
     let adbSerial: String
     let id: DeviceID
+    /// The device's forget count when the refusal was raised.
+    let forgets: UInt64
   }
 
   private let state = OSAllocatedUnfairLock(initialState: State())
@@ -67,19 +72,22 @@ public final class WirelessVouching: Sendable {
   }
 
   public func serves(_ adbSerial: String, as id: DeviceID) -> Bool {
-    let (serve, report) = state.withLock { state -> (Bool, Bool) in
+    let (serve, refusal) = state.withLock { state -> (Bool, Refusal?) in
       guard state.loaded, let locations = state.locations, state.unsettled[adbSerial] == nil
-      else { return (false, false) }
-      if state.vouched[id]?.contains(adbSerial) == true { return (true, false) }
+      else { return (false, nil) }
+      if state.vouched[id]?.contains(adbSerial) == true { return (true, nil) }
       let mdnsName =
         adbSerial.hasPrefix("adb-\(id.serial)-") && adbSerial.hasSuffix("._adb-tls-connect._tcp")
-      if state.paired.contains(id), mdnsName { return (true, false) }
+      if state.paired.contains(id), mdnsName { return (true, nil) }
       if Self.isLocated(id, in: locations) {
-        return (false, state.reported.insert(adbSerial).inserted)
+        guard state.reported.insert(adbSerial).inserted else { return (false, nil) }
+        return (
+          false, Refusal(adbSerial: adbSerial, id: id, forgets: state.forgets[id, default: 0])
+        )
       }
-      return (locations.complete && state.storeIntact && state.vouched[id] == nil, false)
+      return (locations.complete && state.storeIntact && state.vouched[id] == nil, nil)
     }
-    if report { refused.yield(Refusal(adbSerial: adbSerial, id: id)) }
+    if let refusal { refused.yield(refusal) }
     return serve
   }
 
@@ -129,6 +137,21 @@ public final class WirelessVouching: Sendable {
   /// served only once Ferry has vouched for it.
   func storeUnreadable() {
     state.withLock { $0.storeIntact = false }
+  }
+
+  /// The device was forgotten: refusals raised for it before now are stale.
+  func forgot(_ id: DeviceID) {
+    state.withLock { $0.forgets[id, default: 0] += 1 }
+  }
+
+  /// Whether `refusal` predates a forget of its device. A stale one is let go: its route may be
+  /// reported again on a later scan.
+  func isStale(_ refusal: Refusal) -> Bool {
+    state.withLock { state in
+      guard state.forgets[refusal.id, default: 0] != refusal.forgets else { return false }
+      state.reported.remove(refusal.adbSerial)
+      return true
+    }
   }
 
   func unsettle(_ adbSerial: String) {

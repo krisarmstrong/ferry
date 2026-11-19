@@ -4,6 +4,7 @@ import DeviceKitTestSupport
 import FerryIPC
 import Foundation
 import Testing
+import os
 
 @testable import FerryAgentCore
 
@@ -81,5 +82,78 @@ struct AgentUseOverWiFiTests {
     #expect(await adb.calls.isEmpty)
     await fake.recording.end()
     _ = await recording.value
+  }
+
+  @Test func aDeviceWithATransferRunningIsNotRestarted() async throws {
+    let harness = try AgentHarness()
+    defer { harness.finish() }
+    let adb = await usbUnit()
+    let service = service(harness, adb, FakeToolDevice())
+    let (released, release) = AsyncStream.makeStream(of: Void.self)
+    let transfer = Task {
+      try await service.transfers.track(
+        ActiveTransfer(
+          device: Self.linkRunner.id, name: "a.bin", direction: .toDevice, completed: 0,
+          total: 1),
+        report: { _, _ in },
+        { (_) async throws(TransportError) in
+          for await _ in released { break }
+        })
+    }
+    #expect(try await eventually { await !service.transfers.list().isEmpty })
+    #expect(
+      await service.handle(.enableWireless(Self.linkRunner.id), file: nil)
+        == .wireless(.failed(.deviceInUse)))
+    #expect(await adb.calls.isEmpty)
+    release.yield()
+    try await transfer.value
+  }
+}
+
+/// While a device's adb restarts for Use over Wi-Fi, a transfer that starts on it waits for the
+/// restart to finish instead of being cut off by it.
+@Suite(.timeLimit(.minutes(1)))
+struct TransferBoardRestartTests {
+  let device = DeviceID(serial: "0123456789abcdef")
+
+  private func start(_ board: TransferBoard, ran: OSAllocatedUnfairLock<Bool>) -> Task<
+    Void, any Error
+  > {
+    Task {
+      try await board.track(
+        ActiveTransfer(device: device, name: "a", direction: .toMac, completed: 0, total: 1),
+        report: { _, _ in },
+        { (_) async throws(TransportError) in ran.withLock { $0 = true } })
+    }
+  }
+
+  @Test func aTransferWaitsForTheRestart() async throws {
+    let board = TransferBoard()
+    #expect(await board.beginRestart(device))
+    let ran = OSAllocatedUnfairLock(initialState: false)
+    let transfer = start(board, ran: ran)
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(!ran.withLock { $0 })
+    await board.endRestart(device)
+    try await transfer.value
+    #expect(ran.withLock { $0 })
+  }
+
+  @Test func aRestartWaitsForNoTransferOnTheDevice() async throws {
+    let board = TransferBoard()
+    let (released, release) = AsyncStream.makeStream(of: Void.self)
+    let transfer = Task {
+      try await board.track(
+        ActiveTransfer(device: device, name: "a", direction: .toMac, completed: 0, total: 1),
+        report: { _, _ in },
+        { (_) async throws(TransportError) in
+          for await _ in released { break }
+        })
+    }
+    #expect(try await eventually { await !board.list().isEmpty })
+    #expect(await !board.beginRestart(device))
+    release.yield()
+    try await transfer.value
+    #expect(await board.beginRestart(device))
   }
 }
