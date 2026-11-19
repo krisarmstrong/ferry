@@ -411,8 +411,9 @@ Recording** ends it.
 Ferry saves them in `Documents/Ferry/<device>/`, screenshots in `Screenshots` and recordings in
 `Screen Recordings`, named like macOS's own, such as
 `Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png`, and shows them in Finder. macOS asks
-whether Ferry may use Documents the first time it saves one. It never replaces a file. A recording waits on the device until Ferry has
-saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device.
+whether Ferry may use Documents the first time it saves one. It never replaces a file. A
+recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry
+then removes it from the device.
 
 If Ferry can't save a recording, the menu shows **Recording couldn't be saved**:
 **Choose Folder…** saves it where you pick, and **Discard** deletes it from the device.
