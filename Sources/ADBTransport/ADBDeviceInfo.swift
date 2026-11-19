@@ -1,8 +1,8 @@
 import DeviceKit
 import Foundation
 
-/// What Device Info reads, all of it read-only: `getprop`, `dumpsys battery`, `ip -o addr` and
-/// `df`. A part the device cannot answer is left out; the rest is still shown.
+/// What a device's details read, all of it read-only: `getprop`, `dumpsys battery`, `ip -o addr`
+/// and `df`. A part the device cannot answer is left out; the rest is still shown.
 enum ADBDeviceInfo {
   /// The battery's level, as a percent of its scale, and its state, from `dumpsys battery`.
   /// `nil` unless both are there.

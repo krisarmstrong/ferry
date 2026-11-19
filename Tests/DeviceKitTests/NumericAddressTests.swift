@@ -6,7 +6,7 @@ import Testing
 /// `inet_ntop` would write for it, so nothing after a NUL or in another script's digits gets
 /// through with it.
 struct NumericAddressTests {
-  @Test(arguments: ["192.0.2.1", "0.0.0.0", "255.255.255.255"])
+  @Test(arguments: ["192.0.2.1", "192.0.2.0", "192.0.2.255"])
   func anIPv4AddressIsAccepted(text: String) {
     #expect(NumericAddress.isIPv4(text))
   }
@@ -19,7 +19,7 @@ struct NumericAddressTests {
     #expect(!NumericAddress.isIPv4(text))
   }
 
-  @Test(arguments: ["2001:db8::1", "::1", "fe80::1", "::ffff:192.0.2.1"])
+  @Test(arguments: ["2001:db8::1", "::1", "2001:db8:0:1::abcd", "::ffff:192.0.2.1"])
   func anIPv6AddressIsAccepted(text: String) {
     #expect(NumericAddress.isIPv6(text))
   }
