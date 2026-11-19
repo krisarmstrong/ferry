@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Click an address to copy it; the line shows Copied for a moment. Copy All Details copies everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage." : {
+      "extractionState" : "manual"
+    },
     "Android %@" : {
 
     },
@@ -237,7 +240,7 @@
     "Choose **Refresh** in the Ferry menu." : {
       "extractionState" : "manual"
     },
-    "Click Device Info to see the model, Android version, build, serial number, battery, IP addresses and storage the device reports. Ferry only reads them. Copy puts them on the clipboard." : {
+    "An open device lists its network ports with their IPv4 addresses, then its Android version and battery. For a model Ferry knows, every port is listed by the name on the unit, with Not connected for one that has no address. Ferry only reads them, when you open the device and every 10 seconds while the menu stays open." : {
       "extractionState" : "manual"
     },
     "Click Logcat to watch the device's log in a window of its own. Ferry keeps the newest 50,000 lines. Level shows lines at that level and above, and Filter shows the lines that contain your text, whatever its case. Pause freezes the window while lines keep arriving, and Resume catches up. Clear empties it." : {
@@ -359,7 +362,7 @@
     "Device" : {
 
     },
-    "Device info" : {
+    "Device details" : {
       "extractionState" : "manual"
     },
     "Discard" : {
@@ -1050,7 +1053,7 @@
     "Sends files you choose into the device's Download folder, as **Send to** does in Finder." : {
       "extractionState" : "manual"
     },
-    "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its tools: Take Screenshot, Record Screen, Logcat, Device Info, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
+    "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details and tools: Copy All Details, Take Screenshot, Record Screen, Logcat, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
       "extractionState" : "manual"
     },
     "When every selected file is an .apk and Ferry reaches the device over ADB (with USB debugging on, or over Wi-Fi), the menu also has **Install on** the device, which installs the apps as Install App… does." : {

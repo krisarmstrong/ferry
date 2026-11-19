@@ -386,9 +386,9 @@ Settings:
 
 ## Tools over USB debugging
 
-Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its tools:
-**Take Screenshot**, **Record Screen**, **Logcat**, **Device Info**, **Port Forwarding**,
-**Install App…** and **Open Shell**. A device on file transfer shows **More Tools with USB
+Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details
+and tools: **Copy All Details**, **Take Screenshot**, **Record Screen**, **Logcat**, **Port
+Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows **More Tools with USB
 Debugging…** instead.
 
 ### Install an app
@@ -448,11 +448,16 @@ then click **Add**. **Remove** ends a forward.
 If the port on this Mac is already in use, the window shows adb's message. Ferry lists only the
 TCP forwards adb holds for this device.
 
-### Device info
+### Device details
 
-Click **Device Info** to see the model, Android version, build,
-serial number, battery, IP addresses and storage the device reports. Ferry only reads them.
-**Copy** puts them on the clipboard.
+An open device lists its network ports with their IPv4 addresses, then its Android version and
+battery. For a model Ferry knows, every port is listed by the name on the unit, with **Not
+connected** for one that has no address. Ferry only reads them, when you open the device and
+every 10 seconds while the menu stays open.
+
+Click an address to copy it; the line shows **Copied** for a moment. **Copy All Details** copies
+everything the device reports: model, Android version, build, serial number, battery, every
+address on every port including IPv6, and storage.
 
 ## Troubleshooting
 
