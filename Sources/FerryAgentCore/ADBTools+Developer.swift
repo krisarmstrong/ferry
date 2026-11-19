@@ -69,7 +69,6 @@ extension ADBTools {
     }
   }
 
-  /// The program and serial for `adb -s <serial> shell` in Terminal.
   /// The address the tools reach the device at over the network: its route's `host:port`. A USB
   /// serial and an mDNS name have no port, so they are not one.
   public func networkAddress(of id: DeviceID) async -> WirelessEndpoint? {
@@ -77,6 +76,7 @@ extension ADBTools {
     return WirelessEndpoint(parsing: route.serial, defaultPort: nil)
   }
 
+  /// The program and serial for `adb -s <serial> shell` in Terminal.
   public func shellTarget(_ id: DeviceID) async throws(TransportError)
     -> Result<ShellTarget, ToolFailure>
   {
