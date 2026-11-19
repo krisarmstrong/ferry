@@ -156,4 +156,23 @@ struct TransferBoardRestartTests {
     try await transfer.value
     #expect(await board.beginRestart(device))
   }
+
+  /// A transfer waiting for the restart that its client cancels ends at once, as cancelled,
+  /// without waiting for the restart to finish.
+  @Test func aCancelledWaitingTransferEndsAtOnce() async throws {
+    let board = TransferBoard()
+    #expect(await board.beginRestart(device))
+    let cancellation = RequestCancellation()
+    let ran = OSAllocatedUnfairLock(initialState: false)
+    let transfer = Task {
+      try await RequestCancellation.$current.withValue(cancellation) {
+        try await start(board, ran: ran).value
+      }
+    }
+    cancellation.cancel()
+    await #expect(throws: TransportError.cancelled) { try await transfer.value }
+    #expect(!ran.withLock { $0 })
+    #expect(await board.list().isEmpty)
+    await board.endRestart(device)
+  }
 }

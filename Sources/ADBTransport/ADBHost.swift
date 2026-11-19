@@ -37,12 +37,6 @@ public actor ADBHost {
   private let locator: ADBLocator
   private let launcher: @Sendable (URL) async throws(ADBError) -> Void
   private let backoff: Backoff
-  /// adb serials pinned to the server's connection to one unit (`transport_id`), while a
-  /// session is open on it. adb reconnects a network address by itself, and the unit answering
-  /// there afterwards may be another one: a pinned serial is selected by its connection, so
-  /// whatever reaches it (the session's new sync connections, its commands, the tools) fails
-  /// once that connection is gone rather than reaching the other unit.
-  private var pins: [String: String] = [:]
 
   public init(port: UInt16 = 5037, locator: ADBLocator) {
     self.init(
@@ -111,27 +105,11 @@ public actor ADBHost {
     }
   }
 
-  /// Selects `serial`'s connection by its transport id from now on (see `pins`).
-  func pin(_ serial: String, to transportID: String) {
-    pins[serial] = transportID
-  }
-
-  /// Ends a pin, unless another session has pinned the serial since.
-  func unpin(_ serial: String, from transportID: String) {
-    if pins[serial] == transportID { pins[serial] = nil }
-  }
-
-  /// The serial's connection to select by: `transportID` when the caller names one (a scan
-  /// reading the connection it listed), else the pin, if any.
-  private func selected(_ serial: String, _ transportID: String?) -> String? {
-    transportID ?? pins[serial]
-  }
-
   public func features(_ serial: String, transportID: String? = nil) async throws(ADBError)
     -> Set<String>
   {
     let prefix =
-      selected(serial, transportID).map { "host-transport-id:\($0)" } ?? "host-serial:\(serial)"
+      transportID.map { "host-transport-id:\($0)" } ?? "host-serial:\(serial)"
     do {
       let reply = try await query("\(prefix):features")
       return Set(reply.split(separator: ",").map(String.init))
@@ -145,13 +123,14 @@ public actor ADBHost {
     message.contains("not found") || message.hasPrefix("no device with transport id")
   }
 
-  /// Opens a connection routed to `serial` (by its pinned connection, if it has one) and starts
-  /// `service` on it; what follows on the returned stream is the service's own protocol.
+  /// Opens a connection routed to `serial`, or to the unit's connection when `transportID` names
+  /// one, and starts `service` on it; what follows on the returned stream is the service's own
+  /// protocol.
   public func connect(
     _ serial: String, service: String, transportID: String? = nil
   ) async throws(ADBError) -> ADBStream {
     let target =
-      selected(serial, transportID).map { "host:transport-id:\($0)" }
+      transportID.map { "host:transport-id:\($0)" }
       ?? "host:transport:\(serial)"
     let select = try ADBWire.frame(target)
     let start = try ADBWire.frame(service)

@@ -19,7 +19,7 @@ actor TransferBoard {
 
   private var active: [(id: UUID, transfer: ActiveTransfer)] = []
   /// Devices whose adb is restarting (Use over Wi-Fi), with the transfers waiting for it.
-  private var restarting: [DeviceID: [CheckedContinuation<Void, Never>]] = [:]
+  private var restarting: [DeviceID: [UUID: CheckedContinuation<Void, Never>]] = [:]
 
   static let interval = Duration.milliseconds(250)
 
@@ -38,7 +38,7 @@ actor TransferBoard {
     let latestTotal = LatestTotal()
     let (values, continuation) = AsyncStream.makeStream(
       of: (UInt64, UInt64).self, bufferingPolicy: .bufferingNewest(1))
-    await begin(id, start)
+    try await begin(id, start, cancellation: cancellation)
     let pump = Task {
       for await (completed, total) in values {
         await update(id, completed: completed, total: total)
@@ -75,19 +75,34 @@ actor TransferBoard {
   func beginRestart(_ device: DeviceID) -> Bool {
     guard restarting[device] == nil, !active.contains(where: { $0.transfer.device == device })
     else { return false }
-    restarting[device] = []
+    restarting[device] = [:]
     return true
   }
 
   func endRestart(_ device: DeviceID) {
-    for waiter in restarting.removeValue(forKey: device) ?? [] { waiter.resume() }
+    for waiter in (restarting.removeValue(forKey: device) ?? [:]).values { waiter.resume() }
   }
 
-  private func begin(_ id: UUID, _ transfer: ActiveTransfer) async {
-    while restarting[transfer.device] != nil {
-      await withCheckedContinuation { restarting[transfer.device, default: []].append($0) }
+  /// Lists the transfer, once no restart of its device is under way. A client's cancel ends the
+  /// wait at once, before the transfer touches the device.
+  private func begin(
+    _ id: UUID, _ transfer: ActiveTransfer, cancellation: RequestCancellation?
+  ) async throws(TransportError) {
+    let device = transfer.device
+    while restarting[device] != nil {
+      if cancellation?.isCancelled == true { throw .cancelled }
+      let token = UUID()
+      // The wake-up reaches this actor only once the wait below is stored.
+      cancellation?.whenCancelled { [weak self] in
+        Task { await self?.wake(device, token) }
+      }
+      await withCheckedContinuation { restarting[device]?[token] = $0 }
     }
     active.append((id, transfer))
+  }
+
+  private func wake(_ device: DeviceID, _ token: UUID) {
+    restarting[device]?.removeValue(forKey: token)?.resume()
   }
 
   private func update(_ id: UUID, completed: UInt64, total: UInt64) {

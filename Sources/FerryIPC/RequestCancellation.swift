@@ -24,6 +24,8 @@ public final class RequestCancellation: DeviceTurn {
   private let cancelled = Atomic(false)
   private let started = Atomic(false)
   private let onStart: @Sendable () -> Void
+  /// Run once, on cancel, by work that waits rather than polls the flag.
+  private let onCancel = Mutex<[@Sendable () -> Void]>([])
 
   public init(onStart: @escaping @Sendable () -> Void = {}) {
     self.onStart = onStart
@@ -32,7 +34,22 @@ public final class RequestCancellation: DeviceTurn {
   public var isCancelled: Bool { cancelled.load(ordering: .acquiring) }
 
   public func cancel() {
-    cancelled.store(true, ordering: .releasing)
+    let actions = onCancel.withLock { actions in
+      cancelled.store(true, ordering: .releasing)
+      defer { actions = [] }
+      return actions
+    }
+    for action in actions { action() }
+  }
+
+  /// Runs `action` once the request is cancelled: at once if it already is.
+  public func whenCancelled(_ action: @escaping @Sendable () -> Void) {
+    let now = onCancel.withLock { actions -> Bool in
+      if cancelled.load(ordering: .acquiring) { return true }
+      actions.append(action)
+      return false
+    }
+    if now { action() }
   }
 
   /// The request has started; the client hears it once.

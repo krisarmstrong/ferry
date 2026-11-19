@@ -48,10 +48,6 @@ public actor ADBTransport: DeviceTransport {
   /// The server's connection (`transport_id`) behind each listed adb serial, as of the most
   /// recent scan; absent where adb does not report one.
   var transportIDs: [String: String] = [:]
-  /// Pins set on the host (see `ADBHost.pin`), by adb serial, lifted at the first scan after
-  /// their session ends. The tools do not depend on them: an `ADBRoute` carries its own
-  /// connection, however long ago it was taken.
-  var pinned: [String: String] = [:]
   /// Devices with an open (or opening) session, with what `park` needs, recorded at open: the
   /// device may be missing from every scan by the time it is ejected.
   var held: [DeviceID: Held] = [:]
@@ -65,19 +61,15 @@ public actor ADBTransport: DeviceTransport {
   private var unnamedTries: [Listing: Int] = [:]
   private let now: @Sendable () -> ContinuousClock.Instant
 
-  struct Pin {
-    let serial: String
-    let transportID: String
-  }
-
   struct Held {
     let info: DeviceInfo
     let serials: Set<String>
     /// The adb serial the session was opened on, once it is open; `nil` while it opens and for
     /// what was last seen of a device.
     var route: String?
-    /// The adb serial the session is pinned by, and the connection (see `ADBHost.pin`).
-    var pin: Pin?
+    /// The server's connection to the unit when the session opened (`transport_id`), if adb
+    /// reports one: the session and its tool route select the unit by it.
+    var transportID: String?
   }
 
   private struct Parked {
@@ -172,7 +164,7 @@ public actor ADBTransport: DeviceTransport {
       let onUSB = Set(listed.filter { !$0.isWireless }.map { DeviceID(serial: $0.serial) })
       let found = assemble(usable).filter { $0.value.usb != nil || !onUSB.contains($0.key) }
       routes = found.mapValues { ADBRoutes(usb: $0.usb, wireless: $0.wireless.sorted()) }
-      await notePins(listed)
+      noteTransports(listed)
       for (id, device) in found {
         lastKnown[id] = Held(
           info: device.info, serials: Set(device.wireless + [device.usb].compactMap { $0 }))
@@ -229,18 +221,15 @@ public actor ADBTransport: DeviceTransport {
     guard parked[id] == nil, let routes = routes[id], let serial = routes.preferred,
       let info = named.first(where: { $0.key.serial == serial })?.value
     else { throw .deviceNotFound(id) }
-    // Held from here, so a second open while this one waits is busy. Pinned to the connection
-    // the scan saw, so the open itself cannot reach a unit that took the address since.
-    let pin = transportIDs[serial].map { Pin(serial: serial, transportID: $0) }
-    held[id] = Held(info: info, serials: routes.serials, pin: pin)
-    if let pin {
-      pinned[pin.serial] = pin.transportID
-      await host.pin(pin.serial, to: pin.transportID)
-    }
+    // Held from here, so a second open while this one waits is busy. The session, and the
+    // open itself, select the unit by the connection the scan saw, so neither can reach a unit
+    // that took the address since.
+    let transportID = transportIDs[serial]
+    held[id] = Held(info: info, serials: routes.serials, transportID: transportID)
     let features: Set<String>
     do throws(ADBError) {
       features = try await Self.within(answerLimit) { [host] () async throws(ADBError) in
-        try await host.features(serial)
+        try await host.features(serial, transportID: transportID)
       }
     } catch {
       release(id)
@@ -256,14 +245,14 @@ public actor ADBTransport: DeviceTransport {
     }
     // Only now is there a session for the tools to follow.
     held[id]?.route = serial
-    if pin == nil {
+    if transportID == nil {
       Self.log.info(
         "adb lists no connection id for \(serial, privacy: .private); its session and tools use the serial"
       )
     }
-    opened(id, ADBRoute(serial: serial, transportID: pin?.transportID), deviceTools)
+    opened(id, ADBRoute(serial: serial, transportID: transportID), deviceTools)
     return ADBSession(
-      host: host, serial: serial, info: info, features: features,
+      host: host, serial: serial, transportID: transportID, info: info, features: features,
       method: routes.usb == nil ? .wifiADB : .usbADB,
       onRelease: { [weak self] in await self?.release(id) })
   }
@@ -354,7 +343,7 @@ extension ADBTransport {
   /// find: a network route the policy stops serving still carries the session open on it.
   public func sessionRoute(for id: DeviceID) -> ADBRoute? {
     held[id].flatMap { entry in
-      entry.route.map { ADBRoute(serial: $0, transportID: entry.pin?.transportID) }
+      entry.route.map { ADBRoute(serial: $0, transportID: entry.transportID) }
     }
   }
 

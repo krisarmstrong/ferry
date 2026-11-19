@@ -102,4 +102,25 @@ struct ADBTransportPinningTests {
     #expect(unitB.state.withLock { $0.tools.services } == servicesBefore)
     await hub.kill()
   }
+
+  /// Opening B at the address while A's session is still held never moves A's session to B.
+  @Test func openingTheNextUnitNeverMovesAnOpenSession() async throws {
+    let unitA = Fixture.android(serial: "0123456789abcdef")
+    let unitB = Fixture.android(serial: "fedcba9876543210")
+    let hub = try await Fixture.hub([.init(Self.address, device: unitA, transportID: 1)])
+    let transport = Fixture.transport(port: hub.port)
+    _ = try await transport.scan()
+    let sessionA = try await transport.open(Self.first)
+    hub.set([.init(Self.address, device: unitB, transportID: 2)])
+    let second = DeviceID(serial: "fedcba9876543210")
+    #expect(try await transport.scan().devices.map(\.id).contains(second))
+    let sessionB = try await transport.open(second)
+    let servicesBefore = unitB.state.withLock { $0.tools.services }
+    await #expect(throws: TransportError.deviceDisconnected) {
+      _ = try await sessionA.storages()
+    }
+    #expect(unitB.state.withLock { $0.tools.services } == servicesBefore)
+    await sessionB.close()
+    await hub.kill()
+  }
 }

@@ -23,8 +23,11 @@ public actor ADBSession: DeviceSession {
   public nonisolated let method: ConnectionMethod
   let host: ADBHost
   /// The adb server's name for the device (`host:port` over Wi-Fi), which need not be
-  /// `info.id.serial` (`ro.serialno`).
-  let serial: String
+  /// `info.id.serial` (`ro.serialno`), and the server's connection to the unit (`transport_id`)
+  /// when the session opened, if adb reports one. Every connection the session makes selects by
+  /// that connection, so after adb hands the address to another unit it fails as gone.
+  let route: ADBRoute
+  var serial: String { route.serial }
   private let features: Set<String>
   private let gate = OperationGate()
   private var sync: ADBSync?
@@ -37,12 +40,12 @@ public actor ADBSession: DeviceSession {
   private var onRelease: (@Sendable () async -> Void)?
 
   public init(
-    host: ADBHost, serial: String, info: DeviceInfo, features: Set<String>,
-    method: ConnectionMethod, partials: PartialRegistry = PartialRegistry(),
+    host: ADBHost, serial: String, transportID: String? = nil, info: DeviceInfo,
+    features: Set<String>, method: ConnectionMethod, partials: PartialRegistry = PartialRegistry(),
     onRelease: @escaping @Sendable () async -> Void = {}
   ) {
     self.host = host
-    self.serial = serial
+    self.route = ADBRoute(serial: serial, transportID: transportID)
     self.method = method
     self.info = info
     self.features = features
@@ -169,7 +172,7 @@ public actor ADBSession: DeviceSession {
     if let sync {
       open = sync
     } else {
-      open = ADBSync(stream: try await host.connect(serial, service: "sync:"), features: features)
+      open = ADBSync(stream: try await host.connect(route, service: "sync:"), features: features)
       sync = open
     }
     do throws(ADBError) {
@@ -192,7 +195,8 @@ public actor ADBSession: DeviceSession {
   {
     try await adb(step) { () async throws(ADBError) in
       try await host.run(
-        serial: serial, command: ADBShell.command(program, args), features: features)
+        serial: serial, command: ADBShell.command(program, args), features: features,
+        transportID: route.transportID)
     }
   }
 
@@ -283,9 +287,9 @@ extension ADBSession {
   /// cancelled caller cannot find out; that is no sign the device left, so it counts as there.
   func reachable() async -> Bool {
     do throws(ADBError) {
-      let (host, serial) = (host, serial)
+      let (host, route) = (host, route)
       _ = try await ADBTransport.within(ADBTransport.defaultAnswerLimit) {
-        () async throws(ADBError) in try await host.features(serial)
+        () async throws(ADBError) in try await host.features(route)
       }
       return true
     } catch .cancelled {

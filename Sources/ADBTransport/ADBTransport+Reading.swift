@@ -5,7 +5,7 @@ import os
 /// What a scan reads from the server and the devices, each answer bounded in time.
 extension ADBTransport {
   /// The device behind an adb serial, or `nil` if it reports no serial number. A scan names the
-  /// `transportID` it listed, so it reads that unit even while a session's pin selects another.
+  /// `transportID` it listed, so it reads exactly the unit it listed.
   static func info(of serial: String, on host: ADBHost, transportID: String? = nil)
     async throws(ADBError) -> DeviceInfo?
   {
