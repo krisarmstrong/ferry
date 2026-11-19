@@ -14,17 +14,21 @@ enum ADBWake {
 
 extension ADBDeviceTools {
   /// Sends `KEYCODE_WAKEUP`, which turns the display on and leaves one that is on alone, then
-  /// reads `dumpsys power` until it reports the display on, for at most `wakeLimit` in all. A
-  /// unit whose display is off captures a black screen. Returns whether the display came on; a
-  /// device that refuses the key, or does not answer, is not waited for further, and the caller
-  /// captures anyway.
+  /// reads `dumpsys power` until it reports the display on, for at most `wakeLimit`. A unit
+  /// whose display is off captures a black screen. The key has the usual answer limit of its
+  /// own: `input` starts a runtime and can take longer than the display does. Returns whether
+  /// the display came on; a device that refuses the key, or does not answer, is not waited for
+  /// further, and the caller captures anyway.
   public func wakeScreen(route: ADBRoute) async -> Bool {
-    let host = host
+    let (host, keyLimit) = (host, answerLimit)
     do throws(ADBError) {
       let key = try ADBShell.command("input", ["keyevent", "KEYCODE_WAKEUP"])
       let power = try ADBShell.command("dumpsys", ["power"])
+      let pressed = try await ADBTransport.within(keyLimit) { () async throws(ADBError) in
+        try await host.run(route: route, command: key).status == 0
+      }
+      guard pressed else { return false }
       return try await ADBTransport.within(wakeLimit) { () async throws(ADBError) -> Bool in
-        guard try await host.run(route: route, command: key).status == 0 else { return false }
         // Each read is a round trip to the device, which paces the loop.
         while true {
           let result = try await host.run(route: route, command: power)

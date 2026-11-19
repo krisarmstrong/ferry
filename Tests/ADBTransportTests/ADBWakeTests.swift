@@ -36,13 +36,13 @@ struct ADBWakeTests {
   }
 
   private func withTools<T>(
-    _ device: FakeAndroid, wakeLimit: Duration = .seconds(5),
+    _ device: FakeAndroid, answerLimit: Duration = .seconds(5), wakeLimit: Duration = .seconds(5),
     _ body: (ADBDeviceTools) async throws -> T
   ) async throws -> T {
     let server = try await device.serve(serial: Self.serial)
     defer { server.stop() }
     let tools = ADBDeviceTools(
-      host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: .seconds(5),
+      host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: answerLimit,
       captureLimit: ADBDeviceTools.defaultCaptureLimit, captureWait: .seconds(5),
       wakeLimit: wakeLimit)
     return try await body(tools)
@@ -102,13 +102,18 @@ struct ADBWakeTests {
     #expect(device.commands == [["input", "keyevent", "KEYCODE_WAKEUP"]])
   }
 
-  /// A device that hangs on the key is given up at the limit too.
-  @Test func aHangingKeyIsGivenUpAtTheLimit() async throws {
+  /// The key has its own bound, the device's usual answer limit: `input` starts a runtime and can
+  /// take longer than the display does, and the 2 s are for the display alone.
+  @Test func aHangingKeyIsGivenUpAtTheAnswerLimit() async throws {
     let device = FakeAndroid()
     device.state.withLock { $0.hangingPrograms = ["input"] }
-    let woke = try await withTools(device, wakeLimit: .milliseconds(300)) {
+    let start = ContinuousClock.now
+    let limits = (answer: Duration.milliseconds(300), wake: Duration.seconds(10))
+    let woke = try await withTools(device, answerLimit: limits.answer, wakeLimit: limits.wake) {
       await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
     }
     #expect(!woke)
+    #expect(ContinuousClock.now - start < .seconds(5))
+    #expect(!device.commands.contains(["dumpsys", "power"]))
   }
 }
