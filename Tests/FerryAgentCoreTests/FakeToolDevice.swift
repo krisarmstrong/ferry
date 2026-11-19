@@ -78,6 +78,20 @@ actor FakeRecording: ScreenRecordingControl {
   var outcome = ADBScreenRecording.End.exited(status: 0, detail: "")
   var video = FakeRecording.mp4
   var pullFailure: ADBError?
+  /// The adb serial of each pull.
+  private(set) var pulls: [String] = []
+  /// How the pull behaves instead of sending `video`.
+  var pullBehaviour = PullBehaviour.normal
+
+  enum PullBehaviour: Sendable {
+    case normal
+    /// DATA forever, in chunks, until the progress handler stops it.
+    case endless
+    /// Reports a total of this many bytes, then sends `video`.
+    case declares(UInt64)
+    /// Sends nothing until cancelled.
+    case stalls
+  }
   private var ended = false
   private var waiters: [CheckedContinuation<Void, Never>] = []
 
@@ -110,10 +124,35 @@ actor FakeRecording: ScreenRecordingControl {
     end()
   }
 
-  func pull(into file: FileHandle, progress: ProgressHandler) async throws(ADBError) -> UInt64 {
+  func pull(into file: FileHandle, serial: String, progress: ProgressHandler)
+    async throws(ADBError) -> UInt64
+  {
+    pulls.append(serial)
     if let pullFailure { throw pullFailure }
-    try? file.write(contentsOf: video)
-    return UInt64(video.count)
+    switch pullBehaviour {
+    case .normal:
+      try? file.write(contentsOf: video)
+      guard progress(UInt64(video.count), UInt64(video.count)) else { throw .cancelled }
+      return UInt64(video.count)
+    case .endless:
+      var sent: UInt64 = 0
+      while true {
+        let chunk = Data(repeating: 7, count: 512)
+        try? file.write(contentsOf: chunk)
+        sent += UInt64(chunk.count)
+        // The device does not say how big it is.
+        guard progress(sent, 0) else { throw .cancelled }
+        await Task.yield()
+      }
+    case .declares(let total):
+      guard progress(0, total) else { throw .cancelled }
+      try? file.write(contentsOf: video)
+      return UInt64(video.count)
+    case .stalls:
+      // Gives up only when cancelled, as a socket read does.
+      while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
+      throw .cancelled
+    }
   }
 
 }

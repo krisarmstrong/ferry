@@ -90,7 +90,7 @@ struct ADBToolsRecordingTests {
     let (url, handle) = try destination()
     #expect(
       try await tools.saveRecording(device, into: handle.fileDescriptor)
-        == .failed(.alreadyRecording))
+        == .failed(.recordingBusy))
     #expect(try Data(contentsOf: url).isEmpty)
     await fake.recording.end()
     _ = try await recording.value
@@ -213,5 +213,14 @@ struct ADBToolsRecordingTests {
     }
     #expect(await fake.removals.isEmpty)
     #expect(await journal.paths(on: device) == [try await path(fake)])
+    // The video is still on the device and listed, so it is collected once the device is back;
+    // a session opening meanwhile does not sweep it.
+    #expect(await tools.recordingsRunning().map(\.finished) == [true])
+    await journal.sweep(device, serial: serial, using: fake)
+    #expect(await fake.removals.isEmpty)
+    await fake.recording.set { $0.pullFailure = nil }
+    let (url, retry) = try destination()
+    #expect(try await tools.saveRecording(device, into: retry.fileDescriptor) == .done)
+    #expect(try Data(contentsOf: url) == FakeRecording.mp4)
   }
 }

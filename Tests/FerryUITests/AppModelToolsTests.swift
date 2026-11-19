@@ -145,7 +145,8 @@ struct AppModelToolsTests {
   @Test func aRecordingFinishedBeforeARelaunchIsStillCollected() async throws {
     let client = FakeClient(log: log)
     client.setStatus(
-      [], recordings: [ActiveRecording(device: id, started: .now, stopping: false, finished: true)])
+      [device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB)],
+      recordings: [ActiveRecording(device: id, started: .now, stopping: false, finished: true)])
     client.setTool(.done, writes: Data("....ftypmp42".utf8))
     let services = FakeServices(log: log)
     let folder = try TestScratch.folder("recordings")

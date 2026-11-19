@@ -7,20 +7,27 @@ import SwiftUI
 struct ToolActions {
   let install: AppInstall?
   let recording: ActiveRecording?
+  /// The finished recording could not be saved and waits for Choose Folder… or Discard.
+  let unsaved: Bool
   let chooseAPK: () -> Void
   let installDropped: (URL) -> Void
   let screenshot: () -> Void
   let record: () -> Void
   let stopRecording: () -> Void
+  let chooseFolder: () -> Void
+  let discard: () -> Void
 
   init(model: AppModel, device: DeviceID) {
     install = model.installs[device]
     recording = model.recording(on: device)
+    unsaved = model.recordingUnsaved(on: device)
     chooseAPK = { Task { await model.chooseAndInstallAPK(on: device) } }
     installDropped = { url in Task { await model.installAPK(url, on: device) } }
     screenshot = { Task { await model.takeScreenshot(on: device) } }
     record = { Task { await model.startRecording(on: device) } }
     stopRecording = { Task { await model.stopRecording(on: device) } }
+    chooseFolder = { Task { await model.chooseRecordingDestination(on: device) } }
+    discard = { Task { await model.discardRecording(on: device) } }
   }
 
   func install(_ url: URL) { installDropped(url) }
@@ -38,7 +45,25 @@ struct ToolRow: View {
         .lineLimit(1)
         .truncationMode(.middle)
     }
-    if let recording = actions.recording {
+    if let recording = actions.recording, recording.finished, actions.unsaved {
+      VStack(alignment: .leading, spacing: 6) {
+        Label {
+          Text("Recording couldn't be saved", bundle: .module)
+        } icon: {
+          Image(systemName: "exclamationmark.triangle")
+            .foregroundStyle(.yellow)
+        }
+        .font(.callout)
+        HStack {
+          Button(action: actions.chooseFolder) {
+            Text("Choose Folder…", bundle: .module)
+          }
+          Button(action: actions.discard) {
+            Text("Discard", bundle: .module)
+          }
+        }
+      }
+    } else if let recording = actions.recording {
       HStack {
         Label {
           if recording.stopping || recording.finished {

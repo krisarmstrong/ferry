@@ -14,14 +14,6 @@ public struct AppInstall: Sendable, Equatable {
 /// over ADB. The app creates each screenshot and recording file where macOS saves its own, the
 /// agent fills it through its descriptor, and the app names it and shows it in Finder.
 extension AppModel {
-  /// The device's recording: as the agent reports it, or as asked for until the agent answers.
-  public func recording(on device: DeviceID) -> ActiveRecording? {
-    recordings.first { $0.device == device }
-      ?? requestedRecordings[device].map {
-        ActiveRecording(device: device, started: $0, stopping: false)
-      }
-  }
-
   /// Install App…: asks for an `.apk`, then installs it.
   public func chooseAndInstallAPK(on device: DeviceID) async {
     guard let url = await services.chooseAPK() else { return }
@@ -55,79 +47,56 @@ extension AppModel {
   }
 
   public func takeScreenshot(on device: DeviceID) async {
-    await capture(.screenshot, of: device, at: Date(), request: .screenshot(device))
+    await capture(
+      .screenshot, named: captureName(.screenshot, of: device, at: Date()),
+      in: services.captureFolders(), request: .screenshot(device))
     await refresh()
   }
 
-  /// Starts a recording. The agent answers once it has ended (Stop, or its time limit), and the
-  /// video is collected then; meanwhile the status shows it running.
-  public func startRecording(on device: DeviceID) async {
-    guard recording(on: device) == nil else { return }
-    requestedRecordings[device] = Date()
-    let response = await sendTool(.startRecording(device), file: nil)
-    requestedRecordings[device] = nil
-    await refresh()
-    if response == .done { await collectRecording(on: device) }
-  }
-
-  public func stopRecording(on device: DeviceID) async {
-    _ = await sendTool(.stopRecording(device), file: nil)
-    await refresh()
-  }
-
-  /// Collects each finished recording the status lists that is not being collected already.
-  func collectFinishedRecordings() {
-    for recording in recordings
-    where recording.finished && !collectingRecordings.contains(recording.device) {
-      Task { await collectRecording(on: recording.device) }
-    }
-  }
-
-  /// Saves a finished recording and shows it. A recording that finished while no request
-  /// waited for it (the app was relaunched) is collected when the status lists it.
-  func collectRecording(on device: DeviceID) async {
-    guard let recording = recordings.first(where: { $0.device == device && $0.finished }),
-      collectingRecordings.insert(device).inserted
-    else { return }
-    defer { collectingRecordings.remove(device) }
-    await capture(.recording, of: device, at: recording.started, request: .saveRecording(device))
-    await refresh()
-  }
-
-  /// Creates the capture's file where macOS saves screenshots (else the Desktop), has the agent
-  /// fill it through its descriptor, then names it and shows it in Finder. Any failure removes
-  /// the file.
-  private func capture(
-    _ kind: CaptureFiles.Kind, of device: DeviceID, at date: Date, request: AgentRequest
-  ) async {
-    var opened: (url: URL, handle: FileHandle)?
-    for folder in services.captureFolders() where opened == nil {
-      opened = CaptureFiles.temporary(in: folder)
-    }
+  /// Creates the capture's file in the first of `folders` that takes one (where macOS saves
+  /// screenshots, then the Desktop), has the agent fill it through its descriptor, then names it
+  /// `base` (or the next free name) and shows it in Finder. Any failure removes the file. The
+  /// file is created off the main thread: a folder macOS protects can hold the call while it asks
+  /// the user. Returns whether the capture was saved.
+  @discardableResult
+  func capture(
+    _ kind: CaptureFiles.Kind, named base: String, in folders: [URL], request: AgentRequest
+  ) async -> Bool {
+    let opened = await Task.detached { () -> (url: URL, handle: FileHandle)? in
+      for folder in folders {
+        if let file = CaptureFiles.temporary(in: folder) { return file }
+      }
+      return nil
+    }.value
     guard let (temporary, handle) = opened else {
       actionError = DevicePresentation.message(for: .cannotSave)
-      return
+      return false
     }
     let response = await sendTool(request, file: handle)
     try? handle.close()
     guard response == .done else {
       unlink(temporary.path)
-      return
+      return false
     }
-    let model = devices.first { $0.id == device }?.info.model ?? ""
     do throws(TransportError) {
-      let url = try CaptureFiles.place(
-        temporary, base: CaptureFiles.baseName(kind, model: model, at: date),
-        fileExtension: kind.fileExtension)
+      let url = try CaptureFiles.place(temporary, base: base, fileExtension: kind.fileExtension)
       services.reveal([url])
+      return true
     } catch {
       unlink(temporary.path)
       actionError = DevicePresentation.message(for: error)
+      return false
     }
   }
 
+  /// The name macOS would give a capture of `device` made at `date`.
+  func captureName(_ kind: CaptureFiles.Kind, of device: DeviceID, at date: Date) -> String {
+    let model = devices.first { $0.id == device }?.info.model ?? ""
+    return CaptureFiles.baseName(kind, model: model, at: date)
+  }
+
   /// Sends a tool request and shows a failure as the menu's error. Returns the response.
-  private func sendTool(
+  func sendTool(
     _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler? = nil
   ) async -> AgentResponse? {
     preservedChanges = []

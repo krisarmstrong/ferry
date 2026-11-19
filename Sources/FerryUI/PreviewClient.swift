@@ -67,4 +67,5 @@ private final class PreviewServices: SystemServicing {
   func copy(_ text: String) {}
   func chooseAPK() async -> URL? { nil }
   func captureFolders() -> [URL] { [] }
+  func chooseDestination(suggestedName: String) async -> URL? { nil }
 }

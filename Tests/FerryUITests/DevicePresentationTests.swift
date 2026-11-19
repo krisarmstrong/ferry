@@ -147,6 +147,7 @@ struct ToolPresentationTests {
     for failure: ToolFailure in [
       .notOverADB, .notAnAPK, .apkTooLarge, .installFailed("X"), .alreadyRecording, .notRecording,
       .noImage, .recordingFailed(""), .recordingFailed("no encoder"), .cannotSave,
+      .recordingTooLarge, .recordingStalled, .recordingBusy,
     ] {
       #expect(!DevicePresentation.message(for: failure).isEmpty)
     }

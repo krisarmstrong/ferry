@@ -38,6 +38,12 @@ public enum ToolFailure: Codable, Sendable, Equatable {
   case noImage
   /// The recording produced no video; `screenrecord`'s own words, if it gave any.
   case recordingFailed(String)
+  /// The device sent more than any real recording; it was deleted.
+  case recordingTooLarge
+  /// The device stopped sending the recording; it was deleted.
+  case recordingStalled
+  /// The recording is still being finished or saved.
+  case recordingBusy
   /// The app could not create the file where macOS saves screenshots, nor on the Desktop.
   case cannotSave
 }

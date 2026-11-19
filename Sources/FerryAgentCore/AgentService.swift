@@ -101,7 +101,8 @@ public actor AgentService: AgentHandling {
       (.refresh, _), (.eject, _), (.removeAllDomains, _), (.connectAddress, _), (.pair, _),
       (.connectWireless, _), (.enableWireless, _), (.forgetWireless, _), (.confirmWireless, _),
       (.ignoreWireless, _), (.installAPK, _), (.screenshot, _), (.startRecording, _),
-      (.stopRecording, _), (.saveRecording, _):
+      (.stopRecording, _), (.saveRecording, _),
+      (.discardRecording, _):
       throw .io("bad request")
     }
   }

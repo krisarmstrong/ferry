@@ -69,50 +69,123 @@ extension ADBTools {
   }
 
   /// Copies a finished recording into `file`, a writable descriptor from the client, and removes
-  /// it from the device. One with no video is `recordingFailed` with the process's own words.
+  /// it from the device. One with no video is `recordingFailed` with the process's own words; one
+  /// larger than any real recording, or that stops arriving, is removed and reported as such.
+  ///
+  /// The device must still be served over ADB, by the route it uses now: an ejected device is
+  /// left alone, and its video waits until it is served again. A pull the device or the Mac
+  /// broke off keeps the recording, on the device and in the journal, for another try.
   public func saveRecording(_ id: DeviceID, into file: Int32) async throws(TransportError)
     -> Outcome
   {
     try FileTransfer.requireRegular(file)
-    guard let recording = recordings[id], let end = recording.end, let serial = recording.serial,
-      let control = recording.control, !recording.collecting
-    else { return .failed(recordings[id] == nil ? .notRecording : .alreadyRecording) }
+    guard let recording = recordings[id] else { return .failed(.notRecording) }
+    guard recording.end != nil, !recording.collecting else { return .failed(.recordingBusy) }
+    guard let serial = await target(id) else { return .failed(.notOverADB) }
+    guard let current = recordings[id], current.token == recording.token, !current.collecting,
+      let control = current.control, let end = current.end
+    else { return .failed(.recordingBusy) }
     recordings[id]?.collecting = true
     var detail = ""
     if case .exited(_, let text) = end { detail = text }
     let staged = FileTransfer.scratchURL(in: scratch)
     defer { FileTransfer.remove(staged) }
-    let pulled: Result<Bool, TransportError> = await pull(control, into: staged)
-    recordings[id] = nil
+    let pulled: Result<Pulled, TransportError> = await pull(
+      control, serial: serial, into: staged)
+    let failure: ToolFailure
     switch pulled {
     case .failure(let error):
-      // The device went away: its file stays journalled for the next session.
-      await journal.release(recording.path)
+      recordings[id]?.collecting = false
       throw error
-    case .success(let gotFile):
-      await removeFromDevice(recording.path, of: id, serial: serial)
-      guard gotFile, Self.isMP4(at: staged) else { return .failed(.recordingFailed(detail)) }
-      try await FileTransfer.copyOut(staged, to: file)
+    case .success(.tooLarge): failure = .recordingTooLarge
+    case .success(.stalled): failure = .recordingStalled
+    case .success(.noFile): failure = .recordingFailed(detail)
+    case .success(.pulled):
+      guard Self.isMP4(at: staged) else {
+        failure = .recordingFailed(detail)
+        break
+      }
+      do throws(TransportError) {
+        try await FileTransfer.copyOut(staged, to: file)
+      } catch {
+        // The Mac could not take it: the video stays on the device for another try.
+        recordings[id]?.collecting = false
+        throw error
+      }
+      await finish(id, path: recording.path, serial: serial)
       return .done
     }
+    await finish(id, path: recording.path, serial: serial)
+    return .failed(failure)
   }
 
-  /// Pulls the recording into the agent's own `staged` file: whether the device had a file, or
-  /// the device lost.
-  private func pull(_ control: any ScreenRecordingControl, into staged: URL) async
-    -> Result<Bool, TransportError>
+  /// Deletes a finished recording the app will not save, from the device and the journal. A
+  /// device not served now keeps the file until its next session's sweep.
+  public func discardRecording(_ id: DeviceID) async throws(TransportError) -> Outcome {
+    guard let recording = recordings[id] else { return .failed(.notRecording) }
+    guard recording.end != nil, !recording.collecting else { return .failed(.recordingBusy) }
+    recordings[id]?.collecting = true
+    if let serial = await target(id) {
+      await finish(id, path: recording.path, serial: serial)
+    } else {
+      recordings[id] = nil
+      await journal.release(recording.path)
+    }
+    return .done
+  }
+
+  /// Removes a recording the app is done with, from the device and from the list.
+  private func finish(_ id: DeviceID, path: String, serial: String) async {
+    recordings[id] = nil
+    await removeFromDevice(path, of: id, serial: serial)
+  }
+
+  enum Pulled {
+    case pulled
+    /// The device refused the pull: there is no file.
+    case noFile
+    case tooLarge
+    case stalled
+  }
+
+  /// Pulls the recording into the agent's own `staged` file, at most `limits.recordingSize`
+  /// bytes, given up once no data has arrived for `limits.pullStall`. Fails when the device went
+  /// away or the Mac has no room for it.
+  private func pull(_ control: any ScreenRecordingControl, serial: String, into staged: URL)
+    async -> Result<Pulled, TransportError>
   {
     guard FileManager.default.createFile(atPath: staged.path, contents: nil),
       let handle = try? FileHandle(forWritingTo: staged)
     else { return .failure(.io("cannot stage the recording")) }
     defer { try? handle.close() }
-    do throws(ADBError) {
-      _ = try await control.pull(into: handle) { _, _ in true }
-      return .success(true)
-    } catch {
+    let watch = PullWatch(limit: limits.recordingSize, folder: staged.deletingLastPathComponent())
+    let pulling = Task { () -> Result<UInt64, ADBError> in
+      do throws(ADBError) {
+        return .success(
+          try await control.pull(into: handle, serial: serial, progress: watch.progress))
+      } catch {
+        return .failure(error)
+      }
+    }
+    let stall = limits.pullStall
+    let watchdog = Task {
+      while (try? await Task.sleep(for: stall / 4)) != nil {
+        if watch.idle(longerThan: stall) {
+          pulling.cancel()
+          return
+        }
+      }
+    }
+    let result = await pulling.value
+    watchdog.cancel()
+    switch (watch.stop, result) {
+    case (.tooLarge, _): return .success(.tooLarge)
+    case (.noRoom(let error), _): return .failure(error)
+    case (.stalled, _): return .success(.stalled)
+    case (nil, .success): return .success(.pulled)
+    case (nil, .failure(let error)):
       let mapped = Self.transportError(error)
-      // The device refused the pull: there is no file. Otherwise the device went away.
-      if case .failed = error, mapped != .deviceDisconnected { return .success(false) }
+      if case .failed = error, mapped != .deviceDisconnected { return .success(.noFile) }
       return .failure(mapped)
     }
   }

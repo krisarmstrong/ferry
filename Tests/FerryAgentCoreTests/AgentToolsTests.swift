@@ -47,7 +47,9 @@ struct AgentToolsTests {
     ] {
       #expect(await harness.service.handle(request, file: nil) == .failure(.io("bad request")))
     }
-    for request: AgentRequest in [.startRecording(device), .stopRecording(device)] {
+    for request: AgentRequest in [
+      .startRecording(device), .stopRecording(device), .discardRecording(device),
+    ] {
       let file = try harness.readable("x", "x")
       #expect(await harness.service.handle(request, file: file) == .failure(.io("bad request")))
     }

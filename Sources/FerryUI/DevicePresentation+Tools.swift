@@ -6,7 +6,7 @@ import Foundation
 extension DevicePresentation {
   /// Tools are offered on a device Ferry serves over ADB, by USB or the network.
   static func offersTools(_ device: AttachedDevice) -> Bool {
-    if case .ready = device.state { device.method != .usbFileTransfer } else { false }
+    if case .ready = device.state { [.usbADB, .wifiADB].contains(device.method) } else { false }
   }
 
   /// Whether a file the user picked or dropped is offered to the agent as an app. The agent
@@ -62,6 +62,18 @@ extension DevicePresentation {
           "The device didn't send a screenshot. Unlock it and try again.", bundle: .module))
     case .recordingFailed(let detail):
       recordingFailure(detail)
+    case .recordingTooLarge:
+      String(
+        localized: LocalizedStringResource(
+          "The device sent more than a recording can be, so Ferry deleted it.", bundle: .module))
+    case .recordingStalled:
+      String(
+        localized: LocalizedStringResource(
+          "The device stopped sending the recording, so Ferry deleted it.", bundle: .module))
+    case .recordingBusy:
+      String(
+        localized: LocalizedStringResource(
+          "The recording is still being finished. Try again in a moment.", bundle: .module))
     case .cannotSave:
       String(
         localized: LocalizedStringResource(

@@ -110,7 +110,7 @@ public struct ADBDeviceTools: Sendable {
       .split(whereSeparator: \.isNewline)
       .map { $0.trimmingCharacters(in: .whitespaces) }
       .filter { !$0.isEmpty }
-    if lines.contains("Success") { return .installed }
+    // A failure code anywhere wins over a `Success` line, which package text could forge.
     for line in lines {
       guard let open = line.range(of: "Failure ["), let close = line.lastIndex(of: "]"),
         open.upperBound <= close
@@ -119,6 +119,7 @@ public struct ADBDeviceTools: Sendable {
       let code = reason.prefix { $0 != ":" && $0 != " " }
       if Self.isCode(code) { return .failed(String(code)) }
     }
+    if lines.contains("Success") { return .installed }
     return .failed(String((lines.first ?? "pm printed nothing").prefix(200)))
   }
 
@@ -263,8 +264,9 @@ public actor ADBScreenRecording {
     let line = try await ADBTransport.within(limit) { () async throws(ADBError) in
       try await output.firstLine()
     }
+    // Digits only, and never 0 or 1: `kill` would read them as the process group or init.
     guard let line, (1...10).contains(line.count), line.allSatisfy(\.isASCII),
-      line.allSatisfy(\.isNumber)
+      line.allSatisfy(\.isNumber), let number = Int(line), number >= 2
     else {
       throw .failed(
         "screenrecord did not start: \(line.map { String($0.prefix(200)) } ?? output.detail)")
@@ -308,9 +310,10 @@ public actor ADBScreenRecording {
     output.stream.cancel()
   }
 
-  /// Copies the recording into `file` and returns its size.
-  public func pull(into file: FileHandle, progress: ProgressHandler) async throws(ADBError)
-    -> UInt64
+  /// Copies the recording into `file` over `serial` (the device's route now, which may differ
+  /// from the one it was recorded over) and returns its size.
+  public func pull(into file: FileHandle, serial: String, progress: ProgressHandler)
+    async throws(ADBError) -> UInt64
   {
     let features = try await tools.host.features(serial)
     let sync = ADBSync(

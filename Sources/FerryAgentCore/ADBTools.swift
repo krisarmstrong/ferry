@@ -22,7 +22,9 @@ public protocol ScreenRecordingControl: Sendable {
   func finished() async -> ADBScreenRecording.End
   func interrupt() async throws(ADBError)
   func abandon() async
-  func pull(into file: FileHandle, progress: ProgressHandler) async throws(ADBError) -> UInt64
+  /// Copies the recording into `file` over `serial`, the route the device is served by now.
+  func pull(into file: FileHandle, serial: String, progress: ProgressHandler)
+    async throws(ADBError) -> UInt64
 }
 
 extension ADBScreenRecording: ScreenRecordingControl {}
@@ -62,6 +64,10 @@ public actor ADBTools {
     public var grace = Duration.seconds(10)
     /// How long a recording may take to finish after SIGINT before its connection is closed.
     public var stopWait = Duration.seconds(15)
+    /// The largest recording pulled (see `PullWatch`).
+    public var recordingSize: UInt64 = 1 << 30
+    /// How long a pull may go without data before it is given up.
+    public var pullStall = Duration.seconds(30)
 
     public init() {}
   }
@@ -119,7 +125,7 @@ public actor ADBTools {
     for id: DeviceID, devices: [AttachedDevice], routes: ADBRoutes?
   ) -> String? {
     guard let device = devices.first(where: { $0.id == id }), case .ready = device.state,
-      device.method != .usbFileTransfer
+      [.usbADB, .wifiADB].contains(device.method)
     else { return nil }
     return routes?.preferred
   }

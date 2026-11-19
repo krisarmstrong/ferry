@@ -36,6 +36,8 @@ public protocol SystemServicing {
   /// Where screenshots and recordings go, in order of preference: where macOS saves its own,
   /// then the Desktop.
   func captureFolders() -> [URL]
+  /// Asks the user where to save a file, suggesting `suggestedName`; `nil` if they cancel.
+  func chooseDestination(suggestedName: String) async -> URL?
 }
 
 /// `SMAppService`, `NSWorkspace` and `NSApplication`.
@@ -122,6 +124,14 @@ public final class SystemServices: SystemServicing {
     panel.message = String(
       localized: LocalizedStringResource(
         "Choose an Android app (.apk) to install.", bundle: .module))
+    NSApp.activate()
+    return panel.runModal() == .OK ? panel.url : nil
+  }
+
+  public func chooseDestination(suggestedName: String) async -> URL? {
+    let panel = NSSavePanel()
+    panel.nameFieldStringValue = suggestedName
+    panel.allowedContentTypes = [.mpeg4Movie]
     NSApp.activate()
     return panel.runModal() == .OK ? panel.url : nil
   }

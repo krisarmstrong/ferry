@@ -219,6 +219,8 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// Writes a finished recording (an MP4) into the writable file sent with the request and
   /// removes it from the device. Answered with `.done`.
   case saveRecording(DeviceID)
+  /// Deletes a finished recording the app will not save, from the device. Answered with `.done`.
+  case discardRecording(DeviceID)
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
   /// device reach Finder.
   case refresh(DeviceID)

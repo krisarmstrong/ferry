@@ -108,6 +108,9 @@
     "Choose **Refresh** in the Ferry menu." : {
       "extractionState" : "manual"
     },
+    "Choose Folder…" : {
+
+    },
     "Choose Transfer files on the device." : {
 
     },
@@ -204,6 +207,9 @@
       "extractionState" : "manual"
     },
     "Device" : {
+
+    },
+    "Discard" : {
 
     },
     "Done" : {
@@ -328,6 +334,9 @@
     },
     "IP address and port" : {
 
+    },
+    "If Ferry can't save a recording, the menu shows Recording couldn't be saved: Choose Folder… saves it where you pick, and Discard deletes it from the device. Record Screen returns once it is saved or discarded. An ejected device keeps its recording until Ferry serves it again." : {
+      "extractionState" : "manual"
     },
     "If a file changed on the device after the Mac read it, Ferry keeps the device's version and saves yours beside it as **name (conflict from Mac)**." : {
       "extractionState" : "manual"
@@ -514,6 +523,9 @@
     "Recording" : {
 
     },
+    "Recording couldn't be saved" : {
+
+    },
     "Refresh" : {
 
     },
@@ -646,6 +658,12 @@
     "The device reports no storage." : {
 
     },
+    "The device sent more than a recording can be, so Ferry deleted it." : {
+
+    },
+    "The device stopped sending the recording, so Ferry deleted it." : {
+
+    },
     "The device was disconnected." : {
 
     },
@@ -666,6 +684,9 @@
     },
     "The menu" : {
       "extractionState" : "manual"
+    },
+    "The recording is still being finished. Try again in a moment." : {
+
     },
     "The sidebar says \"Ferry\"" : {
       "extractionState" : "manual"

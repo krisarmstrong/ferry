@@ -326,6 +326,11 @@ folder in the Screenshot app), named like macOS's own, such as
 replaces a file. A recording waits on the device until Ferry has saved it, even if you quit
 Ferry meanwhile; Ferry then removes it from the device.
 
+If Ferry can't save a recording, the menu shows **Recording couldn't be saved**:
+**Choose Folder…** saves it where you pick, and **Discard** deletes it from the device.
+**Record Screen** returns once it is saved or discarded. An ejected device keeps its recording
+until Ferry serves it again.
+
 A device whose screen is off sends a black screenshot, and a recording of a screen that does not
 change has a single frame.
 

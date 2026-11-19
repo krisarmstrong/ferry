@@ -59,6 +59,16 @@ final class FakeClient: AgentSending {
     toolBytes.withLock { $0 = bytes }
   }
 
+  private func clearRecordings() {
+    status.withLock { reply in
+      guard case .status(let report) = reply else { return }
+      reply = .status(
+        StatusReport(
+          devices: report.devices, provider: report.provider, transfers: report.transfers,
+          adbStatus: report.adbStatus, remembered: report.remembered))
+    }
+  }
+
   private func tool(_ progress: TransferProgressHandler?, into file: FileHandle? = nil)
     -> AgentResponse
   {
@@ -144,20 +154,19 @@ final class FakeClient: AgentSending {
       return tool(progress, into: file)
     case .saveRecording(let id):
       log.record("saveRecording \(id.serial) file:\(file != nil)")
+      let reply = tool(progress, into: file)
       // Collected: the agent no longer lists it.
-      status.withLock { reply in
-        guard case .status(let report) = reply else { return }
-        reply = .status(
-          StatusReport(
-            devices: report.devices, provider: report.provider, transfers: report.transfers,
-            adbStatus: report.adbStatus, remembered: report.remembered))
-      }
-      return tool(progress, into: file)
+      if reply == .done { clearRecordings() }
+      return reply
     case .startRecording(let id):
       log.record("startRecording \(id.serial)")
       return tool(progress)
     case .stopRecording(let id):
       log.record("stopRecording \(id.serial)")
+      return .done
+    case .discardRecording(let id):
+      log.record("discardRecording \(id.serial)")
+      clearRecordings()
       return .done
     default:
       return .failure(.unsupported("\(request)"))
@@ -255,6 +264,14 @@ final class FakeServices: SystemServicing {
   var folders: [URL] = []
 
   func captureFolders() -> [URL] { folders }
+
+  /// What the save panel returns: `nil` is Cancel.
+  var destination: URL?
+
+  func chooseDestination(suggestedName: String) async -> URL? {
+    log.record("chooseDestination \(suggestedName)")
+    return destination
+  }
 
   func chooseAPK() async -> URL? {
     log.record("chooseAPK")

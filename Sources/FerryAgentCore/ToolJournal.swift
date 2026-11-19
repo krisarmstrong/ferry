@@ -82,15 +82,29 @@ public actor ToolJournal {
     return pending
   }
 
+  /// Written to a new 0600 file beside the journal and renamed over it, so the journal is never
+  /// readable by others, not even for a moment; a folder made for it is 0700.
   private func save() {
     let stored = Dictionary(
       uniqueKeysWithValues: pending.map { ($0.key.serial, $0.value.sorted()) })
+    let folder = store.deletingLastPathComponent()
+    let temporary = folder.appending(path: ".tool-files-\(UUID().uuidString)")
     do {
       try FileManager.default.createDirectory(
-        at: store.deletingLastPathComponent(), withIntermediateDirectories: true)
-      try JSONEncoder().encode(stored).write(to: store, options: .atomic)
-      try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: store.path)
+        at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+      let data = try JSONEncoder().encode(stored)
+      let descriptor = open(
+        temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+      guard descriptor >= 0 else { throw POSIXError(.init(rawValue: errno) ?? .EIO) }
+      let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+      try handle.write(contentsOf: data)
+      try handle.synchronize()
+      try handle.close()
+      guard rename(temporary.path, store.path) == 0 else {
+        throw POSIXError(.init(rawValue: errno) ?? .EIO)
+      }
     } catch {
+      unlink(temporary.path)
       log.error("saving the tool file journal failed: \(error, privacy: .private)")
     }
   }

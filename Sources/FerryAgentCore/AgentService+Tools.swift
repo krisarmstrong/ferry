@@ -31,6 +31,9 @@ extension AgentService {
     case (.saveRecording(let id), let file?):
       guard let tools else { return .toolFailed(.notRecording) }
       outcome = try await tools.saveRecording(id, into: file)
+    case (.discardRecording(let id), _):
+      guard let tools else { return .toolFailed(.notRecording) }
+      outcome = try await tools.discardRecording(id)
     default:
       return nil
     }

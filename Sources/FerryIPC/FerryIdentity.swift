@@ -75,7 +75,7 @@ public enum ClientRole: Sendable, CaseIterable {
     switch request {
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
       .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
-      .installAPK, .screenshot, .startRecording, .stopRecording, .saveRecording:
+      .installAPK, .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording:
       self == .app
     case .item, .list, .fetch, .create, .rename, .move, .replaceContents, .delete, .changes,
       .workingSet:

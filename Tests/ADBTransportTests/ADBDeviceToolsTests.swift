@@ -140,6 +140,12 @@ struct ADBDeviceToolsTests {
       .failed("Error: java.lang.SecurityException: denied")
     ),
     ("", "", .failed("pm printed nothing")),
+    // A failure code wins over a Success line, which package text could forge.
+    (
+      "Success\nFailure [INSTALL_FAILED_VERSION_DOWNGRADE]\n", "",
+      .failed("INSTALL_FAILED_VERSION_DOWNGRADE")
+    ),
+    ("Success\n", "Failure [INSTALL_FAILED_TEST_ONLY]", .failed("INSTALL_FAILED_TEST_ONLY")),
     // "Success" inside a longer line is not success.
     ("Successfully nothing", "", .failed("Successfully nothing")),
   ])
@@ -215,7 +221,8 @@ struct ADBDeviceToolsTests {
       try await recording.interrupt()
       #expect(await recording.finished() == .exited(status: 0, detail: ""))
       let size = try await recording.pull(
-        into: try FileHandle(forWritingTo: pulled), progress: ADBFixture.noProgress)
+        into: try FileHandle(forWritingTo: pulled), serial: Self.serial,
+        progress: ADBFixture.noProgress)
       #expect(size == UInt64(device.state.withLock { $0.tools.recordingBytes.count }))
       #expect(await recording.discard())
       #expect(device.commands.dropFirst() == [["kill", "-2", "4242"], ["rm", "-f", "--", path]])
@@ -238,7 +245,7 @@ struct ADBDeviceToolsTests {
     }
   }
 
-  @Test(arguments: ["sh: screenrecord: not found\n", "12a\n", "\n"])
+  @Test(arguments: ["sh: screenrecord: not found\n", "12a\n", "\n", "0\n", "1\n"])
   func aRecordingWithoutAPidIsRefused(line: String) async throws {
     let device = FakeAndroid()
     device.setTools { $0.pidLine = line }
