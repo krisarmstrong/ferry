@@ -79,8 +79,8 @@ extension AgentService {
         // As FileProvider holds it: at the size a download delivered (see `delete`).
         let entry = await route.items.observed(current)
         if entry.item.kind == .file, !ContentVersion(entry.item).matches(base) {
-          return try await ConflictCopy.keepDevice(
-            entry, onConflict, mac: scratch, on: route, transfers: transfers, report: progress)
+          return try await keepDevice(
+            entry, onConflict, mac: scratch, on: route, report: progress)
         }
         checked = current
       }
@@ -97,10 +97,34 @@ extension AgentService {
         // The device replaced the file between the check and the write.
         let entry = await route.items.observed(
           try await route.session.item(at: path, in: route.storage))
-        return try await ConflictCopy.keepDevice(
-          entry, onConflict, mac: scratch, on: route, transfers: transfers, report: progress)
+        return try await keepDevice(
+          entry, onConflict, mac: scratch, on: route, report: progress)
       }
       return .entry(await route.items.changed(item, id: id))
+    }
+  }
+}
+
+extension AgentService {
+  /// The device's file `entry` is newer than the save: it stays. With `.keepBoth` the Mac's
+  /// contents in `mac` go up beside it as a conflict copy, listed in `transfers` and stopped by
+  /// the request's cancel like any upload; with `.fail` nothing is written.
+  func keepDevice(
+    _ entry: ProviderEntry, _ onConflict: ConflictPolicy, mac: URL,
+    on route: DomainController.Route, report: @escaping TransferProgressHandler
+  ) async throws(TransportError) -> AgentResponse {
+    switch onConflict {
+    case .fail:
+      throw .changedOnDevice(entry.item.path)
+    case .keepBoth:
+      let path = entry.item.path
+      let copy = try await transfers.track(
+        Self.transfer(path, .toDevice, on: route), report: report
+      ) { handler throws(TransportError) in
+        try await ConflictCopy.upload(mac, beside: path, route, progress: handler)
+      }
+      _ = await route.items.created(copy)
+      return .keptOnDevice(entry)
     }
   }
 }
