@@ -28,6 +28,49 @@ private final class ScriptedAgent: AgentSending {
   }
 }
 
+/// Holds every request until `release()`, and says when the first one reaches it.
+private final class HeldAgent: AgentSending {
+  private let calls = Atomic(0)
+  private let arrived: AsyncStream<Void>
+  private let arrivals: AsyncStream<Void>.Continuation
+  /// Whether `release()` was called, and the requests it has not let go yet.
+  private let gate = Mutex((released: false, held: [CheckedContinuation<Void, Never>]()))
+
+  init() {
+    (arrived, arrivals) = AsyncStream.makeStream()
+  }
+
+  var count: Int { calls.load(ordering: .relaxed) }
+
+  /// Returns once a request has reached the agent.
+  func arrival() async {
+    for await _ in arrived { return }
+  }
+
+  func release() {
+    let waiting = gate.withLock { gate in
+      defer { gate = (true, []) }
+      return gate.held
+    }
+    for continuation in waiting { continuation.resume() }
+  }
+
+  func send(_ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?)
+    async throws(TransportError) -> AgentResponse
+  {
+    calls.add(1, ordering: .relaxed)
+    arrivals.yield()
+    await withCheckedContinuation { continuation in
+      let released = gate.withLock { gate in
+        if !gate.released { gate.held.append(continuation) }
+        return gate.released
+      }
+      if released { continuation.resume() }
+    }
+    return .devices([])
+  }
+}
+
 private struct UnreachableAgent: AgentSending {
   func send(_ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?)
     async throws(TransportError) -> AgentResponse
@@ -72,13 +115,16 @@ struct DeviceListTests {
     #expect(list.current == [])
   }
 
-  /// An agent that never answers holds one request, not one per right-click.
-  @Test func menusWhileARequestIsPendingAskNothingMore() {
-    let agent = ScriptedAgent([([], .seconds(10))])
+  /// An agent that never answers holds one request, not one per right-click. The request runs
+  /// in a task of its own, so the count is read once it has reached the agent.
+  @Test func menusWhileARequestIsPendingAskNothingMore() async {
+    let agent = HeldAgent()
     let list = DeviceList(agent: agent)
     for _ in 0..<5 {
-      #expect(list.fresh(waitingUpTo: .milliseconds(20)) == [])
+      #expect(list.fresh(waitingUpTo: .zero) == [])
     }
+    await agent.arrival()
     #expect(agent.count == 1)
+    agent.release()
   }
 }
