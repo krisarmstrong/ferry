@@ -388,8 +388,8 @@ Settings:
 
 Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details
 and tools: **Copy All Details**, **Take Screenshot**, **Record Screen**, **Logcat**, **Port
-Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows **More Tools with USB
-Debugging…** instead.
+Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows **More Tools
+with USB Debugging…** instead.
 
 ### Install an app
 
