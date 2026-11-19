@@ -114,7 +114,8 @@ enum CaptureFiles {
 
   /// Deletes the hidden capture files older than `age` in `folders`: ones an app that quit or
   /// crashed mid-save left behind (a recording can be hundreds of MB). A capture under way is
-  /// younger than any save takes.
+  /// younger than any save takes. Run only on a folder Ferry is about to save into: the
+  /// Desktop is protected, and listing it otherwise could ask the user for access.
   static func sweep(_ folders: [URL], olderThan age: TimeInterval = 3600, now: Date = Date()) {
     let manager = FileManager.default
     for folder in Set(folders) {

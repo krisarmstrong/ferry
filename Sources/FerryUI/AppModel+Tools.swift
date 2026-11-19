@@ -87,7 +87,10 @@ extension AppModel {
   ) async -> CaptureResult {
     let opened = await Task.detached { () -> (url: URL, handle: FileHandle)? in
       for folder in folders {
-        if let file = CaptureFiles.temporary(in: folder) { return file }
+        guard let file = CaptureFiles.temporary(in: folder) else { continue }
+        // Ferry has access to this folder now: clear what a quit or crash mid-save left here.
+        CaptureFiles.sweep([folder])
+        return file
       }
       return nil
     }.value

@@ -357,7 +357,10 @@ final class FakeServices: SystemServicing {
   /// Where captures go.
   var folders: [URL] = []
 
-  func captureFolders() -> [URL] { folders }
+  func captureFolders() -> [URL] {
+    log.record("captureFolders")
+    return folders
+  }
 
   /// What the folder panel returns: `nil` is Cancel.
   var chosenFolder: URL?
@@ -388,13 +391,4 @@ final class FakeServices: SystemServicing {
     terminalScripts.append(script)
     return terminalOpens
   }
-}
-
-func device(
-  _ serial: String, model: String, _ state: DeviceState,
-  method: ConnectionMethod = .usbFileTransfer
-) -> AttachedDevice {
-  AttachedDevice(
-    info: DeviceInfo(id: DeviceID(serial: serial), manufacturer: "NetAlly", model: model),
-    state: state, method: method)
 }

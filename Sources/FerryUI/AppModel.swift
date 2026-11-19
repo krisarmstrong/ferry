@@ -222,9 +222,6 @@ import os
   /// Registers the agent, reads its status, then whether Ferry opens at login. The system calls
   /// run off the main actor (see `SystemServices`), so the app opens without waiting on them.
   public func launch() async {
-    // Hidden capture files a crash or a quit mid-save left behind.
-    let folders = services.captureFolders()
-    await Task.detached { CaptureFiles.sweep(folders) }.value
     await services.registerAgent()
     await refresh()
     opensAtLogin = await services.opensAtLogin()
