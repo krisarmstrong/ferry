@@ -113,6 +113,52 @@ struct MenuExpansionTests {
     #expect(model.expansion.expanded == .device(nowReady.id))
   }
 
+  /// Opening the menu expands nothing until its first status arrives, so the default never
+  /// comes from the list the menu saw when it last closed.
+  @Test func nothingIsExpandedBeforeTheFirstStatus() async {
+    let client = FakeClient(log: log)
+    client.setStatus([Self.first])
+    let model = await openMenu(client)
+    #expect(model.expansion.expanded == .device(Self.first.id))
+    model.resetExpansion()
+    #expect(model.expansion.expanded == nil)
+  }
+
+  /// Ejecting the open device keeps its row open, so Mount is where the user is looking.
+  @Test func ejectingTheOpenDeviceKeepsItOpen() async {
+    let client = FakeClient(log: log)
+    client.setStatus([Self.first, Self.second])
+    let model = await openMenu(client)
+    #expect(model.expansion.expanded == .device(Self.first.id))
+    let ejected = device("B", model: "Galaxy S24", .ejected, method: .usbADB)
+    client.setStatus([ejected, Self.second])
+    await model.refresh()
+    #expect(model.expansion.expanded == .device(Self.first.id))
+  }
+
+  /// A device listed earlier that becomes ready does not take the expansion from the open row.
+  @Test func aDeviceListedEarlierBecomingReadyDoesNotMoveIt() async {
+    let client = FakeClient(log: log)
+    client.setStatus([Self.waiting, Self.first])
+    let model = await openMenu(client)
+    #expect(model.expansion.expanded == .device(Self.first.id))
+    let nowReady = device("A", model: "Pixel 8", .ready([]), method: .usbADB)
+    client.setStatus([nowReady, Self.first])
+    await model.refresh()
+    #expect(model.expansion.expanded == .device(Self.first.id))
+  }
+
+  /// The open device going away collapses its row, and no other row opens in its place.
+  @Test func theOpenDeviceGoingAwayCollapsesAndNothingElseOpens() async {
+    let client = FakeClient(log: log)
+    client.setStatus([Self.first, Self.second])
+    let model = await openMenu(client)
+    #expect(model.expansion.expanded == .device(Self.first.id))
+    client.setStatus([Self.second])
+    await model.refresh()
+    #expect(model.expansion.expanded == nil)
+  }
+
   /// A remembered device and an offer that names a known device are rows of their own, apart
   /// from that device's row.
   @Test func rememberedAndOfferRowsExpandApartFromTheDevice() async throws {

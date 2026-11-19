@@ -1,10 +1,13 @@
 import DeviceKit
 import FerryIPC
 
-/// Which row of the menu is expanded, as in Control Center: one at most. Until the user expands
-/// or collapses a row, the first ready device as the latest status lists it is expanded, so the
-/// status read on opening decides it, and a device plugged in while the menu is open shows its
-/// actions too.
+/// Which row of the menu is expanded, as in Control Center: one at most.
+///
+/// Opening the menu expands nothing until its first status arrives; that status, or the first
+/// later one that lists a ready device, expands the first ready device. From then on the open
+/// row stays open while it exists, whatever happens to the device (an Eject must leave Mount in
+/// view) and whichever devices become ready, until the user picks another row or closes it. A
+/// row that goes away collapses, and nothing opens in its place.
 struct MenuExpansion: Equatable, Sendable {
   /// A row that expands. A remembered device and an address offered for a known device have
   /// rows of their own, apart from that device's.
@@ -15,24 +18,26 @@ struct MenuExpansion: Equatable, Sendable {
   }
 
   private(set) var expanded: Row?
-  private var followsDefault = true
+  /// Whether the first ready device is still to be expanded: until one is, or the user acts.
+  private var awaitingDefault = true
 
   mutating func toggle(_ row: Row) {
     expanded = expanded == row ? nil : row
-    followsDefault = false
+    awaitingDefault = false
   }
 
-  /// The menu opened: back to the first ready device.
-  mutating func reset(rows: [Row], firstReady: Row?) {
+  /// The menu opened: nothing is expanded until a status arrives.
+  mutating func reset() {
     expanded = nil
-    followsDefault = true
-    update(rows: rows, firstReady: firstReady)
+    awaitingDefault = true
   }
 
-  /// The rows changed: a row that went away is no longer expanded.
+  /// A status arrived with these rows.
   mutating func update(rows: [Row], firstReady: Row?) {
-    if followsDefault {
+    if awaitingDefault {
+      guard let firstReady else { return }
       expanded = firstReady
+      awaitingDefault = false
     } else if let expanded, !rows.contains(expanded) {
       self.expanded = nil
     }
@@ -59,7 +64,7 @@ extension AppModel {
   }
 
   func resetExpansion() {
-    expansion.reset(rows: expandingRows, firstReady: firstReadyRow)
+    expansion.reset()
   }
 
   func updateExpansion() {
