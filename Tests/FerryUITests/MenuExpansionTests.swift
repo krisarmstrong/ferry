@@ -42,6 +42,10 @@ struct MenuExpansionTests {
     client.setStatus([Self.waiting], remembered: [Self.remembered])
     let model = await openMenu(client)
     #expect(model.expansion.expanded == nil)
+    // The rows were there to expand: a ready device now is.
+    client.setStatus([Self.waiting, Self.first], remembered: [Self.remembered])
+    await model.refresh()
+    #expect(model.expansion.expanded == .device(Self.first.id))
   }
 
   @Test func expandingARowCollapsesTheOther() async {
@@ -57,6 +61,7 @@ struct MenuExpansionTests {
     let client = FakeClient(log: log)
     client.setStatus([Self.first])
     let model = await openMenu(client)
+    #expect(model.expansion.expanded == .device(Self.first.id))
     model.toggleExpansion(.device(Self.first.id))
     #expect(model.expansion.expanded == nil)
   }
@@ -66,7 +71,9 @@ struct MenuExpansionTests {
     let client = FakeClient(log: log)
     client.setStatus([Self.first])
     let model = await openMenu(client)
+    #expect(model.expansion.expanded == .device(Self.first.id))
     model.toggleExpansion(.device(Self.first.id))
+    #expect(model.expansion.expanded == nil)
     await model.refresh()
     #expect(model.expansion.expanded == nil)
   }
@@ -76,6 +83,7 @@ struct MenuExpansionTests {
     client.setStatus([Self.first, Self.second])
     let model = await openMenu(client)
     model.toggleExpansion(.device(Self.second.id))
+    #expect(model.expansion.expanded == .device(Self.second.id))
     client.setStatus([Self.first])
     await model.refresh()
     #expect(model.expansion.expanded == nil)
