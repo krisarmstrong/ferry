@@ -38,6 +38,7 @@ private func tag(_ request: AgentRequest) -> Int {
   case .screenshot: 24
   case .startRecording: 25
   case .stopRecording: 26
+  case .saveRecording: 27
   }
 }
 
@@ -71,7 +72,7 @@ private func requests() -> [AgentRequest] {
   ]
   all += [
     .installAPK(device, name: "Ferry Test.apk"), .screenshot(device), .startRecording(device),
-    .stopRecording(device),
+    .stopRecording(device), .saveRecording(device),
   ]
   return all
 }
@@ -134,8 +135,7 @@ private func tag(_ response: AgentResponse) -> Int {
   case .removed: 7
   case .keptOnDevice: 8
   case .wireless: 9
-  case .saved: 10
-  case .toolFailed: 11
+  case .toolFailed: 10
   }
 }
 
@@ -182,9 +182,7 @@ private func responses() throws -> [AgentResponse] {
 }
 
 private func toolResponses() -> [AgentResponse] {
-  var all: [AgentResponse] = [
-    .saved(URL(filePath: "/Users/someone/Desktop/Screenshot LinkRunner 2026-11-18 at 17.09.27.png"))
-  ]
+  var all: [AgentResponse] = []
   for failure: ToolFailure in [
     .notOverADB, .notAnAPK, .apkTooLarge, .installFailed("INSTALL_FAILED_OLDER_SDK"),
     .alreadyRecording, .notRecording, .noImage, .recordingFailed("no encoder"), .cannotSave,
@@ -197,7 +195,10 @@ private func toolResponses() -> [AgentResponse] {
         devices: [], provider: .enabled,
         recordings: [
           ActiveRecording(
-            device: device, started: Date(timeIntervalSince1970: 1_763_503_767), stopping: true)
+            device: device, started: Date(timeIntervalSince1970: 1_763_503_767), stopping: true),
+          ActiveRecording(
+            device: device, started: Date(timeIntervalSince1970: 1_763_503_800), stopping: false,
+            finished: true),
         ])))
   return all
 }
@@ -229,7 +230,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...26))
+  #expect(Set(requests().map(tag)) == Set(0...27))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
@@ -243,7 +244,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyResponseRoundTripsJSON() throws {
-  #expect(Set(try responses().map(tag)) == Set(0...11))
+  #expect(Set(try responses().map(tag)) == Set(0...10))
   for response in try responses() {
     #expect(try roundTrip(response) == response)
   }
@@ -302,7 +303,7 @@ func invalidWirelessRequestsReplyBadRequest(valid: String, invalid: String) asyn
 @Test func toolRequestsAreTheAppsAlone() {
   for request: AgentRequest in [
     .installAPK(device, name: "a.apk"), .screenshot(device), .startRecording(device),
-    .stopRecording(device),
+    .stopRecording(device), .saveRecording(device),
   ] {
     #expect(ClientRole.app.allows(request))
     #expect(!ClientRole.provider.allows(request))

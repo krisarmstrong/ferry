@@ -5,13 +5,17 @@ import Foundation
 public struct ActiveRecording: Codable, Sendable, Equatable {
   public let device: DeviceID
   public let started: Date
-  /// Stop was asked for; the recording is being finished and saved.
+  /// Stop was asked for; the recording is being finished.
   public let stopping: Bool
+  /// The recording has ended and waits on the device for the app to collect it with
+  /// `.saveRecording`.
+  public let finished: Bool
 
-  public init(device: DeviceID, started: Date, stopping: Bool) {
+  public init(device: DeviceID, started: Date, stopping: Bool, finished: Bool = false) {
     self.device = device
     self.started = started
     self.stopping = stopping
+    self.finished = finished
   }
 }
 
@@ -34,6 +38,6 @@ public enum ToolFailure: Codable, Sendable, Equatable {
   case noImage
   /// The recording produced no video; `screenrecord`'s own words, if it gave any.
   case recordingFailed(String)
-  /// The file could not be written where macOS saves screenshots, nor on the Desktop.
+  /// The app could not create the file where macOS saves screenshots, nor on the Desktop.
   case cannotSave
 }

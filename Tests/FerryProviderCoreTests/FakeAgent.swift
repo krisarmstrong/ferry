@@ -167,7 +167,7 @@ actor FakeAgent: AgentSending {
       return try workingSetPage(page)
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
       .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
-      .installAPK, .screenshot, .startRecording, .stopRecording:
+      .installAPK, .screenshot, .startRecording, .stopRecording, .saveRecording:
       throw .unsupported("\(request)")
     }
   }

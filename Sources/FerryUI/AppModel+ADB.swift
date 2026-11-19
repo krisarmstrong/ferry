@@ -27,6 +27,17 @@ extension AppModel {
     services.copy(DevicePresentation.installCommand)
   }
 
+  /// Opens the guide, with the model picker, once per app run when the agent is running but
+  /// has seen no device for 10 s of the menu being open, counted from the agent's first
+  /// answer.
+  func considerEmptyGuide(openFor: Duration) {
+    guard agent == .running, devices.isEmpty, openFor >= Self.emptyGuideDelay,
+      !emptyGuideShown
+    else { return }
+    emptyGuideShown = true
+    showGuide(for: nil)
+  }
+
   /// Opens the guide at the device's USB debugging steps, or the model picker if Ferry does not
   /// know its model or no device is given.
   public func showUSBDebuggingGuide(for device: AttachedDevice?) {

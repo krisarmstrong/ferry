@@ -2,26 +2,6 @@ import DeviceKit
 import Foundation
 import os
 
-/// The adb serials a device answers on: its USB serial and any `host:port` it is connected at.
-public struct ADBRoutes: Sendable, Equatable {
-  public let usb: String?
-  public let wireless: [String]
-
-  public init(usb: String?, wireless: [String]) {
-    self.usb = usb
-    self.wireless = wireless
-  }
-
-  /// The route a session uses: USB while the cable is in.
-  public var preferred: String? { usb ?? wireless.first }
-
-  var serials: Set<String> { Set(wireless + [usb].compactMap { $0 }) }
-}
-
-/// Whether a network route (`host:port`, or an mDNS name) may serve the device it answers as.
-/// The agent decides: an address it has not vouched for never serves a device Ferry knows.
-public typealias ADBNetworkPolicy = @Sendable (_ adbSerial: String, _ id: DeviceID) -> Bool
-
 /// `DeviceTransport` over the user's adb server, for Android devices with USB debugging on.
 ///
 /// The server lists devices by its own serial: the USB serial, or `host:port` over the network.
@@ -60,6 +40,7 @@ public actor ADBTransport: DeviceTransport {
   private let scans = OperationGate()
   private let answerLimit: Duration
   private let serving: ADBNetworkPolicy
+  private let opened: ADBOpenHandler
   /// Each listed adb serial's device, read from its properties.
   private var named: [String: DeviceInfo] = [:]
   /// The routes of each usable device, as of the most recent scan.
@@ -90,12 +71,16 @@ public actor ADBTransport: DeviceTransport {
     var missingSince: ContinuousClock.Instant?
   }
 
-  /// `serving` decides which network routes serve their device; USB routes always do.
+  /// `serving` decides which network routes serve their device; USB routes always do. `opened`
+  /// hears of each session as it opens.
   public init(
     port: UInt16 = 5037, locator: ADBLocator = ADBLocator(),
-    serving: @escaping ADBNetworkPolicy = { _, _ in true }
+    serving: @escaping ADBNetworkPolicy = { _, _ in true },
+    opened: @escaping ADBOpenHandler = { _, _, _ in }
   ) {
-    self.init(host: ADBHost(port: port, locator: locator), locator: locator, serving: serving)
+    self.init(
+      host: ADBHost(port: port, locator: locator), locator: locator, serving: serving,
+      opened: opened)
   }
 
   /// How long a parked device must be missing from adb's list to count as unplugged. A
@@ -117,19 +102,15 @@ public actor ADBTransport: DeviceTransport {
   static let unnamedRetry = Duration.seconds(2)
   static let unnamedRetryLimit = Duration.seconds(30)
 
-  static func unnamedDelay(afterTries tries: Int) -> Duration {
-    var delay = unnamedRetry
-    for _ in 1..<max(tries, 1) where delay < unnamedRetryLimit { delay *= 2 }
-    return min(delay, unnamedRetryLimit)
-  }
-
   init(
     host: ADBHost, locator: ADBLocator, answerLimit: Duration = defaultAnswerLimit,
     serving: @escaping ADBNetworkPolicy = { _, _ in true },
+    opened: @escaping ADBOpenHandler = { _, _, _ in },
     now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
   ) {
     self.host = host
     self.serving = serving
+    self.opened = opened
     self.locator = locator
     self.answerLimit = answerLimit
     self.now = now
@@ -142,12 +123,6 @@ public actor ADBTransport: DeviceTransport {
       continuation.onTermination = { _ in relay.cancel() }
     }
   }
-
-  /// Where the adb server reaches `id`, as of the most recent scan.
-  public func routes(for id: DeviceID) -> ADBRoutes? { routes[id] }
-
-  /// The tools (APK install, screenshot, screen recording) over this transport's server.
-  public nonisolated var deviceTools: ADBDeviceTools { ADBDeviceTools(host: host) }
 
   public func scan() async throws(TransportError) -> DeviceScan {
     try await scans.run { () async throws(TransportError) -> DeviceScan in
@@ -250,6 +225,7 @@ public actor ADBTransport: DeviceTransport {
       Self.log.info("not opening \(serial, privacy: .private): \(String(describing: error))")
       throw .deviceNotFound(id)
     }
+    opened(id, serial, deviceTools)
     return ADBSession(
       host: host, serial: serial, info: info, features: features,
       method: routes.usb == nil ? .wifiADB : .usbADB,
@@ -369,6 +345,19 @@ public actor ADBTransport: DeviceTransport {
 }
 
 extension ADBTransport {
+  /// How long to wait before scanning again for a device that stayed unnamed `tries` scans.
+  static func unnamedDelay(afterTries tries: Int) -> Duration {
+    var delay = unnamedRetry
+    for _ in 1..<max(tries, 1) where delay < unnamedRetryLimit { delay *= 2 }
+    return min(delay, unnamedRetryLimit)
+  }
+
+  /// Where the adb server reaches `id`, as of the most recent scan.
+  public func routes(for id: DeviceID) -> ADBRoutes? { routes[id] }
+
+  /// The tools (APK install, screenshot, screen recording) over this transport's server.
+  public nonisolated var deviceTools: ADBDeviceTools { ADBDeviceTools(host: host) }
+
   /// The devices adb lists over USB as unauthorised: USB debugging is on, the user has not
   /// allowed this Mac yet.
   private static func waitingForAllow(_ listed: [ADBDevice]) -> Set<DeviceID> {

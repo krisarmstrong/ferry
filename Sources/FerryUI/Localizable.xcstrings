@@ -14,7 +14,13 @@
     "%lld." : {
 
     },
+    "A device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) shows Install App…, Screenshot and Record Screen under its name. A device on file transfer shows More tools with USB debugging… instead." : {
+      "extractionState" : "manual"
+    },
     "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device." : {
+      "extractionState" : "manual"
+    },
+    "A device whose screen is off sends a black screenshot, and a recording of a screen that does not change has a single frame." : {
       "extractionState" : "manual"
     },
     "A file changed on both sides" : {
@@ -115,6 +121,12 @@
 
     },
     "Click **Open System Settings**." : {
+      "extractionState" : "manual"
+    },
+    "Click Install App… and choose an .apk file, or drag one .apk onto the device in the menu. Ferry checks that the file is an Android app, copies it to the device and installs it, replacing an older version of the same app. The menu shows how far the copy has got, then says when the app is installed." : {
+      "extractionState" : "manual"
+    },
+    "Click Screenshot to save what the device's screen shows. Click Record Screen to record it, for up to three minutes; the menu shows how long it has been recording, and Stop ends it." : {
       "extractionState" : "manual"
     },
     "Click the Ferry icon in the menu bar." : {
@@ -221,7 +233,7 @@
     "Ferry Help" : {
 
     },
-    "Ferry can't save to your screenshot folder or the Desktop. Allow it in Privacy & Security." : {
+    "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security." : {
 
     },
     "Ferry has no address for this device. Connect it by address." : {
@@ -246,6 +258,9 @@
       "extractionState" : "manual"
     },
     "Ferry reaches the device over USB file transfer. Turn on USB debugging to use ADB instead." : {
+      "extractionState" : "manual"
+    },
+    "Ferry saves them where macOS saves its own screenshots (the Desktop, unless you chose another folder in the Screenshot app), named like macOS's own, such as Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png, and shows them in Finder. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device." : {
       "extractionState" : "manual"
     },
     "Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon." : {
@@ -317,6 +332,9 @@
     "If a file changed on the device after the Mac read it, Ferry keeps the device's version and saves yours beside it as **name (conflict from Mac)**." : {
       "extractionState" : "manual"
     },
+    "If the device refuses the app, the menu says why, for example that a newer version is installed or that the app needs a newer version of Android. Ferry removes its copy of the app from the device either way." : {
+      "extractionState" : "manual"
+    },
     "If the menu says **Allow Ferry's helper** or **macOS can't find Ferry's helper**, click **Open System Settings** and turn on Ferry under Allow in the Background." : {
       "extractionState" : "manual"
     },
@@ -346,6 +364,9 @@
 
     },
     "Install adb for more tools…" : {
+      "extractionState" : "manual"
+    },
+    "Install an app" : {
       "extractionState" : "manual"
     },
     "Installed “%@”." : {
@@ -517,6 +538,9 @@
     "Screenshot" : {
 
     },
+    "Screenshots and screen recordings" : {
+      "extractionState" : "manual"
+    },
     "Set Up Your Device" : {
 
     },
@@ -650,6 +674,9 @@
 
     },
     "To see files added on the device while it is connected, choose **Refresh** in the Ferry menu." : {
+      "extractionState" : "manual"
+    },
+    "Tools over USB debugging" : {
       "extractionState" : "manual"
     },
     "Troubleshooting" : {

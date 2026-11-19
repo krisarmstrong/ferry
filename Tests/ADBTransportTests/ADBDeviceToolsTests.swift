@@ -48,17 +48,18 @@ struct ADBDeviceToolsTests {
 
   // MARK: Installing
 
-  @Test func installPushesRunsPMThenRemovesTheCopy() async throws {
+  @Test func installPushesToItsPathAndRunsPM() async throws {
     let device = FakeAndroid()
+    let path = ADBDeviceTools.apkPath()
     let result = try await withTools(device) { tools in
-      try await tools.installAPK(try apk(), serial: Self.serial, progress: ADBFixture.noProgress)
+      try await tools.installAPK(
+        try apk(), to: path, serial: Self.serial, progress: ADBFixture.noProgress)
     }
     #expect(result == .installed)
-    let path = try sentPath(device)
     #expect(Self.isAPKCopy(path))
-    #expect(device.changes == [["pm", "install", "-r", path], ["rm", "-f", path]])
+    #expect(try sentPath(device) == path)
+    #expect(device.changes == [["pm", "install", "-r", path]])
     #expect(device.installed == [Data("PK\u{3}\u{4} an app".utf8)])
-    #expect(device.node(absolute: path) == nil)
   }
 
   @Test(arguments: [
@@ -69,17 +70,56 @@ struct ADBDeviceToolsTests {
       "INSTALL_PARSE_FAILED_NO_CERTIFICATES"
     ),
   ])
-  func aRefusedInstallReportsItsCodeAndRemovesTheCopy(
-    status: Int32, stdout: String, code: String
-  ) async throws {
+  func aRefusedInstallReportsItsCode(status: Int32, stdout: String, code: String) async throws {
     let device = FakeAndroid()
     device.setTools { $0.pmResult = FakeAndroid.ShellResult(status: status, stdout: stdout) }
     let result = try await withTools(device) { tools in
-      try await tools.installAPK(try apk(), serial: Self.serial, progress: ADBFixture.noProgress)
+      try await tools.installAPK(
+        try apk(), to: ADBDeviceTools.apkPath(), serial: Self.serial,
+        progress: ADBFixture.noProgress)
     }
     #expect(result == .failed(code))
-    #expect(device.node(absolute: try sentPath(device)) == nil)
-    #expect(device.changes.last?.prefix(2) == ["rm", "-f"])
+  }
+
+  /// `rm -f --`, with the path as its own quoted argument, run even for a cancelled caller.
+  @Test func aTemporaryFileIsRemovedEvenByACancelledCaller() async throws {
+    let device = FakeAndroid()
+    let path = ADBDeviceTools.apkPath()
+    try await withTools(device) { tools in
+      _ = try await tools.installAPK(
+        try apk(), to: path, serial: Self.serial, progress: ADBFixture.noProgress)
+      let removal = Task {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return await tools.removeTemporary(path, serial: Self.serial)
+      }
+      #expect(await removal.value)
+      // Already gone: still true.
+      #expect(await tools.removeTemporary(path, serial: Self.serial))
+    }
+    #expect(device.changes.dropFirst() == [["rm", "-f", "--", path], ["rm", "-f", "--", path]])
+    #expect(device.node(absolute: path) == nil)
+  }
+
+  @Test func aTemporaryFileOnADeviceThatLeftIsNotRemoved() async throws {
+    let device = FakeAndroid()
+    device.unplug()
+    let removed = try await withTools(device) { tools in
+      await tools.removeTemporary(ADBDeviceTools.apkPath(), serial: Self.serial)
+    }
+    #expect(!removed)
+  }
+
+  @Test func onlyToolPathsAreTemporary() {
+    #expect(ADBDeviceTools.isTemporaryPath(ADBDeviceTools.apkPath()))
+    #expect(ADBDeviceTools.isTemporaryPath(ADBDeviceTools.recordingPath()))
+    let uuid = UUID().uuidString
+    for path in [
+      "/data/local/tmp/app.apk", "/data/local/tmp/ferry-\(uuid.lowercased()).apk",
+      "/data/local/tmp/ferry-../../system/\(uuid).apk", "/sdcard/Download/ferry-\(uuid).apk",
+      "/sdcard/Download/.ferry-rec-\(uuid).apk", "/sdcard/DCIM/.ferry-rec-\(uuid).mp4", "",
+    ] {
+      #expect(!ADBDeviceTools.isTemporaryPath(path), "\(path)")
+    }
   }
 
   @Test(arguments: [
@@ -114,61 +154,15 @@ struct ADBDeviceToolsTests {
     #expect(ADBDeviceTools.installResult(output) == .failed(String(repeating: "x", count: 200)))
   }
 
-  @Test func aFailedPushStillRemovesTheCopy() async throws {
-    let device = FakeAndroid()
-    device.failNextSend("couldn't write: No space left on device")
-    await #expect(throws: ADBError.self) {
-      try await withTools(device) { tools in
-        try await tools.installAPK(try apk(), serial: Self.serial, progress: ADBFixture.noProgress)
-      }
-    }
-    let path = try sentPath(device)
-    #expect(device.changes == [["rm", "-f", path]])
-    #expect(device.node(absolute: path) == nil)
-  }
-
-  /// A cancelled install, whether while sending or while pm runs, still removes the copy.
-  @Test func aCancelledPushStillRemovesTheCopy() async throws {
-    let device = FakeAndroid()
-    await #expect(throws: ADBError.cancelled) {
-      try await withTools(device) { tools in
-        try await tools.installAPK(try apk(), serial: Self.serial) { _, _ in false }
-      }
-    }
-    let path = try sentPath(device)
-    #expect(device.changes == [["rm", "-f", path]])
-    #expect(device.node(absolute: path) == nil)
-  }
-
-  @Test func aCancelledInstallStillRemovesTheCopy() async throws {
-    let device = FakeAndroid()
-    device.state.withLock { $0.hangingPrograms = ["pm"] }
-    try await withTools(device) { tools in
-      let install = Task {
-        try await tools.installAPK(try apk(), serial: Self.serial, progress: ADBFixture.noProgress)
-      }
-      let installing = try await ADBFixture.eventually {
-        device.services.contains { $0.contains("pm") }
-      }
-      #expect(installing)
-      install.cancel()
-      await #expect(throws: ADBError.cancelled) { try await install.value }
-    }
-    let path = try sentPath(device)
-    #expect(device.changes == [["rm", "-f", path]])
-    #expect(device.node(absolute: path) == nil)
-  }
-
-  /// A device that leaves mid-push fails the install; the clean-up cannot reach it and says so
-  /// only in the log.
+  /// A device that leaves mid-push fails the install.
   @Test func aDeviceLostMidPushFails() async throws {
     let device = FakeAndroid()
     device.dropDuring("SEND", afterBytes: 1)
     await #expect(throws: ADBError.self) {
       try await withTools(device) { tools in
         try await tools.installAPK(
-          try apk(String(repeating: "a", count: 100_000)), serial: Self.serial,
-          progress: ADBFixture.noProgress)
+          try apk(String(repeating: "a", count: 100_000)), to: ADBDeviceTools.apkPath(),
+          serial: Self.serial, progress: ADBFixture.noProgress)
       }
     }
     #expect(device.changes.isEmpty)
@@ -213,7 +207,8 @@ struct ADBDeviceToolsTests {
     let device = FakeAndroid()
     let pulled = try ADBFixture.localFile(Data())
     try await withTools(device) { tools in
-      let recording = try await tools.startRecording(serial: Self.serial)
+      let recording = try await tools.startRecording(
+        serial: Self.serial, to: ADBDeviceTools.recordingPath())
       let path = recording.devicePath
       #expect(Self.isRecording(path))
       #expect(device.commands == [["sh", "-c", ADBDeviceTools.recordScript, "sh", path]])
@@ -222,8 +217,8 @@ struct ADBDeviceToolsTests {
       let size = try await recording.pull(
         into: try FileHandle(forWritingTo: pulled), progress: ADBFixture.noProgress)
       #expect(size == UInt64(device.state.withLock { $0.tools.recordingBytes.count }))
-      await recording.discard()
-      #expect(device.commands.dropFirst() == [["kill", "-2", "4242"], ["rm", "-f", path]])
+      #expect(await recording.discard())
+      #expect(device.commands.dropFirst() == [["kill", "-2", "4242"], ["rm", "-f", "--", path]])
       #expect(device.node(absolute: path) == nil)
     }
     #expect(try Data(contentsOf: pulled) == device.state.withLock { $0.tools.recordingBytes })
@@ -235,7 +230,8 @@ struct ADBDeviceToolsTests {
     let device = FakeAndroid()
     device.setTools { $0.recordingEndsOnItsOwn = true }
     try await withTools(device) { tools in
-      let recording = try await tools.startRecording(serial: Self.serial)
+      let recording = try await tools.startRecording(
+        serial: Self.serial, to: ADBDeviceTools.recordingPath())
       #expect(await recording.finished() == .exited(status: 0, detail: ""))
       try await recording.interrupt()
       #expect(!device.commands.contains { $0.first == "kill" })
@@ -243,20 +239,22 @@ struct ADBDeviceToolsTests {
   }
 
   @Test(arguments: ["sh: screenrecord: not found\n", "12a\n", "\n"])
-  func aRecordingWithoutAPidIsRefusedAndCleanedUp(line: String) async throws {
+  func aRecordingWithoutAPidIsRefused(line: String) async throws {
     let device = FakeAndroid()
     device.setTools { $0.pidLine = line }
     await #expect(throws: ADBError.self) {
-      try await withTools(device) { tools in try await tools.startRecording(serial: Self.serial) }
+      try await withTools(device) { tools in
+        try await tools.startRecording(serial: Self.serial, to: ADBDeviceTools.recordingPath())
+      }
     }
-    let path = try #require(device.commands.first?.last)
-    #expect(device.commands.dropFirst() == [["rm", "-f", path]])
+    #expect(device.commands.count == 1)
   }
 
   @Test func aRecordingWhoseDeviceLeavesIsLost() async throws {
     let device = FakeAndroid()
     try await withTools(device) { tools in
-      let recording = try await tools.startRecording(serial: Self.serial)
+      let recording = try await tools.startRecording(
+        serial: Self.serial, to: ADBDeviceTools.recordingPath())
       device.unplug()
       guard case .lost = await recording.finished() else {
         Issue.record("the recording did not report the connection lost")
@@ -271,14 +269,15 @@ struct ADBDeviceToolsTests {
     let device = FakeAndroid()
     device.state.withLock { $0.features = "cmd,stat_v2" }
     try await withTools(device) { tools in
-      let recording = try await tools.startRecording(serial: Self.serial)
+      let recording = try await tools.startRecording(
+        serial: Self.serial, to: ADBDeviceTools.recordingPath())
       #expect(device.services.first?.hasPrefix("shell:( sh '-c'") == true)
       try await recording.interrupt()
       #expect(await recording.finished() == .exited(status: 0, detail: ""))
-      await recording.discard()
+      #expect(await recording.discard())
       #expect(
         device.commands.dropFirst() == [
-          ["kill", "-2", "4242"], ["rm", "-f", recording.devicePath],
+          ["kill", "-2", "4242"], ["rm", "-f", "--", recording.devicePath],
         ])
     }
   }

@@ -207,13 +207,18 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// any installed version. `name` is the file's name, shown with the transfer's progress.
   /// Answered with `.done` once installed.
   case installAPK(DeviceID, name: String)
-  /// Saves a screenshot where macOS saves its own. Answered with `.saved`.
+  /// Writes a screenshot (a PNG) into the writable file sent with the request, which the app
+  /// created where macOS saves screenshots. Answered with `.done`.
   case screenshot(DeviceID)
-  /// Records the device's screen, for up to three minutes. Answered with `.saved` once the
-  /// recording has ended (Stop, or the time limit) and is saved where macOS saves screenshots.
+  /// Records the device's screen, for up to three minutes. Answered with `.done` once the
+  /// recording has ended (Stop, or the time limit); it then waits on the device, listed in the
+  /// status as finished, for `.saveRecording`.
   case startRecording(DeviceID)
-  /// Stops a recording. Answered with `.done`; the `.startRecording` request answers with the file.
+  /// Stops a recording. Answered with `.done`.
   case stopRecording(DeviceID)
+  /// Writes a finished recording (an MP4) into the writable file sent with the request and
+  /// removes it from the device. Answered with `.done`.
+  case saveRecording(DeviceID)
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
   /// device reach Finder.
   case refresh(DeviceID)
@@ -264,8 +269,6 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   /// domains had not sent to the device yet, if any.
   case removed(preserved: [URL])
   case wireless(WirelessOutcome)
-  /// Where the agent saved a screenshot or a recording, on this Mac.
-  case saved(URL)
   case toolFailed(ToolFailure)
   case done
   case failure(TransportError)

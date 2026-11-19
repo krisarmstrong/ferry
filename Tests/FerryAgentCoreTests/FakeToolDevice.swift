@@ -8,9 +8,21 @@ import Foundation
 actor FakeToolDevice: ADBToolDevice {
   static let png = ADBTools.pngMagic + Data(repeating: 9, count: 100)
 
-  private(set) var installs: [(serial: String, contents: Data)] = []
+  struct Install: Equatable {
+    let serial: String
+    let path: String
+    let contents: Data
+  }
+
+  private(set) var installs: [Install] = []
   private(set) var screenshots: [String] = []
-  private(set) var recordingsStarted: [String] = []
+  private(set) var recordingsStarted: [(serial: String, path: String)] = []
+  /// Every `removeTemporary`, in order.
+  private(set) var removals: [String] = []
+  /// Whether removing works (the device is still there).
+  var removes = true
+  /// Runs as each tool file is created, to see what the journal holds then.
+  var onCreate: (@Sendable (String) async -> Void)?
   var installResult = APKInstallResult.installed
   var failure: ADBError?
   var image = FakeToolDevice.png
@@ -22,11 +34,13 @@ actor FakeToolDevice: ADBToolDevice {
 
   func set(_ body: @Sendable (isolated FakeToolDevice) -> Void) { body(self) }
 
-  func installAPK(_ file: FileHandle, serial: String, progress: ProgressHandler)
+  func installAPK(_ file: FileHandle, to path: String, serial: String, progress: ProgressHandler)
     async throws(ADBError) -> APKInstallResult
   {
+    await onCreate?(path)
     if let failure { throw failure }
-    installs.append((serial, (try? file.readToEnd()) ?? Data()))
+    installs.append(
+      Install(serial: serial, path: path, contents: (try? file.readToEnd()) ?? Data()))
     return installResult
   }
 
@@ -36,10 +50,18 @@ actor FakeToolDevice: ADBToolDevice {
     return image
   }
 
-  func recordScreen(serial: String) async throws(ADBError) -> any ScreenRecordingControl {
+  func recordScreen(serial: String, to path: String) async throws(ADBError)
+    -> any ScreenRecordingControl
+  {
+    await onCreate?(path)
     if let failure { throw failure }
-    recordingsStarted.append(serial)
+    recordingsStarted.append((serial, path))
     return recording
+  }
+
+  func removeTemporary(_ path: String, serial: String) async -> Bool {
+    removals.append(path)
+    return removes
   }
 }
 
@@ -49,7 +71,6 @@ actor FakeRecording: ScreenRecordingControl {
 
   private(set) var interrupts = 0
   private(set) var abandons = 0
-  private(set) var discards = 0
   /// Whether SIGINT stops it, as it stops `screenrecord`.
   var endsOnInterrupt = true
   /// Whether `kill` itself never answers.
@@ -95,9 +116,6 @@ actor FakeRecording: ScreenRecordingControl {
     return UInt64(video.count)
   }
 
-  func discard() async {
-    discards += 1
-  }
 }
 
 /// Minimal ZIP files, one stored (empty) entry per name, as `zip -0` writes them.

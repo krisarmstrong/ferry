@@ -8,31 +8,32 @@ import Testing
 @testable import FerryAgentCore
 
 private let device = DeviceID(serial: "0123456789abcdef")
-private let target = ADBTools.Target(serial: "0123456789abcdef", model: "LinkRunner-100G")
-/// 2026-11-18 22:09:27 UTC.
+private let serial = "0123456789abcdef"
 private let moment = Date(timeIntervalSince1970: 1_795_039_767)
 
-/// Screen recordings as the agent runs them: one per device, stopped by Stop, by their time
-/// limit or by Ferry when they outlive it, saved where screenshots go and removed from the device.
+/// Screen recordings as the agent runs them: one per device, stopped by Stop, by their time limit
+/// or by Ferry when they outlive it, then waiting on the device until the app collects the video
+/// into its file, after which the device's copy is removed.
 @Suite(.timeLimit(.minutes(1)))
 struct ADBToolsRecordingTests {
-  let folder: URL
-  let desktop: URL
+  let scratch: URL
+  let journal: ToolJournal
 
   init() throws {
-    folder = try TestScratch.folder("recordings")
-    desktop = try TestScratch.folder("desktop")
+    scratch = try TestScratch.folder("recordings")
+    journal = ToolJournal(store: scratch.appending(path: "journal.json"))
   }
 
   private func makeTools(_ fake: FakeToolDevice, limits: ADBTools.Limits = .init()) -> ADBTools {
-    let shots = folder
-    return ADBTools(
-      device: fake, target: { _ in target }, folder: { shots }, desktop: desktop,
-      scratch: folder, now: { moment }, limits: limits)
+    ADBTools(
+      device: fake, target: { _ in serial }, journal: journal, scratch: scratch, now: { moment },
+      limits: limits)
   }
 
-  private func names(_ url: URL) throws -> [String] {
-    try FileManager.default.contentsOfDirectory(atPath: url.path).sorted()
+  private func destination() throws -> (URL, FileHandle) {
+    let url = scratch.appending(path: "capture-\(UUID().uuidString)")
+    try Data().write(to: url)
+    return (url, try FileHandle(forWritingTo: url))
   }
 
   /// Waits until the recording is under way, as the menu would show it.
@@ -43,7 +44,11 @@ struct ADBToolsRecordingTests {
     }
   }
 
-  @Test func stopSavesTheRecordingAndRemovesItFromTheDevice() async throws {
+  private func path(_ fake: FakeToolDevice) async throws -> String {
+    try #require(await fake.recordingsStarted.first?.path)
+  }
+
+  @Test func stopEndsTheRecordingAndTheAppCollectsIt() async throws {
     let fake = FakeToolDevice()
     let tools = makeTools(fake)
     let recording = Task { try await tools.startRecording(device) }
@@ -53,31 +58,54 @@ struct ADBToolsRecordingTests {
         == [ActiveRecording(device: device, started: moment, stopping: false)])
     #expect(try await tools.startRecording(device) == .failed(.alreadyRecording))
     #expect(try await tools.stopRecording(device) == .done)
-    let base = CaptureFiles.baseName(.recording, model: "LinkRunner-100G", at: moment)
-    #expect(try await recording.value == .saved(folder.appending(path: base + ".mp4")))
-    #expect(try Data(contentsOf: folder.appending(path: base + ".mp4")) == FakeRecording.mp4)
+    #expect(try await recording.value == .done)
+    #expect(
+      await tools.recordingsRunning()
+        == [ActiveRecording(device: device, started: moment, stopping: true, finished: true)])
+    let path = try await path(fake)
+    #expect(await journal.paths(on: device) == [path])
+    let (url, handle) = try destination()
+    #expect(try await tools.saveRecording(device, into: handle.fileDescriptor) == .done)
+    #expect(try Data(contentsOf: url) == FakeRecording.mp4)
     #expect(await fake.recording.interrupts == 1)
-    #expect(await fake.recording.discards == 1)
+    #expect(await fake.removals == [path])
+    #expect(await journal.paths(on: device).isEmpty)
     #expect(await tools.recordingsRunning().isEmpty)
   }
 
-  @Test func stopWithoutARecordingIsRefused() async throws {
-    #expect(try await makeTools(FakeToolDevice()).stopRecording(device) == .failed(.notRecording))
+  @Test func stopOrSaveWithoutARecordingIsRefused() async throws {
+    let tools = makeTools(FakeToolDevice())
+    #expect(try await tools.stopRecording(device) == .failed(.notRecording))
+    let (_, handle) = try destination()
+    #expect(
+      try await tools.saveRecording(device, into: handle.fileDescriptor) == .failed(.notRecording))
   }
 
-  /// At its time limit screenrecord stops by itself; the file is saved with no Stop.
-  @Test func aRecordingThatEndsByItselfIsSaved() async throws {
+  /// A recording still running cannot be collected yet.
+  @Test func aRunningRecordingIsNotCollected() async throws {
+    let fake = FakeToolDevice()
+    let tools = makeTools(fake)
+    let recording = Task { try await tools.startRecording(device) }
+    try await whenRecording(tools)
+    let (url, handle) = try destination()
+    #expect(
+      try await tools.saveRecording(device, into: handle.fileDescriptor)
+        == .failed(.alreadyRecording))
+    #expect(try Data(contentsOf: url).isEmpty)
+    await fake.recording.end()
+    _ = try await recording.value
+  }
+
+  /// At its time limit screenrecord stops by itself; it waits, finished, with no Stop.
+  @Test func aRecordingThatEndsByItselfWaitsToBeCollected() async throws {
     let fake = FakeToolDevice()
     let tools = makeTools(fake)
     let recording = Task { try await tools.startRecording(device) }
     try await whenRecording(tools)
     await fake.recording.end()
-    guard case .saved = try await recording.value else {
-      Issue.record("not saved")
-      return
-    }
+    #expect(try await recording.value == .done)
+    #expect(await tools.recordingsRunning().map(\.finished) == [true])
     #expect(await fake.recording.interrupts == 0)
-    #expect(await fake.recording.discards == 1)
   }
 
   /// One that outlives its limit is stopped by Ferry, and closed if SIGINT does not end it.
@@ -104,50 +132,6 @@ struct ADBToolsRecordingTests {
     #expect(try await tools.stopRecording(device) == .done)
     _ = try await recording.value
     #expect(await fake.recording.abandons == 1)
-    #expect(await tools.recordingsRunning().isEmpty)
-  }
-
-  @Test func aRecordingWithNoVideoLeavesNoFile() async throws {
-    let fake = FakeToolDevice()
-    await fake.recording.set {
-      $0.outcome = .exited(status: 1, detail: "ERROR: unable to create video encoder")
-      $0.pullFailure = .failed("open failed: No such file or directory")
-    }
-    let tools = makeTools(fake)
-    let recording = Task { try await tools.startRecording(device) }
-    try await whenRecording(tools)
-    await fake.recording.end()
-    #expect(
-      try await recording.value
-        == .failed(.recordingFailed("ERROR: unable to create video encoder")))
-    #expect(try names(folder).isEmpty)
-    #expect(await fake.recording.discards == 1)
-  }
-
-  @Test func somethingOtherThanAVideoIsNotSaved() async throws {
-    let fake = FakeToolDevice()
-    await fake.recording.set { $0.video = Data("garbage".utf8) }
-    let tools = makeTools(fake)
-    let recording = Task { try await tools.startRecording(device) }
-    try await whenRecording(tools)
-    await fake.recording.end()
-    #expect(try await recording.value == .failed(.recordingFailed("")))
-    #expect(try names(folder).isEmpty)
-  }
-
-  @Test func aDeviceLostWhileRecordingIsDisconnected() async throws {
-    let fake = FakeToolDevice()
-    await fake.recording.set {
-      $0.outcome = .lost(.connectionClosed)
-      $0.pullFailure = .deviceGone("0123456789abcdef")
-    }
-    let tools = makeTools(fake)
-    let recording = Task { try await tools.startRecording(device) }
-    try await whenRecording(tools)
-    await fake.recording.end()
-    await #expect(throws: TransportError.deviceDisconnected) { try await recording.value }
-    #expect(try names(folder).isEmpty)
-    #expect(await tools.recordingsRunning().isEmpty)
   }
 
   /// A kill that never answers still ends in the connection being closed, so the device's slot
@@ -164,7 +148,54 @@ struct ADBToolsRecordingTests {
     _ = try await recording.value
     _ = try await stop.value
     #expect(await fake.recording.abandons == 1)
+  }
+
+  @Test func aRecordingWithNoVideoIsRefusedAndRemoved() async throws {
+    let fake = FakeToolDevice()
+    await fake.recording.set {
+      $0.outcome = .exited(status: 1, detail: "ERROR: unable to create video encoder")
+      $0.pullFailure = .failed("open failed: No such file or directory")
+    }
+    let tools = makeTools(fake)
+    let recording = Task { try await tools.startRecording(device) }
+    try await whenRecording(tools)
+    await fake.recording.end()
+    _ = try await recording.value
+    let (url, handle) = try destination()
+    #expect(
+      try await tools.saveRecording(device, into: handle.fileDescriptor)
+        == .failed(.recordingFailed("ERROR: unable to create video encoder")))
+    #expect(try Data(contentsOf: url).isEmpty)
+    #expect(await fake.removals.count == 1)
     #expect(await tools.recordingsRunning().isEmpty)
+  }
+
+  @Test func somethingOtherThanAVideoIsNotWritten() async throws {
+    let fake = FakeToolDevice()
+    await fake.recording.set { $0.video = Data("garbage".utf8) }
+    let tools = makeTools(fake)
+    let recording = Task { try await tools.startRecording(device) }
+    try await whenRecording(tools)
+    await fake.recording.end()
+    _ = try await recording.value
+    let (url, handle) = try destination()
+    #expect(
+      try await tools.saveRecording(device, into: handle.fileDescriptor)
+        == .failed(.recordingFailed("")))
+    #expect(try Data(contentsOf: url).isEmpty)
+  }
+
+  /// The device went away while recording: disconnected, and its file stays journalled.
+  @Test func aDeviceLostWhileRecordingIsDisconnected() async throws {
+    let fake = FakeToolDevice()
+    await fake.recording.set { $0.outcome = .lost(.connectionClosed) }
+    let tools = makeTools(fake)
+    let recording = Task { try await tools.startRecording(device) }
+    try await whenRecording(tools)
+    await fake.recording.end()
+    await #expect(throws: TransportError.deviceDisconnected) { try await recording.value }
+    #expect(await tools.recordingsRunning().isEmpty)
+    #expect(await journal.paths(on: device) == [try await path(fake)])
   }
 
   /// A device that goes offline during the pull is disconnected, not a failed recording.
@@ -175,6 +206,12 @@ struct ADBToolsRecordingTests {
     let recording = Task { try await tools.startRecording(device) }
     try await whenRecording(tools)
     await fake.recording.end()
-    await #expect(throws: TransportError.deviceDisconnected) { try await recording.value }
+    _ = try await recording.value
+    let (_, handle) = try destination()
+    await #expect(throws: TransportError.deviceDisconnected) {
+      try await tools.saveRecording(device, into: handle.fileDescriptor)
+    }
+    #expect(await fake.removals.isEmpty)
+    #expect(await journal.paths(on: device) == [try await path(fake)])
   }
 }

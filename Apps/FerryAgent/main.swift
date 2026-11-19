@@ -18,9 +18,11 @@ guard let identity = FerryIdentity() else {
 
 let itemStore: URL
 let wirelessStore: URL
+let toolStore: URL
 do {
   itemStore = try DomainController.defaultItemStore()
   wirelessStore = try WirelessADB.defaultStore()
+  toolStore = try ToolJournal.defaultStore()
 } catch {
   log.fault("no item store: \(error, privacy: .public)")
   exit(EXIT_FAILURE)
@@ -34,7 +36,13 @@ FileTransfer.sweep()
 // has published its Finder locations, so a scan the hub makes first cannot serve a connection the
 // adb server kept from before this agent started.
 let vouching = WirelessVouching()
-let adb = ADBTransport(serving: { vouching.serves($0, as: $1) })
+// Files the tools left on a device (it went away, or the agent stopped) are removed the next
+// time a session for it opens.
+let toolJournal = ToolJournal(store: toolStore)
+let adb = ADBTransport(
+  serving: { vouching.serves($0, as: $1) },
+  opened: { id, serial, tools in Task { await toolJournal.sweep(id, serial: serial, using: tools) }
+  })
 let hub = DeviceHub(
   transport: CompositeTransport(mtp: MTPTransport(), adb: adb),
   arrivals: merged(USBWatcher.ticks(), merged(adb.arrivals, vouching.changes)))
@@ -61,7 +69,7 @@ let tools = ADBTools(
   device: adb.deviceTools,
   target: { id in
     ADBTools.target(for: id, devices: await hub.devices(), routes: await adb.routes(for: id))
-  })
+  }, journal: toolJournal)
 
 // The listener holds its delegate weakly; both live for the whole process.
 let delegate = AgentListenerDelegate(

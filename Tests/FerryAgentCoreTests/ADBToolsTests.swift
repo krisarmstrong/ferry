@@ -8,36 +8,26 @@ import Testing
 @testable import FerryAgentCore
 
 private let device = DeviceID(serial: "0123456789abcdef")
-private let target = ADBTools.Target(serial: "0123456789abcdef", model: "LinkRunner-100G")
-/// 2026-11-18 22:09:27 UTC.
-private let moment = Date(timeIntervalSince1970: 1_795_039_767)
+private let serial = "0123456789abcdef"
 
-/// The agent's side of the tools: who may use them, what is saved where and under which name,
-/// and that nothing is left behind.
+/// The agent's side of the tools: who may use them, what reaches the client's file, and that the
+/// files put on the device are journalled and removed.
 @Suite(.timeLimit(.minutes(1)))
 struct ADBToolsTests {
-  let folder: URL
-  let desktop: URL
   let scratch: URL
+  let journal: ToolJournal
 
   init() throws {
-    folder = try TestScratch.folder("captures")
-    desktop = try TestScratch.folder("desktop")
     scratch = try TestScratch.folder("tools-scratch")
+    journal = ToolJournal(store: scratch.appending(path: "journal.json"))
   }
 
   private func makeTools(
-    _ fake: FakeToolDevice, served: Bool = true, folder: URL? = nil,
-    limits: ADBTools.Limits = .init()
+    _ fake: FakeToolDevice, served: Bool = true, limits: ADBTools.Limits = .init()
   ) -> ADBTools {
-    let shots = folder ?? self.folder
-    return ADBTools(
-      device: fake, target: { _ in served ? target : nil }, folder: { shots }, desktop: desktop,
-      scratch: scratch, now: { moment }, limits: limits)
-  }
-
-  private func names(_ url: URL) throws -> [String] {
-    try FileManager.default.contentsOfDirectory(atPath: url.path).sorted()
+    ADBTools(
+      device: fake, target: { _ in served ? serial : nil }, journal: journal, scratch: scratch,
+      limits: limits)
   }
 
   private func source(_ data: Data) throws -> FileHandle {
@@ -46,56 +36,17 @@ struct ADBToolsTests {
     return try FileHandle(forReadingFrom: url)
   }
 
-  /// The scratch folder holds only the files the test put there: the agent's copy is gone.
+  /// A file the client created for the capture, open for writing.
+  private func destination() throws -> (URL, FileHandle) {
+    let url = scratch.appending(path: "capture-\(UUID().uuidString)")
+    try Data().write(to: url)
+    return (url, try FileHandle(forWritingTo: url))
+  }
+
+  /// The agent's own scratch copies: none is left behind.
   private func agentCopies() throws -> [String] {
-    try names(scratch).filter { !$0.hasPrefix("picked-") }
-  }
-
-  // MARK: Names and folders
-
-  @Test func namesFollowMacOS() {
-    let utc = TimeZone(identifier: "UTC")!
-    #expect(
-      CaptureFiles.baseName(.screenshot, model: "LinkRunner-100G", at: moment, timeZone: utc)
-        == "Screenshot LinkRunner-100G 2026-11-18 at 22.09.27")
-    #expect(
-      CaptureFiles.baseName(.recording, model: "EtherScope nXG", at: moment, timeZone: utc)
-        == "Screen Recording EtherScope nXG 2026-11-18 at 22.09.27")
-  }
-
-  @Test(arguments: [
-    ("LinkRunner-100G", "LinkRunner-100G"), ("a/b:c", "a-b-c"), ("..hidden", "hidden"),
-    ("evil\u{202E}gnp.exe", "evilgnp.exe"), ("line\nbreak\u{0}", "linebreak"), ("", "Android"),
-    ("  ", "Android"), (String(repeating: "x", count: 100), String(repeating: "x", count: 64)),
-  ])
-  func modelsBecomeOneSafeComponent(model: String, safe: String) {
-    #expect(CaptureFiles.fileSafe(model) == safe)
-  }
-
-  @Test func theFolderIsWhereMacOSSavesScreenshots() {
-    let home = URL(filePath: "/Users/someone", directoryHint: .isDirectory)
-    let desktop = home.appending(path: "Desktop", directoryHint: .isDirectory)
-    #expect(
-      CaptureFiles.folder(location: "~/Pictures/Shots", home: home) { _ in true }.path
-        == "/Users/someone/Pictures/Shots")
-    #expect(
-      CaptureFiles.folder(location: "/Volumes/Shots", home: home) { _ in true }.path
-        == "/Volumes/Shots")
-    #expect(CaptureFiles.folder(location: nil, home: home) { _ in true } == desktop)
-    #expect(CaptureFiles.folder(location: "Shots", home: home) { _ in true } == desktop)
-    #expect(CaptureFiles.folder(location: "/Volumes/Gone", home: home) { _ in false } == desktop)
-  }
-
-  @Test func anExistingFileIsNeverReplaced() throws {
-    try Data("mine".utf8).write(to: folder.appending(path: "Shot.png"))
-    try Data("mine too".utf8).write(to: folder.appending(path: "Shot 2.png"))
-    let (temporary, handle) = try #require(CaptureFiles.temporary(in: folder))
-    try handle.write(contentsOf: Data("new".utf8))
-    try handle.close()
-    let placed = try CaptureFiles.place(temporary, base: "Shot", fileExtension: "png")
-    #expect(placed.lastPathComponent == "Shot 3.png")
-    #expect(try Data(contentsOf: folder.appending(path: "Shot.png")) == Data("mine".utf8))
-    #expect(try names(folder) == ["Shot 2.png", "Shot 3.png", "Shot.png"])
+    try FileManager.default.contentsOfDirectory(atPath: scratch.path)
+      .filter { $0.hasPrefix("ferry-transfer-") }
   }
 
   @Test(arguments: [
@@ -105,7 +56,7 @@ struct ADBToolsTests {
     let info = DeviceInfo(id: device, manufacturer: "", model: "LinkRunner-100G")
     let storage = StorageInfo(
       id: StorageID(device: device, key: "internal"), description: "Internal", capacity: 1, free: 1)
-    let routes = ADBRoutes(usb: "0123456789abcdef", wireless: ["10.0.0.5:5555"])
+    let routes = ADBRoutes(usb: serial, wireless: ["10.0.0.5:5555"])
     let ready = AttachedDevice(info: info, state: .ready([storage]), method: method)
     #expect((ADBTools.target(for: device, devices: [ready], routes: routes) != nil) == has)
     let ejected = AttachedDevice(info: info, state: .ejected, method: method)
@@ -118,57 +69,50 @@ struct ADBToolsTests {
     let info = DeviceInfo(id: device, manufacturer: "", model: "LinkRunner-100G")
     let ready = AttachedDevice(info: info, state: .ready([]), method: .usbADB)
     let routes = ADBRoutes(usb: "usb-serial", wireless: ["10.0.0.5:5555"])
-    #expect(ADBTools.target(for: device, devices: [ready], routes: routes)?.serial == "usb-serial")
+    #expect(ADBTools.target(for: device, devices: [ready], routes: routes) == "usb-serial")
   }
 
   // MARK: Screenshot
 
-  @Test func aScreenshotIsSavedWhereMacOSSavesThem() async throws {
+  @Test func aScreenshotGoesIntoTheClientsFile() async throws {
     let fake = FakeToolDevice()
-    let outcome = try await makeTools(fake).screenshot(device)
-    let base = CaptureFiles.baseName(.screenshot, model: "LinkRunner-100G", at: moment)
-    #expect(outcome == .saved(folder.appending(path: base + ".png")))
-    #expect(try names(folder) == [base + ".png"])
-    #expect(try Data(contentsOf: folder.appending(path: base + ".png")) == FakeToolDevice.png)
-    #expect(await fake.screenshots == [target.serial])
+    let (url, handle) = try destination()
+    #expect(try await makeTools(fake).screenshot(device, into: handle.fileDescriptor) == .done)
+    #expect(try Data(contentsOf: url) == FakeToolDevice.png)
+    #expect(await fake.screenshots == [serial])
+    #expect(try agentCopies().isEmpty)
   }
 
-  @Test func aSecondScreenshotInTheSameSecondGetsTheNextName() async throws {
+  /// adbd's `exec:` carries stderr with the image: text before the PNG signature is dropped.
+  @Test func textBeforeTheImageIsDropped() async throws {
     let fake = FakeToolDevice()
-    let tools = makeTools(fake)
-    _ = try await tools.screenshot(device)
-    let base = CaptureFiles.baseName(.screenshot, model: "LinkRunner-100G", at: moment)
-    #expect(try await tools.screenshot(device) == .saved(folder.appending(path: base + " 2.png")))
-  }
-
-  @Test func somethingOtherThanAnImageIsNotSaved() async throws {
-    let fake = FakeToolDevice()
-    await fake.set { $0.image = Data("/system/bin/sh: screencap: not found\n".utf8) }
-    #expect(try await makeTools(fake).screenshot(device) == .failed(.noImage))
-    #expect(try names(folder).isEmpty)
-  }
-
-  @Test func anUnwritableFolderFallsBackToTheDesktop() async throws {
-    let fake = FakeToolDevice()
-    let gone = folder.appending(path: "gone", directoryHint: .isDirectory)
-    guard case .saved(let url) = try await makeTools(fake, folder: gone).screenshot(device) else {
-      Issue.record("not saved")
-      return
+    await fake.set {
+      $0.image = Data("WARNING: linker: unused DT entry\n".utf8) + FakeToolDevice.png
     }
-    #expect(url.deletingLastPathComponent().standardizedFileURL == desktop.standardizedFileURL)
+    let (url, handle) = try destination()
+    #expect(try await makeTools(fake).screenshot(device, into: handle.fileDescriptor) == .done)
+    #expect(try Data(contentsOf: url) == FakeToolDevice.png)
   }
 
-  @Test func withNowhereToWriteNothingIsSaved() async throws {
+  @Test(arguments: [
+    Data("/system/bin/sh: screencap: not found\n".utf8),
+    Data(repeating: 0x20, count: 4097) + FakeToolDevice.png, Data(),
+  ])
+  func somethingOtherThanAnImageIsNotWritten(output: Data) async throws {
     let fake = FakeToolDevice()
-    try FileManager.default.removeItem(at: desktop)
-    let gone = folder.appending(path: "gone", directoryHint: .isDirectory)
-    #expect(try await makeTools(fake, folder: gone).screenshot(device) == .failed(.cannotSave))
+    await fake.set { $0.image = output }
+    let (url, handle) = try destination()
+    #expect(
+      try await makeTools(fake).screenshot(device, into: handle.fileDescriptor)
+        == .failed(.noImage))
+    #expect(try Data(contentsOf: url).isEmpty)
   }
 
   @Test func aDeviceNotOnADBGetsNoTools() async throws {
     let fake = FakeToolDevice()
     let tools = makeTools(fake, served: false)
-    #expect(try await tools.screenshot(device) == .failed(.notOverADB))
+    let (_, handle) = try destination()
+    #expect(try await tools.screenshot(device, into: handle.fileDescriptor) == .failed(.notOverADB))
     #expect(try await tools.startRecording(device) == .failed(.notOverADB))
     let apk = try source(ZipFixture.archive(["AndroidManifest.xml"]))
     #expect(
@@ -182,27 +126,36 @@ struct ADBToolsTests {
 
   @Test func aLostDeviceIsDisconnected() async throws {
     let fake = FakeToolDevice()
-    await fake.set { $0.failure = .deviceGone("0123456789abcdef") }
+    await fake.set { $0.failure = .deviceGone(serial) }
+    let (_, handle) = try destination()
     await #expect(throws: TransportError.deviceDisconnected) {
-      try await makeTools(fake).screenshot(device)
+      try await makeTools(fake).screenshot(device, into: handle.fileDescriptor)
     }
-    #expect(try names(folder).isEmpty)
   }
 
   // MARK: APK
 
-  @Test func anAPKIsCheckedThenInstalled() async throws {
+  /// The device's copy is journalled before it exists and dropped once it is removed.
+  @Test func anAPKIsCheckedInstalledAndItsCopyRemoved() async throws {
     let fake = FakeToolDevice()
+    let journal = journal
+    await fake.set { fake in
+      fake.onCreate = { path in #expect(await journal.paths(on: device) == [path]) }
+    }
     let apk = ZipFixture.archive(["classes.dex", "AndroidManifest.xml", "res/layout/a.xml"])
     let handle = try source(apk)
     // A client's offset is not trusted.
     try handle.seekToEnd()
-    #expect(
-      try await makeTools(fake).installAPK(handle.fileDescriptor, on: device) { _, _ in true }
-        == .done)
+    let outcome = try await makeTools(fake).installAPK(handle.fileDescriptor, on: device) { _, _ in
+      true
+    }
+    #expect(outcome == .done)
     let installs = await fake.installs
-    #expect(installs.map(\.serial) == [target.serial])
     #expect(installs.map(\.contents) == [apk])
+    let path = try #require(installs.first?.path)
+    #expect(ADBDeviceTools.isTemporaryPath(path) && path.hasSuffix(".apk"))
+    #expect(await fake.removals == [path])
+    #expect(await journal.paths(on: device).isEmpty)
     #expect(try agentCopies().isEmpty)
   }
 
@@ -221,6 +174,7 @@ struct ADBToolsTests {
       try await makeTools(fake).installAPK(handle.fileDescriptor, on: device) { _, _ in true }
         == .failed(.notAnAPK))
     #expect(await fake.installs.isEmpty)
+    #expect(await journal.paths(on: device).isEmpty)
     #expect(try agentCopies().isEmpty)
   }
 
@@ -236,23 +190,40 @@ struct ADBToolsTests {
     #expect(try agentCopies().isEmpty)
   }
 
-  @Test func pmsRefusalIsPassedOn() async throws {
+  @Test func pmsRefusalIsPassedOnAndTheCopyRemoved() async throws {
     let fake = FakeToolDevice()
     await fake.set { $0.installResult = .failed("INSTALL_FAILED_VERSION_DOWNGRADE") }
     let handle = try source(ZipFixture.archive(["AndroidManifest.xml"]))
     #expect(
       try await makeTools(fake).installAPK(handle.fileDescriptor, on: device) { _, _ in true }
         == .failed(.installFailed("INSTALL_FAILED_VERSION_DOWNGRADE")))
-    #expect(try agentCopies().isEmpty)
+    #expect(await fake.removals.count == 1)
+    #expect(await journal.paths(on: device).isEmpty)
   }
 
-  @Test func aDeviceLostDuringInstallLeavesNoCopy() async throws {
+  /// The device went away: its copy cannot be removed, so it stays journalled for the next
+  /// session, which removes it.
+  @Test func aCopyThatCannotBeRemovedIsSweptNextSession() async throws {
     let fake = FakeToolDevice()
-    await fake.set { $0.failure = .connectionClosed }
+    await fake.set {
+      $0.failure = .connectionClosed
+      $0.removes = false
+    }
     let handle = try source(ZipFixture.archive(["AndroidManifest.xml"]))
     await #expect(throws: TransportError.deviceDisconnected) {
       try await makeTools(fake).installAPK(handle.fileDescriptor, on: device) { _, _ in true }
     }
+    let left = try #require(await fake.removals.first)
+    #expect(await journal.paths(on: device) == [left])
     #expect(try agentCopies().isEmpty)
+    // A restarted agent reads the journal back, and the next session removes the file.
+    let restarted = ToolJournal(store: scratch.appending(path: "journal.json"))
+    #expect(await restarted.paths(on: device) == [left])
+    await fake.set { $0.removes = true }
+    await restarted.sweep(device, serial: serial, using: fake)
+    #expect(await fake.removals == [left, left])
+    #expect(await restarted.paths(on: device).isEmpty)
+    #expect(
+      await ToolJournal(store: scratch.appending(path: "journal.json")).paths(on: device).isEmpty)
   }
 }

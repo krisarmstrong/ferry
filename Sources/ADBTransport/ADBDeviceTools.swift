@@ -15,8 +15,9 @@ public enum APKInstallResult: Sendable, Equatable {
 /// built by `ADBShell.command`.
 ///
 /// Files Ferry puts on the device for a tool (the APK it installs, the recording before it is
-/// pulled) are removed in every outcome, from a task of their own so a cancelled caller still
-/// cleans up. A device that has gone cannot be cleaned; that is logged.
+/// pulled) live at paths the caller takes from `apkPath()` and `recordingPath()`, so it can note
+/// them before they exist; `removeTemporary` removes one, from a task of its own so a cancelled
+/// caller still cleans up, and says whether it did.
 public struct ADBDeviceTools: Sendable {
   static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBTools")
 
@@ -51,25 +52,40 @@ public struct ADBDeviceTools: Sendable {
     self.captureWait = captureWait
   }
 
+  /// A new path for an APK on its way to pm.
+  public static func apkPath() -> String {
+    "\(apkFolder)/ferry-\(UUID().uuidString).apk"
+  }
+
+  /// A new hidden path for a recording, in the device's Download folder.
+  public static func recordingPath() -> String {
+    "\(recordingFolder)/.ferry-rec-\(UUID().uuidString).mp4"
+  }
+
+  /// Whether `path` is one `apkPath()` or `recordingPath()` made, so a stored path can only ever
+  /// name a file Ferry created.
+  public static func isTemporaryPath(_ path: String) -> Bool {
+    for (prefix, suffix) in [
+      ("\(apkFolder)/ferry-", ".apk"), ("\(recordingFolder)/.ferry-rec-", ".mp4"),
+    ]
+    where path.hasPrefix(prefix) && path.hasSuffix(suffix) {
+      let middle = path.dropFirst(prefix.count).dropLast(suffix.count)
+      if let uuid = UUID(uuidString: String(middle)), uuid.uuidString == middle { return true }
+    }
+    return false
+  }
+
   // MARK: Installing
 
-  /// Pushes `file` (from its current offset) to a new temporary path on the device, installs it
-  /// with `pm install -r`, then removes the copy, whatever happened.
+  /// Pushes `file` (from its current offset) to `path` on the device and installs it with
+  /// `pm install -r`. The caller removes `path` afterwards, whatever happened.
   public func installAPK(
-    _ file: FileHandle, serial: String, progress: ProgressHandler
+    _ file: FileHandle, to path: String, serial: String, progress: ProgressHandler
   ) async throws(ADBError) -> APKInstallResult {
-    let path = "\(Self.apkFolder)/ferry-\(UUID().uuidString).apk"
-    let outcome: Result<APKInstallResult, ADBError>
-    do throws(ADBError) {
-      try await push(file, to: path, serial: serial, progress: progress)
-      let result = try await host.run(
-        serial: serial, command: try ADBShell.command("pm", ["install", "-r", path]))
-      outcome = .success(Self.installResult(result))
-    } catch {
-      outcome = .failure(error)
-    }
-    await remove(path, on: serial)
-    return try outcome.get()
+    try await push(file, to: path, serial: serial, progress: progress)
+    let result = try await host.run(
+      serial: serial, command: try ADBShell.command("pm", ["install", "-r", path]))
+    return Self.installResult(result)
   }
 
   private func push(
@@ -141,11 +157,12 @@ public struct ADBDeviceTools: Sendable {
 
   // MARK: Recording
 
-  /// Starts `screenrecord` into a new hidden file in the device's Download folder and returns
-  /// once it has printed its pid. The recording runs until `interrupt()`, its time limit, or the
-  /// connection closing.
-  public func startRecording(serial: String) async throws(ADBError) -> ADBScreenRecording {
-    let path = "\(Self.recordingFolder)/.ferry-rec-\(UUID().uuidString).mp4"
+  /// Starts `screenrecord` into `path` and returns once it has printed its pid. The recording
+  /// runs until `interrupt()`, its time limit, or the connection closing. The caller removes
+  /// `path` afterwards, whatever happened.
+  public func startRecording(serial: String, to path: String) async throws(ADBError)
+    -> ADBScreenRecording
+  {
     let command = try ADBShell.command("sh", ["-c", Self.recordScript, "sh", path])
     let output: ShellOutput
     if try await host.features(serial).contains("shell_v2") {
@@ -166,21 +183,23 @@ public struct ADBDeviceTools: Sendable {
       return recording
     } catch {
       output.stream.cancel()
-      await remove(path, on: serial)
       throw error
     }
   }
 
   // MARK: Plumbing
 
-  /// `rm -f path`, run to the end even when the caller was cancelled, bounded in time.
-  func remove(_ path: String, on serial: String) async {
-    await runDetached(on: serial, "rm", ["-f", path], what: "removing \(path)")
+  /// `rm -f -- path`, run to the end even when the caller was cancelled, bounded in time. True
+  /// once the path is gone (or was never there).
+  public func removeTemporary(_ path: String, serial: String) async -> Bool {
+    await runDetached(on: serial, "rm", ["-f", "--", path], what: "removing \(path)")
   }
 
   /// Runs a short command on a task of its own, so a cancelled caller cannot stop it, and logs
-  /// what went wrong; nothing is thrown.
-  func runDetached(on serial: String, _ program: String, _ args: [String], what: String) async {
+  /// what went wrong. True when it ran and exited 0.
+  func runDetached(on serial: String, _ program: String, _ args: [String], what: String) async
+    -> Bool
+  {
     let host = host
     let limit = answerLimit
     let result = await Task {
@@ -196,7 +215,7 @@ public struct ADBDeviceTools: Sendable {
     }.value
     switch result {
     case .success(let output) where output.status == 0:
-      return
+      return true
     case .success(let output):
       let detail = Self.text(output.stdout + output.stderr)
       Self.log.error(
@@ -205,6 +224,7 @@ public struct ADBDeviceTools: Sendable {
       Self.log.error(
         "\(what, privacy: .private) failed: \(String(describing: error), privacy: .public)")
     }
+    return false
   }
 }
 
@@ -305,8 +325,8 @@ public actor ADBScreenRecording {
     }
   }
 
-  /// Removes the recording from the device; best effort, and logged when it fails.
-  public func discard() async {
-    await tools.remove(devicePath, on: serial)
+  /// Removes the recording from the device. True once it is gone.
+  public func discard() async -> Bool {
+    await tools.removeTemporary(devicePath, serial: serial)
   }
 }

@@ -1,13 +1,15 @@
 import DeviceKit
 import Foundation
 
-/// Where the agent saves screenshots and screen recordings: where macOS saves its own (the
+/// Where the app saves screenshots and screen recordings: where macOS saves its own (the
 /// `location` the Screenshot app sets in `com.apple.screencapture`), else the Desktop, under
 /// names like macOS's own: `Screenshot <model> 2026-11-18 at 17.09.27.png`.
 ///
-/// A file is written under a hidden temporary name in the folder, then given the first free name
-/// (`… 2.png`, `… 3.png`) in one step that fails rather than replace a file. A failed save
-/// removes what it wrote, so no partial file is ever left under a real name, nor at all.
+/// The app creates a hidden temporary file in the folder and sends it to the agent as a writable
+/// descriptor; once the agent has filled it, the file is given the first free name (`… 2.png`,
+/// `… 3.png`) in one step that fails rather than replace a file. A failed capture removes the
+/// temporary file, so no partial file is ever left under a real name, nor at all. The agent, a
+/// background process, never touches the user's folders.
 enum CaptureFiles {
   enum Kind {
     case screenshot
@@ -98,7 +100,7 @@ enum CaptureFiles {
   }
 
   /// A new hidden file in `folder`, open for writing; `nil` if the folder cannot take one (it is
-  /// gone, read-only, or macOS denies the agent access to it).
+  /// gone, read-only, or macOS denies Ferry access to it).
   static func temporary(in folder: URL) -> (url: URL, handle: FileHandle)? {
     let url = folder.appending(path: temporaryPrefix + UUID().uuidString)
     let descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)

@@ -33,6 +33,9 @@ public protocol SystemServicing {
   func copy(_ text: String)
   /// Asks the user for an `.apk`; `nil` if they cancel.
   func chooseAPK() async -> URL?
+  /// Where screenshots and recordings go, in order of preference: where macOS saves its own,
+  /// then the Desktop.
+  func captureFolders() -> [URL]
 }
 
 /// `SMAppService`, `NSWorkspace` and `NSApplication`.
@@ -121,6 +124,10 @@ public final class SystemServices: SystemServicing {
         "Choose an Android app (.apk) to install.", bundle: .module))
     NSApp.activate()
     return panel.runModal() == .OK ? panel.url : nil
+  }
+
+  public func captureFolders() -> [URL] {
+    [CaptureFiles.current(), CaptureFiles.desktop()]
   }
 
   private nonisolated static func describe(_ status: SMAppService.Status) -> String {

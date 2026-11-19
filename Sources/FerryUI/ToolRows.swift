@@ -41,7 +41,7 @@ struct ToolRow: View {
     if let recording = actions.recording {
       HStack {
         Label {
-          if recording.stopping {
+          if recording.stopping || recording.finished {
             Text("Saving recording…", bundle: .module)
           } else {
             HStack(spacing: 4) {
@@ -56,7 +56,7 @@ struct ToolRow: View {
         }
         .font(.callout)
         Spacer()
-        if !recording.stopping {
+        if !recording.stopping && !recording.finished {
           Button(action: actions.stopRecording) {
             Text("Stop", bundle: .module)
           }

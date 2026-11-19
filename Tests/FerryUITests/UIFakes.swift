@@ -24,6 +24,8 @@ final class FakeClient: AgentSending {
   private let ejectResult = Mutex<AgentResponse>(.removed(preserved: []))
   private let wirelessResult = Mutex<AgentResponse>(.wireless(.connected))
   private let toolResult = Mutex<AgentResponse>(.done)
+  /// What the agent writes into the file a capture request carries.
+  private let toolBytes = Mutex(Data())
   /// Progress the agent reports on a tool request before it answers.
   private let toolProgress = Mutex<[(UInt64, UInt64)]>([])
 
@@ -49,13 +51,19 @@ final class FakeClient: AgentSending {
   }
 
   /// What the agent answers to the next tool request, after reporting `progress`.
-  func setTool(_ response: AgentResponse, progress: [(UInt64, UInt64)] = []) {
+  func setTool(
+    _ response: AgentResponse, progress: [(UInt64, UInt64)] = [], writes bytes: Data = Data()
+  ) {
     toolResult.withLock { $0 = response }
     toolProgress.withLock { $0 = progress }
+    toolBytes.withLock { $0 = bytes }
   }
 
-  private func tool(_ progress: TransferProgressHandler?) -> AgentResponse {
+  private func tool(_ progress: TransferProgressHandler?, into file: FileHandle? = nil)
+    -> AgentResponse
+  {
     for (done, total) in toolProgress.withLock({ $0 }) { progress?(done, total) }
+    if let file { try? file.write(contentsOf: toolBytes.withLock { $0 }) }
     return toolResult.withLock { $0 }
   }
 
@@ -132,8 +140,19 @@ final class FakeClient: AgentSending {
       log.record("installAPK \(id.serial) \(name) file:\(file != nil)")
       return tool(progress)
     case .screenshot(let id):
-      log.record("screenshot \(id.serial)")
-      return tool(progress)
+      log.record("screenshot \(id.serial) file:\(file != nil)")
+      return tool(progress, into: file)
+    case .saveRecording(let id):
+      log.record("saveRecording \(id.serial) file:\(file != nil)")
+      // Collected: the agent no longer lists it.
+      status.withLock { reply in
+        guard case .status(let report) = reply else { return }
+        reply = .status(
+          StatusReport(
+            devices: report.devices, provider: report.provider, transfers: report.transfers,
+            adbStatus: report.adbStatus, remembered: report.remembered))
+      }
+      return tool(progress, into: file)
     case .startRecording(let id):
       log.record("startRecording \(id.serial)")
       return tool(progress)
@@ -232,6 +251,10 @@ final class FakeServices: SystemServicing {
 
   /// What the open panel returns: `nil` is Cancel.
   var pickedAPK: URL?
+  /// Where captures go.
+  var folders: [URL] = []
+
+  func captureFolders() -> [URL] { folders }
 
   func chooseAPK() async -> URL? {
     log.record("chooseAPK")

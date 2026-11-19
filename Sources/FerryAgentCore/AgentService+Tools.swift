@@ -19,15 +19,18 @@ extension AgentService {
         try await tools.installAPK(file, on: id, progress: handler)
       }
       outcome = try await transfers.track(start, report: progress, install)
-    case (.screenshot(let id), _):
+    case (.screenshot(let id), let file?):
       guard let tools else { return .toolFailed(.notOverADB) }
-      outcome = try await tools.screenshot(id)
+      outcome = try await tools.screenshot(id, into: file)
     case (.startRecording(let id), _):
       guard let tools else { return .toolFailed(.notOverADB) }
       outcome = try await tools.startRecording(id)
     case (.stopRecording(let id), _):
       guard let tools else { return .toolFailed(.notRecording) }
       outcome = try await tools.stopRecording(id)
+    case (.saveRecording(let id), let file?):
+      guard let tools else { return .toolFailed(.notRecording) }
+      outcome = try await tools.saveRecording(id, into: file)
     default:
       return nil
     }

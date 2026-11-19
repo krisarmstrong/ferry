@@ -79,12 +79,12 @@ extension AgentService {
   /// into.
   static func takesFile(_ request: AgentRequest) -> Bool {
     switch request {
-    case .fetch, .replaceContents, .installAPK: true
+    case .fetch, .replaceContents, .installAPK, .screenshot, .saveRecording: true
     case .create(_, _, _, let isFolder): !isFolder
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .item, .list, .rename,
       .move, .delete, .changes, .workingSet, .connectAddress, .pair, .connectWireless,
-      .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless, .screenshot,
-      .startRecording, .stopRecording:
+      .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless, .startRecording,
+      .stopRecording:
       false
     }
   }

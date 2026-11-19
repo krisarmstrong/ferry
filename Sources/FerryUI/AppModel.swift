@@ -24,7 +24,7 @@ import os
 
   private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "AppModel")
   private static let pollInterval = Duration.seconds(2)
-  private static let emptyGuideDelay = Duration.seconds(10)
+  static let emptyGuideDelay = Duration.seconds(10)
 
   public private(set) var devices: [AttachedDevice] = []
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
@@ -60,6 +60,8 @@ import os
   /// Recordings this menu asked for, by when, until the agent answers: shown before the status
   /// lists them.
   var requestedRecordings: [DeviceID: Date] = [:]
+  /// Finished recordings being saved, so each is collected once.
+  var collectingRecordings: Set<DeviceID> = []
   /// What the last tool request said when it succeeded without a file to show.
   public internal(set) var toolMessage: String?
   /// Where the system saved changes an eject removed before they reached the device. Shown until
@@ -84,7 +86,7 @@ import os
   private let sleep: @Sendable (Duration) async throws -> Void
   /// Devices the guide has opened for this app run.
   private var guidedDevices: Set<DeviceID> = []
-  private var emptyGuideShown = false
+  var emptyGuideShown = false
 
   public convenience init(
     client: any AgentSending, services: any SystemServicing = SystemServices()
@@ -170,17 +172,6 @@ import os
       }
       answeredFor? += Self.pollInterval
     }
-  }
-
-  /// Opens the guide, with the model picker, once per app run when the agent is running but
-  /// has seen no device for 10 s of the menu being open, counted from the agent's first
-  /// answer.
-  func considerEmptyGuide(openFor: Duration) {
-    guard agent == .running, devices.isEmpty, openFor >= Self.emptyGuideDelay,
-      !emptyGuideShown
-    else { return }
-    emptyGuideShown = true
-    showGuide(for: nil)
   }
 
   /// Opens the guide with the device's steps, or the model picker if Ferry does not know its
@@ -334,6 +325,7 @@ import os
     remembered = report.remembered
     unconfirmed = report.unconfirmed
     recordings = report.recordings
+    collectFinishedRecordings()
     agent = .running
     // The agent replaced a domain on its own and the system kept its unsent changes: shown as an
     // eject's are.

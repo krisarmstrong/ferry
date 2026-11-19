@@ -65,7 +65,7 @@ extension DevicePresentation {
     case .cannotSave:
       String(
         localized: LocalizedStringResource(
-          "Ferry can't save to your screenshot folder or the Desktop. Allow it in Privacy & Security.",
+          "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security.",
           bundle: .module))
     }
   }

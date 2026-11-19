@@ -4,15 +4,17 @@ import FerryIPC
 import Foundation
 import os
 
-private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBTools")
+let toolsLog = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBTools")
 
 /// What `ADBTools` needs of a device on adb. `ADBDeviceTools` is the real one; tests script a
 /// fake.
 public protocol ADBToolDevice: Sendable {
-  func installAPK(_ file: FileHandle, serial: String, progress: ProgressHandler)
+  func installAPK(_ file: FileHandle, to path: String, serial: String, progress: ProgressHandler)
     async throws(ADBError) -> APKInstallResult
   func screenshot(serial: String) async throws(ADBError) -> Data
-  func recordScreen(serial: String) async throws(ADBError) -> any ScreenRecordingControl
+  func recordScreen(serial: String, to path: String) async throws(ADBError)
+    -> any ScreenRecordingControl
+  func removeTemporary(_ path: String, serial: String) async -> Bool
 }
 
 /// A screen recording running on a device (see `ADBScreenRecording`).
@@ -21,39 +23,36 @@ public protocol ScreenRecordingControl: Sendable {
   func interrupt() async throws(ADBError)
   func abandon() async
   func pull(into file: FileHandle, progress: ProgressHandler) async throws(ADBError) -> UInt64
-  func discard() async
 }
 
 extension ADBScreenRecording: ScreenRecordingControl {}
 
 extension ADBDeviceTools: ADBToolDevice {
-  public func recordScreen(serial: String) async throws(ADBError) -> any ScreenRecordingControl {
-    try await startRecording(serial: serial)
+  public func recordScreen(serial: String, to path: String) async throws(ADBError)
+    -> any ScreenRecordingControl
+  {
+    try await startRecording(serial: serial, to: path)
   }
 }
 
 /// The ADB tools: install an APK, take a screenshot, record the screen. Only a device the hub
 /// serves over ADB (USB or the network) can use them, by the route its session uses.
 ///
-/// The agent writes the screenshots and recordings itself, where macOS saves its own (see
-/// `CaptureFiles`): it holds the device's stream, and a recording that reaches its time limit
-/// is saved with no request waiting for it, even after the menu has quit. The app is told where
-/// the file is only to show it in Finder; no path ever goes from the app to the agent.
+/// The agent never opens a file on the Mac a client named, and never touches the user's folders:
+/// the app creates each screenshot or recording file where macOS saves its own and sends it as a
+/// writable descriptor, as `.fetch` does. The agent checks what the device sent in its own
+/// scratch folder first (a PNG, an MP4), so the client's file receives only a whole, checked
+/// capture. An APK arrives as a readable descriptor, is copied into the scratch folder, and is
+/// checked to be an Android app there before anything reaches the device.
 ///
-/// An APK arrives as a descriptor, is copied into the agent's scratch folder, and is checked to
-/// be an Android app there before anything reaches the device.
+/// Files put on the device (the APK on its way to pm, the recording until it is collected) are
+/// noted in the `ToolJournal` before they exist and dropped once removed; one that could not be
+/// removed is swept the next time a session for the device opens.
+///
+/// A recording runs until Stop, its time limit or the process ending; `.startRecording` answers
+/// then, and the recording waits on the device, listed as finished, until the app collects it
+/// with `.saveRecording`, even after the app was relaunched.
 public actor ADBTools {
-  /// The adb route the tools use for a device, and the model the file names carry.
-  public struct Target: Sendable, Equatable {
-    public let serial: String
-    public let model: String
-
-    public init(serial: String, model: String) {
-      self.serial = serial
-      self.model = model
-    }
-  }
-
   public struct Limits: Sendable {
     /// No APK can be larger: its ZIP offsets are 32-bit.
     public var apkSize: UInt64 = 4 << 30
@@ -70,64 +69,59 @@ public actor ADBTools {
   /// How a tool request ended, short of a lost device.
   public enum Outcome: Sendable, Equatable {
     case done
-    case saved(URL)
     case failed(ToolFailure)
 
     var response: AgentResponse {
       switch self {
       case .done: .done
-      case .saved(let url): .saved(url)
       case .failed(let failure): .toolFailed(failure)
       }
     }
   }
 
-  private struct Recording {
+  struct Recording {
     let token = UUID()
     let started: Date
+    let path = ADBDeviceTools.recordingPath()
+    var serial: String?
     var stopping = false
     var control: (any ScreenRecordingControl)?
+    /// How it ended; `nil` while it runs.
+    var end: ADBScreenRecording.End?
+    var collecting = false
   }
 
-  private let device: any ADBToolDevice
-  private let target: @Sendable (DeviceID) async -> Target?
-  let folder: @Sendable () -> URL
-  let desktop: URL
-  private let scratch: URL
-  private let now: @Sendable () -> Date
-  private let limits: Limits
-  private var recordings: [DeviceID: Recording] = [:]
+  let device: any ADBToolDevice
+  /// The adb serial the tools use for a device: only a ready device served over ADB has one.
+  let target: @Sendable (DeviceID) async -> String?
+  let journal: ToolJournal
+  let scratch: URL
+  let now: @Sendable () -> Date
+  let limits: Limits
+  var recordings: [DeviceID: Recording] = [:]
 
   public init(
-    device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> Target?,
-    folder: (@Sendable () -> URL)? = nil, desktop: URL? = nil,
-    scratch: URL = FileManager.default.temporaryDirectory,
+    device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> String?,
+    journal: ToolJournal, scratch: URL = FileManager.default.temporaryDirectory,
     now: @escaping @Sendable () -> Date = Date.init, limits: Limits = Limits()
   ) {
     self.device = device
     self.target = target
-    self.folder = folder ?? { CaptureFiles.current() }
-    self.desktop = desktop ?? CaptureFiles.desktop()
+    self.journal = journal
     self.scratch = scratch
     self.now = now
     self.limits = limits
   }
 
-  /// The tools' route for `id`: only a ready device served over ADB has one.
+  /// The tools' adb serial for `id`: the route its session uses, for a ready device served over
+  /// ADB only.
   public static func target(
     for id: DeviceID, devices: [AttachedDevice], routes: ADBRoutes?
-  ) -> Target? {
+  ) -> String? {
     guard let device = devices.first(where: { $0.id == id }), case .ready = device.state,
-      device.method != .usbFileTransfer, let serial = routes?.preferred
+      device.method != .usbFileTransfer
     else { return nil }
-    return Target(serial: serial, model: device.info.model)
-  }
-
-  public func recordingsRunning() -> [ActiveRecording] {
-    recordings.map {
-      ActiveRecording(device: $0.key, started: $0.value.started, stopping: $0.value.stopping)
-    }
-    .sorted { $0.started < $1.started }
+    return routes?.preferred
   }
 
   // MARK: APK
@@ -136,7 +130,7 @@ public actor ADBTools {
   public func installAPK(_ source: Int32, on id: DeviceID, progress: ProgressHandler)
     async throws(TransportError) -> Outcome
   {
-    guard let target = await target(id) else { return .failed(.notOverADB) }
+    guard let serial = await target(id) else { return .failed(.notOverADB) }
     guard try Self.size(of: source) <= limits.apkSize else { return .failed(.apkTooLarge) }
     let copy = try await FileTransfer.copyIn(source, into: scratch)
     defer { FileTransfer.remove(copy) }
@@ -152,149 +146,92 @@ public actor ADBTools {
       return .failed(.apkTooLarge)
     }
     guard APKCheck.isAPK(at: copy) else { return .failed(.notAnAPK) }
+    let path = ADBDeviceTools.apkPath()
+    await journal.note(path, on: id)
+    let result: Result<APKInstallResult, ADBError>
     do throws(ADBError) {
-      try? handle.seek(toOffset: 0)
-      switch try await device.installAPK(handle, serial: target.serial, progress: progress) {
-      case .installed: return .done
-      case .failed(let reason): return .failed(.installFailed(reason))
-      }
+      result = .success(
+        try await device.installAPK(handle, to: path, serial: serial, progress: progress))
     } catch {
-      throw Self.transportError(error)
+      result = .failure(error)
+    }
+    await removeFromDevice(path, of: id, serial: serial)
+    switch result {
+    case .success(.installed): return .done
+    case .success(.failed(let reason)): return .failed(.installFailed(reason))
+    case .failure(let error): throw Self.transportError(error)
     }
   }
 
   // MARK: Screenshot
 
-  public func screenshot(_ id: DeviceID) async throws(TransportError) -> Outcome {
-    guard let target = await target(id) else { return .failed(.notOverADB) }
+  /// Streams a screenshot into `target`, a writable descriptor from the client.
+  public func screenshot(_ id: DeviceID, into file: Int32) async throws(TransportError) -> Outcome {
+    try FileTransfer.requireRegular(file)
+    guard let serial = await target(id) else { return .failed(.notOverADB) }
     let image: Data
     do throws(ADBError) {
-      image = try await device.screenshot(serial: target.serial)
+      image = try await device.screenshot(serial: serial)
     } catch {
       throw Self.transportError(error)
     }
-    guard image.starts(with: Self.pngMagic) else { return .failed(.noImage) }
-    let write: Writer = { handle throws(SaveError) in
-      do {
-        try handle.write(contentsOf: image)
-      } catch {
-        throw .transport(.io("cannot write the screenshot: \(error.localizedDescription)"))
-      }
-    }
-    return try await save(.screenshot, of: target, at: now(), failure: .noImage, write)
-  }
-
-  static let pngMagic = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
-
-  // MARK: Recording
-
-  /// Records until Stop, the time limit, or the device going, then saves the video. One
-  /// recording per device.
-  public func startRecording(_ id: DeviceID) async throws(TransportError) -> Outcome {
-    guard recordings[id] == nil else { return .failed(.alreadyRecording) }
-    let recording = Recording(started: now())
-    recordings[id] = recording
-    let started: (Target, any ScreenRecordingControl)?
-    do throws(TransportError) {
-      started = try await begin(id, token: recording.token)
+    guard let png = Self.png(in: image) else { return .failed(.noImage) }
+    let staged = FileTransfer.scratchURL(in: scratch)
+    defer { FileTransfer.remove(staged) }
+    do {
+      try png.write(to: staged, options: .withoutOverwriting)
     } catch {
-      recordings[id] = nil
-      throw error
+      throw .io("cannot stage the screenshot: \(error.localizedDescription)")
     }
-    guard let (target, control) = started else {
-      recordings[id] = nil
-      return .failed(.notOverADB)
-    }
-    let watchdog = Task { [limits] in
-      // screenrecord stops at its own limit; this is for one that does not.
-      guard (try? await Task.sleep(for: limits.recording + limits.grace)) != nil else { return }
-      log.error("a recording outlived its time limit; stopping it")
-      // The kill may never answer on a wedged device; the close below does not wait for it.
-      Task { try? await control.interrupt() }
-      guard (try? await Task.sleep(for: limits.stopWait)) != nil else { return }
-      await control.abandon()
-    }
-    let end = await control.finished()
-    watchdog.cancel()
-    let outcome = await finish(control, end: end, target: target, started: recording.started)
-    await control.discard()
-    recordings[id] = nil
-    return try outcome.get()
-  }
-
-  public func stopRecording(_ id: DeviceID) async throws(TransportError) -> Outcome {
-    guard let recording = recordings[id] else { return .failed(.notRecording) }
-    recordings[id]?.stopping = true
-    // Still starting: `begin` stops it once it has a pid.
-    guard let control = recording.control else { return .done }
-    try await stop(id, token: recording.token, control)
+    try await FileTransfer.copyOut(staged, to: file)
     return .done
   }
 
-  /// Sends SIGINT, and closes the recording if it has not ended `stopWait` later.
-  /// The close is armed first, so a kill that never answers still frees the device.
-  private func stop(_ id: DeviceID, token: UUID, _ control: any ScreenRecordingControl)
-    async throws(TransportError)
-  {
-    Task { [limits] in
-      guard (try? await Task.sleep(for: limits.stopWait)) != nil else { return }
-      await self.abandon(id, token: token, control)
+  static let pngMagic = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+  /// adbd's `exec:` carries stderr with stdout, so a warning can come before the image.
+  static let pngSearch = 4096
+
+  /// The PNG in what `screencap` sent, without any text before its signature; `nil` if no
+  /// signature starts within the first 4 KB.
+  static func png(in output: Data) -> Data? {
+    guard let found = output.prefix(pngSearch + pngMagic.count).firstRange(of: pngMagic) else {
+      return nil
     }
-    do throws(ADBError) {
-      try await control.interrupt()
-    } catch {
-      throw Self.transportError(error)
+    return output[found.lowerBound...]
+  }
+
+  // MARK: Plumbing
+
+  /// Removes a tool's file from the device and drops it from the journal once it is gone; one
+  /// that stays is swept when the device's next session opens.
+  func removeFromDevice(_ path: String, of id: DeviceID, serial: String) async {
+    if await device.removeTemporary(path, serial: serial) {
+      await journal.removed(path, on: id)
+    } else {
+      await journal.release(path)
     }
   }
 
-  /// Starts the recording on the device and records its control.
-  private func begin(_ id: DeviceID, token: UUID) async throws(TransportError)
-    -> (Target, any ScreenRecordingControl)?
-  {
-    guard let target = await target(id) else { return nil }
-    let control: any ScreenRecordingControl
-    do throws(ADBError) {
-      control = try await device.recordScreen(serial: target.serial)
-    } catch {
-      throw Self.transportError(error)
-    }
-    recordings[id]?.control = control
-    if recordings[id]?.stopping == true { try? await stop(id, token: token, control) }
-    return (target, control)
+  static func size(of descriptor: Int32) throws(TransportError) -> UInt64 {
+    try FileTransfer.requireRegular(descriptor)
+    var info = stat()
+    guard fstat(descriptor, &info) == 0 else { throw .io("cannot inspect the file") }
+    return UInt64(clamping: info.st_size)
   }
 
-  /// Closes a recording that has not ended `stopWait` after Stop.
-  private func abandon(_ id: DeviceID, token: UUID, _ control: any ScreenRecordingControl) async {
-    guard recordings[id]?.token == token else { return }
-    log.error("a recording did not end after Stop; closing it")
-    await control.abandon()
-  }
-
-  /// Pulls the recording into a new file where screenshots go. A recording with no video (the
-  /// device refused, or the process failed) is `recordingFailed` with its own words.
-  private func finish(
-    _ control: any ScreenRecordingControl, end: ADBScreenRecording.End, target: Target,
-    started: Date
-  ) async -> Result<Outcome, TransportError> {
-    var detail = ""
-    if case .exited(_, let text) = end { detail = text }
-    let write: Writer = { handle throws(SaveError) in
-      do throws(ADBError) {
-        _ = try await control.pull(into: handle) { _, _ in true }
-      } catch {
-        // The device refused the pull (there is no file), as against a device that went away.
-        let lost = Self.transportError(error) == .deviceDisconnected
-        if case .failed = error, !lost { throw .tool(.recordingFailed(detail)) }
-        throw .transport(Self.transportError(error))
-      }
-    }
-    do throws(TransportError) {
-      return .success(
-        try await save(
-          .recording, of: target, at: started, failure: .recordingFailed(detail), write))
-    } catch {
-      if case .lost(let lost) = end { return .failure(Self.transportError(lost)) }
-      return .failure(error)
+  /// A device or server that went away is a disconnected device, as for files; adb's other
+  /// failures carry its words.
+  static func transportError(_ error: ADBError) -> TransportError {
+    switch error {
+    case .deviceGone, .connectionClosed, .serverUnavailable, .adbNotInstalled:
+      .deviceDisconnected
+    case .cancelled:
+      .cancelled
+    case .failed(let message)
+    where message.contains("offline") || message.contains("unauthorized"):
+      .deviceDisconnected
+    case .failed(let message), .protocolViolation(let message), .invalidArgument(let message):
+      .io(message)
     }
   }
 }

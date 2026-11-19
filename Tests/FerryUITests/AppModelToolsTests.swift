@@ -22,24 +22,62 @@ struct AppModelToolsTests {
     return url
   }
 
-  @Test func aScreenshotIsShownInFinder() async {
+  private func names(_ folder: URL) throws -> [String] {
+    try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+  }
+
+  /// The app creates the file where screenshots go, the agent fills it, the app names it and
+  /// shows it.
+  @Test func aScreenshotIsSavedByTheAppAndShownInFinder() async throws {
     let client = FakeClient(log: log)
-    let saved = URL(
-      filePath: "/Users/someone/Downloads/Screenshot LinkRunner 2026-11-18 at 17.09.27.png")
-    client.setTool(.saved(saved))
-    let model = model(client)
+    let png = Data([0x89, 0x50, 0x4E, 0x47, 1, 2, 3])
+    client.setTool(.done, writes: png)
+    client.setStatus([device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB)])
+    let services = FakeServices(log: log)
+    let folder = try TestScratch.folder("shots")
+    services.folders = [folder]
+    let model = model(client, services: services)
+    await model.refresh()
     await model.takeScreenshot(on: id)
-    #expect(log.all == ["screenshot \(id.serial)", "reveal \(saved.path)", "status"])
+    let saved = try names(folder)
+    #expect(saved.count == 1)
+    let name = try #require(saved.first)
+    #expect(name.hasPrefix("Screenshot LinkRunner-100G ") && name.hasSuffix(".png"))
+    #expect(try Data(contentsOf: folder.appending(path: name)) == png)
+    #expect(log.all.contains("screenshot \(id.serial) file:true"))
+    #expect(log.all.contains("reveal \(folder.appending(path: name).path)"))
     #expect(model.actionError == nil)
   }
 
-  @Test func aToolFailureIsShown() async {
+  @Test func aFailedCaptureLeavesNothing() async throws {
     let client = FakeClient(log: log)
-    client.setTool(.toolFailed(.noImage))
-    let model = model(client)
+    client.setTool(.toolFailed(.noImage), writes: Data("half".utf8))
+    let services = FakeServices(log: log)
+    let folder = try TestScratch.folder("shots")
+    services.folders = [folder]
+    let model = model(client, services: services)
     await model.takeScreenshot(on: id)
     #expect(model.actionError == "The device didn't send a screenshot. Unlock it and try again.")
+    #expect(try names(folder).isEmpty)
     #expect(!log.all.contains { $0.hasPrefix("reveal") })
+  }
+
+  /// The first folder that takes a file is used: where macOS saves screenshots, else the Desktop.
+  @Test func anUnusableFolderFallsBackToTheNext() async throws {
+    let client = FakeClient(log: log)
+    let services = FakeServices(log: log)
+    let desktop = try TestScratch.folder("desktop")
+    services.folders = [desktop.appending(path: "gone", directoryHint: .isDirectory), desktop]
+    await model(client, services: services).takeScreenshot(on: id)
+    #expect(try names(desktop).count == 1)
+  }
+
+  @Test func withNowhereToSaveNothingIsSent() async throws {
+    let services = FakeServices(log: log)
+    let model = model(FakeClient(log: log), services: services)
+    await model.takeScreenshot(on: id)
+    #expect(model.actionError == DevicePresentation.message(for: .cannotSave))
+    #expect(!log.all.contains { $0.hasPrefix("screenshot") })
   }
 
   @Test func anAPKIsSentAsAnOpenFileWithItsName() async throws {
@@ -78,26 +116,55 @@ struct AppModelToolsTests {
     #expect(model.toolMessage == nil)
   }
 
-  @Test func aRecordingIsShownWhileRunningAndItsFileAfter() async {
+  /// Start answers once the recording has ended; the app then collects the video into its own
+  /// file and shows it.
+  @Test func aRecordingIsCollectedWhenItEnds() async throws {
     let client = FakeClient(log: log)
-    let started = Date(timeIntervalSince1970: 1_763_503_767)
+    let started = Date(timeIntervalSince1970: 1_795_039_767)
     client.setStatus(
-      [], recordings: [ActiveRecording(device: id, started: started, stopping: false)])
-    let model = model(client)
-    await model.refresh()
-    #expect(
-      model.recording(on: id) == ActiveRecording(device: id, started: started, stopping: false))
-    let saved = URL(filePath: "/Users/someone/Downloads/Screen Recording LinkRunner.mp4")
-    client.setTool(.saved(saved))
-    client.setStatus([])
-    // Already recording: nothing is sent.
-    await model.refresh()
+      [device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB)],
+      recordings: [ActiveRecording(device: id, started: started, stopping: true, finished: true)])
+    let mp4 = Data("....ftypmp42".utf8)
+    client.setTool(.done, writes: mp4)
+    let services = FakeServices(log: log)
+    let folder = try TestScratch.folder("recordings")
+    services.folders = [folder]
+    let model = model(client, services: services)
     await model.startRecording(on: id)
     #expect(log.all.contains("startRecording \(id.serial)"))
-    #expect(log.all.contains("reveal \(saved.path)"))
-    #expect(model.recording(on: id) == nil)
+    #expect(log.all.contains("saveRecording \(id.serial) file:true"))
+    let name = try #require(try names(folder).first)
+    #expect(name.hasPrefix("Screen Recording LinkRunner-100G ") && name.hasSuffix(".mp4"))
+    #expect(try Data(contentsOf: folder.appending(path: name)) == mp4)
+    #expect(log.all.contains("reveal \(folder.appending(path: name).path)"))
+    #expect(log.all.filter { $0.hasPrefix("saveRecording") }.count == 1)
+  }
+
+  /// A recording that finished while no request waited (the app was relaunched) is collected
+  /// once the status lists it.
+  @Test func aRecordingFinishedBeforeARelaunchIsStillCollected() async throws {
+    let client = FakeClient(log: log)
+    client.setStatus(
+      [], recordings: [ActiveRecording(device: id, started: .now, stopping: false, finished: true)])
+    client.setTool(.done, writes: Data("....ftypmp42".utf8))
+    let services = FakeServices(log: log)
+    let folder = try TestScratch.folder("recordings")
+    services.folders = [folder]
+    let model = model(client, services: services)
+    await model.refresh()
+    let deadline = ContinuousClock.now + .seconds(5)
+    let revealed = { log.all.contains { $0.hasPrefix("reveal") } }
+    while !revealed(), ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(try names(folder).count == 1)
+    #expect(log.all.contains("saveRecording \(id.serial) file:true"))
+  }
+
+  @Test func stopIsSent() async {
+    let model = model(FakeClient(log: log))
     await model.stopRecording(on: id)
-    #expect(log.all.contains("stopRecording \(id.serial)"))
+    #expect(log.all.first == "stopRecording \(id.serial)")
   }
 
   @Test func aRunningRecordingIsNotStartedAgain() async {
@@ -108,5 +175,59 @@ struct AppModelToolsTests {
     await model.refresh()
     await model.startRecording(on: id)
     #expect(!log.all.contains("startRecording \(id.serial)"))
+  }
+}
+
+/// Where captures go and what they are called, as macOS names its own.
+struct CaptureFilesTests {
+  /// 2026-11-18 22:09:27 UTC.
+  private let moment = Date(timeIntervalSince1970: 1_795_039_767)
+
+  @Test func namesFollowMacOS() throws {
+    let utc = try #require(TimeZone(identifier: "UTC"))
+    #expect(
+      CaptureFiles.baseName(.screenshot, model: "LinkRunner-100G", at: moment, timeZone: utc)
+        == "Screenshot LinkRunner-100G 2026-11-18 at 22.09.27")
+    #expect(
+      CaptureFiles.baseName(.recording, model: "EtherScope nXG", at: moment, timeZone: utc)
+        == "Screen Recording EtherScope nXG 2026-11-18 at 22.09.27")
+  }
+
+  @Test(arguments: [
+    ("LinkRunner-100G", "LinkRunner-100G"), ("a/b:c", "a-b-c"), ("..hidden", "hidden"),
+    ("evil\u{202E}gnp.exe", "evilgnp.exe"), ("line\nbreak\u{0}", "linebreak"), ("", "Android"),
+    ("  ", "Android"), (String(repeating: "x", count: 100), String(repeating: "x", count: 64)),
+  ])
+  func modelsBecomeOneSafeComponent(model: String, safe: String) {
+    #expect(CaptureFiles.fileSafe(model) == safe)
+  }
+
+  @Test func theFolderIsWhereMacOSSavesScreenshots() {
+    let home = URL(filePath: "/Users/someone", directoryHint: .isDirectory)
+    let desktop = home.appending(path: "Desktop", directoryHint: .isDirectory)
+    #expect(
+      CaptureFiles.folder(location: "~/Pictures/Shots", home: home) { _ in true }.path
+        == "/Users/someone/Pictures/Shots")
+    #expect(
+      CaptureFiles.folder(location: "/Volumes/Shots", home: home) { _ in true }.path
+        == "/Volumes/Shots")
+    #expect(CaptureFiles.folder(location: nil, home: home) { _ in true } == desktop)
+    #expect(CaptureFiles.folder(location: "Shots", home: home) { _ in true } == desktop)
+    #expect(CaptureFiles.folder(location: "/Volumes/Gone", home: home) { _ in false } == desktop)
+  }
+
+  @Test func anExistingFileIsNeverReplaced() throws {
+    let folder = try TestScratch.folder("never-replace")
+    try Data("mine".utf8).write(to: folder.appending(path: "Shot.png"))
+    try Data("mine too".utf8).write(to: folder.appending(path: "Shot 2.png"))
+    let (temporary, handle) = try #require(CaptureFiles.temporary(in: folder))
+    try handle.write(contentsOf: Data("new".utf8))
+    try handle.close()
+    let placed = try CaptureFiles.place(temporary, base: "Shot", fileExtension: "png")
+    #expect(placed.lastPathComponent == "Shot 3.png")
+    #expect(try Data(contentsOf: folder.appending(path: "Shot.png")) == Data("mine".utf8))
+    #expect(
+      try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+        == ["Shot 2.png", "Shot 3.png", "Shot.png"])
   }
 }

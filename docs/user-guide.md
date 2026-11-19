@@ -264,7 +264,8 @@ Under each ready device, the menu says how Ferry reaches it:
 | **Wi-Fi · ADB** | ADB over your network. |
 | **USB · File transfer** | USB file transfer, with USB debugging off or not yet allowed. |
 
-A device on file transfer also shows **More tools with USB debugging…**, which opens the
+A device over ADB shows the [tools](#tools-over-usb-debugging) under its name. A device on
+file transfer also shows **More tools with USB debugging…**, which opens the
 [steps](#usb-debugging-adb), or **Allow USB debugging on the device** once USB debugging is on
 and waits for you to tap **Allow**. When `adb` is not installed and a device is connected, the
 menu shows **Install adb for more tools…**. When `adb` is installed but its server is not
@@ -295,6 +296,38 @@ Settings:
 - **How to connect**: opens the setup guide, on file transfer or USB debugging.
 - **Help**: opens Ferry Help.
 - **Remove Ferry…**: see [Uninstall](#uninstall).
+
+## Tools over USB debugging
+
+A device Ferry reaches over ADB (**USB · ADB** or **Wi-Fi · ADB** in the menu) shows
+**Install App…**, **Screenshot** and **Record Screen** under its name. A device on file
+transfer shows **More tools with USB debugging…** instead.
+
+### Install an app
+
+Click **Install App…** and choose an `.apk` file, or drag one `.apk` onto the device in the
+menu. Ferry checks that the file is an Android app, copies it to the device and installs it,
+replacing an older version of the same app. The menu shows how far the copy has got, then says
+when the app is installed.
+
+If the device refuses the app, the menu says why, for example that a newer version is installed
+or that the app needs a newer version of Android. Ferry removes its copy of the app from the
+device either way.
+
+### Screenshots and screen recordings
+
+Click **Screenshot** to save what the device's screen shows. Click **Record Screen** to record
+it, for up to three minutes; the menu shows how long it has been recording, and **Stop** ends
+it.
+
+Ferry saves them where macOS saves its own screenshots (the Desktop, unless you chose another
+folder in the Screenshot app), named like macOS's own, such as
+`Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png`, and shows them in Finder. It never
+replaces a file. A recording waits on the device until Ferry has saved it, even if you quit
+Ferry meanwhile; Ferry then removes it from the device.
+
+A device whose screen is off sends a black screenshot, and a recording of a screen that does not
+change has a single frame.
 
 ## Troubleshooting
 

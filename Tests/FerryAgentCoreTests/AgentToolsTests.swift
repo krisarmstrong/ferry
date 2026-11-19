@@ -11,13 +11,11 @@ import Testing
 struct AgentToolsTests {
   private let device = DeviceID(serial: "0123456789abcdef")
 
-  private func service(_ harness: AgentHarness, _ fake: FakeToolDevice, folder: URL)
-    -> AgentService
-  {
+  private func service(_ harness: AgentHarness, _ fake: FakeToolDevice) -> AgentService {
     let tools = ADBTools(
-      device: fake,
-      target: { _ in ADBTools.Target(serial: "0123456789abcdef", model: "LinkRunner-100G") },
-      folder: { folder }, desktop: folder, scratch: harness.scratch)
+      device: fake, target: { _ in "0123456789abcdef" },
+      journal: ToolJournal(store: harness.scratch.appending(path: "journal.json")),
+      scratch: harness.scratch)
     return AgentService(
       hub: harness.hub, domains: harness.controller, scratch: harness.scratch, tools: tools)
   }
@@ -25,8 +23,9 @@ struct AgentToolsTests {
   @Test func withoutAdbTheToolsAreUnavailable() async throws {
     let harness = try AgentHarness()
     defer { harness.finish() }
+    let (_, capture) = try harness.writable("shot", "")
     #expect(
-      await harness.service.handle(.screenshot(device), file: nil) == .toolFailed(.notOverADB))
+      await harness.service.handle(.screenshot(device), file: capture) == .toolFailed(.notOverADB))
     #expect(
       await harness.service.handle(.startRecording(device), file: nil) == .toolFailed(.notOverADB))
     #expect(
@@ -38,16 +37,20 @@ struct AgentToolsTests {
         == .toolFailed(.notOverADB))
   }
 
-  /// The app comes as a descriptor, never a path; a request without one is refused.
-  @Test func anInstallNeedsItsFile() async throws {
+  /// Files travel as descriptors, never paths: a request without its file is refused, and so is
+  /// one that takes none but came with one.
+  @Test func eachToolTakesItsFileOrNone() async throws {
     let harness = try AgentHarness()
     defer { harness.finish() }
-    #expect(
-      await harness.service.handle(.installAPK(device, name: "a.apk"), file: nil)
-        == .failure(.io("bad request")))
-    let file = try harness.readable("x", "x")
-    #expect(
-      await harness.service.handle(.screenshot(device), file: file) == .failure(.io("bad request")))
+    for request: AgentRequest in [
+      .installAPK(device, name: "a.apk"), .screenshot(device), .saveRecording(device),
+    ] {
+      #expect(await harness.service.handle(request, file: nil) == .failure(.io("bad request")))
+    }
+    for request: AgentRequest in [.startRecording(device), .stopRecording(device)] {
+      let file = try harness.readable("x", "x")
+      #expect(await harness.service.handle(request, file: file) == .failure(.io("bad request")))
+    }
   }
 
   @Test func theAppsNameMustBeOneComponent() async throws {
@@ -62,9 +65,8 @@ struct AgentToolsTests {
   @Test func anInstallIsListedAsATransferAndReportsProgress() async throws {
     let harness = try AgentHarness()
     defer { harness.finish() }
-    let folder = try TestScratch.folder("agent-captures")
     let fake = FakeToolDevice()
-    let service = service(harness, fake, folder: folder)
+    let service = service(harness, fake)
     let url = try harness.file("app.apk", "")
     try ZipFixture.archive(["AndroidManifest.xml"]).write(to: url)
     let response = await service.handle(
@@ -74,24 +76,19 @@ struct AgentToolsTests {
     #expect(await fake.installs.count == 1)
   }
 
-  @Test func aScreenshotRepliesWithItsFile() async throws {
+  @Test func aScreenshotFillsTheAppsFile() async throws {
     let harness = try AgentHarness()
     defer { harness.finish() }
-    let folder = try TestScratch.folder("agent-captures")
-    let service = service(harness, FakeToolDevice(), folder: folder)
-    guard case .saved(let url) = await service.handle(.screenshot(device), file: nil) else {
-      Issue.record("no file")
-      return
-    }
-    #expect(url.deletingLastPathComponent().standardizedFileURL == folder.standardizedFileURL)
-    #expect(url.pathExtension == "png")
+    let service = service(harness, FakeToolDevice())
+    let (url, capture) = try harness.writable("shot", "")
+    #expect(await service.handle(.screenshot(device), file: capture) == .done)
+    #expect(try Data(contentsOf: url) == FakeToolDevice.png)
   }
 
-  @Test func statusShowsARecordingUntilItIsSaved() async throws {
+  @Test func statusShowsARecordingUntilItIsCollected() async throws {
     let harness = try AgentHarness()
     defer { harness.finish() }
-    let folder = try TestScratch.folder("agent-captures")
-    let service = service(harness, FakeToolDevice(), folder: folder)
+    let service = service(harness, FakeToolDevice())
     let recording = Task { await service.handle(.startRecording(device), file: nil) }
     var running: [ActiveRecording] = []
     let deadline = ContinuousClock.now + .seconds(5)
@@ -101,11 +98,12 @@ struct AgentToolsTests {
     }
     #expect(running.map(\.device) == [device])
     #expect(await service.handle(.stopRecording(device), file: nil) == .done)
-    guard case .saved(let url) = await recording.value else {
-      Issue.record("no file")
-      return
-    }
-    #expect(url.pathExtension == "mp4")
+    #expect(await recording.value == .done)
+    guard case .status(let finished) = await service.handle(.status, file: nil) else { return }
+    #expect(finished.recordings.map(\.finished) == [true])
+    let (url, capture) = try harness.writable("video", "")
+    #expect(await service.handle(.saveRecording(device), file: capture) == .done)
+    #expect(try Data(contentsOf: url) == FakeRecording.mp4)
     guard case .status(let report) = await service.handle(.status, file: nil) else { return }
     #expect(report.recordings.isEmpty)
   }
