@@ -43,9 +43,7 @@ public final class FinderMenuBook: Sendable {
   public func record(_ entries: [FinderMenuEntry], devices: [DeviceSummary], selection: [URL])
     -> [Int?]
   {
-    let names = Dictionary(
-      devices.map { ($0.id, FinderMenu.displayName(of: $0)) },
-      uniquingKeysWith: { first, _ in first })
+    let names = FinderMenu.displayNames(of: devices)
     return state.withLock { state in
       var tags: [Int?] = []
       var menu: [Int] = []

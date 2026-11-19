@@ -46,9 +46,9 @@ public enum DomainNaming {
 
   /// A spec for each storage of each ready device, in order.
   ///
-  /// A domain is named after its device's model, with the last four characters of the serial
-  /// added when another listed device has the same model, and ` – SD card` added for every
-  /// storage after the device's first.
+  /// A domain is named after its device (`DeviceInfo.name`), with the end of its serial added
+  /// when another listed device has the same name (see `DeviceNames`), as the menus name it,
+  /// and ` – SD card` added for every storage after the device's first.
   public static func specs(for devices: [AttachedDevice]) -> [DomainSpec] {
     domains(for: devices).map(\.spec)
   }
@@ -59,15 +59,10 @@ public enum DomainNaming {
   /// every card of a vendor shares, and ADB by its volume ID. It has a location per method, so
   /// another card can never take a card's location.
   static func domains(for devices: [AttachedDevice]) -> [Wanted] {
-    var models: [String: Int] = [:]
-    for device in devices {
-      models[device.info.model, default: 0] += 1
-    }
+    let suffixes = DeviceNames.suffixes(for: devices.map { ($0.id, $0.info.name) })
     return devices.flatMap { device -> [Wanted] in
       guard case .ready(let storages) = device.state else { return [] }
-      let model = device.info.model
-      let base =
-        models[model, default: 0] > 1 ? "\(model) (\(device.id.serial.suffix(4)))" : model
+      let base = DeviceNames.named(device.info.name, suffix: suffixes[device.id])
       return storages.enumerated().map { index, storage in
         let spec = DomainSpec(
           identifier: identifier(for: storage.id),

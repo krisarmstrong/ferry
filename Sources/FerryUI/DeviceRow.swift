@@ -7,6 +7,8 @@ import SwiftUI
 /// hint about USB debugging where it applies, then its actions.
 struct DeviceRow: View {
   let device: AttachedDevice
+  /// What the menu calls the device.
+  let name: String
   let transfers: [ActiveTransfer]
   let awaitingUSBDebugging: Bool
   let eject: () -> Void
@@ -25,7 +27,7 @@ struct DeviceRow: View {
     VStack(alignment: .leading, spacing: 6) {
       Label {
         HStack(spacing: 4) {
-          Text(verbatim: device.displayName)
+          Text(verbatim: name)
             .font(.headline)
           Text(verbatim: "·")
             .foregroundStyle(.secondary)

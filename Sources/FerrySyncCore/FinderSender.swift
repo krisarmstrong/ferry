@@ -28,7 +28,7 @@ public struct FinderSender: Sendable {
   }
 
   /// Sends or installs every item of `urls` on the device, and says how it went. `deviceName`
-  /// is the name the menu showed (see `FinderMenu.displayName(of:)`).
+  /// is the name the menu showed (see `FinderMenu.displayNames(of:)`).
   public func perform(_ action: FinderAction, on urls: [URL], deviceName: String) async
     -> FinderNotice
   {

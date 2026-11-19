@@ -41,6 +41,19 @@ struct FinderMenuTests {
     #expect(entries == [FinderMenuEntry(title: "Send to LinkRunner 10G", action: .send(device.id))])
   }
 
+  /// Two units of one model whose serials end alike are named as the Ferry menu and their
+  /// Finder locations name them; a device that is not ready still counts, as the menu lists it.
+  @Test func sameNamedDevicesAreToldApart() {
+    let first = attached("0123456789abcdef", model: "LinkRunner-100G")
+    let second = attached("0b1771d6dd935e72", model: "LinkRunner-100G")
+    let away = attached("0c1771d6dd935e72", model: "LinkRunner-100G", ready: false)
+    let entries = FinderMenu.entries(devices: [first, second, away], selection: [report])
+    #expect(
+      entries.map(\.title) == [
+        "Send to LinkRunner-100G (a1771d6dd935e72)", "Send to LinkRunner-100G (b1771d6dd935e72)",
+      ])
+  }
+
   /// Install is offered only on devices served over ADB, and only when every selected item is an
   /// app, whatever the case of its extension.
   @Test func twoDevicesAndAppsOfferInstallOverADBOnly() {
@@ -106,16 +119,17 @@ struct FinderMenuBookTests {
     let pixelB = attached("B", model: "Pixel 8")
     let shown = FinderMenu.entries(devices: [pixelA, pixelB], selection: [first])
     let shownTags = book.record(shown, devices: [pixelA, pixelB], selection: [first])
-    // Finder builds another menu, with the devices the other way round, before the click.
+    // Finder builds another menu, with the devices the other way round, before the click. The
+    // notice names each unit as the menu did, told apart by its serial.
     let later = FinderMenu.entries(devices: [pixelB, pixelA], selection: [second])
     let laterTags = book.record(later, devices: [pixelB, pixelA], selection: [second])
 
     let shownTag = try #require(shownTags[0])
     let laterTag = try #require(laterTags[0])
     let clicked = try #require(book.choice(for: shownTag))
-    #expect(clicked == .init(action: .send(pixelA.id), device: "Pixel 8", selection: [first]))
+    #expect(clicked == .init(action: .send(pixelA.id), device: "Pixel 8 (A)", selection: [first]))
     let other = try #require(book.choice(for: laterTag))
-    #expect(other == .init(action: .send(pixelB.id), device: "Pixel 8", selection: [second]))
+    #expect(other == .init(action: .send(pixelB.id), device: "Pixel 8 (B)", selection: [second]))
     #expect(Set(shownTags.compactMap { $0 }).isDisjoint(with: laterTags.compactMap { $0 }))
   }
 

@@ -2,20 +2,33 @@ import DeviceKit
 import FerryIPC
 import Foundation
 
-extension AttachedDevice {
-  /// The model as the device reports it, made safe to show: a hostile device can name itself
-  /// with control characters or bidi overrides.
-  public var displayName: String {
-    DevicePresentation.shownName(info.name)
-  }
-}
-
 extension DevicePresentation {
+  /// What each device is called, made safe to show (a hostile device can name itself with
+  /// control characters or bidi overrides), with the end of its serial where another device has
+  /// the same name: the name its Finder location has.
+  static func shownNames(_ devices: [(id: DeviceID, name: String)]) -> [DeviceID: String] {
+    let suffixes = DeviceNames.suffixes(for: devices)
+    var names: [DeviceID: String] = [:]
+    for device in devices {
+      names[device.id] = DeviceNames.named(
+        shownName(device.name), suffix: suffixes[device.id].map(DisplayText.escaped))
+    }
+    return names
+  }
+
   /// A device-supplied name made safe to show, or "Unknown device" when there is none.
   static func shownName(_ name: String) -> String {
     name.isEmpty
       ? String(localized: LocalizedStringResource("Unknown device", bundle: .module))
       : DisplayText.escaped(name)
+  }
+}
+
+extension AppModel {
+  /// What the menu calls `device` (see `DevicePresentation.shownNames(_:)`).
+  public func displayName(of device: AttachedDevice) -> String {
+    DevicePresentation.shownNames(devices.map { ($0.id, $0.info.name) })[device.id]
+      ?? DevicePresentation.shownName(device.info.name)
   }
 }
 

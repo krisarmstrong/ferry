@@ -193,8 +193,27 @@ struct AppModelTests {
     #expect(model.opensAtLogin)
   }
 
-  @Test func deviceTextIsEscaped() {
+  @Test func deviceTextIsEscaped() async {
     let shown = device("A1", model: "Evil\u{1B}[2J\u{202E}", .busy)
-    #expect(shown.displayName == "Evil\\u{1B}[2J\\u{202E}")
+    let client = FakeClient(log: log)
+    client.setStatus([shown])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.refresh()
+    #expect(model.displayName(of: shown) == "Evil\\u{1B}[2J\\u{202E}")
+  }
+
+  /// Two units of one model whose serials end alike are told apart as their Finder locations
+  /// are: by as much of the serial as it takes.
+  @Test func sameNamedDevicesAreToldApartAsInFinder() async {
+    let first = device("0123456789abcdef", model: "LinkRunner-100G", .busy)
+    let second = device("0b1771d6dd935e72", model: "LinkRunner-100G", .busy)
+    let other = device("ZZZZ", model: "Phone", .busy)
+    let client = FakeClient(log: log)
+    client.setStatus([first, second, other])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.refresh()
+    #expect(model.displayName(of: first) == "LinkRunner-100G (a1771d6dd935e72)")
+    #expect(model.displayName(of: second) == "LinkRunner-100G (b1771d6dd935e72)")
+    #expect(model.displayName(of: other) == "Phone")
   }
 }

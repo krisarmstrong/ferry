@@ -24,6 +24,11 @@ public enum PresentationText {
     DevicePresentation.shownName(name)
   }
 
+  /// What the menu calls each device, as `AppModel.displayName(of:)` does.
+  public static func deviceNames(_ devices: [(id: DeviceID, name: String)]) -> [DeviceID: String] {
+    DevicePresentation.shownNames(devices)
+  }
+
   /// Whether a file is offered to the agent as an app. The agent checks its contents.
   public static func isAPK(_ url: URL) -> Bool {
     DevicePresentation.isAPK(url)

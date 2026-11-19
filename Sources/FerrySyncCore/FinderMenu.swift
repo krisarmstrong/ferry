@@ -41,15 +41,16 @@ public enum FinderMenu {
     guard !selection.isEmpty else {
       return [FinderMenuEntry(title: text("Select files to send"), action: nil)]
     }
+    let names = displayNames(of: devices)
     var entries = ready.map { device in
-      let name = displayName(of: device)
+      let name = names[device.id] ?? ""
       return FinderMenuEntry(
         title: String(localized: LocalizedStringResource("Send to \(name)", bundle: .module)),
         action: .send(device.id))
     }
     if selection.allSatisfy(PresentationText.isAPK) {
       entries += ready.filter { PresentationText.offersTools($0.method) }.map { device in
-        let name = displayName(of: device)
+        let name = names[device.id] ?? ""
         return FinderMenuEntry(
           title: String(localized: LocalizedStringResource("Install on \(name)", bundle: .module)),
           action: .install(device.id))
@@ -60,10 +61,11 @@ public enum FinderMenu {
 
   public static var toolbarToolTip: String { text("Send selected files to a device") }
 
-  /// The name a device goes by in the menu and in notices: the one the Ferry menu shows,
-  /// escaped, since the device supplies it.
-  public static func displayName(of device: DeviceSummary) -> String {
-    PresentationText.deviceName(device.name)
+  /// The name each device goes by in the menu and in notices: the one the Ferry menu shows,
+  /// escaped, since the device supplies it, and told apart from another of the same name as
+  /// there. `devices` is every device the agent listed, ready or not, as the Ferry menu lists.
+  public static func displayNames(of devices: [DeviceSummary]) -> [DeviceID: String] {
+    PresentationText.deviceNames(devices.map { ($0.id, $0.name) })
   }
 
   private static func text(_ key: String.LocalizationValue) -> String {

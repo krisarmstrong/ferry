@@ -10,6 +10,23 @@ import Testing
 /// fails it.
 @Suite(.timeLimit(.minutes(1)))
 struct DomainControllerTests {
+  /// Two units of one model whose serials end alike get as much of the serial as tells them
+  /// apart, not one name for two locations.
+  @Test func namesDisambiguateSerialsThatEndAlike() async throws {
+    let first = await makeDevice("0123456789abcdef", model: "LinkRunner-100G")
+    let second = await makeDevice("0b1771d6dd935e72", model: "LinkRunner-100G")
+    var devices: [AttachedDevice] = []
+    for device in [first, second] {
+      devices.append(
+        try await AttachedDevice(
+          info: device.info, state: .ready(device.storages()), method: .usbFileTransfer))
+    }
+    #expect(
+      DomainNaming.specs(for: devices).map(\.displayName) == [
+        "LinkRunner-100G (a1771d6dd935e72)", "LinkRunner-100G (b1771d6dd935e72)",
+      ])
+  }
+
   @Test func namesDisambiguateSameModelAndSDCard() async throws {
     let first = await makeDevice(
       "SER0000AAAA", model: "LinkRunner 10G", keys: [internalKey, cardKey])

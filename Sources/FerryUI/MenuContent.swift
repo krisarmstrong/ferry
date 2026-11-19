@@ -37,7 +37,8 @@ public struct MenuContent: View {
       }
       ForEach(model.devices) { device in
         DeviceRow(
-          device: device, transfers: model.transfers(on: device.id),
+          device: device, name: model.displayName(of: device),
+          transfers: model.transfers(on: device.id),
           awaitingUSBDebugging: model.isAwaitingUSBDebugging(device.id),
           eject: { Task { await model.eject(device.id) } },
           recheck: { Task { await model.recheck(device.id) } },
