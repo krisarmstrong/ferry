@@ -311,3 +311,58 @@ struct UnreachableClient: AgentSending {
     throw .deviceDisconnected
   }
 }
+
+/// `inner`, but each device-info request waits until `release()` or until its task is
+/// cancelled, which it records and answers with `.cancelled` as `AgentClient` does. Each status
+/// request first runs `onStatus`.
+final class HeldInfoClient: AgentSending {
+  let inner: FakeClient
+  let onStatus = Mutex<(@Sendable () -> Void)?>(nil)
+  private let arrived: AsyncStream<Void>
+  private let arrivals: AsyncStream<Void>.Continuation
+  private let held = Mutex([Int: CheckedContinuation<Void, Never>]())
+  private let nextRequest = Atomic(0)
+
+  init(_ inner: FakeClient) {
+    self.inner = inner
+    (arrived, arrivals) = AsyncStream.makeStream()
+  }
+
+  /// Returns once a device-info request is waiting.
+  func arrival() async {
+    for await _ in arrived { return }
+  }
+
+  /// Lets every waiting device-info request through.
+  func release() {
+    let waiting = held.withLock { held in
+      defer { held = [:] }
+      return held.values
+    }
+    for continuation in waiting { continuation.resume() }
+  }
+
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError) -> AgentResponse {
+    if case .status = request { onStatus.withLock { $0 }?() }
+    guard case .deviceInfo(let id) = request else {
+      return try await inner.send(request, file: file, progress: progress)
+    }
+    let number = nextRequest.add(1, ordering: .relaxed).oldValue
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        held.withLock { $0[number] = continuation }
+        arrivals.yield()
+        if Task.isCancelled { held.withLock { $0.removeValue(forKey: number) }?.resume() }
+      }
+    } onCancel: {
+      held.withLock { $0.removeValue(forKey: number) }?.resume()
+    }
+    if Task.isCancelled {
+      inner.log.record("deviceInfo \(id.serial) cancelled")
+      throw .cancelled
+    }
+    return try await inner.send(request, file: file, progress: progress)
+  }
+}

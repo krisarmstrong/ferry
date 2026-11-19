@@ -9,6 +9,7 @@ import Testing
 /// The details an expanded device shows inline: when they are read, how often, and what a click
 /// copies.
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct AppModelDetailsTests {
   let log = CallLog()
   let clock = TestClock()
@@ -136,6 +137,43 @@ struct AppModelDetailsTests {
     client.infoReply.withLock { $0 = .failure(.deviceDisconnected) }
     clock.advance(.seconds(10))
     model.loadExpandedDetailsIfDue()
+    await model.detailsSettled()
+    #expect(model.shownDetails(of: id) == .loaded(Self.info))
+  }
+
+  /// The menu closing while the status request runs starts no read.
+  @Test func noReadStartsOnceTheMenuCloses() async {
+    let client = HeldInfoClient(client())
+    let model = AppModel(
+      client: client, services: FakeServices(log: log), sleep: { _ in }, now: clock.now)
+    let watch = Task { await model.watchWhileMenuOpen() }
+    client.onStatus.withLock { $0 = { watch.cancel() } }
+    await watch.value
+    #expect(model.isExpanded(.device(id)))
+    #expect(model.detailReads.isEmpty)
+    #expect(model.shownDetails(of: id) == DetailsShown.hidden)
+  }
+
+  /// Closing the menu cancels a read still running, and the next open reads again at once.
+  @Test func closingTheMenuCancelsARunningRead() async {
+    let client = HeldInfoClient(client())
+    let model = AppModel(
+      client: client, services: FakeServices(log: log),
+      sleep: { _ in
+        await client.arrival()
+        throw CancellationError()
+      }, now: clock.now)
+    await model.watchWhileMenuOpen()
+    let read = model.detailReads[id]
+    #expect(read?.isCancelled == true)
+    // Let a read that was not cancelled finish, so the test ends either way.
+    client.release()
+    await model.detailsSettled()
+    #expect(log.all.contains("deviceInfo \(id.serial) cancelled"))
+
+    model.loadExpandedDetailsIfDue()
+    await client.arrival()
+    client.release()
     await model.detailsSettled()
     #expect(model.shownDetails(of: id) == .loaded(Self.info))
   }

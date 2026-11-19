@@ -10,10 +10,11 @@ enum DetailsShown: Equatable {
   case loaded(AndroidDeviceInfo)
 }
 
-/// A device's details as last read, and when they were asked for.
+/// A device's details as last read, and when they were asked for: `nil` when a read was
+/// cancelled, so the next one is due at once.
 struct DetailsRead {
   var info: AndroidDeviceInfo?
-  var requested: ContinuousClock.Instant
+  var requested: ContinuousClock.Instant?
   var reading: Bool
   /// A read has finished, failed or not: a retry is not the first read, so it shows nothing.
   var settled = false
@@ -46,8 +47,9 @@ extension AppModel {
       let device = devices.first(where: { $0.id == id }), DevicePresentation.offersTools(device)
     else { return }
     let now = now()
-    let busy = details[id].map {
-      $0.reading || $0.requested.duration(to: now) < Self.detailsInterval
+    let busy = details[id].map { read in
+      read.reading
+        || read.requested.map { $0.duration(to: now) < Self.detailsInterval } ?? false
     }
     if busy == true { return }
     details[id] = DetailsRead(
@@ -64,22 +66,35 @@ extension AppModel {
   }
 
   /// Not through `sendTool`: a failure here is no action of the user's, so it shows nothing.
+  /// A read cancelled because the menu closed leaves the details as they were, due again.
   private func readDetails(of id: DeviceID) async {
     var info: AndroidDeviceInfo?
-    if case .deviceInfo(let read)? = try? await client.send(.deviceInfo(id), file: nil) {
-      info = read
+    if !Task.isCancelled {
+      if case .deviceInfo(let read)? = try? await client.send(.deviceInfo(id), file: nil) {
+        info = read
+      }
     }
     detailReads[id] = nil
     // The device went while it was read.
     guard var current = details[id] else { return }
     current.reading = false
-    current.settled = true
-    if let info { current.info = info }
+    if Task.isCancelled {
+      current.requested = nil
+    } else {
+      current.settled = true
+      if let info { current.info = info }
+    }
     details[id] = current
+  }
+
+  /// The menu closed: no read goes on without it.
+  func cancelDetailReads() {
+    for read in detailReads.values { read.cancel() }
   }
 
   func forgetDetailsOfGoneDevices() {
     let listed = Set(devices.map(\.id))
+    for (id, read) in detailReads where !listed.contains(id) { read.cancel() }
     details = details.filter { listed.contains($0.key) }
     if let copied = copiedAddress, !listed.contains(copied.device) { copiedAddress = nil }
   }

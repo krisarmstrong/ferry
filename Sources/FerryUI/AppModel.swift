@@ -178,16 +178,19 @@ import os
     resetExpansion()
     while !Task.isCancelled {
       await refresh()
+      // The menu may have closed while the status was read.
+      guard !Task.isCancelled else { break }
       loadExpandedDetailsIfDue()
       if agent == .running, answeredFor == nil { answeredFor = .zero }
       if let answeredFor { considerEmptyGuide(openFor: answeredFor) }
       do {
         try await sleep(Self.pollInterval)
       } catch {
-        return
+        break
       }
       answeredFor? += Self.pollInterval
     }
+    cancelDetailReads()
   }
 
   /// Opens the guide with the device's steps, or the model picker if Ferry does not know its
