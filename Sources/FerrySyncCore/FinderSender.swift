@@ -32,11 +32,20 @@ public struct FinderSender: Sendable {
   public func perform(_ action: FinderAction, on urls: [URL], deviceName: String) async
     -> FinderNotice
   {
+    await performReporting(action, on: urls, deviceName: deviceName).notice
+  }
+
+  /// Like `perform(_:on:deviceName:)`, also saying whether any item failed, for the Ferry menu,
+  /// which shows a failure as an error.
+  public func performReporting(_ action: FinderAction, on urls: [URL], deviceName: String) async
+    -> (notice: FinderNotice, failed: Bool)
+  {
     var outcomes: [Outcome] = []
     for url in urls {
       outcomes.append(await perform(action, on: url))
     }
-    return Self.notice(for: outcomes, of: action, deviceName: deviceName)
+    let failed = outcomes.contains { if case .failed = $0.result { true } else { false } }
+    return (Self.notice(for: outcomes, of: action, deviceName: deviceName), failed)
   }
 
   // MARK: One item

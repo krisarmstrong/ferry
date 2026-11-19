@@ -25,6 +25,7 @@ final class FakeClient: AgentSending {
   private let wirelessResult = Mutex<AgentResponse>(.wireless(.connected))
   private let toolResult = Mutex<AgentResponse>(.done)
   private let discardResult = Mutex<AgentResponse>(.done)
+  private let sendResult = Mutex<AgentResponse>(.done)
   /// Set by `parkInstalls()`: an install waits until its caller cancels it, then throws
   /// `.cancelled` as `AgentClient` does.
   private let installsParked = Mutex(false)
@@ -77,6 +78,11 @@ final class FakeClient: AgentSending {
 
   func parkInstalls() {
     installsParked.withLock { $0 = true }
+  }
+
+  /// What the agent answers to a file sent to a device.
+  func setSend(_ response: AgentResponse) {
+    sendResult.withLock { $0 = response }
   }
 
   /// What the agent answers to Discard.
@@ -228,6 +234,9 @@ final class FakeClient: AgentSending {
     case .stopRecording(let id):
       log.record("stopRecording \(id.serial)")
       return .done
+    case .sendFile(let id, let name):
+      log.record("sendFile \(id.serial) \(name) file:\(file != nil)")
+      return sendResult.withLock { $0 }
     case .discardRecording(let id):
       log.record("discardRecording \(id.serial)")
       let reply = discardResult.withLock { $0 }
@@ -299,101 +308,5 @@ struct UnreachableClient: AgentSending {
     -> AgentResponse
   {
     throw .deviceDisconnected
-  }
-}
-
-@MainActor
-final class FakeServices: SystemServicing {
-  let log: CallLog
-  var loginItem = true
-  var failLoginItem = false
-  var helper = HelperStatus.allowed
-  /// Whether the app's executable was replaced since launch.
-  var replaced = false
-
-  init(log: CallLog) {
-    self.log = log
-  }
-
-  func registerAgent() async {
-    log.record("registerAgent")
-  }
-
-  func helperStatus() async -> HelperStatus {
-    helper
-  }
-
-  func opensAtLogin() async -> Bool {
-    log.record("readLoginItem")
-    return loginItem
-  }
-
-  func setOpensAtLogin(_ enabled: Bool) async throws {
-    log.record("opensAtLogin \(enabled)")
-    if failLoginItem { throw CocoaError(.featureUnsupported) }
-    loginItem = enabled
-  }
-
-  func unregisterAgent() async throws {
-    log.record("unregisterAgent")
-  }
-
-  func open(_ url: URL) {
-    log.record("open \(url.absoluteString)")
-  }
-
-  func reveal(_ urls: [URL]) {
-    log.record("reveal \(urls.map(\.path).joined(separator: ","))")
-  }
-
-  func quit() {
-    log.record("quit")
-  }
-
-  func appWasReplaced() -> Bool { replaced }
-  func relaunch() { log.record("relaunch") }
-
-  func copy(_ text: String) {
-    log.record("copy \(text)")
-  }
-
-  /// What the open panel returns: `nil` is Cancel.
-  var pickedAPK: URL?
-  /// Where captures go.
-  var folders: [URL] = []
-
-  func captureFolders() -> [URL] {
-    log.record("captureFolders")
-    return folders
-  }
-
-  /// What the folder panel returns: `nil` is Cancel.
-  var chosenFolder: URL?
-
-  func chooseFolder() async -> URL? {
-    log.record("chooseFolder")
-    return chosenFolder
-  }
-
-  func chooseAPK() async -> URL? {
-    log.record("chooseAPK")
-    return pickedAPK
-  }
-
-  /// What the save panel for a log returns: `nil` is Cancel.
-  var logDestination: URL?
-  /// The scripts handed to Terminal, and whether it opens them.
-  var terminalScripts: [URL] = []
-  var terminalOpens = true
-
-  func chooseLogDestination(suggestedName: String) async -> URL? {
-    log.record("chooseLogDestination \(suggestedName)")
-    return logDestination
-  }
-
-  func openInTerminal(_ script: URL) async -> Bool {
-    log.record("openInTerminal \(script.lastPathComponent)")
-    terminalScripts.append(script)
-    return terminalOpens
   }
 }

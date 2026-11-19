@@ -1,5 +1,6 @@
 import DeviceKit
 import FerryIPC
+import FerrySyncCore
 import FerryText
 import Foundation
 
@@ -171,5 +172,27 @@ extension AppModel {
       actionError = DevicePresentation.message(for: error)
       return nil
     }
+  }
+}
+
+extension AppModel {
+  /// Send File…: asks for files, then sends them into the device's Download folder as Finder's
+  /// Send to does (see `FinderSender`), which opens each one itself, refusing links and anything
+  /// but a regular file.
+  public func chooseAndSendFiles(on device: DeviceID) async {
+    let urls = await services.chooseFilesToSend()
+    guard !urls.isEmpty else { return }
+    preservedChanges = []
+    toolMessage = nil
+    let (notice, failed) = await FinderSender(agent: client).performReporting(
+      .send(device), on: urls, deviceName: windowName(of: device))
+    let text = [notice.title, notice.body].filter { !$0.isEmpty }.joined(separator: "\n")
+    if failed {
+      actionError = text
+    } else {
+      actionError = nil
+      toolMessage = text
+    }
+    await refresh()
   }
 }

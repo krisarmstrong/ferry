@@ -46,6 +46,9 @@ check-app:
 	@echo "Finder Sync extension carries its strings and not the menu UI"
 	@test -d "$(APP)/Contents/Resources/Ferry_FerryText.bundle/Contents/Resources/en.lproj" \
 	  || { echo "error: no FerryText strings in $(APP)/Contents/Resources" >&2; exit 1; }
+	@# The menu's Send File… words its notices with the Finder extension's strings.
+	@test -d "$(APP)/Contents/Resources/Ferry_FerrySyncCore.bundle/Contents/Resources/en.lproj" \
+	  || { echo "error: no FerrySyncCore strings in $(APP)/Contents/Resources" >&2; exit 1; }
 	@# The FileProvider extension's errors and the agent's words come from their own bundles,
 	@# and a missing bundle stops the process at its first string.
 	@test -d "$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Resources/Ferry_FerryProviderCore.bundle/Contents/Resources/en.lproj" \

@@ -38,6 +38,8 @@ public protocol SystemServicing {
   func copy(_ text: String)
   /// Asks the user for an `.apk`; `nil` if they cancel.
   func chooseAPK() async -> URL?
+  /// Asks the user for files to send to a device; empty if they cancel.
+  func chooseFilesToSend() async -> [URL]
   /// The folders screenshots and recordings go under, in order of preference, each holding a
   /// folder per device. Touches no disk.
   func captureFolders() -> [URL]
@@ -165,6 +167,18 @@ public final class SystemServices: SystemServicing {
         "Choose an Android app (.apk) to install.", bundle: .module))
     NSApp.activate()
     return panel.runModal() == .OK ? panel.url : nil
+  }
+
+  public func chooseFilesToSend() async -> [URL] {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = true
+    panel.message = String(
+      localized: LocalizedStringResource(
+        "Choose files to send to the device’s Download folder.", bundle: .module))
+    panel.prompt = String(localized: LocalizedStringResource("Send", bundle: .module))
+    NSApp.activate()
+    return panel.runModal() == .OK ? panel.urls : []
   }
 
   public func chooseFolder() async -> URL? {

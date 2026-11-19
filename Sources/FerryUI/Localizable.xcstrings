@@ -1036,6 +1036,12 @@
     },
     "Remembered · not nearby" : {
 
+    },
+    "Choose files to send to the device’s Download folder." : {
+
+    },
+    "Send" : {
+
     }
   },
   "version" : "1.0"
