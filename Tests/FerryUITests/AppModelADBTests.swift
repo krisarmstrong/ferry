@@ -151,7 +151,7 @@ struct AppModelADBTests {
     await model.refresh()
     #expect(model.showsNoDevice)
     #expect(!model.showsInstallADB)
-    model.openNetworkForm(.address)
+    model.toggleNetworkForm(.address)
     #expect(model.showsInstallADB)
   }
 }

@@ -13,6 +13,17 @@ struct AppModelWirelessTests {
     AppModel(client: client, services: FakeServices(log: log))
   }
 
+  /// Types into the form and sends it, as the menu does. Returns whether the form closed.
+  private func send(
+    _ model: AppModel, _ kind: WirelessForm, address: String, code: String = ""
+  ) async -> Bool {
+    model.toggleNetworkForm(kind)
+    model.networkForm?.address = address
+    model.networkForm?.code = code
+    await model.submitNetworkForm()
+    return model.networkForm == nil
+  }
+
   static let etherScope = RememberedDevice(
     id: DeviceID(serial: "fedcba9876543210"), name: "EtherScope nXG",
     addresses: [WirelessEndpoint(parsing: "192.0.2.31")!])
@@ -45,7 +56,7 @@ struct AppModelWirelessTests {
   @Test func connectByAddressSendsTheValidatedAddress() async {
     let client = FakeClient(log: log)
     let model = model(client)
-    #expect(await model.connect(address: "192.0.2.31") == true)
+    #expect(await send(model, .address, address: "192.0.2.31") == true)
     #expect(log.all == ["connectAddress 192.0.2.31:5555", "status"])
     #expect(model.wirelessMessage == nil)
   }
@@ -55,20 +66,22 @@ struct AppModelWirelessTests {
   func anAddressThatIsNotOneSendsNothing(text: String) async {
     let client = FakeClient(log: log)
     let model = model(client)
-    #expect(AppModel.isValidAddress(text) == false)
-    #expect(await model.connect(address: text) == false)
+    #expect(await send(model, .address, address: text) == false)
     #expect(log.all.isEmpty)
   }
 
   @Test func pairingNeedsAPortAndSixDigits() async {
-    #expect(AppModel.isValidPairing(address: "198.51.100.169:37123", code: "482913"))
-    #expect(!AppModel.isValidPairing(address: "198.51.100.169", code: "482913"))
-    #expect(!AppModel.isValidPairing(address: "198.51.100.169:37123", code: "48291"))
-    #expect(!AppModel.isValidPairing(address: "pixel.lan:37123", code: "482913"))
+    func canSend(_ address: String, _ code: String) -> Bool {
+      NetworkForm(kind: .code, address: address, code: code).canSend
+    }
+    #expect(canSend("198.51.100.169:37123", "482913"))
+    #expect(!canSend("198.51.100.169", "482913"))
+    #expect(!canSend("198.51.100.169:37123", "48291"))
+    #expect(!canSend("pixel.lan:37123", "482913"))
     let client = FakeClient(log: log)
     let model = model(client)
-    #expect(await model.pair(address: "198.51.100.169:37123", code: "482913") == true)
-    #expect(log.all.first == "pair 198.51.100.169:37123")
+    #expect(await send(model, .code, address: "198.51.100.169:37123", code: "482913") == true)
+    #expect(log.all.first == "pair 198.51.100.169:37123 482913")
   }
 
   /// Waiting for Allow is a step for the user, not a failure: the form closes and the menu shows
@@ -78,7 +91,7 @@ struct AppModelWirelessTests {
     let address = try #require(WirelessEndpoint(parsing: "192.0.2.31"))
     client.setWireless(.wireless(.awaitingAllow(address)))
     let model = model(client)
-    #expect(await model.connect(address: "192.0.2.31") == true)
+    #expect(await send(model, .address, address: "192.0.2.31") == true)
     #expect(model.wirelessMessage == "Tap Allow on the device to finish connecting.")
   }
 
@@ -98,7 +111,7 @@ struct AppModelWirelessTests {
     let client = FakeClient(log: log)
     client.setWireless(.wireless(outcome))
     let model = model(client)
-    #expect(await model.connect(address: "192.0.2.99") == false)
+    #expect(await send(model, .address, address: "192.0.2.99") == false)
     #expect(model.wirelessMessage == message)
   }
 
@@ -159,7 +172,7 @@ struct AppModelWirelessTests {
     client.setStatus([], unconfirmed: [offer])
     client.setWireless(.wireless(.needsConfirmation(address)))
     let model = model(client)
-    #expect(await model.connect(address: "192.0.2.99") == true)
+    #expect(await send(model, .address, address: "192.0.2.99") == true)
     #expect(model.unconfirmed == [offer])
     #expect(DevicePresentation.confirmQuestion(offer) == "Is 192.0.2.99:5555 your EtherScope nXG?")
     await model.confirm(offer)

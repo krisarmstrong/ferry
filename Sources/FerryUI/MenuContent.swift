@@ -5,7 +5,7 @@ import SwiftUI
 
 /// The menu-bar window, after Control Center's Wi-Fi and Bluetooth menus: a header with
 /// Refresh, anything that needs the user's attention, the devices (one expanded at a time, with
-/// its actions as rows), the network forms, then Help, Settings and Quit.
+/// its actions as rows), the network forms (opening in place), then Help, Settings and Quit.
 ///
 /// While it is open it refreshes every 2 s (see `AppModel.watchWhileMenuOpen()`), and it opens
 /// the setup guide when the model asks for it.
@@ -25,7 +25,7 @@ public struct MenuContent: View {
       devices
       MenuSeparator()
       if model.agent == .running, model.adbStatus != nil {
-        NetworkFormRows(open: openNetworkForm)
+        NetworkFormRows(model: model)
         MenuSeparator()
       }
       footer
@@ -109,7 +109,7 @@ public struct MenuContent: View {
       StatusRow(
         symbol: "hand.raised", title: Text(verbatim: DevicePresentation.waitingLine(for: address)))
     }
-    if let message = model.wirelessMessage {
+    if let message = model.wirelessStatusMessage {
       StatusRow(symbol: "wifi.exclamationmark", title: Text(verbatim: message))
     }
     if let message = model.toolMessage {
@@ -214,12 +214,6 @@ public struct MenuContent: View {
 
   private func openUSBDebuggingGuide(for device: AttachedDevice) {
     model.showUSBDebuggingGuide(for: device)
-  }
-
-  private func openNetworkForm(_ form: WirelessForm) {
-    model.openNetworkForm(form)
-    NSApp.activate()
-    openWindow(id: PairDeviceView.windowID)
   }
 }
 

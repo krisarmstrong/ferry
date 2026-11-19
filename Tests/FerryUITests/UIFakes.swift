@@ -29,6 +29,8 @@ final class FakeClient: AgentSending {
   /// Set by `parkInstalls()`: an install waits until its caller cancels it, then throws
   /// `.cancelled` as `AgentClient` does.
   private let installsParked = Mutex(false)
+  /// Connect by Address and Pair wait here once `wirelessPark.start()` is called.
+  let wirelessPark = RequestPark()
   /// What the agent writes into the file a capture request carries.
   private let toolBytes = Mutex(Data())
   /// Progress the agent reports on a tool request before it answers.
@@ -86,6 +88,13 @@ final class FakeClient: AgentSending {
 
   func parkInstalls() {
     installsParked.withLock { $0 = true }
+  }
+
+  private func wirelessReply() async throws(TransportError) -> AgentResponse {
+    guard wirelessPark.isOn else { return wirelessResult.withLock { $0 } }
+    await wirelessPark.waitUntilCancelled()
+    log.record("wireless cancelled")
+    throw .cancelled
   }
 
   /// What the agent answers to a file sent to a device.
@@ -196,10 +205,10 @@ final class FakeClient: AgentSending {
       return removeResult.withLock { $0 }
     case .connectAddress(let address):
       log.record("connectAddress \(address.argument)")
-      return wirelessResult.withLock { $0 }
-    case .pair(let address, _):
-      log.record("pair \(address.argument)")
-      return wirelessResult.withLock { $0 }
+      return try await wirelessReply()
+    case .pair(let address, let code):
+      log.record("pair \(address.argument) \(code.digits)")
+      return try await wirelessReply()
     case .enableWireless(let id):
       log.record("enableWireless \(id.serial)")
       return wirelessResult.withLock { $0 }

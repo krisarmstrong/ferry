@@ -13,12 +13,6 @@ extension AppModel {
   /// "No device connected" and its file-transfer hint: only with no device at all.
   public var showsNoDevice: Bool { agent == .running && !hasDevices }
 
-  /// Opens a network form; from then on the menu offers adb if it is missing.
-  public func openNetworkForm(_ form: WirelessForm) {
-    wirelessForm = form
-    wantsNetwork = true
-  }
-
   /// Opens the guide, with the model picker, once per app run when the agent is running but
   /// has had no device for 10 s of the menu being open, counted from the agent's first answer.
   func considerEmptyGuide(openFor: Duration) {

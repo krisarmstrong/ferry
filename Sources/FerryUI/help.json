@@ -135,14 +135,14 @@
         {
           "title": "Pair with Code",
           "paragraphs": [
-            "On the device, open **Developer options** → **Wireless debugging** and choose **Pair device with pairing code**. In Ferry's menu, click **Pair with Code…**, enter the IP address and port and the code the device shows, and click **Pair**.",
+            "On the device, open **Developer options** → **Wireless debugging** and choose **Pair device with pairing code**. In Ferry's menu, click **Pair with Code…**: the form opens in the menu. Enter the IP address and port and the code the device shows, and click **Pair** or press Return. Press Escape, or click **Pair with Code…** again, to close it.",
             "Ferry then connects to the address the device offers for connections, which is not the one it paired on."
           ]
         },
         {
           "title": "Connect by Address",
           "paragraphs": [
-            "Click **Connect by Address…**, type the device's IP address or name, and click **Connect**. Ferry uses adb's usual port unless you add another after a colon. If the device asks, tap **Allow** on it: the menu shows that it is waiting until you do."
+            "Click **Connect by Address…**, type the device's IP address or name in the field that opens in the menu, and click **Connect** or press Return. Ferry uses adb's usual port unless you add another after a colon. If the device asks, tap **Allow** on it: the menu shows that it is waiting until you do."
           ]
         },
         {

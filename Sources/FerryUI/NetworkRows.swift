@@ -63,13 +63,3 @@ struct UnconfirmedRow: View {
     }
   }
 }
-
-/// The two ways onto the network adb offers, as menu rows.
-struct NetworkFormRows: View {
-  let open: (WirelessForm) -> Void
-
-  var body: some View {
-    MenuRow(title: Text("Connect by Address…", bundle: .module)) { open(.address) }
-    MenuRow(title: Text("Pair with Code…", bundle: .module)) { open(.code) }
-  }
-}
