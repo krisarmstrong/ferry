@@ -65,8 +65,8 @@ Wi-Fi**, **Pair with Code…** and **Connect by Address…** reach a device over
 [USB debugging](docs/user-guide.md#usb-debugging-adb) and
 [Connect over the network](docs/user-guide.md#connect-over-the-network).
 
-Full instructions: [User guide](docs/user-guide.md). The same help is in the app: click the
-question-mark button in the Ferry menu.
+Full instructions: [User guide](docs/user-guide.md). The same help is in the app: choose
+**Help** in the Ferry menu.
 
 ## Build from source
 

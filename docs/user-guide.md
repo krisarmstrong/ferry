@@ -148,8 +148,8 @@ debugging reports for itself. A device that is also on a cable is always served 
 
 ### Use over Wi-Fi
 
-With the device on USB debugging and connected by cable, click **Use over Wi-Fi** under its
-name. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the network if it
+With the device on USB debugging and connected by cable, click the device in the menu, then
+**Use over Wi-Fi**. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the network if it
 is off, and connects to the first address that answers. Connect the device to Ethernet or Wi-Fi
 first.
 
@@ -172,8 +172,8 @@ Ferry uses adb's usual port unless you add another after a colon. If the device 
 ### Remembered devices
 
 Ferry remembers each device it connects this way by its serial number, and connects to it again
-when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Not
-connected**, with **Connect** to try again.
+when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered · not
+nearby**: click it, then **Connect Again** to try again.
 
 **Forget** disconnects the device and forgets its addresses. Ferry no longer connects to it by
 itself.
@@ -318,16 +318,19 @@ the device, Control-click the file and choose **Remove Download**.
 
 ## The menu
 
-Click the Ferry icon in the menu bar to see each connected device, how Ferry reaches it, its
-storage and free space, and its state.
+Click the Ferry icon in the menu bar to see each connected device. Each one is a row with a
+round tile (in color while Ferry serves the device, grey otherwise), its name, and a line under the
+name: how Ferry reaches it and its free space, such as **USB · 21 GB free**, its address over
+Wi-Fi, or its state. Click a device to see what you can do with it, and click it again to close
+it. One device is open at a time; the first ready one is open when the menu opens.
 
 | State | Meaning |
 | ----- | ------- |
-| **Ready** | The device is sharing files and is in Finder. The menu lists each storage and its free space. |
+| **Ready** | The device is sharing files and is in Finder. Click it to see each storage and its free space. |
 | **Not sharing files** | The device is connected but file transfer is off or it is locked. Click **How to Turn On File Transfer** for the steps. |
 | **Ejected** | You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in. |
-| **In use by another app** | Another app has the device. Quit it, then click **Try Again**. See [Troubleshooting](#in-use-by-another-app). |
-| **Can't open** | The device reported an error, shown under its name. Click **Try Again**, or unplug it and plug it back in. |
+| **In use by another app** | Another app has the device. Quit it, then click **Check Again**. See [Troubleshooting](#in-use-by-another-app). |
+| **Can't open** | The device reported an error, shown under its name. Click **Check Again**, or unplug it and plug it back in. |
 
 Above the devices, the menu can also show:
 
@@ -343,7 +346,7 @@ Above the devices, the menu can also show:
 
 While the menu is open, Ferry checks for devices every 2 seconds.
 
-Under each ready device, the menu says how Ferry reaches it:
+When you click a ready device, the menu says how Ferry reaches it:
 
 | Shown | Meaning |
 | ----- | ------- |
@@ -351,7 +354,7 @@ Under each ready device, the menu says how Ferry reaches it:
 | **Wi-Fi · ADB** | ADB over your network. |
 | **USB · File transfer** | USB file transfer, with USB debugging off or not yet allowed. |
 
-A device over ADB shows the [tools](#tools-over-usb-debugging) under its name. A device on
+A device over ADB lists the [tools](#tools-over-usb-debugging) when you click it. A device on
 file transfer also shows **More Tools with USB Debugging…**, which opens the
 [steps](#usb-debugging-adb), or **Allow USB debugging on the device** once USB debugging is on
 and waits for you to tap **Allow**. When `adb` is not installed and a device is connected, the
@@ -364,18 +367,20 @@ Menu items:
 - **Refresh** (⌘R): reads each ready device's folders again at once, so every change made on
   the device shows in Finder, including files changed in place or renamed in file transfer
   mode; mounts every device you ejected; and checks again a device that is not sharing files.
-- **Eject** (next to a ready device): removes the device from Finder and releases it, so you
+- **Eject** (in a ready device's list): removes the device from Finder and releases it, so you
   can unplug it or use it with another app. The device then shows **Ejected** until you click
   **Mount**, choose **Refresh**, or unplug it and plug it back in. Changes that had not reached the device
   are saved to a folder on the Mac: the menu says **Unsent changes were saved to** that folder
   and offers **Reveal in Finder**. Deletes and renames that had not reached the device are
   dropped, so the device keeps those files under their old names.
-- **Mount** (next to an ejected device): puts it back in Finder.
-- **Try Again** (next to a device that is in use or can't open): asks Ferry to open the
-  device again.
-- **Help** (the question-mark button, ⌘?): opens Ferry Help.
+- **Mount** (in an ejected device's list): puts it back in Finder.
+- **Check Again** (in the list of a device that is in use or can't open): asks Ferry to open
+  the device again.
+- **Send File…** (in a ready device's list): sends files you choose into the device's
+  `Download` folder, as **Send to** does in Finder.
+- **Help** (⌘?): opens Ferry Help.
 - **Settings…** (⌘,): opens Settings.
-- **Quit**: closes the menu-bar item. The helper keeps running, so devices stay in Finder.
+- **Quit Ferry** (⌘Q): closes the menu-bar item. The helper keeps running, so devices stay in Finder.
 
 Settings:
 
@@ -386,9 +391,10 @@ Settings:
 
 ## Tools over USB debugging
 
-A device Ferry reaches over ADB (**USB · ADB** or **Wi-Fi · ADB** in the menu) shows
-**Install App…**, **Screenshot** and **Record Screen** under its name, and a **Developer
-Tools** menu. A device on file transfer shows **More Tools with USB Debugging…** instead.
+Click a device Ferry reaches over ADB (**USB · ADB** or **Wi-Fi · ADB** in the menu) to see
+its tools: **Take Screenshot**, **Record Screen**, **Logcat**, **Device Info**, **Port
+Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows **More Tools
+with USB Debugging…** instead.
 
 ### Install an app
 
@@ -403,9 +409,9 @@ device either way.
 
 ### Screenshots and screen recordings
 
-Click **Screenshot** to save what the device's screen shows. Click **Record Screen** to record
-it, for up to three minutes; the menu shows how long it has been recording, and **Stop** ends
-it.
+Click **Take Screenshot** to save what the device's screen shows. Click **Record Screen** to
+record it, for up to three minutes; the menu shows how long it has been recording, and **Stop
+Recording** ends it.
 
 Ferry saves them where macOS saves its own screenshots (the Desktop, unless you chose another
 folder in the Screenshot app), named like macOS's own, such as
@@ -423,7 +429,7 @@ change has a single frame.
 
 ### Logcat
 
-Choose **Developer Tools**, then **Logcat…**, to watch the device's log in a window of its own.
+Click **Logcat** to watch the device's log in a window of its own.
 Ferry keeps the newest 50,000 lines. **Level** shows lines at that level and above, and
 **Filter** shows the lines that contain your text, whatever its case. **Pause** freezes the
 window while lines keep arriving, and **Resume** catches up. **Clear** empties it.
@@ -433,13 +439,13 @@ stops when you close the window or the device goes away.
 
 ### Open a shell
 
-Choose **Developer Tools**, then **Open Shell**, to open Terminal with a shell on the device
+Click **Open Shell** to open Terminal with a shell on the device
 (`adb shell`). Ferry needs adb for this, and says so if it can't find it. Nothing on the device
 changes unless you type a command that changes it.
 
 ### Forward a port
 
-Choose **Developer Tools**, then **Port Forwarding…**, to send connections to a port on this Mac
+Click **Port Forwarding** to send connections to a port on this Mac
 to a port on the device. Type the port on this Mac (1024 or higher) and the port on the device,
 then click **Add**. **Remove** ends a forward.
 
@@ -448,7 +454,7 @@ TCP forwards adb holds for this device.
 
 ### Device info
 
-Choose **Developer Tools**, then **Device Info…**, to see the model, Android version, build,
+Click **Device Info** to see the model, Android version, build,
 serial number, battery, IP addresses and storage the device reports. Ferry only reads them.
 **Copy** puts them on the clipboard.
 
@@ -473,7 +479,7 @@ cable. A device you ejected shows **Ejected** instead: click **Mount**.
 ### "In use by another app"
 
 Only one app can use the device at a time. Quit any of these that are open, then click
-**Try Again**:
+**Check Again**:
 
 - Image Capture
 - Preview

@@ -39,7 +39,7 @@
     "**Forget** disconnects the device and forgets its addresses. Ferry no longer connects to it by itself." : {
       "extractionState" : "manual"
     },
-    "Ferry remembers each device it connects this way by its serial number, and connects to it again when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Not connected**, with **Connect** to try again." : {
+    "Ferry remembers each device it connects this way by its serial number, and connects to it again when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered · not nearby**: click it, then **Connect Again** to try again." : {
       "extractionState" : "manual"
     },
     "Remembered devices" : {
@@ -57,7 +57,7 @@
     "Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again." : {
       "extractionState" : "manual"
     },
-    "With the device on USB debugging and connected by cable, click **Use over Wi-Fi** under its name. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the network if it is off, and connects to the first address that answers. Connect the device to Ethernet or Wi-Fi first." : {
+    "With the device on USB debugging and connected by cable, click the device in the menu, then **Use over Wi-Fi**. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the network if it is off, and connects to the first address that answers. Connect the device to Ethernet or Wi-Fi first." : {
       "extractionState" : "manual"
     },
     "Use over Wi-Fi suits a device already on USB debugging, such as a NetAlly tester or a phone with Android 8 to 10. Pair with Code is for Android 11 and newer. Connect by Address is for a device that already accepts ADB over the network." : {
@@ -121,7 +121,7 @@
     "%lld." : {
 
     },
-    "A device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) shows Install App…, Screenshot and Record Screen under its name, and a Developer Tools menu. A device on file transfer shows More Tools with USB Debugging… instead." : {
+    "Click a device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) to see its tools: Take Screenshot, Record Screen, Logcat, Device Info, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
       "extractionState" : "manual"
     },
     "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device." : {
@@ -182,7 +182,7 @@
     "Android version" : {
 
     },
-    "Another app has the device. Quit that app, then click **Try Again**." : {
+    "Another app has the device. Quit that app, then click **Check Again**." : {
       "extractionState" : "manual"
     },
     "Ask NetAlly to enable ADB on the tester." : {
@@ -212,16 +212,16 @@
     "Choose **Refresh** in the Ferry menu." : {
       "extractionState" : "manual"
     },
-    "Choose Developer Tools, then Device Info…, to see the model, Android version, build, serial number, battery, IP addresses and storage the device reports. Ferry only reads them. Copy puts them on the clipboard." : {
+    "Click Device Info to see the model, Android version, build, serial number, battery, IP addresses and storage the device reports. Ferry only reads them. Copy puts them on the clipboard." : {
       "extractionState" : "manual"
     },
-    "Choose Developer Tools, then Logcat…, to watch the device's log in a window of its own. Ferry keeps the newest 50,000 lines. Level shows lines at that level and above, and Filter shows the lines that contain your text, whatever its case. Pause freezes the window while lines keep arriving, and Resume catches up. Clear empties it." : {
+    "Click Logcat to watch the device's log in a window of its own. Ferry keeps the newest 50,000 lines. Level shows lines at that level and above, and Filter shows the lines that contain your text, whatever its case. Pause freezes the window while lines keep arriving, and Resume catches up. Clear empties it." : {
       "extractionState" : "manual"
     },
-    "Choose Developer Tools, then Open Shell, to open Terminal with a shell on the device (adb shell). Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it." : {
+    "Click Open Shell to open Terminal with a shell on the device (adb shell). Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it." : {
       "extractionState" : "manual"
     },
-    "Choose Developer Tools, then Port Forwarding…, to send connections to a port on this Mac to a port on the device. Type the port on this Mac (1024 or higher) and the port on the device, then click Add. Remove ends a forward." : {
+    "Click Port Forwarding to send connections to a port on this Mac to a port on the device. Type the port on this Mac (1024 or higher) and the port on the device, then click Add. Remove ends a forward." : {
       "extractionState" : "manual"
     },
     "Choose Folder…" : {
@@ -248,7 +248,7 @@
     "Click Install App… and choose an .apk file, or drag one .apk onto the device in the menu. Ferry checks that the file is an Android app, copies it to the device and installs it, replacing an older version of the same app. The menu shows how far the copy has got, then says when the app is installed." : {
       "extractionState" : "manual"
     },
-    "Click Screenshot to save what the device's screen shows. Click Record Screen to record it, for up to three minutes; the menu shows how long it has been recording, and Stop ends it." : {
+    "Click Take Screenshot to save what the device's screen shows. Click Record Screen to record it, for up to three minutes; the menu shows how long it has been recording, and Stop Recording ends it." : {
       "extractionState" : "manual"
     },
     "Click the Ferry icon in the menu bar." : {
@@ -570,7 +570,7 @@
     "NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG" : {
 
     },
-    "Next to an ejected device: puts it back in Finder." : {
+    "For an ejected device: puts it back in Finder." : {
       "extractionState" : "manual"
     },
     "No device connected" : {
@@ -690,13 +690,10 @@
     "Pull down the notification shade and tap **USB charging this device**." : {
 
     },
-    "Quit" : {
-
-    },
     "Quit Image Capture or Android File Transfer, then try again." : {
 
     },
-    "Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then click **Try Again**." : {
+    "Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then click **Check Again**." : {
       "extractionState" : "manual"
     },
     "Reading the device…" : {
@@ -804,10 +801,10 @@
     "The device has no network address. Connect it to Ethernet or Wi-Fi first." : {
 
     },
-    "The device is sharing files and is in Finder." : {
+    "The device is sharing files and is in Finder. Under its name the menu shows how Ferry reaches it and the free space, such as USB · 21 GB free, or its address over Wi-Fi." : {
       "extractionState" : "manual"
     },
-    "The device reported an error. Click **Try Again**, or unplug it and plug it back in." : {
+    "The device reported an error. Click **Check Again**, or unplug it and plug it back in." : {
       "extractionState" : "manual"
     },
     "The device's IP address or name. Ferry uses port 5555 unless you add another." : {
@@ -1033,6 +1030,12 @@
     },
     "Collapsed" : {
 
+    },
+    "Click a device to see what you can do with it, and click it again to close it. One device is open at a time; the first ready one is open when the menu opens." : {
+      "extractionState" : "manual"
+    },
+    "Sends files you choose into the device's Download folder, as **Send to** does in Finder." : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.0"
