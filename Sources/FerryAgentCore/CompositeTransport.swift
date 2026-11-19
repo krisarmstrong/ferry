@@ -9,7 +9,8 @@ import os
 /// network. A serial alone does not prove a network device is the unit on the cable, so a
 /// network route serves a device only while no USB route of either kind presents its serial in
 /// any state (usable, busy, not sharing, ejected, unauthorised, offline). A transport whose scan
-/// fails is taken as unchanged since its last successful scan, never as having found nothing. A
+/// fails is taken as unchanged since its last successful scan, never as having found nothing;
+/// until MTP has scanned successfully once, no network route is served at all. A
 /// device keeps the name MTP gave it once MTP has seen it, so its Finder location is not renamed
 /// when the method changes; one only ADB has seen keeps ADB's name.
 ///
@@ -98,12 +99,15 @@ public actor CompositeTransport: DeviceTransport {
     }
     let ejectedIDs = Set(ejected.map(\.id))
     let onUSB = Self.onUSB(mtp: viaMTP, adb: viaADB)
+    // Until MTP has scanned once, any unit on the cable may be missing from `onUSB` (one with USB
+    // debugging off is only seen by MTP): the network serves nothing until then.
+    let networkAllowed = lastMTP != nil
     var servers: [DeviceID: Side] = [:]
     var chosen: [DeviceID: DeviceInfo] = [:]
     for (side, scan) in [(Side.adb, viaADB), (.mtp, viaMTP)] {
       for info in scan.devices where !ejectedIDs.contains(info.id) {
         let method = scan.method(of: info.id)
-        if method == .wifiADB, onUSB.contains(info.id) { continue }
+        if method == .wifiADB, !networkAllowed || onUSB.contains(info.id) { continue }
         if let best = methods[info.id], chosen[info.id] != nil, !method.isPreferred(over: best) {
           continue
         }

@@ -184,15 +184,17 @@ public actor ADBTools {
     self.limits = limits
   }
 
-  /// The tools' adb serial for `id`: the route its session uses, for a ready device served over
-  /// ADB only.
+  /// The tools' adb serial for `id`: `session`, the route its open session uses, for a ready
+  /// device served over ADB only. The tools follow the session, not the latest scan: a network
+  /// route the serving check stopped serving (its device got a Finder location after a terminal
+  /// `adb connect`) still carries the files until that session ends, and so the tools too.
   public static func target(
-    for id: DeviceID, devices: [AttachedDevice], routes: ADBRoutes?
+    for id: DeviceID, devices: [AttachedDevice], session: String?
   ) -> String? {
     guard let device = devices.first(where: { $0.id == id }), case .ready = device.state,
       [.usbADB, .wifiADB].contains(device.method)
     else { return nil }
-    return routes?.preferred
+    return session
   }
 
   // MARK: APK

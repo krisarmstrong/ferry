@@ -61,6 +61,9 @@ public enum WirelessFailure: Codable, Sendable, Equatable {
   case pairingNeedsAddress
   /// The address no longer stands for the device the menu showed; the menu has the current offer.
   case offerChanged
+  /// Use over Wi-Fi restarts the device's adb, which would cut off a transfer, a screen recording
+  /// or a log stream running on it.
+  case deviceInUse
   /// adb's own words, one line.
   case adb(String)
 }

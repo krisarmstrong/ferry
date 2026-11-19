@@ -68,7 +68,7 @@ Task {
 let tools = ADBTools(
   device: adb.deviceTools,
   target: { id in
-    ADBTools.target(for: id, devices: await hub.devices(), routes: await adb.routes(for: id))
+    ADBTools.target(for: id, devices: await hub.devices(), session: await adb.sessionRoute(for: id))
   }, journal: toolJournal)
 
 // The listener holds its delegate weakly; both live for the whole process.

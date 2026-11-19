@@ -169,9 +169,10 @@ public actor WirelessADB {
     self.known = known
     self.located = located
     self.vouching = vouching
-    let entries = WirelessStore.load(store)
-    self.entries = entries
-    vouching.remember(entries)
+    let loaded = WirelessStore.load(store)
+    entries = loaded.entries
+    if !loaded.intact { vouching.storeUnreadable() }
+    vouching.remember(loaded.entries)
   }
 
   /// `wireless.json` beside the agent's item tables.
@@ -298,6 +299,9 @@ public actor WirelessADB {
       }
       for endpoint in revoked.keys { pending[endpoint] = nil }
       unconfirmedAddresses = unconfirmedAddresses.filter { $0.value.id != id }
+      // Held as undecided before they stop being vouched for: until they are disconnected, a
+      // scan would otherwise find a located device on an unvouched route and offer it.
+      for endpoint in addresses { vouching.unsettle(endpoint.argument) }
       save()
       log.info("forgot \(id.serial, privacy: .private)")
       for endpoint in addresses.union(revoked.keys).sorted(by: { $0.argument < $1.argument }) {
@@ -308,6 +312,8 @@ public actor WirelessADB {
         }
       }
       // Only once disconnected: the device is unknown to Ferry now, which a scan would serve.
+      // Each hold is released once: an address both remembered and pending has two.
+      for endpoint in addresses { vouching.settle(endpoint.argument) }
       for endpoint in revoked.keys { vouching.settle(endpoint.argument) }
     }
   }

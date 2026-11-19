@@ -15,10 +15,11 @@ import os
 ///   such as after a restart), and the address is offered in the menu for the user to confirm,
 ///   which makes it remembered.
 ///
-/// While the location set is incomplete (the system's domains could not be listed), only
-/// remembered routes are served. An address `WirelessADB` is still deciding about, connecting to
-/// or waiting for Allow on, is never served, whoever it claims to be, so a scan cannot race the
-/// decision. A unit on USB is kept off the network by `CompositeTransport`.
+/// While the location set is incomplete (the system's domains could not be listed), or the store
+/// of remembered devices could not be read this run, only remembered routes are served. An
+/// address `WirelessADB` is still deciding about, connecting to or waiting for Allow on, is never
+/// served, whoever it claims to be, so a scan cannot race the decision. A unit on USB is kept off
+/// the network by `CompositeTransport`.
 public final class WirelessVouching: Sendable {
   struct Locations {
     let identifiers: Set<String>
@@ -30,6 +31,8 @@ public final class WirelessVouching: Sendable {
   private struct State {
     /// False until the store is loaded: until then no network route is served at all.
     var loaded = false
+    /// False when the store could not be read this run: any device may have been remembered.
+    var storeIntact = true
     /// `nil` until the domain controller first publishes them, and until then nothing is served.
     var locations: Locations?
     var vouched: [DeviceID: Set<String>] = [:]
@@ -74,7 +77,7 @@ public final class WirelessVouching: Sendable {
       if Self.isLocated(id, in: locations) {
         return (false, state.reported.insert(adbSerial).inserted)
       }
-      return (locations.complete && state.vouched[id] == nil, false)
+      return (locations.complete && state.storeIntact && state.vouched[id] == nil, false)
     }
     if report { refused.yield(Refusal(adbSerial: adbSerial, id: id)) }
     return serve
@@ -107,6 +110,12 @@ public final class WirelessVouching: Sendable {
         entries.filter { $0.value.addresses.contains { $0.learnt == .paired } }.keys)
     }
     changed.yield()
+  }
+
+  /// The store of remembered devices could not be read: for the rest of this run, a route is
+  /// served only once Ferry has vouched for it.
+  func storeUnreadable() {
+    state.withLock { $0.storeIntact = false }
   }
 
   func unsettle(_ adbSerial: String) {

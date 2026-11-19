@@ -176,6 +176,11 @@ enum DevicePresentation {
       String(
         localized: LocalizedStringResource(
           "That address changed. Check the menu and try again.", bundle: .module))
+    case .deviceInUse:
+      String(
+        localized: LocalizedStringResource(
+          "Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again.",
+          bundle: .module))
     case .adb(let detail):
       String(
         localized: LocalizedStringResource(

@@ -103,9 +103,10 @@ actor LogQueue {
 /// before sending the next, so the stream goes at the client's pace. A watchdog checks every
 /// `routeWatch` that the device is still served over ADB by the route the stream began on (an
 /// eject or a switch of method closes nothing on the adb connection) and closes the stream if
-/// not, which ends a read waiting on a silent log. It also ends when the client says it wants
-/// no more, when its own stop arrives, when a new stream for the device replaces it, or when
-/// the device or the adb server goes away.
+/// not, which ends a read waiting on a silent log. The same watchdog ends the stream once the
+/// client cancels the request or its connection drops. It also ends when the client says it
+/// wants no more, when its own stop arrives, when a new stream for the device replaces it, or
+/// when the device or the adb server goes away.
 extension ADBTools {
   /// Runs until the stream ends. A device lost meanwhile throws, as for any tool.
   public func streamLogcat(_ id: DeviceID, stream: UUID, to sink: LogSink)
@@ -129,7 +130,8 @@ extension ADBTools {
     logcats[id] = run
     let queue = LogQueue(maxLines: limits.logQueueLines, maxBytes: limits.logQueueBytes)
     let reader = Self.read(source, into: queue)
-    let watchdog = watch(id, serial: serial, run, every: limits.routeWatch)
+    let watchdog = watch(
+      id, serial: serial, run, cancellation: RequestCancellation.current, every: limits.routeWatch)
     let clientLeft = await deliver(queue, run, to: sink)
     // Whether somebody ended it, read before this ends it too.
     let (stopped, lost) = (run.isStopped, run.isRouteLost)
@@ -157,13 +159,18 @@ extension ADBTools {
   }
 
   /// Closes the stream, which ends a read waiting on a silent log, once the device is no longer
-  /// served over ADB by `serial`'s route.
-  private func watch(_ id: DeviceID, serial: String, _ run: LogcatRun, every interval: Duration)
-    -> Task<Void, Never>
-  {
+  /// served over ADB by `serial`'s route, or the client has cancelled the request.
+  private func watch(
+    _ id: DeviceID, serial: String, _ run: LogcatRun, cancellation: RequestCancellation?,
+    every interval: Duration
+  ) -> Task<Void, Never> {
     let target = target
     return Task {
       while (try? await Task.sleep(for: interval)) != nil {
+        if cancellation?.isCancelled == true {
+          run.stop()
+          return
+        }
         if await target(id) != serial {
           run.routeLost()
           return

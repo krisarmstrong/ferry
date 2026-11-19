@@ -56,20 +56,20 @@ struct ADBToolsTests {
     let info = DeviceInfo(id: device, manufacturer: "", model: "LinkRunner-100G")
     let storage = StorageInfo(
       id: StorageID(device: device, key: "internal"), description: "Internal", capacity: 1, free: 1)
-    let routes = ADBRoutes(usb: serial, wireless: ["10.0.0.5:5555"])
     let ready = AttachedDevice(info: info, state: .ready([storage]), method: method)
-    #expect((ADBTools.target(for: device, devices: [ready], routes: routes) != nil) == has)
+    #expect((ADBTools.target(for: device, devices: [ready], session: serial) != nil) == has)
     let ejected = AttachedDevice(info: info, state: .ejected, method: method)
-    #expect(ADBTools.target(for: device, devices: [ejected], routes: routes) == nil)
-    #expect(ADBTools.target(for: device, devices: [ready], routes: nil) == nil)
+    #expect(ADBTools.target(for: device, devices: [ejected], session: serial) == nil)
+    #expect(ADBTools.target(for: device, devices: [ready], session: nil) == nil)
   }
 
-  /// USB while the cable is in, as the session.
+  /// The route the open session uses, whatever a later scan would pick.
   @Test func toolsUseTheSessionsRoute() {
     let info = DeviceInfo(id: device, manufacturer: "", model: "LinkRunner-100G")
-    let ready = AttachedDevice(info: info, state: .ready([]), method: .usbADB)
-    let routes = ADBRoutes(usb: "usb-serial", wireless: ["10.0.0.5:5555"])
-    #expect(ADBTools.target(for: device, devices: [ready], routes: routes) == "usb-serial")
+    let ready = AttachedDevice(info: info, state: .ready([]), method: .wifiADB)
+    #expect(
+      ADBTools.target(for: device, devices: [ready], session: "192.0.2.5:5555")
+        == "192.0.2.5:5555")
   }
 
   // MARK: Screenshot

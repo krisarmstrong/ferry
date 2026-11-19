@@ -277,4 +277,20 @@ struct CompositeTransportTests {
     await mtp.detach(id)
     #expect(try await composite.scan().method(of: id) == .wifiADB)
   }
+
+  /// Until MTP has scanned once, Ferry cannot know which units are on the cable: the network
+  /// serves nothing, so a unit on USB with debugging off is not served over Wi-Fi meanwhile.
+  @Test func noNetworkRouteIsServedBeforeTheFirstMTPScan() async throws {
+    let mtp = FakeTransport(devices: [])
+    await mtp.failScans(with: .io("registry"))
+    let adb = FakeTransport(devices: [adbDevice], method: .usbADB)
+    await adb.setMethod(.wifiADB, for: id)
+    let composite = CompositeTransport(mtp: mtp, adb: adb)
+    let failed = try await composite.scan()
+    #expect(failed.devices.isEmpty)
+    #expect(failed.rescanAfter == CompositeTransport.staleRetry)
+
+    await mtp.failScans(with: nil)
+    #expect(try await composite.scan().method(of: id) == .wifiADB)
+  }
 }

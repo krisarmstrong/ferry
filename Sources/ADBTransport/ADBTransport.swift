@@ -61,6 +61,8 @@ public actor ADBTransport: DeviceTransport {
   private struct Held {
     let info: DeviceInfo
     let serials: Set<String>
+    /// The adb serial the session was opened on; `nil` for what was last seen of a device.
+    var route: String?
   }
 
   private struct Parked {
@@ -212,7 +214,7 @@ public actor ADBTransport: DeviceTransport {
       let info = named.first(where: { $0.key.serial == serial })?.value
     else { throw .deviceNotFound(id) }
     // Held from here, so a second open while this one waits is busy.
-    held[id] = Held(info: info, serials: routes.serials)
+    held[id] = Held(info: info, serials: routes.serials, route: serial)
     let features: Set<String>
     do throws(ADBError) {
       features = try await Self.within(answerLimit) { [host] () async throws(ADBError) in
@@ -313,6 +315,10 @@ extension ADBTransport {
 
   /// Where the adb server reaches `id`, as of the most recent scan.
   public func routes(for id: DeviceID) -> ADBRoutes? { routes[id] }
+
+  /// The adb serial of `id`'s open session, until that session ends, whatever later scans
+  /// find: a network route the policy stops serving still carries the session open on it.
+  public func sessionRoute(for id: DeviceID) -> String? { held[id]?.route }
 
   /// The tools (APK install, screenshot, screen recording) over this transport's server.
   public nonisolated var deviceTools: ADBDeviceTools { ADBDeviceTools(host: host) }

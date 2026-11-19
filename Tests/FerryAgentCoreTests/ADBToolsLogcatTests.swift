@@ -179,6 +179,27 @@ struct ADBToolsLogcatTests {
     #expect(try await eventually { await log.closed })
   }
 
+  /// The client cancelled (its app quit, or the connection dropped): the stream ends at once,
+  /// even on a log that prints nothing.
+  @Test func aCancelledRequestEndsASilentStream() async throws {
+    let fake = FakeToolDevice()
+    let log = FakeLogcat()
+    await fake.set { $0.logcats = [log] }
+    let tools = makeTools(fake)
+    let cancellation = RequestCancellation()
+    let client = Client()
+    let run = Task {
+      try await RequestCancellation.$current.withValue(cancellation) {
+        try await tools.streamLogcat(device, stream: UUID(), to: client.sink)
+      }
+    }
+    await log.send(["one"])
+    #expect(try await eventually { client.lines == ["one"] })
+    cancellation.cancel()
+    #expect(try await run.value == .done)
+    #expect(try await eventually { await log.closed })
+  }
+
   /// A stop that arrives while the stream is still connecting ends it as soon as it is up.
   @Test func aStopBeforeTheStreamIsUpEndsIt() async throws {
     let fake = FakeToolDevice()

@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again." : {
+
+    },
     "%@ used, %@ free" : {
 
     },
@@ -856,7 +859,7 @@
     "The device sent more than a recording can be, so Ferry deleted it." : {
 
     },
-    "The device stopped sending the recording, so Ferry deleted it." : {
+    "The recording stopped arriving. It's still on the device: choose a folder, or discard it." : {
 
     },
     "The device was disconnected." : {

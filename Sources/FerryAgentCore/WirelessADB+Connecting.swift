@@ -35,13 +35,17 @@ extension WirelessADB {
 
   /// Offers each route the serving check refused because its device has a Finder location, by
   /// the name Ferry has for the device, instead of leaving it refused without a word. An adb serial
-  /// that is not an address (an mDNS name) cannot be confirmed by address and is not offered.
+  /// that is not an address (an mDNS name) cannot be confirmed by address and is not offered, nor
+  /// is a refusal for a device the user forgot after it was raised: it waited for its turn behind
+  /// the forget, and the forget withdrew everything under way for the device.
   func offerRefusedRoutes() async {
     for await refusal in vouching.refusals {
       guard let endpoint = WirelessEndpoint(parsing: refusal.adbSerial, defaultPort: nil) else {
         continue
       }
+      let raised = forgets
       await gate.run {
+        if let forgottenAt = forgotten[refusal.id], forgottenAt > raised { return }
         var name = await knownNames()[refusal.id]
         if name == nil { name = await located(refusal.id) }
         offer(endpoint, as: refusal.id, named: name ?? refusal.id.serial)

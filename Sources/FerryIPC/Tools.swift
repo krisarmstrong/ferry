@@ -40,7 +40,7 @@ public enum ToolFailure: Error, Codable, Sendable, Equatable {
   case recordingFailed(String)
   /// The device sent more than any real recording; it was deleted.
   case recordingTooLarge
-  /// The device stopped sending the recording; it was deleted.
+  /// The device stopped sending the recording; it is kept on the device for another try.
   case recordingStalled
   /// The recording is still being finished or saved.
   case recordingBusy

@@ -147,13 +147,27 @@ struct WirelessADBRememberedTests {
       await wireless.remembered().first?.addresses == [Self.endpoint("192.0.2.31:5555")])
   }
 
+  /// An unreadable store is moved aside, not overwritten, so the user's devices can be got
+  /// back; for this run only vouched routes are served, as the remembered set is unknown.
   @Test(.timeLimit(.minutes(1)))
-  func anUnreadableStoreStartsEmpty() async throws {
-    let file = Self.storeFile()
-    defer { try? FileManager.default.removeItem(at: file) }
+  func anUnreadableStoreIsKeptAsideAndServesOnlyVouchedRoutes() async throws {
+    let folder = TestScratch.root.appending(path: "ferry-wireless-\(UUID())")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let file = folder.appending(path: "wireless.json")
     try Data("not json".utf8).write(to: file)
-    let wireless = WirelessADB(adb: FakeWirelessADB(), store: file, timing: Self.fast)
+    let vouching = WirelessVouching()
+    let wireless = WirelessADB(
+      adb: FakeWirelessADB(), store: file, timing: Self.fast, vouching: vouching)
     #expect(await wireless.remembered().isEmpty)
+    let kept = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+    #expect(kept.count == 1)
+    #expect(kept.first?.hasPrefix("wireless.json.unreadable-") == true)
+    #expect(
+      try Data(contentsOf: folder.appending(path: try #require(kept.first)))
+        == Data("not json".utf8))
+    vouching.locate(identifiers: [], devices: [], complete: true)
+    #expect(!vouching.serves("192.0.2.31:5555", as: DeviceID(serial: "NEWUNIT1")))
   }
 }
 

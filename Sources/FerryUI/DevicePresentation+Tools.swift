@@ -70,7 +70,8 @@ extension DevicePresentation {
         "The device sent more than a recording can be, so Ferry deleted it.", bundle: .module)
     case .recordingStalled:
       LocalizedStringResource(
-        "The device stopped sending the recording, so Ferry deleted it.", bundle: .module)
+        "The recording stopped arriving. It's still on the device: choose a folder, or discard it.",
+        bundle: .module)
     case .recordingBusy:
       LocalizedStringResource(
         "The recording is still being finished. Try again in a moment.", bundle: .module)

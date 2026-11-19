@@ -14,6 +14,15 @@ extension ADBTools {
     .sorted { $0.started < $1.started }
   }
 
+  /// Whether the device has something under way over ADB that a restart of its adbd would cut
+  /// off: a recording still running or being pulled, or a log stream. A finished recording that
+  /// waits on the device is not cut off.
+  public func isBusy(_ id: DeviceID) -> Bool {
+    if logcats[id] != nil { return true }
+    guard let recording = recordings[id] else { return false }
+    return recording.end == nil || recording.collecting
+  }
+
   /// Records until Stop, the time limit, or the process ending, and answers `.done` then: the
   /// video waits on the device for `saveRecording`. A device lost meanwhile is disconnected and
   /// its file is left for the next session's sweep.
@@ -70,11 +79,12 @@ extension ADBTools {
 
   /// Copies a finished recording into `file`, a writable descriptor from the client, and removes
   /// it from the device. One with no video is `recordingFailed` with the process's own words; one
-  /// larger than any real recording, or that stops arriving, is removed and reported as such.
+  /// larger than any real recording is removed and reported as such.
   ///
   /// The device must still be served over ADB, by the route it uses now: an ejected device is
   /// left alone, and its video waits until it is served again. A pull the device or the Mac
-  /// broke off keeps the recording, on the device and in the journal, for another try.
+  /// broke off, or that stopped arriving (a Wi-Fi roam, a busy link), keeps the recording, on the
+  /// device and in the journal, for another try.
   public func saveRecording(_ id: DeviceID, into file: Int32) async throws(TransportError)
     -> Outcome
   {
@@ -98,7 +108,9 @@ extension ADBTools {
       recordings[id]?.collecting = false
       throw error
     case .success(.tooLarge): failure = .recordingTooLarge
-    case .success(.stalled): failure = .recordingStalled
+    case .success(.stalled):
+      recordings[id]?.collecting = false
+      return .failed(.recordingStalled)
     case .success(.noFile): failure = .recordingFailed(detail)
     case .success(.pulled):
       guard Self.isMP4(at: staged) else {
@@ -182,11 +194,13 @@ extension ADBTools {
     }
     let result = await pulling.value
     watchdog.cancel()
+    // A pull that completed as the watchdog gave up on it completed; only a recording larger
+    // than any real one is refused whatever arrived.
     switch (watch.stop, result) {
     case (.tooLarge, _): return .success(.tooLarge)
+    case (_, .success): return .success(.pulled)
     case (.noRoom(let error), _): return .failure(error)
     case (.stalled, _): return .success(.stalled)
-    case (nil, .success): return .success(.pulled)
     case (nil, .failure(let error)):
       let mapped = Self.transportError(error)
       if case .failed = error, mapped != .deviceDisconnected { return .success(.noFile) }

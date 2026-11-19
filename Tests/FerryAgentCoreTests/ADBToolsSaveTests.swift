@@ -80,19 +80,38 @@ struct ADBToolsSaveTests {
     await expectGone(tools, fake)
   }
 
-  @Test func aPullThatStopsArrivingIsGivenUp() async throws {
+  /// A pull that stops arriving (a Wi-Fi roam, a busy link) is given up, but the video stays
+  /// on the device and in the journal for another try.
+  @Test func aPullThatStopsArrivingKeepsTheRecording() async throws {
     let fake = FakeToolDevice()
     await fake.recording.set { $0.pullBehaviour = .stalls }
     var limits = ADBTools.Limits()
     limits.pullStall = .milliseconds(80)
     let tools = try await finished(fake, limits: limits)
-    let (_, handle) = try destination()
+    let (url, handle) = try destination()
     #expect(
       try await tools.saveRecording(device, into: handle.fileDescriptor)
         == .failed(.recordingStalled))
+    #expect(await tools.recordingsRunning().map(\.finished) == [true])
+    #expect(await fake.removals.isEmpty)
+    #expect(await journal.paths(on: device).count == 1)
+    await fake.recording.set { $0.pullBehaviour = .normal }
+    #expect(try await tools.saveRecording(device, into: handle.fileDescriptor) == .done)
+    #expect(try Data(contentsOf: url) == FakeRecording.mp4)
     await expectGone(tools, fake)
-    // The device is free for another recording.
-    #expect(await tools.recordingsRunning().isEmpty)
+  }
+
+  /// A pull that completes as the watchdog gives up on it is a pull that completed.
+  @Test func aPullThatFinishesAsTheWatchdogFiresIsSaved() async throws {
+    let fake = FakeToolDevice()
+    await fake.recording.set { $0.pullBehaviour = .finishesLate(.milliseconds(300)) }
+    var limits = ADBTools.Limits()
+    limits.pullStall = .milliseconds(80)
+    let tools = try await finished(fake, limits: limits)
+    let (url, handle) = try destination()
+    #expect(try await tools.saveRecording(device, into: handle.fileDescriptor) == .done)
+    #expect(try Data(contentsOf: url) == FakeRecording.mp4)
+    await expectGone(tools, fake)
   }
 
   /// No room on the Mac: the video stays on the device for another try.

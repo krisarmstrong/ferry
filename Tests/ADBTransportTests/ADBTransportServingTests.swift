@@ -1,6 +1,7 @@
 import DeviceKit
 import Foundation
 import Testing
+import os
 
 @testable import ADBTransport
 
@@ -49,5 +50,27 @@ struct ADBTransportServingTests {
     let hub = try await Fixture.hub([.init(Fixture.linkRunnerWiFi, device: android)])
     let transport = Fixture.transport(port: hub.port, serving: { _, _ in true })
     #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
+  }
+
+  /// A route the policy stops serving (its device got a Finder location after a terminal
+  /// `adb connect`) still carries the session already open on it, and the tools follow that
+  /// session, as the files do, until it ends.
+  @Test func theOpenSessionsRouteOutlastsThePolicy() async throws {
+    let android = Fixture.android(serial: Fixture.linkRunnerSerial)
+    let hub = try await Fixture.hub([.init(Fixture.linkRunnerWiFi, device: android)])
+    let serving = OSAllocatedUnfairLock(initialState: true)
+    let transport = Fixture.transport(
+      port: hub.port, serving: { _, _ in serving.withLock { $0 } })
+    #expect(try await transport.scan().devices == [Fixture.linkRunnerInfo])
+    #expect(await transport.sessionRoute(for: Fixture.linkRunner) == nil)
+    let session = try await transport.open(Fixture.linkRunner)
+    #expect(await transport.sessionRoute(for: Fixture.linkRunner) == Fixture.linkRunnerWiFi)
+    serving.withLock { $0 = false }
+    _ = try await transport.scan()
+    #expect(await transport.routes(for: Fixture.linkRunner) == nil)
+    #expect(await transport.sessionRoute(for: Fixture.linkRunner) == Fixture.linkRunnerWiFi)
+    await session.close()
+    #expect(await transport.sessionRoute(for: Fixture.linkRunner) == nil)
+    await hub.kill()
   }
 }

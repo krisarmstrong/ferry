@@ -199,6 +199,9 @@ actor FakeRecording: ScreenRecordingControl {
     case declares(UInt64)
     /// Sends nothing until cancelled.
     case stalls
+    /// Sends `video`, then goes quiet for this long whatever happens, then finishes: a pull
+    /// that completes just as the stall watchdog gives up on it.
+    case finishesLate(Duration)
   }
   private var ended = false
   private var waiters: [CheckedContinuation<Void, Never>] = []
@@ -260,6 +263,12 @@ actor FakeRecording: ScreenRecordingControl {
       // Gives up only when cancelled, as a socket read does.
       while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
       throw .cancelled
+    case .finishesLate(let quiet):
+      try? file.write(contentsOf: video)
+      // The last bytes are in flight: a cancel no longer stops them arriving.
+      await Task.detached { try? await Task.sleep(for: quiet) }.value
+      _ = progress(UInt64(video.count), UInt64(video.count))
+      return UInt64(video.count)
     }
   }
 
