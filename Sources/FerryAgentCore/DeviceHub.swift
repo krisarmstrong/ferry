@@ -85,6 +85,9 @@ public actor DeviceHub {
   static let firstRetryDelay = Duration.seconds(2)
   static let maxRetryDelay = Duration.seconds(60)
   var generations: UInt64 = 0
+  /// Counts the sessions the hub has taken up; `sessionNumbers` records each device's latest.
+  var sessionsHeld: UInt64 = 0
+  var sessionNumbers: [DeviceID: UInt64] = [:]
   /// Held devices with a tick's storage read still in flight.
   private var probing: Set<DeviceID> = []
   /// The reconcile most recently asked for; the next one waits for it.
@@ -290,6 +293,7 @@ public actor DeviceHub {
     log.info(
       "device \(info.id.serial, privacy: .private) opened over \(opened.rawValue, privacy: .public)"
     )
+    hold(info.id)
     store(info, state, .held(session), method: opened)
   }
 
@@ -346,5 +350,25 @@ public actor DeviceHub {
       continuation.yield(.attached(device))
     }
     updatePolling()
+  }
+}
+
+// MARK: Session numbers
+
+extension DeviceHub {
+  /// The number of each held device's session: a new one means the device was reached again
+  /// (replugged, the adb server restarted, another method), so work that failed with the old
+  /// one may be tried again.
+  public func heldSessions() -> [DeviceID: UInt64] {
+    sessionNumbers.filter { id, _ in
+      if case .held = entries[id]?.holding { return true }
+      return false
+    }
+  }
+
+  /// Numbers the session the hub is about to hold for `id`.
+  func hold(_ id: DeviceID) {
+    sessionsHeld += 1
+    sessionNumbers[id] = sessionsHeld
   }
 }

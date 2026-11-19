@@ -38,6 +38,8 @@ import os
   public private(set) var adbStatus: ADBStatus?
   /// The agent cannot watch USB, so devices come and go in the menu only every 30 s.
   public private(set) var usbWatchFailed = false
+  /// The number of each served device's session, as of the last status.
+  private(set) var sessions: [DeviceID: UInt64] = [:]
   /// Devices with USB debugging on that wait for the user to allow this Mac on them.
   private(set) var awaitingUSBDebugging: Set<DeviceID> = []
   /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
@@ -92,6 +94,7 @@ import os
   let client: any AgentSending
   let services: any SystemServicing
   private let sleep: @Sendable (Duration) async throws -> Void
+  let now: @Sendable () -> ContinuousClock.Instant
   /// Devices the guide has opened for this app run.
   private var guidedDevices: Set<DeviceID> = []
   var emptyGuideShown = false
@@ -104,25 +107,13 @@ import os
 
   init(
     client: any AgentSending, services: any SystemServicing,
-    sleep: @escaping @Sendable (Duration) async throws -> Void
+    sleep: @escaping @Sendable (Duration) async throws -> Void,
+    now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }
   ) {
     self.client = client
     self.services = services
     self.sleep = sleep
-  }
-
-  /// The transfers running on `device`.
-  public func transfers(on device: DeviceID) -> [ActiveTransfer] {
-    transfers.filter { $0.device == device }
-  }
-
-  /// No answer from the agent yet, so whether a device is attached is not known.
-  public var isChecking: Bool { agent == .checking }
-
-  /// Ferry's locations exist and are all off in Finder: not an error, but the user must turn
-  /// Ferry on. With no location yet there is nothing to turn on.
-  public var showsTurnOnRow: Bool {
-    agent == .running && provider == .disabled
+    self.now = now
   }
 
   public func refresh() async {
@@ -329,6 +320,7 @@ import os
     transfers = report.transfers
     adbStatus = report.adbStatus
     usbWatchFailed = report.usbWatchFailed
+    sessions = report.sessions
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered
@@ -354,5 +346,21 @@ import os
       guard guidedDevices.insert(device.id).inserted, !isGuidePresented else { continue }
       showGuide(for: device)
     }
+  }
+}
+
+extension AppModel {
+  /// The transfers running on `device`.
+  public func transfers(on device: DeviceID) -> [ActiveTransfer] {
+    transfers.filter { $0.device == device }
+  }
+
+  /// No answer from the agent yet, so whether a device is attached is not known.
+  public var isChecking: Bool { agent == .checking }
+
+  /// Ferry's locations exist and are all off in Finder: not an error, but the user must turn
+  /// Ferry on. With no location yet there is nothing to turn on.
+  public var showsTurnOnRow: Bool {
+    agent == .running && provider == .disabled
   }
 }

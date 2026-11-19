@@ -154,13 +154,17 @@ public struct StatusReport: Codable, Sendable, Equatable {
   /// The agent cannot watch USB for devices coming and going, so it looks for them only every
   /// 30 s (`USBWatcher`).
   public let usbWatchFailed: Bool
+  /// The number of each served device's session (`DeviceHub.heldSessions()`): it changes when
+  /// the device is reached again.
+  public let sessions: [DeviceID: UInt64]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
     awaitingAuthorization: [String] = [], adbStatus: ADBStatus? = nil,
     awaitingUSBDebugging: [DeviceID] = [], preservedChanges: [URL] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
-    recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false
+    recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
+    sessions: [DeviceID: UInt64] = [:]
   ) {
     self.devices = devices
     self.provider = provider
@@ -173,6 +177,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.unconfirmed = unconfirmed
     self.recordings = recordings
     self.usbWatchFailed = usbWatchFailed
+    self.sessions = sessions
   }
 }
 

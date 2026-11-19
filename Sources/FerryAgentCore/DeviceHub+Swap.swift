@@ -199,6 +199,7 @@ extension DeviceHub {
     }
     switch reading {
     case .state(let state) where usable:
+      hold(id)
       store(entry.info, state, .held(session), method: await session.method)
       return true
     case .state, .gone:
@@ -259,6 +260,7 @@ extension DeviceHub {
       return false
     }
     log.info("device \(info.id.serial, privacy: .private) back on file transfer")
+    hold(info.id)
     store(info, state, .held(session), method: .usbFileTransfer)
     return true
   }

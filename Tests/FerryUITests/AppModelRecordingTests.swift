@@ -2,6 +2,7 @@ import DeviceKit
 import DeviceKitTestSupport
 import FerryIPC
 import Foundation
+import Synchronization
 import Testing
 
 @testable import FerryUI
@@ -19,19 +20,26 @@ struct AppModelRecordingTests {
 
   let client: FakeClient
   let services: FakeServices
+  let clock = TestClock()
 
   init() {
     client = FakeClient(log: log)
     services = FakeServices(log: log)
   }
 
-  /// The device, served by `method`, has a finished recording waiting.
-  private func setUp(method: ConnectionMethod = .usbADB) -> AppModel {
+  /// The device, served by `method` in its session `session`, has a finished recording waiting.
+  private func serve(method: ConnectionMethod = .usbADB, session: UInt64 = 1) {
     client.setStatus(
       [device(id.serial, model: "LinkRunner-100G", .ready([]), method: method)],
-      recordings: [finished])
+      recordings: [finished], sessions: [id: session])
+  }
+
+  private func setUp(method: ConnectionMethod = .usbADB) -> AppModel {
+    serve(method: method)
     client.setTool(.done, writes: Data("....ftypmp42".utf8))
-    return AppModel(client: client, services: services)
+    return AppModel(
+      client: client, services: services, sleep: { try await Task.sleep(for: $0) },
+      now: clock.now)
   }
 
   private func saves() -> Int { log.all.filter { $0.hasPrefix("saveRecording") }.count }
@@ -64,6 +72,7 @@ struct AppModelRecordingTests {
     #expect(model.recordingUnsaved(on: id))
     let folder = try TestScratch.folder("now-writable")
     services.folders = [folder]
+    clock.advance(.seconds(30))
     await model.refresh()
     let deadline = ContinuousClock.now + .seconds(5)
     while saves() == 0, ContinuousClock.now < deadline {
@@ -99,8 +108,8 @@ struct AppModelRecordingTests {
     #expect(model.recording(on: id) == nil)
   }
 
-  /// A save the device broke off (unplugged, say) is tried again once a status has shown the
-  /// device gone and then back, not while it still looks served.
+  /// A save the device broke off (unplugged, say) is tried again once the device is reached
+  /// again (a new session), even if no status saw it gone, not while it still looks served.
   @Test func aRecordingIsCollectedWhenItsDeviceComesBack() async throws {
     let model = setUp()
     let folder = try TestScratch.folder("device-back")
@@ -114,17 +123,35 @@ struct AppModelRecordingTests {
     await settle()
     #expect(saves() == 1)
 
-    client.setStatus([], recordings: [finished])
-    await model.refresh()
-    client.setStatus(
-      [device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB)],
-      recordings: [finished])
+    // Replugged between two statuses: only its session number says so.
+    serve(session: 2)
     client.setTool(.done, writes: Data("....ftypmp42".utf8))
     await model.refresh()
     try await waitForSaves(2)
     await settle()
     #expect(!model.recordingUnsaved(on: id))
     #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).count == 1)
+  }
+
+  /// While a recording waits for a capture folder, the folders are checked (a file created and
+  /// removed in each) at most every 30 s, not on every status.
+  @Test func theFolderCheckIsThrottled() async throws {
+    let model = setUp()
+    services.folders = []
+    await model.refresh()
+    await model.collectRecording(on: id)
+    #expect(model.recordingUnsaved(on: id))
+    services.folders = [try TestScratch.folder("throttled")]
+    clock.advance(.seconds(10))
+    await model.refresh()
+    // A check starts with the status that allows it; none did.
+    #expect(!model.probingRecordings.contains(id))
+    await settle()
+    #expect(saves() == 0)
+
+    clock.advance(.seconds(21))
+    await model.refresh()
+    try await waitForSaves(1)
   }
 
   /// A save the agent refused for another reason waits for the user, even across a reconnect.
@@ -134,11 +161,7 @@ struct AppModelRecordingTests {
     client.setTool(.toolFailed(.recordingBusy))
     await model.refresh()
     try await waitForSaves(1)
-    client.setStatus([], recordings: [finished])
-    await model.refresh()
-    client.setStatus(
-      [device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB)],
-      recordings: [finished])
+    serve(session: 2)
     await model.refresh()
     await settle()
     #expect(saves() == 1)
@@ -188,5 +211,18 @@ struct AppModelRecordingTests {
     await model.refresh()
     await settle()
     #expect(saves() == 0)
+  }
+}
+
+/// A clock a test moves by hand.
+final class TestClock: Sendable {
+  private let instant = Mutex(ContinuousClock.now)
+
+  var now: @Sendable () -> ContinuousClock.Instant {
+    { self.instant.withLock { $0 } }
+  }
+
+  func advance(_ duration: Duration) {
+    instant.withLock { $0 += duration }
   }
 }

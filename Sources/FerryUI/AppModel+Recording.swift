@@ -4,12 +4,14 @@ import Foundation
 
 /// Why a finished recording waits on the device for the user.
 enum UnsavedRecording: Equatable {
-  /// No capture folder could take it: the folders that could take a file then. Tried again
-  /// once another one can.
-  case noFolder(Set<URL>)
-  /// The device was lost during the save. Tried again once a status has shown it gone
-  /// (`away`) and then served again.
-  case deviceLost(away: Bool)
+  /// No capture folder could take it: the folders that could take a file when last `checked`.
+  /// Tried again once another one can; checked at most every `folderCheckInterval`, since each
+  /// check creates a file in each folder.
+  case noFolder(Set<URL>, checked: ContinuousClock.Instant)
+  /// The device was lost during the save, in its session `session`. Tried again once the device
+  /// is served in another session (replugged, the adb server restarted), whether or not a
+  /// status saw it gone meanwhile.
+  case deviceLost(session: UInt64?)
   /// The agent refused, or the video was broken off for another reason: only the user tries
   /// again.
   case refused
@@ -80,29 +82,35 @@ extension AppModel {
       let id = recording.device
       guard let device = devices.first(where: { $0.id == id }),
         DevicePresentation.offersTools(device)
-      else {
-        if case .deviceLost = unsavedRecordings[id] {
-          unsavedRecordings[id] = .deviceLost(away: true)
-        }
-        continue
-      }
+      else { continue }
       switch unsavedRecordings[id] {
-      case nil, .deviceLost(away: true):
+      case nil:
         Task { await collectRecording(on: id) }
-      case .deviceLost(away: false), .refused:
+      case .deviceLost(let lostIn):
+        guard let session = sessions[id], session != lostIn else { continue }
+        Task { await collectRecording(on: id) }
+      case .refused:
         continue
-      case .noFolder(let failedWith):
-        guard probingRecordings.insert(id).inserted else { continue }
+      case .noFolder(let failedWith, let checked):
+        guard now() - checked >= Self.folderCheckInterval, probingRecordings.insert(id).inserted
+        else { continue }
+        let waiting = UnsavedRecording.noFolder(failedWith, checked: checked)
         Task {
-          let now = await writableCaptureFolders()
+          let found = await writableCaptureFolders()
           probingRecordings.remove(id)
-          guard !now.isSubset(of: failedWith), unsavedRecordings[id] == .noFolder(failedWith)
-          else { return }
+          guard unsavedRecordings[id] == waiting else { return }
+          guard !found.isSubset(of: failedWith) else {
+            unsavedRecordings[id] = .noFolder(failedWith, checked: now())
+            return
+          }
           await collectRecording(on: id)
         }
       }
     }
   }
+
+  /// How often the capture folders of a recording that waits for one are checked.
+  static let folderCheckInterval = Duration.seconds(30)
 
   /// Saves a finished recording and shows it. A recording that finished while no request
   /// waited for it (the app was relaunched) is collected when the status lists it.
@@ -120,9 +128,10 @@ extension AppModel {
     case .saved:
       unsavedRecordings[device] = nil
     case .noFolder:
-      unsavedRecordings[device] = .noFolder(await writableCaptureFolders())
+      unsavedRecordings[device] = .noFolder(await writableCaptureFolders(), checked: now())
     case .notSent(let response):
-      unsavedRecordings[device] = Self.lostDevice(response) ? .deviceLost(away: false) : .refused
+      unsavedRecordings[device] =
+        Self.lostDevice(response) ? .deviceLost(session: sessions[device]) : .refused
     }
     await refresh()
   }
