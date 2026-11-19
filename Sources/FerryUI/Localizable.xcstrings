@@ -14,6 +14,9 @@
         }
       }
     },
+    "Ferry can't watch USB for devices, so it looks for them every 30 seconds." : {
+
+    },
     "A notification says when the files are on the device or the app is installed, or why not." : {
       "extractionState" : "manual"
     },

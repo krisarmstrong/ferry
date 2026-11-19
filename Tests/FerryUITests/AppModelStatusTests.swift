@@ -88,3 +88,19 @@ struct AppModelLoginItemTests {
     #expect(model.actionError != nil)
   }
 }
+
+/// The agent says it cannot watch USB: the menu says devices are looked for every 30 s.
+@MainActor
+struct AppModelUSBWatchTests {
+  @Test func aFailedUSBWatchIsShownUntilItWorks() async {
+    let log = CallLog()
+    let client = FakeClient(log: log)
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    client.setStatus([], usbWatchFailed: true)
+    await model.refresh()
+    #expect(model.usbWatchFailed)
+    client.setStatus([])
+    await model.refresh()
+    #expect(!model.usbWatchFailed)
+  }
+}

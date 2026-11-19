@@ -2,9 +2,34 @@ import Dispatch
 import IOKit
 import IOKit.usb
 import MTPTransport
+import Synchronization
 import os
 
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "USBWatcher")
+
+/// Whether the USB notifications are armed, for the menu: while they are not, devices are found
+/// only by the watcher's slow poll.
+public final class USBWatchState: Sendable {
+  private let state = Mutex(false)
+
+  public init() {}
+
+  /// Arming the notifications failed and is being retried.
+  public var failed: Bool { state.withLock { $0 } }
+
+  func set(failed: Bool) {
+    state.withLock { $0 = failed }
+  }
+}
+
+/// What `USBWatcher` arms: IOKit's notifications, or a test's stand-in.
+protocol USBArming: Sendable {
+  /// Arms the notifications and ticks once armed. False if they could not be armed; nothing is
+  /// left half armed then.
+  func arm() async -> Bool
+  /// Disarms for good.
+  func stop() async
+}
 
 /// Ticks whenever a device Ferry may use attaches or detaches, for `DeviceHub`'s `arrivals`.
 ///
@@ -14,17 +39,45 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// device's interfaces are already gone, so departures tick for the devices remembered as
 /// candidates when they arrived.
 public struct USBWatcher: Sendable {
+  /// How long to wait before arming again after a failure, ticking meanwhile.
+  public static let retryInterval = Duration.seconds(30)
+
   /// Ticks once when the notifications are armed, so a device plugged in after the hub's first
   /// listing but before then is not missed. Ticks that arrive faster than they are read
   /// coalesce into one.
-  public static func ticks() -> AsyncStream<Void> {
+  ///
+  /// If IOKit will not arm them, the stream does not end, which would leave the hub never
+  /// scanning again: the failure is logged as a fault and shown through `state`, and every
+  /// `retryInterval` the stream ticks, so the hub scans, and arming is tried again.
+  public static func ticks(state: USBWatchState) -> AsyncStream<Void> {
+    ticks(state: state, retryInterval: retryInterval) { USBMonitor(continuation: $0) }
+  }
+
+  static func ticks(
+    state: USBWatchState, retryInterval: Duration,
+    monitor make: (AsyncStream<Void>.Continuation) -> some USBArming
+  ) -> AsyncStream<Void> {
     let (stream, continuation) = AsyncStream.makeStream(
       of: Void.self, bufferingPolicy: .bufferingNewest(1))
-    let monitor = USBMonitor(continuation: continuation)
+    let monitor = make(continuation)
+    let arming = Task {
+      while !Task.isCancelled {
+        if await monitor.arm() {
+          state.set(failed: false)
+          return
+        }
+        log.fault(
+          "USB notifications could not be armed; trying again in \(retryInterval, privacy: .public)"
+        )
+        state.set(failed: true)
+        continuation.yield()
+        try? await Task.sleep(for: retryInterval)
+      }
+    }
     continuation.onTermination = { _ in
+      arming.cancel()
       Task { await monitor.stop() }
     }
-    Task { await monitor.start() }
     return stream
   }
 }
@@ -44,7 +97,7 @@ private struct Subscription {
 
 /// Holds the IOKit notification port. IOKit delivers notifications on a dispatch queue, so this
 /// actor runs on that same queue: callbacks and teardown never overlap.
-private actor USBMonitor {
+private actor USBMonitor: USBArming {
   private let queue = DispatchSerialQueue(label: "io.github.krisarmstrong.ferry.usb-watcher")
   private let continuation: AsyncStream<Void>.Continuation
   private var port: IONotificationPortRef?
@@ -61,12 +114,12 @@ private actor USBMonitor {
     self.continuation = continuation
   }
 
-  func start() {
-    guard !stopped, port == nil else { return }
+  func arm() -> Bool {
+    guard !stopped else { return true }
+    guard port == nil else { return true }
     guard let port = IONotificationPortCreate(kIOMainPortDefault) else {
       log.error("could not create the USB notification port")
-      continuation.finish()
-      return
+      return false
     }
     self.port = port
     IONotificationPortSetDispatchQueue(port, queue)
@@ -85,9 +138,8 @@ private actor USBMonitor {
         log.error(
           "USB \(subscription.type, privacy: .public) notification failed: \(result, privacy: .public)"
         )
-        stop()
-        continuation.finish()
-        return
+        disarm()
+        return false
       }
       iterators.append(iterator)
       // The iterator must be drained to arm the notification; what is already attached is
@@ -99,10 +151,17 @@ private actor USBMonitor {
       }
     }
     continuation.yield()
+    return true
   }
 
   func stop() {
     stopped = true
+    disarm()
+  }
+
+  /// Releases the notifications and the port, so arming can start over.
+  private func disarm() {
+    candidates = []
     for iterator in iterators {
       IOObjectRelease(iterator)
     }

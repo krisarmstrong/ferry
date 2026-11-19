@@ -36,6 +36,8 @@ import os
   public private(set) var transfers: [ActiveTransfer] = []
   /// Whether adb can be used; `nil` until the agent has looked.
   public private(set) var adbStatus: ADBStatus?
+  /// The agent cannot watch USB, so devices come and go in the menu only every 30 s.
+  public private(set) var usbWatchFailed = false
   /// Devices with USB debugging on that wait for the user to allow this Mac on them.
   private(set) var awaitingUSBDebugging: Set<DeviceID> = []
   /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
@@ -324,6 +326,7 @@ import os
     provider = report.provider
     transfers = report.transfers
     adbStatus = report.adbStatus
+    usbWatchFailed = report.usbWatchFailed
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered

@@ -151,13 +151,16 @@ public struct StatusReport: Codable, Sendable, Equatable {
   public let unconfirmed: [UnconfirmedAddress]
   /// Screen recordings running now.
   public let recordings: [ActiveRecording]
+  /// The agent cannot watch USB for devices coming and going, so it looks for them only every
+  /// 30 s (`USBWatcher`).
+  public let usbWatchFailed: Bool
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
     awaitingAuthorization: [String] = [], adbStatus: ADBStatus? = nil,
     awaitingUSBDebugging: [DeviceID] = [], preservedChanges: [URL] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
-    recordings: [ActiveRecording] = []
+    recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false
   ) {
     self.devices = devices
     self.provider = provider
@@ -169,6 +172,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.remembered = remembered
     self.unconfirmed = unconfirmed
     self.recordings = recordings
+    self.usbWatchFailed = usbWatchFailed
   }
 }
 

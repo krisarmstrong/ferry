@@ -49,7 +49,7 @@ final class FakeClient: AgentSending {
     transfers: [ActiveTransfer] = [], preserved: [URL] = [], adb: ADBStatus? = nil,
     awaitingUSBDebugging: [DeviceID] = [], awaitingAuthorization: [String] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
-    recordings: [ActiveRecording] = []
+    recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false
   ) {
     status.withLock {
       $0 = .status(
@@ -57,7 +57,8 @@ final class FakeClient: AgentSending {
           devices: devices, provider: provider, transfers: transfers,
           awaitingAuthorization: awaitingAuthorization, adbStatus: adb,
           awaitingUSBDebugging: awaitingUSBDebugging, preservedChanges: preserved,
-          remembered: remembered, unconfirmed: unconfirmed, recordings: recordings))
+          remembered: remembered, unconfirmed: unconfirmed, recordings: recordings,
+          usbWatchFailed: usbWatchFailed))
     }
   }
 

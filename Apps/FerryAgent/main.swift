@@ -43,9 +43,10 @@ let adb = ADBTransport(
   serving: { vouching.serves($0, as: $1) },
   opened: { id, serial, tools in Task { await toolJournal.sweep(id, serial: serial, using: tools) }
   })
+let usbWatch = USBWatchState()
 let hub = DeviceHub(
   transport: CompositeTransport(mtp: MTPTransport(), adb: adb),
-  arrivals: merged(USBWatcher.ticks(), merged(adb.arrivals, vouching.changes)))
+  arrivals: merged(USBWatcher.ticks(state: usbWatch), merged(adb.arrivals, vouching.changes)))
 let manager = FileProviderDomains()
 let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 // Devices on the network: connected when the user asks, remembered, and reconnected. A host
@@ -73,7 +74,8 @@ let tools = ADBTools(
 
 // The listener holds its delegate weakly; both live for the whole process.
 let delegate = AgentListenerDelegate(
-  handler: AgentService(hub: hub, domains: domains, wireless: wireless, tools: tools),
+  handler: AgentService(
+    hub: hub, domains: domains, wireless: wireless, tools: tools, usbWatch: usbWatch),
   identity: identity)
 let listener = NSXPCListener(machServiceName: identity.machServiceName)
 listener.delegate = delegate

@@ -33,12 +33,15 @@ public actor AgentService: AgentHandling {
   let wireless: WirelessADB?
   /// APK install, screenshot and screen recording; `nil` where adb is not used.
   let tools: ADBTools?
+  /// Whether the USB notifications are armed; `nil` where nothing watches USB.
+  let usbWatch: USBWatchState?
 
   public init(
     hub: DeviceHub, domains: DomainController,
     scratch: URL = FileManager.default.temporaryDirectory, wireless: WirelessADB? = nil,
-    tools: ADBTools? = nil
+    tools: ADBTools? = nil, usbWatch: USBWatchState? = nil
   ) {
+    self.usbWatch = usbWatch
     self.hub = hub
     self.domains = domains
     scratchFolder = scratch
@@ -125,17 +128,7 @@ public actor AgentService: AgentHandling {
   {
     switch request {
     case .status:
-      await hub.firstScan()
-      return .status(
-        StatusReport(
-          devices: await hub.devices(), provider: await domains.providerState(),
-          transfers: await transfers.list(),
-          awaitingAuthorization: await hub.awaitingAuthorization(),
-          adbStatus: await hub.adbStatus(), awaitingUSBDebugging: await hub.awaitingUSBDebugging(),
-          preservedChanges: await domains.preservedByRetirement,
-          remembered: await wireless?.remembered() ?? [],
-          unconfirmed: await wireless?.unconfirmed() ?? [],
-          recordings: await tools?.recordingsRunning() ?? []))
+      return .status(await status())
     case .recheck(let id):
       await hub.recheck(id)
       return .done
@@ -317,4 +310,21 @@ public actor AgentService: AgentHandling {
 
   static let ignoreProgress: ProgressHandler = { _, _ in true }
   static let workingSetPageSize = 500
+}
+
+extension AgentService {
+  /// The menu's status, once the hub has scanned.
+  func status() async -> StatusReport {
+    await hub.firstScan()
+    return StatusReport(
+      devices: await hub.devices(), provider: await domains.providerState(),
+      transfers: await transfers.list(),
+      awaitingAuthorization: await hub.awaitingAuthorization(),
+      adbStatus: await hub.adbStatus(), awaitingUSBDebugging: await hub.awaitingUSBDebugging(),
+      preservedChanges: await domains.preservedByRetirement,
+      remembered: await wireless?.remembered() ?? [],
+      unconfirmed: await wireless?.unconfirmed() ?? [],
+      recordings: await tools?.recordingsRunning() ?? [],
+      usbWatchFailed: usbWatch?.failed ?? false)
+  }
 }

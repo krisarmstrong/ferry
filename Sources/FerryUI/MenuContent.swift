@@ -75,6 +75,14 @@ public struct MenuContent: View {
         message: model.wirelessMessage,
         offersForms: model.agent == .running && model.adbStatus == .available,
         open: openNetworkForm)
+      if model.agent == .running, model.usbWatchFailed {
+        Text(
+          "Ferry can't watch USB for devices, so it looks for them every 30 seconds.",
+          bundle: .module
+        )
+        .font(.callout)
+        .foregroundStyle(.secondary)
+      }
       if model.showsADBNotRunning {
         ADBNotRunningRow { Task { await model.recheckADB() } }
       }
