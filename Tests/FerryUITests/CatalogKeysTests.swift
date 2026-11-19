@@ -68,6 +68,14 @@ struct CatalogKeysTests {
     #expect(!keys.contains("Settings…"))
   }
 
+  /// The setup guide's topics, which its picker shows.
+  @Test func theGuideTopicsHaveCatalogKeys() throws {
+    let keys = try catalogKeys()
+    for topic in GuideTopic.allCases {
+      #expect(keys.contains(topic.title.key), "\(topic)")
+    }
+  }
+
   /// The names of a known model's ports, and the word for one with no address.
   @Test func theKnownPortsHaveCatalogKeys() throws {
     let keys = try catalogKeys()
