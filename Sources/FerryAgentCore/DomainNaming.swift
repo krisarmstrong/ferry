@@ -49,7 +49,7 @@ public enum DomainNaming {
   /// A domain is named after its device (`DeviceInfo.name`), with the end of its serial added
   /// when another listed device has the same name (see `DeviceNames`), as the menus name it,
   /// and ` – SD card` added for every storage after the device's first.
-  public static func specs(for devices: [AttachedDevice]) -> [DomainSpec] {
+  static func specs(for devices: [AttachedDevice]) -> [DomainSpec] {
     domains(for: devices).map(\.spec)
   }
 

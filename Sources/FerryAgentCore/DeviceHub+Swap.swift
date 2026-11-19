@@ -168,7 +168,10 @@ extension DeviceHub {
     async -> Bool
   {
     let id = entry.info.id
-    if entry.method == .usbFileTransfer {
+    // Kept, the old MTP session is the one the entry still holds: resuming it after a failed
+    // move is no new session, and so takes no new number.
+    let resumesHeld = entry.method == .usbFileTransfer
+    if resumesHeld {
       kept[id] = old
     } else {
       await old.close()
@@ -184,7 +187,9 @@ extension DeviceHub {
       log.info(
         "\(serial, privacy: .private) not opened over \(via, privacy: .public): \(reason, privacy: .private)"
       )
-      if await resumeKept(entry.info, generation: entry.generation) { return false }
+      if await resumeKept(entry.info, generation: entry.generation, renumber: !resumesHeld) {
+        return false
+      }
       drop(id)
       return false
     }
@@ -204,7 +209,9 @@ extension DeviceHub {
       return true
     case .state, .gone:
       await session.close()
-      if await resumeKept(entry.info, generation: entry.generation) { return false }
+      if await resumeKept(entry.info, generation: entry.generation, renumber: !resumesHeld) {
+        return false
+      }
       drop(id)
       return false
     }
@@ -246,7 +253,9 @@ extension DeviceHub {
 extension DeviceHub {
   /// Serves the device from its kept MTP session, if it has one that still answers. One that
   /// does not is closed. Counts as a swap while it reads, so no scan reopens the device meanwhile.
-  func resumeKept(_ info: DeviceInfo, generation: UInt64) async -> Bool {
+  /// `renumber` is false when the session is the one the device's entry already holds (a move
+  /// away from it failed): clients would read a new number as the device reached again.
+  func resumeKept(_ info: DeviceInfo, generation: UInt64, renumber: Bool = true) async -> Bool {
     guard let session = kept.removeValue(forKey: info.id) else { return false }
     let owned = swapping.insert(info.id).inserted
     defer { if owned { endSwap(info.id) } }
@@ -260,7 +269,7 @@ extension DeviceHub {
       return false
     }
     log.info("device \(info.id.serial, privacy: .private) back on file transfer")
-    hold(info.id)
+    if renumber { hold(info.id) }
     store(info, state, .held(session), method: .usbFileTransfer)
     return true
   }

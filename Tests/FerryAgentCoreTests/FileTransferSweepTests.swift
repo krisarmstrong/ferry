@@ -95,3 +95,22 @@ struct AgentScratchTests {
     #expect(await device.contents(of: try path("/a.txt"), in: storageID(device)) == nil)
   }
 }
+
+/// A bounded copy stops once the source holds more than its limit, which a source still being
+/// written can reach after it was measured, and leaves no scratch file.
+struct FileTransferLimitTests {
+  @Test func aBoundedCopyStopsPastItsLimit() async throws {
+    let folder = try TestScratch.folder("limit")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let source = folder.appending(path: "source.bin")
+    try Data(repeating: 1, count: 10).write(to: source)
+    let handle = try FileHandle(forReadingFrom: source)
+    defer { try? handle.close() }
+    let scratch = folder.appending(path: "scratch", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+    #expect(try await FileTransfer.copyIn(handle.fileDescriptor, into: scratch, atMost: 9) == nil)
+    #expect(try FileManager.default.contentsOfDirectory(atPath: scratch.path).isEmpty)
+    let copied = try await FileTransfer.copyIn(handle.fileDescriptor, into: scratch, atMost: 10)
+    #expect(try copied.map { try Data(contentsOf: $0) } == Data(repeating: 1, count: 10))
+  }
+}

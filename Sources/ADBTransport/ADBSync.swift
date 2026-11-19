@@ -34,18 +34,22 @@ public actor ADBSync {
   private static let enotdir: UInt32 = 20
   /// A file name is at most 255 bytes and a path at most PATH_MAX (4096) on the device, so no
   /// honest entry or request exceeds 4096.
-  private static let nameLimit = 4096
+  static let nameLimit = 4096
   /// adbd refuses a request longer than this (`path too long`) and ends the session.
   static let requestLimit = 1024
   /// Same bound as a DATA chunk: adbd's FAIL messages are short text.
   private static let messageLimit = 64 * 1024
   /// A hostile peer could stream entries forever; no real folder on a phone comes near this.
   static let defaultEntryLimit = 1_000_000
+  /// How far past its `stat` size a download may grow (a file still being written) before it is
+  /// taken for a device that will not stop sending.
+  static let defaultGrowthAllowance: UInt64 = 64 << 20
 
-  private let stream: ADBStream
+  let stream: ADBStream
   private let statV2: Bool
   private let listV2: Bool
-  private let entryLimit: Int
+  let entryLimit: Int
+  private let growthAllowance: UInt64
   private let gate = OperationGate()
   private var dead = false
   private var active = false
@@ -54,11 +58,15 @@ public actor ADBSync {
     self.init(stream: stream, features: features, entryLimit: Self.defaultEntryLimit)
   }
 
-  init(stream: ADBStream, features: Set<String>, entryLimit: Int) {
+  init(
+    stream: ADBStream, features: Set<String>, entryLimit: Int,
+    growthAllowance: UInt64 = defaultGrowthAllowance
+  ) {
     self.stream = stream
     self.statV2 = features.contains("stat_v2")
     self.listV2 = features.contains("ls_v2")
     self.entryLimit = entryLimit
+    self.growthAllowance = growthAllowance
   }
 
   /// Requests waiting for their turn behind the one in flight.
@@ -88,9 +96,11 @@ public actor ADBSync {
     }
   }
 
-  /// nil when the path does not exist.
+  /// What is at `path` itself, a symbolic link included (`lstat`), on every protocol: `STAT`
+  /// and `LIST` never follow one, so `STA2` is not used here, which does. nil when the path does
+  /// not exist.
   public func stat(_ path: String) async throws(ADBError) -> ADBStat? {
-    try await perform { () async throws(ADBError) in try await statLocked(path) }
+    try await perform { () async throws(ADBError) in try await statLocked(path, follow: false) }
   }
 
   /// `exactSizes: false` is for a caller that needs names and kinds alone: without `ls_v2` it
@@ -135,15 +145,14 @@ public actor ADBSync {
     }
   }
 
-  private func statLocked(_ path: String) async throws(ADBError) -> ADBStat? {
+  /// `follow` reads what a symbolic link points to, as `RECV` opens it; it needs `stat_v2`, and
+  /// without it the v1 `STAT` reports the link itself.
+  private func statLocked(_ path: String, follow: Bool) async throws(ADBError) -> ADBStat? {
     if statV2 {
-      try await request("STA2", path)
-      try await expect("STA2")
-      let body = try await stream.read(exactly: Self.stat2Length)
-      let error = ADBWire.u32(body.prefix(4))
+      let (error, stat) = try await stat2Locked(path, follow: follow)
       if error == Self.enoent || error == Self.enotdir { return nil }
       guard error == 0 else { throw .failed("stat \(path) failed with errno \(error)") }
-      return Self.stat2(body)
+      return stat
     }
     try await request("STAT", path)
     try await expect("STAT")
@@ -155,6 +164,17 @@ public actor ADBSync {
     if mode == 0 && size == 0 && mtime == 0 { return nil }
     return ADBStat(
       mode: mode, size: UInt64(size), mtime: Date(timeIntervalSince1970: TimeInterval(mtime)))
+  }
+
+  /// `STA2` (follows a link) or `LST2`: the errno the device reports, and the stat when it is 0.
+  private func stat2Locked(_ path: String, follow: Bool) async throws(ADBError)
+    -> (errno: UInt32, stat: ADBStat)
+  {
+    let id = follow ? "STA2" : "LST2"
+    try await request(id, path)
+    try await expect(id)
+    let body = try await stream.read(exactly: Self.stat2Length)
+    return (ADBWire.u32(body.prefix(4)), Self.stat2(body))
   }
 
   public typealias Entry = (name: String, stat: ADBStat)
@@ -180,7 +200,9 @@ public actor ADBSync {
         unaddressable += 1
         continue
       }
-      if let exact = try await statLocked(path) { listing.entries[index].stat = exact }
+      // A file the device will not stat (a folder readable but not searchable) keeps its size.
+      let (error, exact) = try await stat2Locked(path, follow: true)
+      if error == 0 { listing.entries[index].stat = exact }
     }
     if unaddressable > 0 {
       Self.log.info("listing kept the 32-bit size of \(unaddressable) entries with paths too long")
@@ -191,7 +213,7 @@ public actor ADBSync {
   private func receiveLocked(
     _ path: String, to file: FileHandle, progress: ProgressHandler
   ) async throws(ADBError) -> UInt64 {
-    let total = try await statLocked(path)?.size ?? 0
+    let total = try await statLocked(path, follow: true)?.size ?? 0
     try await request("RECV", path)
     var received: UInt64 = 0
     while true {
@@ -210,6 +232,10 @@ public actor ADBSync {
           throw .failed("could not write the received data: \(error.localizedDescription)")
         }
         received += UInt64(length)
+        // A file still being written may grow; one that grows without end is not a file.
+        guard received <= total + growthAllowance else {
+          throw await violation("receive passed its size of \(total) bytes")
+        }
         guard progress(received, total) else {
           await stream.close()
           throw .cancelled
@@ -276,20 +302,20 @@ public actor ADBSync {
 extension ADBSync {
 
   /// 4-byte id, little-endian length, then the path or argument.
-  private func request(_ id: String, _ argument: String) async throws(ADBError) {
+  func request(_ id: String, _ argument: String) async throws(ADBError) {
     let payload = Data(argument.utf8)
     guard payload.count <= Self.requestLimit else { throw .invalidArgument(argument) }
     try await stream.write(Data(id.utf8) + ADBWire.le32(UInt32(payload.count)) + payload)
   }
 
   /// Closes the connection, whose framing can no longer be trusted, and names the problem.
-  private func violation(_ message: String) async -> ADBError {
+  func violation(_ message: String) async -> ADBError {
     await stream.close()
     return .protocolViolation(message)
   }
 
   /// The error for a `FAIL` whose message is `length` bytes long.
-  private func failure(_ length: Int) async throws(ADBError) -> ADBError {
+  func failure(_ length: Int) async throws(ADBError) -> ADBError {
     guard length <= Self.messageLimit else {
       throw await violation("FAIL message of \(length) bytes")
     }
@@ -306,93 +332,13 @@ extension ADBSync {
   }
 
   /// error, dev, ino, mode, nlink, uid, gid, size, atime, mtime, ctime.
-  private static let stat2Length = 68
+  static let stat2Length = 68
 
-  private static func stat2(_ body: Data) -> ADBStat {
+  static func stat2(_ body: Data) -> ADBStat {
     let bytes = Array(body)
     return ADBStat(
       mode: ADBWire.u32(bytes[20..<24]), size: ADBWire.u64(bytes[36..<44]),
       mtime: Date(
         timeIntervalSince1970: TimeInterval(Int64(bitPattern: ADBWire.u64(bytes[52..<60])))))
-  }
-
-  private func listWithLis2(_ dir: String) async throws(ADBError) -> Listing {
-    try await request("LIS2", dir)
-    var entries: [Entry] = []
-    var unnamed = 0
-    while true {
-      let id = try ADBWire.text(try await stream.read(exactly: 4))
-      switch id {
-      case "DNT2":
-        let body = try await stream.read(exactly: Self.stat2Length)
-        let name = try await readName()
-        guard ADBWire.u32(body.prefix(4)) == 0 else { continue }
-        try await add(name, Self.stat2(body), to: &entries, unnamed: &unnamed)
-      case "DONE":
-        _ = try await stream.read(exactly: Self.stat2Length + 4)
-        Self.logUnnamed(unnamed)
-        return Listing(entries: entries, unreadableNames: unnamed)
-      case "FAIL":
-        throw try await failure(Int(ADBWire.u32(try await stream.read(exactly: 4))))
-      default:
-        throw await violation("unexpected \(id) in a listing")
-      }
-    }
-  }
-
-  private func listWithList(_ dir: String) async throws(ADBError) -> Listing {
-    try await request("LIST", dir)
-    var entries: [Entry] = []
-    var unnamed = 0
-    while true {
-      let id = try ADBWire.text(try await stream.read(exactly: 4))
-      switch id {
-      case "DENT":
-        let body = Array(try await stream.read(exactly: 12))
-        let stat = ADBStat(
-          mode: ADBWire.u32(body[0..<4]), size: UInt64(ADBWire.u32(body[4..<8])),
-          mtime: Date(timeIntervalSince1970: TimeInterval(ADBWire.u32(body[8..<12]))))
-        try await add(try await readName(), stat, to: &entries, unnamed: &unnamed)
-      case "DONE":
-        _ = try await stream.read(exactly: 16)
-        Self.logUnnamed(unnamed)
-        return Listing(entries: entries, unreadableNames: unnamed)
-      case "FAIL":
-        throw try await failure(Int(ADBWire.u32(try await stream.read(exactly: 4))))
-      default:
-        throw await violation("unexpected \(id) in a listing")
-      }
-    }
-  }
-
-  /// nil for a name that is not UTF-8: it could not be addressed again, so it is not listed.
-  /// `String(validating:)` keeps every scalar, a leading byte order mark included, where
-  /// Foundation's UTF-8 decoding drops one and so would name another file.
-  private func readName() async throws(ADBError) -> String? {
-    let length = Int(ADBWire.u32(try await stream.read(exactly: 4)))
-    guard length <= Self.nameLimit else { throw await violation("name of \(length) bytes") }
-    return String(validating: try await stream.read(exactly: length), as: UTF8.self)
-  }
-
-  /// Skips `.` and `..`, counts names that are not UTF-8, and enforces the entry cap.
-  private func add(
-    _ name: String?, _ stat: ADBStat, to entries: inout [Entry], unnamed: inout Int
-  ) async throws(ADBError) {
-    guard let name else {
-      unnamed += 1
-      return
-    }
-    guard name != ".", name != ".." else { return }
-    guard entries.count < entryLimit else {
-      throw await violation("listing exceeds \(entryLimit) entries")
-    }
-    entries.append((name, stat))
-  }
-
-  private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBSync")
-
-  /// A name that is not UTF-8 cannot be addressed again, so it is left out; say so once.
-  private static func logUnnamed(_ count: Int) {
-    if count > 0 { log.info("listing skipped \(count) names that are not valid UTF-8") }
   }
 }

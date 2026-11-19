@@ -68,6 +68,11 @@ extension FakeADBServer.Peer {
     Data("STA2".utf8) + stat2Body(error: error, mode: mode, size: size, mtime: mtime)
   }
 
+  /// `LST2`, the reply to a stat that does not follow a link.
+  static func lst2(error: UInt32 = 0, mode: UInt32, size: UInt64, mtime: Int64) -> Data {
+    Data("LST2".utf8) + stat2Body(error: error, mode: mode, size: size, mtime: mtime)
+  }
+
   static func dnt2(name: String, mode: UInt32, size: UInt64, mtime: Int64) -> Data {
     Data("DNT2".utf8) + stat2Body(mode: mode, size: size, mtime: mtime)
       + le32(UInt32(name.utf8.count)) + Data(name.utf8)

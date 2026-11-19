@@ -21,6 +21,16 @@ struct WirelessVouchingLocationTests {
     #expect(vouching.serves(Self.address, as: DeviceID(serial: "NEWUNIT1")))
   }
 
+  /// The hub scans again on every change; publishing the same locations is no change.
+  @Test func publishingTheSameLocationsIsNoChange() {
+    let vouching = WirelessVouching()
+    #expect(vouching.locate(identifiers: ["a"], devices: [], complete: true))
+    #expect(!vouching.locate(identifiers: ["a"], devices: [], complete: true))
+    #expect(vouching.locate(identifiers: ["a"], devices: [], complete: false))
+    #expect(vouching.remember([:]))
+    #expect(!vouching.remember([:]))
+  }
+
   @Test(arguments: ["internal", "Internal shared storage|"])
   func aLocationFromBeforeTheRestartIsFoundByHashingTheClaimedSerial(key: String) {
     let located = DeviceID(serial: "0123456789abcdef")

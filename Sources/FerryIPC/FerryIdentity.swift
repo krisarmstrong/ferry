@@ -31,16 +31,6 @@ public struct FerryIdentity: Sendable, Equatable {
 
   public var machServiceName: String { "\(teamID).io.github.krisarmstrong.ferry.agent" }
 
-  /// Admits only the Ferry app and its extensions, signed by this team.
-  public var clientRequirement: String {
-    """
-    anchor apple generic and certificate leaf[subject.OU] = "\(teamID)" and \
-    (identifier "io.github.krisarmstrong.ferry" or \
-    identifier "io.github.krisarmstrong.ferry.provider" or \
-    identifier "io.github.krisarmstrong.ferry.sync")
-    """
-  }
-
   /// Admits only the client in `role`, signed by this team.
   public func requirement(for role: ClientRole) -> String {
     """

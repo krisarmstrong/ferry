@@ -1,4 +1,7 @@
 import DeviceKit
+import os
+
+private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "DomainController")
 
 /// What the controller does when a device's method or storage keys change.
 extension DomainController {
@@ -15,14 +18,22 @@ extension DomainController {
 
   /// Removes the domain a storage of an attached device had under a former key, keeping unsent
   /// changes as Remove Ferry does, unless it is one of the `live` domains. Where they went is
-  /// kept for the app.
+  /// kept for the app. The controller lets go of the domain first, as an eject does; a removal
+  /// the system refuses leaves the domain with the system, and the next start adopts it and
+  /// retires it again.
   func retire(_ former: StorageID, live: Set<String>) async {
     let identifier = DomainNaming.identifier(for: former)
     guard domains[identifier] != nil, !live.contains(identifier) else { return }
     domains[identifier] = nil
     await discardTable(of: identifier)
-    if let preserved = await remove(identifier) {
-      preservedByRetirement.append(preserved)
+    do {
+      let preserved = try await manager.remove(identifier)
+      if let preserved { preservedByRetirement.append(preserved) }
+      log.info("retired domain \(identifier, privacy: .private)")
+    } catch {
+      log.error(
+        "retiring domain \(identifier, privacy: .private) failed: \(error, privacy: .private)")
+      log.error("the next start adopts \(identifier, privacy: .private) and retires it again")
     }
   }
 

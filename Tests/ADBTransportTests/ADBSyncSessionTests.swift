@@ -18,7 +18,7 @@ struct ADBSyncSessionTests {
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       for _ in 0..<2 {
         let request = try await peer.syncPathRequest()
-        let reply = Peer.sta2(mode: 0o100600, size: request.path == "/a" ? 111 : 222, mtime: 1)
+        let reply = Peer.lst2(mode: 0o100600, size: request.path == "/a" ? 111 : 222, mtime: 1)
         // A reply that arrives in two parts leaves room for a second request to barge in.
         try await peer.raw(reply.prefix(10))
         try await Task.sleep(for: .milliseconds(100))
@@ -39,7 +39,7 @@ struct ADBSyncSessionTests {
   func requestPathsAreCappedAt1024Bytes(_ length: Int) async throws {
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
-      try await peer.raw(Peer.sta2(mode: 0o100600, size: 5, mtime: 1))
+      try await peer.raw(Peer.lst2(mode: 0o100600, size: 5, mtime: 1))
     }
     defer { server.stop() }
     let path = "/" + String(repeating: "p", count: length - 1)
@@ -66,7 +66,7 @@ struct ADBSyncSessionTests {
   @Test func aRefusedPathLeavesTheConnectionUsable() async throws {
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
-      try await peer.raw(Peer.sta2(mode: 0o100600, size: 9, mtime: 1))
+      try await peer.raw(Peer.lst2(mode: 0o100600, size: 9, mtime: 1))
     }
     defer { server.stop() }
     let tooLong = String(repeating: "p", count: 2000)
@@ -128,7 +128,7 @@ struct ADBSyncSessionTests {
   @Test func afterAStatErrnoTheConnectionIsDead() async throws {
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
-      try await peer.raw(Peer.sta2(error: 13, mode: 0, size: 0, mtime: 0))
+      try await peer.raw(Peer.lst2(error: 13, mode: 0, size: 0, mtime: 0))
     }
     defer { server.stop() }
     await #expect(throws: ADBError.failed("stat /x failed with errno 13")) {
@@ -140,7 +140,7 @@ struct ADBSyncSessionTests {
   @Test func quitOnADeadConnectionIsHarmless() async throws {
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
-      try await peer.raw(Peer.sta2(error: 13, mode: 0, size: 0, mtime: 0))
+      try await peer.raw(Peer.lst2(error: 13, mode: 0, size: 0, mtime: 0))
     }
     defer { server.stop() }
     _ = try? await sync.stat("/x")
@@ -153,7 +153,7 @@ struct ADBSyncSessionTests {
   func aMissingOrNonDirectoryParentIsNil(_ errno: UInt32) async throws {
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
-      try await peer.raw(Peer.sta2(error: errno, mode: 0, size: 0, mtime: 0))
+      try await peer.raw(Peer.lst2(error: errno, mode: 0, size: 0, mtime: 0))
     }
     defer { server.stop() }
     #expect(try await sync.stat("/file/child") == nil)
@@ -193,11 +193,11 @@ struct ADBSyncSessionTests {
       #expect(first.path == "/first")
       await sawFirst.set(true)
       try await Task.sleep(for: .milliseconds(300))
-      try await peer.raw(Peer.sta2(mode: 0o100600, size: 1, mtime: 1))
+      try await peer.raw(Peer.lst2(mode: 0o100600, size: 1, mtime: 1))
       // The cancelled "/queued" request must never arrive: the next one is "/last".
       let next = try await peer.syncPathRequest()
       #expect(next.path == "/last")
-      try await peer.raw(Peer.sta2(mode: 0o100600, size: 3, mtime: 1))
+      try await peer.raw(Peer.lst2(mode: 0o100600, size: 3, mtime: 1))
     }
     defer { server.stop() }
     let first = Task { try await sync.stat("/first") }

@@ -87,15 +87,18 @@ public enum ADBCommand {
   }
 
   /// Runs `process` and waits for it, terminating it when `limit` passes or the caller is
-  /// cancelled.
+  /// cancelled. A process that has already finished is never reported as stopped: the timer can
+  /// fire between its exit and the timer's cancel.
   private static func wait(for process: Process, limit: Duration) async throws(ADBError) -> Int32 {
-    let state = OSAllocatedUnfairLock(initialState: (launched: false, stopped: false))
+    let state = OSAllocatedUnfairLock(
+      initialState: (launched: false, finished: false, stopped: false))
     let stop: @Sendable () -> Void = {
-      let launched = state.withLock { state in
+      let terminate = state.withLock { state -> Bool in
+        guard !state.finished else { return false }
         state.stopped = true
         return state.launched
       }
-      if launched { process.terminate() }
+      if terminate { process.terminate() }
     }
     let timer = Task {
       guard (try? await Task.sleep(for: limit)) != nil else { return }
@@ -104,8 +107,9 @@ public enum ADBCommand {
     defer { timer.cancel() }
     let result: Result<Int32, ADBError> = await withTaskCancellationHandler {
       await withCheckedContinuation { continuation in
-        process.terminationHandler = {
-          continuation.resume(returning: .success($0.terminationStatus))
+        process.terminationHandler = { process in
+          state.withLock { $0.finished = true }
+          continuation.resume(returning: .success(process.terminationStatus))
         }
         do {
           try process.run()

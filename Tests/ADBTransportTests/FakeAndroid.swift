@@ -16,8 +16,11 @@ final class FakeAndroid: Sendable {
   enum Node: Equatable {
     case folder(mtime: Int64)
     case file(Data, mtime: Int64)
-    /// Anything else on disk (a symlink, a socket): listed, but not a file or a folder.
+    /// Anything else on disk (a socket): listed, but not a file or a folder.
     case special
+    /// A symbolic link to the absolute device path `target`: `lstat` sees the link, `stat`
+    /// (adbd's `STA2`) what it points to.
+    case link(Path)
   }
 
   /// A failure the next matching shell command reports instead of running.
@@ -60,6 +63,12 @@ final class FakeAndroid: Sendable {
     var peers: [ADBStream] = []
     /// `sync:` connections the client has not yet closed.
     var openSyncs = 0
+    /// The errno `STA2` and `LST2` answer for a path, instead of its stat.
+    var statErrors: [Path: UInt32] = [:]
+    /// How many `host-serial:<serial>:features` queries were answered.
+    var featureQueries = 0
+    /// Runs before a features query is answered.
+    var beforeFeatures: (@Sendable () async -> Void)?
     var clock: Int64 = 1_700_000_000
     var tools = Tools()
   }
@@ -156,6 +165,7 @@ final class FakeAndroid: Sendable {
   var changes: [[String]] { commands.filter { $0.first != "df" } }
   var syncRequests: [(id: String, path: String)] { state.withLock { $0.syncRequests } }
   var openSyncs: Int { state.withLock { $0.openSyncs } }
+  var featureQueries: Int { state.withLock { $0.featureQueries } }
 
   func failNextShell(_ program: String, status: Int32 = 1, stderr: String) {
     state.withLock {

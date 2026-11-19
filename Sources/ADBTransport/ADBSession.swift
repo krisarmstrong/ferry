@@ -55,9 +55,10 @@ public actor ADBSession: DeviceSession {
     if let onRelease { Task { await onRelease() } }
   }
 
-  /// `.copy` stands for the device's own `cp`; there is no partial read over sync.
+  /// There is no copy on the device: the sync service has no partial read, and nothing runs
+  /// the device's `cp`.
   public func capabilities() async -> DeviceCapabilities {
-    await gate.run { () async -> DeviceCapabilities in disconnected ? [] : [.move, .copy] }
+    await gate.run { () async -> DeviceCapabilities in disconnected ? [] : [.move] }
   }
 
   public func storages() async throws(TransportError) -> [StorageInfo] {
@@ -190,7 +191,8 @@ public actor ADBSession: DeviceSession {
     -> ADBShellResult
   {
     try await adb(step) { () async throws(ADBError) in
-      try await host.run(serial: serial, command: ADBShell.command(program, args))
+      try await host.run(
+        serial: serial, command: ADBShell.command(program, args), features: features)
     }
   }
 
@@ -277,9 +279,16 @@ extension ADBSession {
     return error
   }
 
+  /// Whether the server still serves the device, asked within the transport's answer limit. A
+  /// cancelled caller cannot find out; that is no sign the device left, so it counts as there.
   func reachable() async -> Bool {
-    do {
-      _ = try await host.features(serial)
+    do throws(ADBError) {
+      let (host, serial) = (host, serial)
+      _ = try await ADBTransport.within(ADBTransport.defaultAnswerLimit) {
+        () async throws(ADBError) in try await host.features(serial)
+      }
+      return true
+    } catch .cancelled {
       return true
     } catch {
       return false

@@ -174,18 +174,9 @@ public struct ADBDeviceTools: Sendable {
     -> ADBScreenRecording
   {
     let command = try ADBShell.command("sh", ["-c", Self.recordScript, "sh", path])
-    let output: ShellOutput
-    if try await host.features(serial).contains("shell_v2") {
-      let stream = try await host.connect(serial, service: "shell,v2,raw:" + command)
-      // Nothing is typed in; screenrecord never reads stdin.
-      try? await stream.write(Data([4]) + ADBWire.le32(0))
-      output = ShellOutput(stream: stream, token: nil)
-    } else {
-      let token = ADBShell.newToken()
-      let stream = try await host.connect(
-        serial, service: "shell:" + ADBShell.legacyWrapper(command, token: token))
-      output = ShellOutput(stream: stream, token: token)
-    }
+    let channel = try await host.openShell(
+      serial, command, token: ADBShell.newToken(), features: nil)
+    let output = ShellOutput(stream: channel.stream, token: channel.token)
     let recording = ADBScreenRecording(
       serial: serial, devicePath: path, output: output, tools: self)
     do throws(ADBError) {

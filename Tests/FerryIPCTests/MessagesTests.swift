@@ -375,7 +375,9 @@ func nonIdentifierRepliesBadRequest(_ folder: String) async throws {
 
 private let requirements =
   [FerryIdentity(teamID: "X6JWYP43HG")].compactMap { $0 }
-  .flatMap { [$0.clientRequirement, $0.agentRequirement] }
+  .flatMap { identity in
+    ClientRole.allCases.map(identity.requirement(for:)) + [identity.agentRequirement]
+  }
 
 @Test(arguments: requirements)
 func requirementCompiles(_ text: String) throws {

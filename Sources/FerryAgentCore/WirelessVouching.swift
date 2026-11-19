@@ -21,7 +21,7 @@ import os
 /// served, whoever it claims to be, so a scan cannot race the decision. A unit on USB is kept off
 /// the network by `CompositeTransport`.
 public final class WirelessVouching: Sendable {
-  struct Locations {
+  struct Locations: Equatable {
     let identifiers: Set<String>
     let devices: Set<DeviceID>
     /// False when the system's domains could not be listed: some locations may be missing.
@@ -94,22 +94,37 @@ public final class WirelessVouching: Sendable {
       }
   }
 
-  /// The domain controller's current locations.
-  func locate(identifiers: Set<String>, devices: Set<DeviceID>, complete: Bool) {
-    state.withLock {
-      $0.locations = Locations(identifiers: identifiers, devices: devices, complete: complete)
+  /// The domain controller's current locations. The hub scans again on every change, and the
+  /// controller publishes after every operation, so only a change ticks. Returns whether it was
+  /// one.
+  @discardableResult
+  func locate(identifiers: Set<String>, devices: Set<DeviceID>, complete: Bool) -> Bool {
+    let locations = Locations(identifiers: identifiers, devices: devices, complete: complete)
+    let changes = state.withLock { state in
+      defer { state.locations = locations }
+      return state.locations != locations
     }
-    changed.yield()
+    if changes { changed.yield() }
+    return changes
   }
 
-  func remember(_ entries: [DeviceID: WirelessADB.Entry]) {
-    state.withLock { state in
-      state.loaded = true
-      state.vouched = entries.mapValues { Set($0.addresses.map(\.endpoint.argument)) }
-      state.paired = Set(
-        entries.filter { $0.value.addresses.contains { $0.learnt == .paired } }.keys)
+  /// What `WirelessADB` remembers. Ticks, and returns true, only on a change (the first call,
+  /// which loads the store, always is one).
+  @discardableResult
+  func remember(_ entries: [DeviceID: WirelessADB.Entry]) -> Bool {
+    let vouched = entries.mapValues { Set($0.addresses.map(\.endpoint.argument)) }
+    let paired = Set(
+      entries.filter { $0.value.addresses.contains { $0.learnt == .paired } }.keys)
+    let changes = state.withLock { state in
+      defer {
+        state.loaded = true
+        state.vouched = vouched
+        state.paired = paired
+      }
+      return !state.loaded || state.vouched != vouched || state.paired != paired
     }
-    changed.yield()
+    if changes { changed.yield() }
+    return changes
   }
 
   /// The store of remembered devices could not be read: for the rest of this run, a route is

@@ -205,7 +205,9 @@ public actor ADBTools {
   {
     guard let serial = await target(id) else { return .failed(.notOverADB) }
     guard try Self.size(of: source) <= limits.apkSize else { return .failed(.apkTooLarge) }
-    let copy = try await FileTransfer.copyIn(source, into: scratch)
+    // The source may grow after it was measured: the copy stops at the cap.
+    guard let copy = try await FileTransfer.copyIn(source, into: scratch, atMost: limits.apkSize)
+    else { return .failed(.apkTooLarge) }
     defer { FileTransfer.remove(copy) }
     let handle: FileHandle
     do {
@@ -214,10 +216,6 @@ public actor ADBTools {
       throw .io("cannot open the app: \(error.localizedDescription)")
     }
     defer { try? handle.close() }
-    // The source may have grown after it was measured.
-    guard try Self.size(of: handle.fileDescriptor) <= limits.apkSize else {
-      return .failed(.apkTooLarge)
-    }
     guard APKCheck.isAPK(at: copy) else { return .failed(.notAnAPK) }
     let path = ADBDeviceTools.apkPath()
     await journal.note(path, on: id)

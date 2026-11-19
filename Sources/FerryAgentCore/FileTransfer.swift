@@ -52,13 +52,7 @@ public enum FileTransfer {
   @concurrent static func copyIn(_ source: Int32, into folder: URL)
     async throws(TransportError) -> URL
   {
-    try requireRegular(source)
-    var info = stat()
-    guard fstat(source, &info) == 0 else { throw .io("cannot inspect file: \(errorText())") }
-    let url = scratchURL(in: folder)
-    try LocalFile.requireSpace(UInt64(clamping: info.st_size), at: url.deletingLastPathComponent())
-    let output = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
-    guard output >= 0 else { throw .io("cannot create transfer file: \(errorText())") }
+    let (url, output) = try newScratch(for: source, in: folder)
     defer { close(output) }
     do throws(TransportError) {
       try copy(from: source, to: output)
@@ -67,6 +61,42 @@ public enum FileTransfer {
       throw error
     }
     return url
+  }
+
+  /// As `copyIn(_:into:)`, but stops once `source` has given more than `limit` bytes, which a
+  /// file still being written can do after it was measured: then nothing is kept and the result
+  /// is nil.
+  @concurrent static func copyIn(_ source: Int32, into folder: URL, atMost limit: UInt64)
+    async throws(TransportError) -> URL?
+  {
+    let (url, output) = try newScratch(for: source, in: folder)
+    defer { close(output) }
+    let whole: Bool
+    do throws(TransportError) {
+      whole = try copy(from: source, to: output, limit: limit)
+    } catch {
+      remove(url)
+      throw error
+    }
+    guard whole else {
+      remove(url)
+      return nil
+    }
+    return url
+  }
+
+  /// A new scratch file in `folder`, open for writing, once there is room for `source`.
+  private static func newScratch(for source: Int32, in folder: URL) throws(TransportError)
+    -> (URL, Int32)
+  {
+    try requireRegular(source)
+    var info = stat()
+    guard fstat(source, &info) == 0 else { throw .io("cannot inspect file: \(errorText())") }
+    let url = scratchURL(in: folder)
+    try LocalFile.requireSpace(UInt64(clamping: info.st_size), at: url.deletingLastPathComponent())
+    let output = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+    guard output >= 0 else { throw .io("cannot create transfer file: \(errorText())") }
+    return (url, output)
   }
 
   /// Replaces the contents of `target`, a regular file, with the scratch file at `url`, and
@@ -83,7 +113,12 @@ public enum FileTransfer {
     guard fsync(target) == 0 else { throw .io("cannot flush file: \(errorText())") }
   }
 
-  private static func copy(from input: Int32, to output: Int32) throws(TransportError) {
+  /// Copies until the end of `input`; false, with the copy unfinished, once more than `limit`
+  /// bytes have been read.
+  @discardableResult
+  private static func copy(from input: Int32, to output: Int32, limit: UInt64? = nil)
+    throws(TransportError) -> Bool
+  {
     var buffer = [UInt8](repeating: 0, count: chunk)
     var offset: off_t = 0
     while true {
@@ -92,7 +127,8 @@ public enum FileTransfer {
         if errno == EINTR { continue }
         throw .io("reading failed: \(errorText())")
       }
-      if count == 0 { return }
+      if count == 0 { return true }
+      if let limit, UInt64(offset) + UInt64(count) > limit { return false }
       try write(buffer, count: count, to: output, at: offset)
       offset += off_t(count)
     }

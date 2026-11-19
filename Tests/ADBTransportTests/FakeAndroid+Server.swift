@@ -20,6 +20,11 @@ extension FakeAndroid {
   func handle(_ peer: Peer, serial: String, first: String) async throws {
     let gone = state.withLock { $0.gone }
     if first == "host-serial:\(serial):features" {
+      let hook = state.withLock { state in
+        state.featureQueries += 1
+        return state.beforeFeatures
+      }
+      await hook?()
       if gone {
         try await peer.fail("device '\(serial)' not found")
       } else {
@@ -92,11 +97,21 @@ extension FakeAndroid {
       }
       for hook in hooks { hook.action(self) }
       switch id {
-      case "STA2":
-        let node = state.withLock { $0.node(at: path) }
+      case "STA2", "LST2":
+        let (node, error) = state.withLock { state in
+          var node = state.node(at: path)
+          // STA2 follows a link, as `stat` does; LST2 reports the link itself.
+          if id == "STA2", case .link(let target) = node { node = state.node(at: target) }
+          return (node, state.statErrors[path])
+        }
+        let body =
+          node.map {
+            Peer.stat2Body(mode: Self.mode($0), size: Self.size($0), mtime: Self.mtime($0))
+          }
+          ?? Peer.stat2Body(error: Self.enoent, mode: 0, size: 0, mtime: 0)
         try await peer.raw(
-          node.map { Peer.sta2(mode: Self.mode($0), size: Self.size($0), mtime: Self.mtime($0)) }
-            ?? Peer.sta2(error: Self.enoent, mode: 0, size: 0, mtime: 0))
+          Data(id.utf8)
+            + (error.map { Peer.stat2Body(error: $0, mode: 0, size: 0, mtime: 0) } ?? body))
       case "STAT":
         let node = state.withLock { $0.node(at: path) }
         try await peer.raw(
@@ -121,6 +136,7 @@ extension FakeAndroid {
     case .folder: 0o40771
     case .file: 0o100660
     case .special: 0o140755
+    case .link: 0o120777
     }
   }
 
@@ -129,13 +145,14 @@ extension FakeAndroid {
     case .folder: 4096
     case .file(let data, _): UInt64(data.count)
     case .special: 0
+    case .link(let target): UInt64(target.count)
     }
   }
 
   static func mtime(_ node: Node) -> Int64 {
     switch node {
     case .folder(let mtime), .file(_, let mtime): mtime
-    case .special: 0
+    case .special, .link: 0
     }
   }
 

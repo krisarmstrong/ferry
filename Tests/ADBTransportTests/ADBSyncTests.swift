@@ -37,9 +37,9 @@ struct ADBSyncTests {
   @Test func statV2CarriesA64BitSize() async throws {
     let (sync, server) = try await sync(["stat_v2"]) { peer in
       let request = try await peer.syncPathRequest()
-      #expect(request.id == "STA2")
+      #expect(request.id == "LST2")
       try await peer.raw(
-        Peer.sta2(mode: 0o100600, size: Self.fiveGB, mtime: 1_700_000_001))
+        Peer.lst2(mode: 0o100600, size: Self.fiveGB, mtime: 1_700_000_001))
     }
     defer { server.stop() }
     let stat = try #require(try await sync.stat("/sdcard/big.mkv"))
@@ -50,7 +50,7 @@ struct ADBSyncTests {
   @Test func aMissingPathIsNilOnBothProtocols() async throws {
     let (withV2, server2) = try await sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
-      try await peer.raw(Peer.sta2(error: 2, mode: 0, size: 0, mtime: 0))
+      try await peer.raw(Peer.lst2(error: 2, mode: 0, size: 0, mtime: 0))
     }
     defer { server2.stop() }
     #expect(try await withV2.stat("/nope") == nil)
@@ -65,7 +65,7 @@ struct ADBSyncTests {
   @Test func otherStatErrorsAreFailures() async throws {
     let (sync, server) = try await sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
-      try await peer.raw(Peer.sta2(error: 13, mode: 0, size: 0, mtime: 0))
+      try await peer.raw(Peer.lst2(error: 13, mode: 0, size: 0, mtime: 0))
     }
     defer { server.stop() }
     await #expect(throws: ADBError.failed("stat /secret failed with errno 13")) {

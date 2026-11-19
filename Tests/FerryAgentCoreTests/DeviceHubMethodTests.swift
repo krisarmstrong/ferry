@@ -226,6 +226,25 @@ struct DeviceHubMethodTests {
     #expect(await mtpDevice.closeCount == 0)
   }
 
+  /// A swap that fails leaves the MTP session serving as it was: its number does not change, so
+  /// clients do not take it for a device reached again and retry their work.
+  @Test func aFailedSwapKeepsTheSessionNumber() async throws {
+    var harness = MethodHarness(mtp: [mtpDevice])
+    defer { harness.finish() }
+    #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
+    let before = await harness.hub.heldSessions()[id]
+    #expect(before != nil)
+    await adbDevice.setLocked(true)
+
+    await harness.adb.attach(adbDevice)
+    harness.tick()
+    while await harness.adb.openCount(of: id) == 0, !Task.isCancelled { await Task.yield() }
+    while await harness.hub.isSwapping(id), !Task.isCancelled { await Task.yield() }
+
+    #expect(await harness.hub.devices() == [ready(mtpDevice, .usbFileTransfer)])
+    #expect(await harness.hub.heldSessions()[id] == before)
+  }
+
   /// Ejecting waits for requests on the device to finish before parking it: parking releases the
   /// MTP handle a scan kept, which resets the unit under the session serving the copy.
   @Test func ejectWaitsForRequestsBeforeParking() async throws {

@@ -100,11 +100,7 @@ enum WirelessStore {
           )
         }))
     do {
-      try FileManager.default.createDirectory(
-        at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-      try JSONEncoder().encode(stored).write(to: file, options: .atomic)
-      // Readable by the user only: it names devices and where they are.
-      try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+      try PrivateFile.write(try JSONEncoder().encode(stored), to: file)
     } catch {
       log.error("saving remembered devices failed: \(error, privacy: .private)")
     }

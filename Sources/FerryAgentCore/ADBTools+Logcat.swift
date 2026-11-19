@@ -197,7 +197,7 @@ extension ADBTools {
   public func stopLogcat(_ id: DeviceID, stream: UUID) -> Outcome {
     if let run = logcats[id], run.id == stream {
       run.stop()
-    } else if logcats[id]?.id != stream {
+    } else {
       // Not running (yet): remembered, so a stream still connecting ends when it is up.
       if pendingStops.count >= 64 { pendingStops.removeAll() }
       pendingStops.insert(stream)

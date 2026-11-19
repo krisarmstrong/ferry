@@ -11,11 +11,9 @@ struct FerryIdentityTests {
     #expect(identity.machServiceName == "ABCDE12345.io.github.krisarmstrong.ferry.agent")
     #expect(identity.appGroup == "ABCDE12345.io.github.krisarmstrong.ferry")
     #expect(
-      identity.clientRequirement == """
+      identity.requirement(for: .finderSync) == """
         anchor apple generic and certificate leaf[subject.OU] = "ABCDE12345" and \
-        (identifier "io.github.krisarmstrong.ferry" or \
-        identifier "io.github.krisarmstrong.ferry.provider" or \
-        identifier "io.github.krisarmstrong.ferry.sync")
+        identifier "io.github.krisarmstrong.ferry.sync"
         """)
     #expect(
       identity.agentRequirement == """

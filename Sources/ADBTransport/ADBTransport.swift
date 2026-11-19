@@ -227,6 +227,11 @@ public actor ADBTransport: DeviceTransport {
       Self.log.info("not opening \(serial, privacy: .private): \(String(describing: error))")
       throw .deviceNotFound(id)
     }
+    // Ejected while the device answered: no session for it.
+    guard parked[id] == nil else {
+      held[id] = nil
+      throw .deviceNotFound(id)
+    }
     opened(id, serial, deviceTools)
     return ADBSession(
       host: host, serial: serial, info: info, features: features,

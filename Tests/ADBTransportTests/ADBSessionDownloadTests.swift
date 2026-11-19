@@ -170,7 +170,7 @@ struct ADBSessionDownloadTests {
     device.addFile("/a.txt", Data("a".utf8))
     try await ADBFixture.withSession(device) { session in
       // The session's first request, on a connection it has just opened.
-      device.beforeNextSync("STA2") { $0.dropConnections() }
+      device.beforeNextSync("LST2") { $0.dropConnections() }
       await #expect {
         _ = try await session.list(.root, in: storage)
       } throws: { error in
@@ -179,7 +179,7 @@ struct ADBSessionDownloadTests {
       }
       let listed = try await session.list(.root, in: storage)
       #expect(listed.count == 1)
-      #expect(await session.capabilities() == [.move, .copy])
+      #expect(await session.capabilities() == [.move])
     }
   }
 

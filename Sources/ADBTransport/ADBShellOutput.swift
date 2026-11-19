@@ -65,23 +65,18 @@ final class ShellOutput: Sendable {
   /// from the exit packet, or from the legacy trailer when the connection closes.
   private func readMore() async throws(ADBError) -> Int32?? {
     if let token {
-      guard let chunk = try await stream.readSome(upTo: 64 * 1024) else {
+      guard let chunk = try await stream.readSome(upTo: ShellPacket.limit) else {
         let all = state.withLock { $0.stdout }
         return .some(try? ADBShell.parseLegacy(all, token: token).status)
       }
       append(chunk, stderr: false)
       return nil
     }
-    let header = try await stream.read(exactly: 5)
-    let length = Int(ADBWire.u32(header.suffix(4)))
-    guard length <= 64 * 1024 else { throw .protocolViolation("shell packet of \(length) bytes") }
-    let body = try await stream.read(exactly: length)
-    switch header[header.startIndex] {
-    case 1: append(body, stderr: false)
-    case 2: append(body, stderr: true)
-    case 3:
-      guard let code = body.first else { throw .protocolViolation("empty exit packet") }
-      return .some(Int32(code))
+    let packet = try await ShellPacket.read(from: stream)
+    switch packet.id {
+    case ShellPacket.stdout: append(packet.body, stderr: false)
+    case ShellPacket.stderr: append(packet.body, stderr: true)
+    case ShellPacket.exit: return .some(try ShellPacket.status(packet.body))
     default: break
     }
     return nil
