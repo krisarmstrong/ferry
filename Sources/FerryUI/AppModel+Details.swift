@@ -18,6 +18,15 @@ struct DetailsRead {
   var reading: Bool
   /// A read has finished, failed or not: a retry is not the first read, so it shows nothing.
   var settled = false
+  /// The read this state waits for. A read whose device went away and came back finds another
+  /// (or none) here, and its answer is dropped.
+  var read: UUID?
+}
+
+/// A device's read in flight, and the token that ties its answer to the state that asked.
+struct DetailReadTask {
+  let token: UUID
+  let task: Task<Void, Never>
 }
 
 /// One click on an address line; its own `click` tells a later click on the same line apart.
@@ -51,32 +60,36 @@ extension AppModel {
       read.reading
         || read.requested.map { $0.duration(to: now) < Self.detailsInterval } ?? false
     }
-    if busy == true { return }
+    // A read from before the device went away may still be running: never two at once.
+    guard busy != true, detailReads[id] == nil else { return }
+    let token = UUID()
     details[id] = DetailsRead(
-      info: details[id]?.info, requested: now, reading: true, settled: details[id]?.settled ?? false
-    )
-    detailReads[id] = Task { await readDetails(of: id) }
+      info: details[id]?.info, requested: now, reading: true,
+      settled: details[id]?.settled ?? false, read: token)
+    detailReads[id] = DetailReadTask(
+      token: token, task: Task { await readDetails(of: id, token: token) })
   }
 
   /// Returns once every read started so far has finished.
   func detailsSettled() async {
     while let read = detailReads.values.first {
-      await read.value
+      await read.task.value
     }
   }
 
   /// Not through `sendTool`: a failure here is no action of the user's, so it shows nothing.
   /// A read cancelled because the menu closed leaves the details as they were, due again.
-  private func readDetails(of id: DeviceID) async {
+  private func readDetails(of id: DeviceID, token: UUID) async {
     var info: AndroidDeviceInfo?
     if !Task.isCancelled {
       if case .deviceInfo(let read)? = try? await client.send(.deviceInfo(id), file: nil) {
         info = read
       }
     }
-    detailReads[id] = nil
-    // The device went while it was read.
-    guard var current = details[id] else { return }
+    if detailReads[id]?.token == token { detailReads[id] = nil }
+    // The device went while it was read, and maybe came back: this answer is not for it.
+    guard var current = details[id], current.read == token else { return }
+    current.read = nil
     current.reading = false
     if Task.isCancelled {
       current.requested = nil
@@ -89,12 +102,12 @@ extension AppModel {
 
   /// The menu closed: no read goes on without it.
   func cancelDetailReads() {
-    for read in detailReads.values { read.cancel() }
+    for read in detailReads.values { read.task.cancel() }
   }
 
   func forgetDetailsOfGoneDevices() {
     let listed = Set(devices.map(\.id))
-    for (id, read) in detailReads where !listed.contains(id) { read.cancel() }
+    for (id, read) in detailReads where !listed.contains(id) { read.task.cancel() }
     details = details.filter { listed.contains($0.key) }
     if let copied = copiedAddress, !listed.contains(copied.device) { copiedAddress = nil }
   }

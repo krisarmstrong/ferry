@@ -88,8 +88,9 @@ import os
   var expansion = MenuExpansion()
   /// What each device said about itself, for its inline details (see `AppModel+Details`).
   var details: [DeviceID: DetailsRead] = [:]
-  /// The reads running, so a test can wait for them.
-  var detailReads: [DeviceID: Task<Void, Never>] = [:]
+  /// The read running for each device (one at most), so the menu can cancel it and a test can
+  /// wait for it.
+  var detailReads: [DeviceID: DetailReadTask] = [:]
   /// The address line just copied, which shows "Copied" for a moment.
   var copiedAddress: CopiedAddress?
   /// Read from the system once launched (see `launch()`); `false` until then.

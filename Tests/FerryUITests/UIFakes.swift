@@ -68,6 +68,13 @@ final class FakeClient: AgentSending {
     }
   }
 
+  /// What the agent answers to `.status` now, to set back with `restoreStatus`.
+  var statusReply: AgentResponse { status.withLock { $0 } }
+
+  func restoreStatus(_ reply: AgentResponse) {
+    status.withLock { $0 = reply }
+  }
+
   /// What the agent answers to the next tool request, after reporting `progress`.
   func setTool(
     _ response: AgentResponse, progress: [(UInt64, UInt64)] = [], writes bytes: Data = Data()
@@ -318,6 +325,8 @@ struct UnreachableClient: AgentSending {
 final class HeldInfoClient: AgentSending {
   let inner: FakeClient
   let onStatus = Mutex<(@Sendable () -> Void)?>(nil)
+  /// Set when a reply is already on its way: cancelling the request no longer stops it.
+  let ignoresCancellation = Atomic(false)
   private let arrived: AsyncStream<Void>
   private let arrivals: AsyncStream<Void>.Continuation
   private let held = Mutex([Int: CheckedContinuation<Void, Never>]())
@@ -357,9 +366,10 @@ final class HeldInfoClient: AgentSending {
         if Task.isCancelled { held.withLock { $0.removeValue(forKey: number) }?.resume() }
       }
     } onCancel: {
+      guard !ignoresCancellation.load(ordering: .relaxed) else { return }
       held.withLock { $0.removeValue(forKey: number) }?.resume()
     }
-    if Task.isCancelled {
+    if Task.isCancelled, !ignoresCancellation.load(ordering: .relaxed) {
       inner.log.record("deviceInfo \(id.serial) cancelled")
       throw .cancelled
     }

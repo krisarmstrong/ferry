@@ -165,7 +165,7 @@ struct AppModelDetailsTests {
       }, now: clock.now)
     await model.watchWhileMenuOpen()
     let read = model.detailReads[id]
-    #expect(read?.isCancelled == true)
+    #expect(read?.task.isCancelled == true)
     // Let a read that was not cancelled finish, so the test ends either way.
     client.release()
     await model.detailsSettled()
@@ -175,6 +175,47 @@ struct AppModelDetailsTests {
     await client.arrival()
     client.release()
     await model.detailsSettled()
+    #expect(model.shownDetails(of: id) == .loaded(Self.info))
+  }
+
+  /// A read of a device that went away and came back belongs to its old session: no second read
+  /// runs beside it, and its answer, arriving late, is dropped instead of overwriting newer state.
+  @Test func aReadFromAnEarlierSessionIsDropped() async throws {
+    let fake = client()
+    let client = HeldInfoClient(fake)
+    client.ignoresCancellation.store(true, ordering: .relaxed)
+    let model = AppModel(
+      client: client, services: FakeServices(log: log), sleep: { _ in }, now: clock.now)
+    await model.refresh()
+    model.loadExpandedDetailsIfDue()
+    await client.arrival()
+
+    let status = fake.statusReply
+    fake.setStatus([])
+    await model.refresh()
+    fake.restoreStatus(status)
+    await model.refresh()
+    model.toggleExpansion(.device(id))
+    #expect(model.isExpanded(.device(id)))
+    // No second read started beside the held one (which would also wait forever here).
+    try #require(model.shownDetails(of: id) == DetailsShown.hidden)
+
+    let stale = AndroidDeviceInfo(
+      model: "EtherScope-nXG", androidVersion: "8.0.0", build: "OLD", serial: id.serial,
+      battery: nil, addresses: [], storage: nil)
+    fake.infoReply.withLock { $0 = .deviceInfo(stale) }
+    client.release()
+    await model.detailsSettled()
+    #expect(reads == 1)
+    #expect(model.shownDetails(of: id) == DetailsShown.hidden)
+
+    fake.infoReply.withLock { $0 = .deviceInfo(Self.info) }
+    client.ignoresCancellation.store(false, ordering: .relaxed)
+    model.loadExpandedDetailsIfDue()
+    await client.arrival()
+    client.release()
+    await model.detailsSettled()
+    #expect(reads == 2)
     #expect(model.shownDetails(of: id) == .loaded(Self.info))
   }
 
