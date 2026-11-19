@@ -293,6 +293,8 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 private struct UnreachableHandler: AgentHandling {
+  func text(for refusal: Refusal) -> String { refusal.testText }
+
   func handle(
     _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler
   ) async -> AgentResponse {

@@ -61,7 +61,9 @@ public actor AgentService: AgentHandling {
     logs: LogSink?
   ) async -> AgentResponse {
     do throws(TransportError) {
-      guard Self.takesFile(request) == (file != nil) else { throw .io("bad request") }
+      guard Self.takesFile(request) == (file != nil) else {
+        throw .io(String(localized: AgentText.badRequest))
+      }
       // A request on a Finder location starts when it has its domain's gate (see `gated`).
       if !Self.waitsForDomainGate(request) { RequestCancellation.current?.markStarted() }
       return try await perform(request, file: file?.fileDescriptor, progress: progress, logs: logs)
@@ -121,7 +123,7 @@ public actor AgentService: AgentHandling {
       (.stopRecording, _), (.saveRecording, _), (.discardRecording, _), (.startLogcat, _),
       (.stopLogcat, _), (.forwards, _), (.addForward, _), (.removeForward, _), (.deviceInfo, _),
       (.shellTarget, _), (.sendFile, nil):
-      throw .io("bad request")
+      throw .io(String(localized: AgentText.badRequest))
     }
   }
 
@@ -184,7 +186,7 @@ public actor AgentService: AgentHandling {
   {
     let cursor = try page.map { data throws(TransportError) in
       guard let id = String(data: data, encoding: .utf8).flatMap(ItemID.init(rawValue:)) else {
-        throw .io("bad request")
+        throw .io(String(localized: AgentText.badRequest))
       }
       return id
     }
@@ -351,6 +353,15 @@ extension AgentService {
       .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward, .deviceInfo,
       .shellTarget, .refresh, .eject, .removeAllDomains, .changes:
       false
+    }
+  }
+}
+
+extension AgentService {
+  public nonisolated func text(for refusal: Refusal) -> String {
+    switch refusal {
+    case .badRequest: String(localized: AgentText.badRequest)
+    case .notAllowed: String(localized: AgentText.notAllowed)
     }
   }
 }

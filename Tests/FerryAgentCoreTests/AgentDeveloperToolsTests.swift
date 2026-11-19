@@ -38,7 +38,9 @@ struct AgentDeveloperToolsTests {
     defer { harness.finish() }
     for request in requests {
       let file = try harness.readable("x", "x")
-      #expect(await harness.service.handle(request, file: file) == .failure(.io("bad request")))
+      #expect(
+        await harness.service.handle(request, file: file)
+          == .failure(.io(String(localized: AgentText.badRequest))))
     }
   }
 
@@ -60,7 +62,7 @@ struct AgentDeveloperToolsTests {
     let service = service(harness, FakeToolDevice())
     #expect(
       await service.handle(.startLogcat(device, stream: stream), file: nil)
-        == .failure(.io("bad request")))
+        == .failure(.io(String(localized: AgentText.badRequest))))
   }
 
   @Test func aLogStreamRunsUntilTheDeviceEndsIt() async throws {

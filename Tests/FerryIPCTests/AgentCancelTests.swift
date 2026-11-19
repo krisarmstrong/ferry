@@ -25,6 +25,8 @@ private final class Flag: Sendable {
 /// `starts`, it says the request has its turn at the device first, as the agent does once it has
 /// the domain's gate; without, the request stays queued.
 private struct ParkingHandler: AgentHandling {
+  func text(for refusal: Refusal) -> String { refusal.testText }
+
   let started: AsyncStream<AgentRequest>.Continuation
   let seen: AsyncStream<Seen>.Continuation
   let released: Flag

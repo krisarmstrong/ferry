@@ -156,7 +156,7 @@ extension ADBTools {
   {
     guard FileManager.default.createFile(atPath: staged.path, contents: nil),
       let handle = try? FileHandle(forWritingTo: staged)
-    else { return .failure(.io("cannot stage the recording")) }
+    else { return .failure(.io(String(localized: AgentText.recordingNotStaged))) }
     defer { try? handle.close() }
     let watch = PullWatch(limit: limits.recordingSize, folder: staged.deletingLastPathComponent())
     // A client's cancel stops the pull as the device breaking it off does: the recording waits.

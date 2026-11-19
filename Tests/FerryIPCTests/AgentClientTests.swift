@@ -24,6 +24,8 @@ private func listing() throws(TransportError) -> [ProviderEntry] {
 /// Answers `.list` with `listing()`, writes `fetched` into the file sent with `.fetch`, and
 /// parks `.status` until the test releases it.
 private struct StubHandler: AgentHandling {
+  func text(for refusal: Refusal) -> String { refusal.testText }
+
   let started: AsyncStream<Void>.Continuation
   let release: AsyncStream<Void>
 

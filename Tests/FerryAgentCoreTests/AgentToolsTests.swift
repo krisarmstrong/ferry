@@ -45,13 +45,17 @@ struct AgentToolsTests {
     for request: AgentRequest in [
       .installAPK(device, name: "a.apk"), .screenshot(device), .saveRecording(device),
     ] {
-      #expect(await harness.service.handle(request, file: nil) == .failure(.io("bad request")))
+      #expect(
+        await harness.service.handle(request, file: nil)
+          == .failure(.io(String(localized: AgentText.badRequest))))
     }
     for request: AgentRequest in [
       .startRecording(device), .stopRecording(device), .discardRecording(device),
     ] {
       let file = try harness.readable("x", "x")
-      #expect(await harness.service.handle(request, file: file) == .failure(.io("bad request")))
+      #expect(
+        await harness.service.handle(request, file: file)
+          == .failure(.io(String(localized: AgentText.badRequest))))
     }
   }
 

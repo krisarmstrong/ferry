@@ -69,6 +69,8 @@ struct AgentADBStatusTests {
     let harness = try AgentHarness()
     defer { harness.finish() }
     let file = try harness.readable("x", "x")
-    #expect(await harness.service.handle(.recheckADB, file: file) == .failure(.io("bad request")))
+    #expect(
+      await harness.service.handle(.recheckADB, file: file)
+        == .failure(.io(String(localized: AgentText.badRequest))))
   }
 }

@@ -163,7 +163,7 @@ struct AgentSendFileTests {
       .sendFile(device.info.id, name: "a.txt"), file: nil)
 
     #expect(escaping == .failure(.invalidName("../a.txt")))
-    #expect(noFile == .failure(.io("bad request")))
+    #expect(noFile == .failure(.io(String(localized: AgentText.badRequest))))
     #expect(
       await device.allPaths(in: storageID(device, StorageKey.internal)).allSatisfy {
         $0.name != "a.txt"

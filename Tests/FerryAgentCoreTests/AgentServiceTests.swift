@@ -181,7 +181,7 @@ struct AgentServiceTests {
     let setup = try await ready()
     let (harness, domain) = (setup.harness, setup.domain)
     defer { harness.finish() }
-    let bad = AgentResponse.failure(.io("bad request"))
+    let bad = AgentResponse.failure(.io(String(localized: AgentText.badRequest)))
     let service = harness.service
 
     let old = try await setup.id(paths.old)

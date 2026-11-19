@@ -179,6 +179,6 @@ struct AgentChangeTests {
     #expect(!set.contains { $0.id == .root || $0.id == doomed.id || $0.id == reshaped.id })
     #expect(
       await domain.send(.workingSet(domain: domain.name, page: Data("/Docs".utf8)))
-        == .failure(.io("bad request")))
+        == .failure(.io(String(localized: AgentText.badRequest))))
   }
 }

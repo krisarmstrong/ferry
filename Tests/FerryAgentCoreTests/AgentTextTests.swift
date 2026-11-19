@@ -29,4 +29,14 @@ struct AgentTextTests {
       String(localized: AgentText.disconnected)
         == "Connect the device and choose Transfer files to see its files.")
   }
+
+  /// The XPC layer's refusals reach the client in the agent's words.
+  @Test func theAgentGivesItsRefusalsInItsWords() throws {
+    let harness = try AgentHarness()
+    defer { harness.finish() }
+    let service = harness.service
+    #expect(service.text(for: .badRequest) == "Ferry's helper couldn't read the request.")
+    #expect(
+      service.text(for: .notAllowed) == "Ferry's helper doesn't take this request from here.")
+  }
 }

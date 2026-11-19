@@ -12,6 +12,39 @@
         }
       }
     },
+    "Ferry's helper couldn't read the request." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry's helper couldn't read the request."
+          }
+        }
+      }
+    },
+    "Ferry's helper couldn't start copying the recording." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry's helper couldn't start copying the recording."
+          }
+        }
+      }
+    },
+    "Ferry's helper doesn't take this request from here." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry's helper doesn't take this request from here."
+          }
+        }
+      }
+    },
     "conflict from Mac" : {
       "extractionState" : "manual",
       "localizations" : {

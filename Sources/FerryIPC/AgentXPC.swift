@@ -17,8 +17,20 @@ import os
   func cancel(_ id: String)
 }
 
+/// Why the agent's XPC layer refuses a request before its handler sees it.
+public enum Refusal: Sendable {
+  /// The request does not decode, or comes without the file it needs.
+  case badRequest
+  /// The client's role may not send it (see `ClientRole.allows`).
+  case notAllowed
+}
+
 /// Serves agent requests from the app and the FileProvider extension.
 public protocol AgentHandling: Sendable {
+  /// What the client is told when the XPC layer refuses a request: the handler's own words, from
+  /// its String Catalog.
+  func text(for refusal: Refusal) -> String
+
   /// `file` is the descriptor sent with the request, if any: readable for `create` and
   /// `replaceContents`, writable for `fetch`. A transfer reports its bytes to `progress`, which
   /// forwards them to the client; it never blocks.
@@ -145,12 +157,12 @@ final class AgentService: NSObject, AgentXPC, Sendable {
       decoded = try JSONDecoder().decode(AgentRequest.self, from: request)
     } catch {
       Self.log.error("rejected undecodable request: \(error, privacy: .private)")
-      reply(Self.encode(.failure(.io("bad request"))))
+      reply(Self.encode(.failure(.io(handler.text(for: .badRequest)))))
       return
     }
     if let role, !role.allows(decoded) {
       Self.log.error("refused a request its client may not send")
-      reply(Self.encode(.failure(.io("request not allowed"))))
+      reply(Self.encode(.failure(.io(handler.text(for: .notAllowed)))))
       return
     }
     // Registered before this call returns, so a cancel, which XPC delivers after it, finds it.

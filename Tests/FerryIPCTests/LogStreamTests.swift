@@ -10,6 +10,8 @@ private let device = DeviceID(serial: "R58N12345")
 /// Sends three batches to the client's sink, as the agent streams a log, and answers `.done`;
 /// holds the sink so a test can use it after the request has returned.
 private final class Streamer: AgentHandling, Sendable {
+  func text(for refusal: Refusal) -> String { refusal.testText }
+
   private let sink = Mutex<LogSink?>(nil)
   private let answers = Mutex<[Bool]>([])
 

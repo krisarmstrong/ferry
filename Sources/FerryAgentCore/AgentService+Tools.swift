@@ -51,7 +51,7 @@ extension AgentService {
     switch request {
     case .startLogcat(let id, let stream):
       // The lines go to the client that asked: with no way to send them there is no stream.
-      guard let logs else { throw .io("bad request") }
+      guard let logs else { throw .io(String(localized: AgentText.badRequest)) }
       guard let tools else { return .toolFailed(.notOverADB) }
       return try await tools.streamLogcat(id, stream: stream, to: logs).response
     case .stopLogcat(let id, let stream):
