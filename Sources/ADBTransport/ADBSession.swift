@@ -81,13 +81,15 @@ public actor ADBSession: DeviceSession {
 
   // MARK: Plumbing
 
-  /// Runs `body` as one gated operation. A `.deviceDisconnected` from it ends the session and
-  /// releases the device, so the transport can open it afresh once it is back.
+  /// Runs `body` as one gated operation, once the request's turn (`DeviceTurns`) lets it. A
+  /// `.deviceDisconnected` from it ends the session and releases the device, so the transport
+  /// can open it afresh once it is back.
   func operation<T>(_ body: () async throws(TransportError) -> T)
     async throws(TransportError) -> T
   {
     try await gate.run { () async throws(TransportError) -> T in
       guard !disconnected else { throw .deviceDisconnected }
+      try DeviceTurns.take()
       do throws(TransportError) {
         return try await body()
       } catch {

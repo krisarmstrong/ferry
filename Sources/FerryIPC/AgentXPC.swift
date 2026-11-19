@@ -180,13 +180,15 @@ final class AgentService: NSObject, AgentXPC, Sendable {
     let sink = logs
     Task {
       let response = await RequestCancellation.$current.withValue(cancellation) {
-        await handler.handle(
-          decoded, file: file,
-          progress: { completed, total in
-            // A report that cannot be delivered is dropped: it never fails the transfer.
-            reported.mark()
-            client?.progress(id, completed: completed, total: total)
-          }, logs: sink)
+        await DeviceTurns.$current.withValue(cancellation) {
+          await handler.handle(
+            decoded, file: file,
+            progress: { completed, total in
+              // A report that cannot be delivered is dropped: it never fails the transfer.
+              reported.mark()
+              client?.progress(id, completed: completed, total: total)
+            }, logs: sink)
+        }
       }
       self.running.withLock { $0[id] = nil }
       if reported.any, let connection {

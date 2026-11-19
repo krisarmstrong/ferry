@@ -52,6 +52,9 @@ public actor FakeDevice: DeviceSession {
   /// Runs when the next delete starts, before it reads the device's contents.
   var deleteHook: (@Sendable () async -> Void)?
   var listFailure: TransportError?
+  /// See `serialiseOperations()`.
+  var serialised = false
+  let sessionGate = OperationGate()
   var storagesFailure: TransportError?
   var storagesFailing: TransportError?
 
@@ -76,7 +79,7 @@ public actor FakeDevice: DeviceSession {
 
   public func capabilities() async -> DeviceCapabilities { deviceCapabilities }
 
-  public func storages() async throws(TransportError) -> [StorageInfo] {
+  func storagesOnDevice() async throws(TransportError) -> [StorageInfo] {
     storagesCallCount += 1
     await pauseIfSuspended(.storages)
     if let failure = storagesFailure {
@@ -88,7 +91,7 @@ public actor FakeDevice: DeviceSession {
     return storageInfos
   }
 
-  public func list(_ folder: RemotePath, in storage: StorageID) async throws(TransportError)
+  func listOnDevice(_ folder: RemotePath, in storage: StorageID) async throws(TransportError)
     -> [RemoteItem]
   {
     await pauseIfSuspended(.list)
@@ -103,7 +106,7 @@ public actor FakeDevice: DeviceSession {
       .sorted { $0.path.description < $1.path.description }
   }
 
-  public func item(at path: RemotePath, in storage: StorageID) async throws(TransportError)
+  func itemOnDevice(at path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem
   {
     let nodes = try nodes(in: storage)
@@ -120,8 +123,7 @@ public actor FakeDevice: DeviceSession {
     return RemoteItem(path: path, kind: item.kind, size: size, modified: item.modified)
   }
 
-  @discardableResult
-  public func download(
+  func downloadOnDevice(
     _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
     progress: ProgressHandler
   ) async throws(TransportError) -> Downloaded {
@@ -142,7 +144,7 @@ public actor FakeDevice: DeviceSession {
     return Downloaded(listed: listed, received: total)
   }
 
-  public func upload(
+  func uploadOnDevice(
     from file: URL, to path: RemotePath, in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
     await runUploadHook()
@@ -171,7 +173,7 @@ public actor FakeDevice: DeviceSession {
     return Self.item(path, node)
   }
 
-  public func makeFolder(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
+  func makeFolderOnDevice(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem
   {
     var nodes = try nodes(in: storage)
@@ -184,7 +186,7 @@ public actor FakeDevice: DeviceSession {
     return Self.item(path, node)
   }
 
-  public func rename(_ path: RemotePath, to newName: String, in storage: StorageID)
+  func renameOnDevice(_ path: RemotePath, to newName: String, in storage: StorageID)
     async throws(TransportError) -> RemoteItem
   {
     let nodes = try nodes(in: storage)
@@ -207,7 +209,7 @@ public actor FakeDevice: DeviceSession {
     return try relocate(path, to: parent.appending(newName), in: storage)
   }
 
-  public func move(_ path: RemotePath, toFolder: RemotePath, in storage: StorageID)
+  func moveOnDevice(_ path: RemotePath, toFolder: RemotePath, in storage: StorageID)
     async throws(TransportError) -> RemoteItem
   {
     guard deviceCapabilities.contains(.move) else { throw .unsupported("move") }
@@ -218,7 +220,7 @@ public actor FakeDevice: DeviceSession {
     return try relocate(path, to: toFolder.appending(name), in: storage)
   }
 
-  public func delete(_ path: RemotePath, in storage: StorageID, expecting: [RemoteItem]?)
+  func deleteOnDevice(_ path: RemotePath, in storage: StorageID, expecting: [RemoteItem]?)
     async throws(TransportError)
   {
     await runDeleteHook()
@@ -380,7 +382,7 @@ extension FakeDevice {
 
 extension FakeDevice {
   /// Counts the calls; the fake remembers nothing a reread would change.
-  public func forgetCachedItems() async throws(TransportError) {
+  func forgetCachedItemsOnDevice() async throws(TransportError) {
     try requireAvailable()
     forgetCount += 1
   }

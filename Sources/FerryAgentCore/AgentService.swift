@@ -64,8 +64,9 @@ public actor AgentService: AgentHandling {
       guard Self.takesFile(request) == (file != nil) else {
         throw .io(String(localized: AgentText.badRequest))
       }
-      // A request on a Finder location starts when it has its domain's gate (see `gated`).
-      if !Self.waitsForDomainGate(request) { RequestCancellation.current?.markStarted() }
+      // A request on a Finder location starts when its session operation holds the device
+      // (`DeviceTurns`); the rest start now.
+      if !Self.waitsForTheDevice(request) { RequestCancellation.current?.markStarted() }
       return try await perform(request, file: file?.fileDescriptor, progress: progress, logs: logs)
     } catch {
       log.log(
@@ -285,19 +286,13 @@ public actor AgentService: AgentHandling {
   }
 
   /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
-  /// `body` recorded a change, even one followed by a failure. A request its client cancelled
-  /// while it waited for the gate is dropped there: `body` never runs. Otherwise the client hears
-  /// it has started, and its reply deadline runs from then.
+  /// `body` recorded a change, even one followed by a failure.
   func gated<T: Sendable>(
     _ domain: String, _ body: (DomainController.Route) async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
     let route = try await domains.route(domain)
     let (result, changed) = await route.items.gate.run {
       () async -> (Result<T, TransportError>, Bool) in
-      if let request = RequestCancellation.current {
-        guard !request.isCancelled else { return (.failure(.cancelled), false) }
-        request.markStarted()
-      }
       let before = await route.items.changeCount
       let result: Result<T, TransportError>
       do throws(TransportError) {
@@ -340,9 +335,10 @@ extension AgentService {
 }
 
 extension AgentService {
-  /// Whether the request runs inside a domain's gate (see `gated`), behind whatever runs on that
-  /// Finder location, a transfer included.
-  static func waitsForDomainGate(_ request: AgentRequest) -> Bool {
+  /// Whether the request works on a Finder location's device, so it waits for the device's
+  /// session behind whatever runs there, a transfer on another of its storages included, and
+  /// starts only when its turn comes (see `RequestCancellation.takeTurn()`).
+  static func waitsForTheDevice(_ request: AgentRequest) -> Bool {
     switch request {
     case .item, .list, .fetch, .create, .rename, .move, .replaceContents, .delete, .workingSet,
       .sendFile:

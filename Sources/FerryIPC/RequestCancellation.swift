@@ -1,3 +1,4 @@
+import DeviceKit
 import Synchronization
 
 /// What a request's client can say to the agent while it runs, and what the agent tells it.
@@ -7,18 +8,19 @@ import Synchronization
 ///   Cancel) or the reply is overdue. The agent also cancels a client's requests when its
 ///   connection goes away, unless the client is the Finder Sync extension, whose Send and Install
 ///   must finish after Finder closes its menu.
-/// - Started: the agent calls `markStarted()` once the request has its turn at the device (the
-///   domain's gate, for requests on a Finder location; at once for the rest), which tells the
-///   client over `AgentClientXPC.started(_:)`; the client's reply deadline runs from then, so
-///   waiting behind a transfer is never mistaken for a wedged device.
+/// - Started: the request has its turn at the device once a session operation holds the
+///   session's gate, where requests on every storage of the device queue behind a transfer
+///   (`takeTurn()`, run through `DeviceTurns`). Requests that do not queue for a device start at
+///   once. The client hears it over `AgentClientXPC.started(_:)`, and its reply deadline runs
+///   from then, so waiting behind a transfer is never mistaken for a wedged device.
 ///
-/// A request cancelled while it waits for the gate is dropped when it gets it: it touches no
-/// device and answers `.cancelled`. Once it runs, only a transfer stops: its progress handler
+/// A request cancelled while it waits for the device is dropped when its turn comes: it touches
+/// no device and answers `.cancelled`. Once it runs, only a transfer stops: its progress handler
 /// reads the flag and answers "stop", so libmtp or the sync service ends it at its next block and
 /// the session cleans up as for any failed write. A flag rather than cancelling the handler's
 /// task: that cleanup (the partial file's delete, the temporary APK's `rm`) talks to the device,
 /// and in a cancelled task that I/O would itself be cancelled.
-public final class RequestCancellation: Sendable {
+public final class RequestCancellation: DeviceTurn {
   private let cancelled = Atomic(false)
   private let started = Atomic(false)
   private let onStart: @Sendable () -> Void
@@ -33,10 +35,19 @@ public final class RequestCancellation: Sendable {
     cancelled.store(true, ordering: .releasing)
   }
 
-  /// The request has its turn at the device; the client hears it once.
+  /// The request has started; the client hears it once.
   public func markStarted() {
     guard !started.exchange(true, ordering: .acquiringAndReleasing) else { return }
     onStart()
+  }
+
+  /// The request's session operation holds the device (`DeviceTurns`): a request cancelled
+  /// while it waited is dropped there; otherwise it has started. Once started, later operations
+  /// of the request go on, so a stopped transfer can still clean up.
+  public func takeTurn() throws(TransportError) {
+    guard !started.load(ordering: .acquiring) else { return }
+    if isCancelled { throw .cancelled }
+    markStarted()
   }
 
   /// The request the current task is handling; `nil` outside one.

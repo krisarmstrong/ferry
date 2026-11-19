@@ -6,8 +6,9 @@ import Testing
 @testable import FerryAgentCore
 @testable import FerryIPC
 
-/// T3 over real XPC: a metadata call's deadline runs from when it has its domain's gate, so one
-/// queued behind a transfer waits for it; a call cancelled while queued never reaches the device.
+/// T3 over real XPC: a metadata call's deadline runs from when its session operation holds the
+/// device, so one queued behind a transfer, on its own storage or another of the device's,
+/// waits for it; a call cancelled while queued never reaches the device.
 @Suite(.timeLimit(.minutes(1)))
 struct AgentQueueDeadlineTests {
   /// The agent's service behind an anonymous listener, a client with a short deadline, and an
@@ -30,6 +31,13 @@ struct AgentQueueDeadlineTests {
       }
     }
 
+    /// Returns once `count` operations wait for the device behind the upload.
+    func queuedAtTheDevice(_ count: Int) async throws {
+      while await device.operationsWaiting < count, !Task.isCancelled {
+        try await Task.sleep(for: .milliseconds(5))
+      }
+    }
+
     func finish() {
       release.finish()
       listener.invalidate()
@@ -37,11 +45,16 @@ struct AgentQueueDeadlineTests {
     }
   }
 
-  private func parkedUpload() async throws -> Setup {
-    let device = await makeDevice("A")
+  /// With `onCard`, the device has an SD card too and runs its operations one at a time, as a
+  /// real session does: the upload goes to the card and holds the whole device, and `domain` is
+  /// the internal storage's, whose own gate is free.
+  private func parkedUpload(onCard: Bool = false) async throws -> Setup {
+    let device = await makeDevice("A", keys: onCard ? [internalKey, cardKey] : [internalKey])
+    if onCard { await device.serialiseOperations() }
     let harness = try AgentHarness(devices: [device])
-    _ = await harness.manager.waitForCalls(1)
+    _ = await harness.manager.waitForCalls(onCard ? 2 : 1)
     let domain = domainID(device)
+    let target = onCard ? domainID(device, cardKey) : domain
     let (started, startedContinuation) = AsyncStream.makeStream(of: Void.self)
     let (released, release) = AsyncStream.makeStream(of: Void.self)
     await device.onNextUpload {
@@ -52,7 +65,7 @@ struct AgentQueueDeadlineTests {
     let service = harness.service
     let upload = Task {
       await service.handle(
-        .create(domain: domain, parent: .root, name: "big.bin", isFolder: false), file: file)
+        .create(domain: target, parent: .root, name: "big.bin", isFolder: false), file: file)
     }
     var iterator = started.makeAsyncIterator()
     await iterator.next()
@@ -125,5 +138,52 @@ struct AgentQueueDeadlineTests {
     await #expect(throws: TransportError.agentNotResponding) {
       try await client.send(.list(domain: domain, folder: .root), file: nil)
     }
+  }
+
+  /// A device with two storages queues requests on its session, not on each storage's gate: a
+  /// list on internal storage behind a copy to the SD card has no deadline until the device is
+  /// its turn.
+  @Test func aListOnOneStorageQueuedBehindAnotherIsNotTimedOut() async throws {
+    let setup = try await parkedUpload(onCard: true)
+    defer { setup.finish() }
+    let (client, domain) = (setup.client, setup.domain)
+    let listing = Task { try await client.send(.list(domain: domain, folder: .root), file: nil) }
+    try await setup.queuedAtTheDevice(1)
+
+    // Queued behind the card's upload for four deadlines.
+    try await Task.sleep(for: .milliseconds(400))
+    setup.release.finish()
+
+    #expect(await setup.upload.value.isEntry)
+    guard case .entries(let entries) = try await listing.value else {
+      Issue.record("no listing")
+      return
+    }
+    #expect(entries.isEmpty)
+  }
+
+  /// A folder create on internal storage, cancelled while it waits for the device behind a copy
+  /// to the SD card, never reaches the device.
+  @Test func aCreateOnOneStorageCancelledWhileQueuedBehindAnotherNeverRuns() async throws {
+    let setup = try await parkedUpload(onCard: true)
+    defer { setup.finish() }
+    let (client, domain) = (setup.client, setup.domain)
+    let create = Task {
+      try await client.send(
+        .create(domain: domain, parent: .root, name: "New", isFolder: true), file: nil)
+    }
+    try await setup.queuedAtTheDevice(1)
+    create.cancel()
+    await #expect(throws: TransportError.cancelled) { try await create.value }
+    // The agent takes a connection's messages in order: once this is answered (it waits for
+    // nothing), the cancel was taken too.
+    _ = try await client.send(.changes(domain: domain, since: nil), file: nil)
+
+    setup.release.finish()
+    #expect(await setup.upload.value.isEntry)
+    // Queued after the create on the device: when it answers, the create has had its turn.
+    _ = try await client.send(.list(domain: domain, folder: .root), file: nil)
+
+    #expect(try await setup.device.list(.root, in: storageID(setup.device)).isEmpty)
   }
 }
