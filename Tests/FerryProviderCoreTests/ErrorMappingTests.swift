@@ -18,7 +18,7 @@ struct ErrorMappingTests {
       .io("pipe broke"), .downloadSizeMismatch(listed: 7, received: 3),
       .directoryNotEmpty(try RemotePath("/a")), .changedOnDevice(try RemotePath("/a")),
       .macDiskFull(needed: 2, free: 1), .folderTooDeep(try RemotePath("/Deep")),
-      .readOnly(try RemotePath("/Notes.rtfd/TXT.rtf")),
+      .readOnly(try RemotePath("/Notes.rtfd/TXT.rtf")), .agentNotResponding,
     ]
   }
 
@@ -107,6 +107,8 @@ struct ErrorMappingTests {
     case .io(let message): .cocoa(.xpcConnectionReplyInvalid, [message])
     case .folderTooDeep: .cocoa(.featureUnsupported, ["Deep", "64"])
     case .readOnly: .fileProvider(.cannotSynchronize)
+    // T3: a metadata call the agent did not answer in time is retried later.
+    case .agentNotResponding: .fileProvider(.serverUnreachable)
     }
   }
 }

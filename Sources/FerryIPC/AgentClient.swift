@@ -41,10 +41,15 @@ extension AgentSending {
 /// `send`. Calls in flight when it is lost throw `.deviceDisconnected`; the agent's own
 /// failures come back as `.failure` responses.
 ///
-/// A cancelled call throws `.cancelled` at once. The agent is not told: it finishes the request,
-/// and its reply is dropped. A fetch it is still writing goes into the caller's descriptor,
-/// which the caller has closed and removed by then.
+/// A cancelled call throws `.cancelled` at once and tells the agent, which stops a transfer at
+/// its next block (see `RequestCancellation`); anything else it finishes, and its reply is
+/// dropped. A metadata call (see `AgentRequest.mayTakeLong`) that has no reply within
+/// `replyDeadline` throws `.agentNotResponding` and is cancelled the same way: a wedged device
+/// must not hold FileProvider's request until its own watchdog.
 public actor AgentClient: AgentSending {
+  /// How long a metadata call may wait for its reply.
+  public static let replyDeadline = Duration.seconds(120)
+
   private enum Target {
     case machService(String, requirement: String)
     case endpoint(NSXPCListenerEndpoint)
@@ -54,6 +59,7 @@ public actor AgentClient: AgentSending {
     subsystem: "io.github.krisarmstrong.ferry", category: "AgentClient")
 
   private let target: Target
+  private let replyDeadline: Duration
   private var connection: NSXPCConnection?
   /// The progress handler of each request in flight, by the identifier it was sent under.
   private var progressHandlers: [String: TransferProgressHandler] = [:]
@@ -76,12 +82,13 @@ public actor AgentClient: AgentSending {
   }
 
   /// Connects to an anonymous listener in the same process, without checking its signature.
-  init(endpoint: NSXPCListenerEndpoint) {
-    self.init(target: .endpoint(endpoint))
+  init(endpoint: NSXPCListenerEndpoint, replyDeadline: Duration = AgentClient.replyDeadline) {
+    self.init(target: .endpoint(endpoint), replyDeadline: replyDeadline)
   }
 
-  private init(target: Target) {
+  private init(target: Target, replyDeadline: Duration = AgentClient.replyDeadline) {
     self.target = target
+    self.replyDeadline = replyDeadline
     (progressEvents, progressSink) = AsyncStream.makeStream(of: ProgressReceiver.Event.self)
     receiver = ProgressReceiver(progressSink, logs: logRouter)
   }
@@ -115,7 +122,8 @@ public actor AgentClient: AgentSending {
     }
     if Task.isCancelled { throw .cancelled }
     let connection = currentConnection()
-    let reply = await awaitReply { reply, failed in
+    let deadline = request.mayTakeLong ? nil : replyDeadline
+    let reply = await awaitReply(deadline: deadline) { reply, failed in
       guard let proxy = connection.remoteObjectProxyWithErrorHandler(failed) as? any AgentXPC
       else {
         failed(TransportError.io("agent proxy has the wrong interface"))
@@ -129,7 +137,12 @@ public actor AgentClient: AgentSending {
       replyData = data
       if progress != nil { await catchUp() }
     case .failure(is CancellationError):
+      Self.cancel(id, on: connection)
       throw .cancelled
+    case .failure(is ReplyOverdue):
+      Self.log.error("the agent did not answer a request in time")
+      Self.cancel(id, on: connection)
+      throw .agentNotResponding
     case .failure(let error):
       // An interrupted connection stays usable: launchd relaunches the agent on the next
       // message. An invalid one never recovers, so the next send must open a fresh one.
@@ -144,6 +157,12 @@ public actor AgentClient: AgentSending {
       Self.log.error("undecodable reply from agent: \(error, privacy: .private)")
       throw .io("bad response from agent")
     }
+  }
+
+  /// Tells the agent the request `id` is no longer wanted. Nothing waits for it.
+  private static func cancel(_ id: String, on connection: NSXPCConnection) {
+    let proxy = connection.remoteObjectProxyWithErrorHandler { _ in } as? any AgentXPC
+    proxy?.cancel(id)
   }
 
   private func currentConnection() -> NSXPCConnection {

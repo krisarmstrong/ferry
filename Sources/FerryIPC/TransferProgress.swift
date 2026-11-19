@@ -6,9 +6,8 @@ import Synchronization
 public typealias TransferProgressHandler = @Sendable (_ completed: UInt64, _ total: UInt64) -> Void
 
 /// The interface a client exports on its connection to the agent: the agent reports a transfer's
-/// progress on it while the request runs, at most a few times a second. Only progress travels
-/// this way now; a cancel can join it as a call in the other direction, keyed by the same
-/// request identifier.
+/// progress on it while the request runs, at most a few times a second. A cancel goes the other
+/// way, keyed by the same request identifier (`AgentXPC.cancel(_:)`).
 ///
 /// `Sendable`: an XPC proxy may be messaged from any thread.
 @objc public protocol AgentClientXPC: Sendable {

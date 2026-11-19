@@ -11,6 +11,7 @@ struct ToolActions {
   let unsaved: Bool
   let chooseAPK: () -> Void
   let installDropped: (URL) -> Void
+  let cancelInstall: () -> Void
   let screenshot: () -> Void
   let record: () -> Void
   let stopRecording: () -> Void
@@ -28,6 +29,7 @@ struct ToolActions {
     unsaved = model.recordingUnsaved(on: device)
     chooseAPK = { Task { await model.chooseAndInstallAPK(on: device) } }
     installDropped = { url in Task { await model.installAPK(url, on: device) } }
+    cancelInstall = { model.cancelInstall(on: device) }
     screenshot = { Task { await model.takeScreenshot(on: device) } }
     record = { Task { await model.startRecording(on: device) } }
     stopRecording = { Task { await model.stopRecording(on: device) } }
@@ -49,10 +51,18 @@ struct ToolRow: View {
 
   var body: some View {
     if let install = actions.install {
-      Text(verbatim: DevicePresentation.installingLine(install))
-        .font(.callout)
-        .lineLimit(1)
-        .truncationMode(.middle)
+      HStack {
+        Text(verbatim: DevicePresentation.installingLine(install))
+          .font(.callout)
+          .lineLimit(1)
+          .truncationMode(.middle)
+        // Once the app is on the device, pm is installing it, which cannot be stopped.
+        if DevicePresentation.offersCancel(install) {
+          Button(action: actions.cancelInstall) {
+            Text("Cancel", bundle: .module)
+          }
+        }
+      }
     }
     if let recording = actions.recording, recording.finished, actions.unsaved {
       VStack(alignment: .leading, spacing: 6) {

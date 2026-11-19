@@ -107,6 +107,32 @@ struct AppModelToolsTests {
     #expect(log.all.contains("installAPK \(id.serial) Ferry Test.apk file:true"))
   }
 
+  /// Cancel stops the copy; the user asked, so nothing is shown as an error.
+  @Test func cancelStopsAnInstallQuietly() async throws {
+    let client = FakeClient(log: log)
+    client.parkInstalls()
+    let model = model(client)
+    let install = Task { await model.installAPK(try apk(), on: id) }
+    while !log.all.contains("installAPK \(id.serial) Ferry Test.apk parked") {
+      try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(model.installs[id] != nil)
+
+    model.cancelInstall(on: id)
+    try await install.value
+
+    #expect(log.all.contains("installAPK cancelled"))
+    #expect(model.installs.isEmpty)
+    #expect(model.actionError == nil)
+    #expect(model.toolMessage == nil)
+  }
+
+  /// Cancel is offered while the app is copied, not once the device is installing it.
+  @Test func cancelIsOfferedOnlyDuringTheCopy() {
+    #expect(DevicePresentation.offersCancel(AppInstall(name: "a.apk", percent: 99)))
+    #expect(!DevicePresentation.offersCancel(AppInstall(name: "a.apk", percent: 100)))
+  }
+
   @Test func pmsRefusalIsShownInPlainWords() async throws {
     let client = FakeClient(log: log)
     client.setTool(.toolFailed(.installFailed("INSTALL_FAILED_VERSION_DOWNGRADE")))

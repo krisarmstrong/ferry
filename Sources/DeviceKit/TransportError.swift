@@ -36,6 +36,9 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   /// (see `RemotePath.isInPackageFolder`).
   case readOnly(RemotePath)
   case cancelled
+  /// The agent did not answer a request that should take moments (see
+  /// `AgentRequest.mayTakeLong`): it is wedged on a device, or stopped.
+  case agentNotResponding
   case io(String)
 }
 

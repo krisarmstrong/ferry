@@ -19,6 +19,12 @@ extension DevicePresentation {
 
   /// An app on its way to the device: its name, escaped since the user's file named it, and how
   /// far it has got. At 100% the device is installing it.
+  /// Cancel is offered while the app is still being copied: once the device is installing it,
+  /// the install finishes.
+  static func offersCancel(_ install: AppInstall) -> Bool {
+    install.percent < 100
+  }
+
   static func installingLine(_ install: AppInstall) -> String {
     let name = DisplayText.escaped(install.name)
     if install.percent >= 100 {

@@ -60,6 +60,7 @@ private func message(for error: TransportError) -> String {
     "\(path) holds folders nested more than \(RemotePath.maxTreeDepth) deep."
   case .changedOnDevice(let path): "\(path) changed on the phone."
   case .cancelled: "Cancelled."
+  case .agentNotResponding: "Ferry's agent did not answer in time."
   case .io(let detail): "I/O error: \(detail)"
   }
 }

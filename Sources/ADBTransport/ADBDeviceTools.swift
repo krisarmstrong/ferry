@@ -1,5 +1,6 @@
 import DeviceKit
 import Foundation
+import Synchronization
 import os
 
 /// What `pm install` said.
@@ -78,11 +79,19 @@ public struct ADBDeviceTools: Sendable {
   // MARK: Installing
 
   /// Pushes `file` (from its current offset) to `path` on the device and installs it with
-  /// `pm install -r`. The caller removes `path` afterwards, whatever happened.
+  /// `pm install -r`. The caller removes `path` afterwards, whatever happened. `progress` is
+  /// asked once more, with the last values it saw, before `pm` starts, so a cancel that came
+  /// after the last block still stops the install; once `pm` runs, the install finishes.
   public func installAPK(
     _ file: FileHandle, to path: String, serial: String, progress: ProgressHandler
   ) async throws(ADBError) -> APKInstallResult {
-    try await push(file, to: path, serial: serial, progress: progress)
+    let last = Mutex<(UInt64, UInt64)>((0, 0))
+    try await push(file, to: path, serial: serial) { done, total in
+      last.withLock { $0 = (done, total) }
+      return progress(done, total)
+    }
+    let (done, total) = last.withLock { $0 }
+    guard progress(done, total) else { throw .cancelled }
     let result = try await host.run(
       serial: serial, command: try ADBShell.command("pm", ["install", "-r", path]))
     return Self.installResult(result)

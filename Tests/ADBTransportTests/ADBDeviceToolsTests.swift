@@ -1,5 +1,6 @@
 import DeviceKit
 import Foundation
+import Synchronization
 import Testing
 
 @testable import ADBTransport
@@ -287,5 +288,45 @@ struct ADBDeviceToolsTests {
           ["kill", "-2", "4242"], ["rm", "-f", "--", recording.devicePath],
         ])
     }
+  }
+}
+
+// MARK: Cancelling an install
+
+extension ADBDeviceToolsTests {
+  /// A cancel during the copy stops it, and `pm` never runs.
+  @Test func aCancelDuringTheCopyStopsTheInstall() async throws {
+    let device = FakeAndroid()
+    await #expect(throws: ADBError.cancelled) {
+      try await withTools(device) { tools in
+        try await tools.installAPK(
+          try apk(String(repeating: "x", count: 200_000)), to: ADBDeviceTools.apkPath(),
+          serial: Self.serial
+        ) { _, _ in false }
+      }
+    }
+    #expect(device.installed.isEmpty)
+    #expect(!device.changes.contains { $0.first == "pm" })
+  }
+
+  /// A cancel that comes after the last block still stops the install before `pm` runs.
+  @Test func aCancelAfterTheLastBlockStopsTheInstall() async throws {
+    let device = FakeAndroid()
+    let finished = Mutex(0)
+    // The copy's last report says go on; the cancel comes just after it.
+    let progress: ProgressHandler = { done, total in
+      finished.withLock { count in
+        if done == total { count += 1 }
+        return count < 2
+      }
+    }
+    await #expect(throws: ADBError.cancelled) {
+      try await withTools(device) { tools in
+        try await tools.installAPK(
+          try apk(), to: ADBDeviceTools.apkPath(), serial: Self.serial, progress: progress)
+      }
+    }
+    #expect(device.installed.isEmpty)
+    #expect(!device.changes.contains { $0.first == "pm" })
   }
 }

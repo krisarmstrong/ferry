@@ -116,6 +116,24 @@ struct ADBToolsSaveTests {
     #expect(await fake.removals.isEmpty)
   }
 
+  /// The app's cancel stops the pull, as the device breaking it off does: the video waits on the
+  /// device for another try.
+  @Test func aCancelledPullKeepsTheRecording() async throws {
+    let fake = FakeToolDevice()
+    let tools = try await finished(fake)
+    let (_, handle) = try destination()
+    let cancellation = RequestCancellation()
+    cancellation.cancel()
+    await #expect(throws: TransportError.cancelled) {
+      _ = try await RequestCancellation.$current.withValue(cancellation) {
+        try await tools.saveRecording(device, into: handle.fileDescriptor)
+      }
+    }
+    #expect(await tools.recordingsRunning().map(\.finished) == [true])
+    #expect(await fake.removals.isEmpty)
+    #expect(try await tools.saveRecording(device, into: handle.fileDescriptor) == .done)
+  }
+
   /// An ejected device is left alone: nothing is pulled or removed, and the video waits.
   @Test func anEjectedDeviceKeepsItsRecording() async throws {
     let fake = FakeToolDevice()

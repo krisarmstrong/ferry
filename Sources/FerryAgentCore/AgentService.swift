@@ -22,7 +22,8 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// disagree and drop an item that is only being renamed. The device runs one operation at a time
 /// anyway; the copies to and from the client's descriptor stay outside the gate.
 ///
-/// A request keeps running if its client goes away; its reply is then dropped.
+/// A transfer stops at its next block once its client cancels it or goes away (see
+/// `RequestCancellation`); any other request finishes, and its reply is then dropped.
 public actor AgentService: AgentHandling {
   let hub: DeviceHub
   let domains: DomainController

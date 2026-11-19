@@ -40,10 +40,21 @@ extension AppModel {
       ).percent
       Task { @MainActor in self?.installs[device]?.percent = percent }
     }
-    let response = await sendTool(.installAPK(device, name: name), file: handle, progress: progress)
+    let sending = Task {
+      await sendTool(.installAPK(device, name: name), file: handle, progress: progress)
+    }
+    installRequests[device] = sending
+    let response = await sending.value
+    installRequests[device] = nil
     installs[device] = nil
     if response == .done { toolMessage = DevicePresentation.installedLine(name) }
     await refresh()
+  }
+
+  /// Cancel: stops the copy to the device; the agent removes what reached it. The user asked,
+  /// so it is not shown as an error.
+  public func cancelInstall(on device: DeviceID) {
+    installRequests[device]?.cancel()
   }
 
   public func takeScreenshot(on device: DeviceID) async {
@@ -113,7 +124,7 @@ extension AppModel {
     do {
       let response = try await client.send(request, file: file, progress: progress)
       switch response {
-      case .done, .shellTarget:
+      case .done, .shellTarget, .failure(.cancelled):
         actionError = nil
       case .toolFailed(let failure):
         actionError = DevicePresentation.message(for: failure)
@@ -123,6 +134,9 @@ extension AppModel {
         actionError = DevicePresentation.message(for: .io("unexpected reply"))
       }
       return response
+    } catch .cancelled {
+      actionError = nil
+      return nil
     } catch {
       actionError = DevicePresentation.message(for: error)
       return nil

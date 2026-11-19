@@ -240,6 +240,9 @@ enum DevicePresentation {
       LocalizedStringResource("Error: \(DisplayText.escaped(detail))", bundle: .module)
     case .cancelled:
       LocalizedStringResource("Cancelled.", bundle: .module)
+    case .agentNotResponding:
+      LocalizedStringResource(
+        "Ferry's helper didn't answer in time. Try again in a moment.", bundle: .module)
     case .notFound, .unknownItem, .alreadyExists, .invalidName, .insufficientSpace,
       .fileTooLargeForStorage, .sizeMismatch, .downloadSizeMismatch, .nameChangedByDevice,
       .directoryNotEmpty, .changedOnDevice, .macDiskFull, .folderTooDeep, .readOnly:

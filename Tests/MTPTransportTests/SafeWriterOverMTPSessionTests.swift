@@ -26,6 +26,25 @@ struct SafeWriterOverMTPSessionTests {
     await device.objects.values.first { $0.name == name }?.data
   }
 
+  /// A client's cancel stops the upload mid-way (libmtp leaves the object with what arrived):
+  /// the partial is removed and the file it was replacing is untouched.
+  @Test func aCancelledReplaceLeavesNothingVisible() async throws {
+    let device = SessionFixture.makeDevice()
+    await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
+    let file = try SessionFixture.localFile(Data(count: 1_000))
+    defer { try? FileManager.default.removeItem(at: file) }
+    let writer = SafeWriter(session: MTPSession(device: device, scratch: TestScratch.root))
+
+    await #expect(throws: TransportError.cancelled) {
+      _ = try await writer.write(
+        from: file, to: SessionFixture.path("/a.txt"), in: storage, replacing: true
+      ) { _, _ in false }
+    }
+
+    #expect(await device.children(of: SessionFixture.root) == ["a.txt"])
+    #expect(await contents(of: "a.txt", on: device) == Data("old".utf8))
+  }
+
   @Test func uploadsToAPartialThenRenames() async throws {
     let device = SessionFixture.makeDevice()
     let item = try await write(Data("new".utf8), to: "/a.txt", on: device, replacing: false)

@@ -222,30 +222,6 @@ actor StubMTPDevice: MTPDeviceOperations {
     if let failure { throw failure }
   }
 
-  func upload(
-    from file: URL, name: String, parent: UInt32, storage: UInt32, progress: ProgressHandler
-  ) async throws(TransportError) -> UInt32 {
-    record()
-    try requireOpen()
-    uploading += 1
-    defer { uploading -= 1 }
-    await uploadHook?(name)
-    await Task.yield()
-    calls.append(.upload(name: name, parent: parent))
-    var data: Data
-    do { data = try Data(contentsOf: file) } catch { throw .io(error.localizedDescription) }
-    if let uploadLimit { data = data.prefix(uploadLimit) }
-    let id = insert(
-      Object(
-        parent: parent, name: storedNames[name] ?? name, isFolder: false, data: data,
-        modified: Self.epoch))
-    if let failure = uploadFailure {
-      uploadFailure = nil
-      throw failure
-    }
-    return id
-  }
-
   func createFolder(name: String, parent: UInt32, storage: UInt32) throws(TransportError)
     -> UInt32
   {
@@ -343,5 +319,40 @@ extension StubMTPDevice {
     try requireOpen()
     reopenCount += 1
     loadedInfo = [:]
+  }
+}
+
+extension StubMTPDevice {
+  func upload(
+    from file: URL, name: String, parent: UInt32, storage: UInt32, progress: ProgressHandler
+  ) async throws(TransportError) -> UInt32 {
+    record()
+    try requireOpen()
+    uploading += 1
+    defer { uploading -= 1 }
+    await uploadHook?(name)
+    await Task.yield()
+    calls.append(.upload(name: name, parent: parent))
+    var data: Data
+    do { data = try Data(contentsOf: file) } catch { throw .io(error.localizedDescription) }
+    if let uploadLimit { data = data.prefix(uploadLimit) }
+    let total = UInt64(data.count)
+    // As libmtp: the object exists once its info is sent; a cancel mid-way leaves what arrived.
+    guard progress(total / 2, total) else {
+      _ = insert(
+        Object(
+          parent: parent, name: storedNames[name] ?? name, isFolder: false,
+          data: data.prefix(data.count / 2), modified: Self.epoch))
+      throw .cancelled
+    }
+    let id = insert(
+      Object(
+        parent: parent, name: storedNames[name] ?? name, isFolder: false, data: data,
+        modified: Self.epoch))
+    if let failure = uploadFailure {
+      uploadFailure = nil
+      throw failure
+    }
+    return id
   }
 }

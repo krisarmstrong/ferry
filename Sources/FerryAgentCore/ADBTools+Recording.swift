@@ -159,10 +159,14 @@ extension ADBTools {
     else { return .failure(.io("cannot stage the recording")) }
     defer { try? handle.close() }
     let watch = PullWatch(limit: limits.recordingSize, folder: staged.deletingLastPathComponent())
+    // A client's cancel stops the pull as the device breaking it off does: the recording waits.
+    let cancellation = RequestCancellation.current
+    let progress: ProgressHandler = { done, total in
+      cancellation?.isCancelled != true && watch.progress(done, total)
+    }
     let pulling = Task { () -> Result<UInt64, ADBError> in
       do throws(ADBError) {
-        return .success(
-          try await control.pull(into: handle, serial: serial, progress: watch.progress))
+        return .success(try await control.pull(into: handle, serial: serial, progress: progress))
       } catch {
         return .failure(error)
       }

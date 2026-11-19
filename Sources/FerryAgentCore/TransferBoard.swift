@@ -11,8 +11,8 @@ import os
 /// the handler it gets only yields to a stream that keeps the newest value. One task per
 /// transfer reads that stream at most four times a second, records the value here and reports
 /// it to the client, and a transfer that succeeds reports its whole size last, so the client
-/// sees it complete before the reply. The handler always answers "go on": a cancel can be added
-/// there later.
+/// sees it complete before the reply. The handler answers "stop" once the client has cancelled
+/// the request (`RequestCancellation`), so the transfer ends at its next block.
 actor TransferBoard {
   private static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "Transfers")
@@ -32,6 +32,7 @@ actor TransferBoard {
     _ body: (_ progress: @escaping ProgressHandler) async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
     let id = UUID()
+    let cancellation = RequestCancellation.current
     let latestTotal = LatestTotal()
     let (values, continuation) = AsyncStream.makeStream(
       of: (UInt64, UInt64).self, bufferingPolicy: .bufferingNewest(1))
@@ -50,7 +51,7 @@ actor TransferBoard {
         try await body { completed, total in
           latestTotal.value.store(total, ordering: .relaxed)
           continuation.yield((completed, total))
-          return true
+          return cancellation?.isCancelled != true
         })
     } catch {
       result = .failure(error)

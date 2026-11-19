@@ -59,6 +59,8 @@ import os
   /// Apps being installed from this menu, by device: the file's name and how much has reached
   /// the device.
   public internal(set) var installs: [DeviceID: AppInstall] = [:]
+  /// The request sending each install, so Cancel can stop it.
+  var installRequests: [DeviceID: Task<AgentResponse?, Never>] = [:]
   /// Recordings this menu asked for, by when, until the agent answers: shown before the status
   /// lists them.
   var requestedRecordings: [DeviceID: Date] = [:]

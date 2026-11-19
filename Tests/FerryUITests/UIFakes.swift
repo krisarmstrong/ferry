@@ -25,6 +25,9 @@ final class FakeClient: AgentSending {
   private let wirelessResult = Mutex<AgentResponse>(.wireless(.connected))
   private let toolResult = Mutex<AgentResponse>(.done)
   private let discardResult = Mutex<AgentResponse>(.done)
+  /// Set by `parkInstalls()`: an install waits until its caller cancels it, then throws
+  /// `.cancelled` as `AgentClient` does.
+  private let installsParked = Mutex(false)
   /// What the agent writes into the file a capture request carries.
   private let toolBytes = Mutex(Data())
   /// Progress the agent reports on a tool request before it answers.
@@ -69,6 +72,10 @@ final class FakeClient: AgentSending {
     toolResult.withLock { $0 = response }
     toolProgress.withLock { $0 = progress }
     toolBytes.withLock { $0 = bytes }
+  }
+
+  func parkInstalls() {
+    installsParked.withLock { $0 = true }
   }
 
   /// What the agent answers to Discard.
@@ -147,6 +154,12 @@ final class FakeClient: AgentSending {
   ) async throws(TransportError)
     -> AgentResponse
   {
+    if case .installAPK(let id, let name) = request, installsParked.withLock({ $0 }) {
+      log.record("installAPK \(id.serial) \(name) parked")
+      while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
+      log.record("installAPK cancelled")
+      throw .cancelled
+    }
     switch request {
     case .status:
       log.record("status")

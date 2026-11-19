@@ -1,6 +1,7 @@
 import DeviceKit
 import Foundation
 import Security
+import Synchronization
 import os
 
 /// The agent's XPC interface. Requests and replies are JSON-encoded `AgentRequest` and
@@ -11,6 +12,9 @@ import os
   /// `AgentClientXPC`.
   func send(
     _ request: Data, id: String, file: FileHandle?, reply: @escaping @Sendable (Data) -> Void)
+  /// Stops the request `id` sent on this connection, if it is one a client can stop and still
+  /// running (see `RequestCancellation`). Its reply still comes, usually as `.cancelled`.
+  func cancel(_ id: String)
 }
 
 /// Serves agent requests from the app and the FileProvider extension.
@@ -87,8 +91,12 @@ public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Senda
     _ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection
   ) -> Bool {
     guard let role = admit(connection) else { return false }
+    let service = AgentService(handler: handler, role: role)
     connection.exportedInterface = NSXPCInterface(with: AgentXPC.self)
-    connection.exportedObject = AgentService(handler: handler, role: role)
+    connection.exportedObject = service
+    // A client that went away (quit, crashed, relaunched) waits for nothing it sent.
+    connection.invalidationHandler = { service.cancelAll() }
+    connection.interruptionHandler = { service.cancelAll() }
     connection.remoteObjectInterface = NSXPCInterface(with: AgentClientXPC.self)
     connection.resume()
     return true
@@ -103,6 +111,8 @@ final class AgentService: NSObject, AgentXPC, Sendable {
   private let handler: any AgentHandling
   /// `nil` only for a test peer.
   private let role: ClientRole?
+  /// The cancellations of this connection's requests that can be cancelled, while they run.
+  private let running = Mutex<[String: RequestCancellation]>([:])
 
   init(handler: any AgentHandling, role: ClientRole?) {
     self.handler = handler
@@ -129,6 +139,11 @@ final class AgentService: NSObject, AgentXPC, Sendable {
       reply(Self.encode(.failure(.io("request not allowed"))))
       return
     }
+    // Registered before this call returns, so a cancel, which XPC delivers after it, finds it.
+    let cancellation = decoded.isCancellable ? RequestCancellation() : nil
+    if let cancellation {
+      running.withLock { $0[id] = cancellation }
+    }
     let reported = Reported()
     var logs: LogSink?
     if let connection {
@@ -138,17 +153,33 @@ final class AgentService: NSObject, AgentXPC, Sendable {
     }
     let sink = logs
     Task {
-      let response = await handler.handle(
-        decoded, file: file,
-        progress: { completed, total in
-          // A report that cannot be delivered is dropped: it never fails the transfer.
-          reported.mark()
-          client?.progress(id, completed: completed, total: total)
-        }, logs: sink)
+      let response = await RequestCancellation.$current.withValue(cancellation) {
+        await handler.handle(
+          decoded, file: file,
+          progress: { completed, total in
+            // A report that cannot be delivered is dropped: it never fails the transfer.
+            reported.mark()
+            client?.progress(id, completed: completed, total: total)
+          }, logs: sink)
+      }
+      if cancellation != nil {
+        self.running.withLock { $0[id] = nil }
+      }
       if reported.any, let connection {
         await Self.flush(id, on: connection)
       }
       reply(Self.encode(response))
+    }
+  }
+
+  func cancel(_ id: String) {
+    running.withLock { $0[id] }?.cancel()
+  }
+
+  /// Cancels every request of this connection that is running.
+  func cancelAll() {
+    for cancellation in running.withLock({ Array($0.values) }) {
+      cancellation.cancel()
     }
   }
 

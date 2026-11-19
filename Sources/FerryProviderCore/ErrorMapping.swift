@@ -20,6 +20,10 @@ public enum ErrorMapping {
     case .noDeviceConnected, .noStorage, .deviceBusy, .deviceDisconnected, .storageNotFound,
       .deviceNotFound:
       return NSFileProviderError(.serverUnreachable)
+    // The agent did not answer a metadata call in time (a wedged device): FileProvider tries
+    // again later rather than holding the request until its own watchdog.
+    case .agentNotResponding:
+      return NSFileProviderError(.serverUnreachable)
     // The phone is locked or not set to share files, which the user fixes on the phone.
     case .deviceLocked:
       return NSFileProviderError(.notAuthenticated)
