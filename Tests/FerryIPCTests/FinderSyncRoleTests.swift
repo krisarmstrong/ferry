@@ -26,12 +26,12 @@ import Testing
   #expect(!ClientRole.provider.allows(.devices))
 }
 
-/// Sending a file is the extension's alone: the app and the FileProvider extension copy files
-/// through Finder's location instead.
-@Test func onlyTheFinderExtensionSendsFiles() {
+/// The Finder extension's Send to and the menu's Send File… send files; the FileProvider
+/// extension copies files through Finder's location instead.
+@Test func theFinderExtensionAndTheAppSendFiles() {
   let request = AgentRequest.sendFile(DeviceID(serial: "A"), name: "Report.pdf")
   #expect(ClientRole.finderSync.allows(request))
-  #expect(!ClientRole.app.allows(request))
+  #expect(ClientRole.app.allows(request))
   #expect(!ClientRole.provider.allows(request))
 }
 
