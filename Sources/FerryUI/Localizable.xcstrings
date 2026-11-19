@@ -786,7 +786,7 @@
     "Settings…" : {
 
     },
-    "Shows changes made on the device in Finder, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds." : {
+    "Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds." : {
       "extractionState" : "manual"
     },
     "Stop" : {
@@ -846,7 +846,7 @@
     "This Mac port %@ → device port %@" : {
 
     },
-    "Files added or changed on the device while it is connected show up on their own, usually within 30 seconds. To see them at once, choose **Refresh** in the Ferry menu." : {
+    "Over USB debugging or Wi-Fi, changes made on the device show up in Finder on their own. In file transfer mode, new and deleted files show up within about 30 seconds; to see a file that was changed in place or renamed on the device, choose **Refresh** in the Ferry menu." : {
       "extractionState" : "manual"
     },
     "Tools over USB debugging" : {

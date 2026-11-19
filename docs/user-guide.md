@@ -207,8 +207,13 @@ Your devices also appear in every app's Open and Save dialogs.
 Click a folder to see what is in it. Double-click a file to open it. Ferry copies the file to
 the Mac when you open it, so a large file can take a moment the first time.
 
-To see files that were added or changed on the device while it was connected, choose
-**Refresh** in the Ferry menu.
+Changes made on the device while it is connected reach Finder on their own:
+
+- Over USB debugging or Wi-Fi, Ferry watches the folders you have open, so changes show up
+  within a few seconds, and within about 30 seconds at most.
+- In file transfer mode, new and deleted files show up within about 30 seconds. A file that was
+  changed in place or renamed on the device shows only after you choose **Refresh** in the
+  Ferry menu.
 
 ### Copy files
 
@@ -356,9 +361,9 @@ waits for you to allow this Mac shows **Waiting for you to allow this Mac on** i
 
 Menu items:
 
-- **Refresh** (⌘R): reads each ready device's folders again, so changes made on the device
-  show in Finder, mounts every device you ejected, and checks again a device that is not
-  sharing files.
+- **Refresh** (⌘R): reads each ready device's folders again at once, so every change made on
+  the device shows in Finder, including files changed in place or renamed in file transfer
+  mode; mounts every device you ejected; and checks again a device that is not sharing files.
 - **Eject** (next to a ready device): removes the device from Finder and releases it, so you
   can unplug it or use it with another app. The device then shows **Ejected** until you click
   **Mount**, choose **Refresh**, or unplug it and plug it back in. Changes that had not reached the device
