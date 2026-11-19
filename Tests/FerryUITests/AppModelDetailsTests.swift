@@ -129,6 +129,9 @@ struct AppModelDetailsTests {
     client.infoReply.withLock { $0 = .deviceInfo(Self.info) }
     clock.advance(.seconds(10))
     model.loadExpandedDetailsIfDue()
+    // A retry after a failure is not the first read: "Loading details…" does not come back.
+    #expect(model.detailReads[id] != nil)
+    #expect(model.shownDetails(of: id) == DetailsShown.hidden)
     await model.detailsSettled()
     client.infoReply.withLock { $0 = .failure(.deviceDisconnected) }
     clock.advance(.seconds(10))

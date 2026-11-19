@@ -15,6 +15,8 @@ struct DetailsRead {
   var info: AndroidDeviceInfo?
   var requested: ContinuousClock.Instant
   var reading: Bool
+  /// A read has finished, failed or not: a retry is not the first read, so it shows nothing.
+  var settled = false
 }
 
 /// One click on an address line; its own `click` tells a later click on the same line apart.
@@ -34,7 +36,7 @@ extension AppModel {
   func shownDetails(of device: DeviceID) -> DetailsShown {
     guard let details = details[device] else { return .hidden }
     if let info = details.info { return .loaded(info) }
-    return details.reading ? .loading : .hidden
+    return details.reading && !details.settled ? .loading : .hidden
   }
 
   /// Starts reading the expanded device's details, unless they are being read or were asked for
@@ -48,7 +50,9 @@ extension AppModel {
       $0.reading || $0.requested.duration(to: now) < Self.detailsInterval
     }
     if busy == true { return }
-    details[id] = DetailsRead(info: details[id]?.info, requested: now, reading: true)
+    details[id] = DetailsRead(
+      info: details[id]?.info, requested: now, reading: true, settled: details[id]?.settled ?? false
+    )
     detailReads[id] = Task { await readDetails(of: id) }
   }
 
@@ -69,6 +73,7 @@ extension AppModel {
     // The device went while it was read.
     guard var current = details[id] else { return }
     current.reading = false
+    current.settled = true
     if let info { current.info = info }
     details[id] = current
   }
