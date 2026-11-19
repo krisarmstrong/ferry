@@ -6,8 +6,14 @@ extension AttachedDevice {
   /// The model as the device reports it, made safe to show: a hostile device can name itself
   /// with control characters or bidi overrides.
   public var displayName: String {
-    let name = info.model.isEmpty ? info.manufacturer : info.model
-    return name.isEmpty
+    DevicePresentation.shownName(info.name)
+  }
+}
+
+extension DevicePresentation {
+  /// A device-supplied name made safe to show, or "Unknown device" when there is none.
+  static func shownName(_ name: String) -> String {
+    name.isEmpty
       ? String(localized: LocalizedStringResource("Unknown device", bundle: .module))
       : DisplayText.escaped(name)
   }

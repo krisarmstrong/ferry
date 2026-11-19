@@ -182,6 +182,8 @@ public struct StatusReport: Codable, Sendable, Equatable {
 public enum AgentRequest: Codable, Sendable, Equatable {
   /// Answered with `.status`.
   case status
+  /// The devices, for the Finder Sync extension's menu. Answered with `.devices`.
+  case devices
   case recheck(DeviceID)
   /// Looks for `adb` again and starts its server, for a user who has just installed it. Answered
   /// with `.done`; the next `.status` shows what it found.
@@ -299,6 +301,7 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   case forwards([PortForward])
   case deviceInfo(AndroidDeviceInfo)
   case shellTarget(ShellTarget)
+  case devices([DeviceSummary])
   case done
   case failure(TransportError)
 }

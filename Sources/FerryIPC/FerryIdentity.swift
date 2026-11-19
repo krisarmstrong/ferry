@@ -60,7 +60,8 @@ public struct FerryIdentity: Sendable, Equatable {
 
 /// Which Ferry process a connection to the agent comes from. Each may send only the requests it
 /// needs: the app manages devices and domains, the FileProvider extension works on items, and
-/// the Finder Sync extension lists devices, sends files to them and installs apps.
+/// the Finder Sync extension lists devices (not the full status), sends files to them and
+/// installs apps.
 public enum ClientRole: Sendable, CaseIterable {
   case app
   case provider
@@ -77,11 +78,11 @@ public enum ClientRole: Sendable, CaseIterable {
   /// Whether a client in this role may send `request`.
   public func allows(_ request: AgentRequest) -> Bool {
     switch request {
-    case .status, .installAPK:
+    case .installAPK:
       self == .app || self == .finderSync
-    case .sendFile:
+    case .devices, .sendFile:
       self == .finderSync
-    case .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
+    case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
       .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
       .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording,
       .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward, .deviceInfo, .shellTarget:

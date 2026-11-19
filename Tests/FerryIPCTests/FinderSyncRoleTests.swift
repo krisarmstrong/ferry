@@ -5,16 +5,25 @@ import Testing
 @testable import FerryIPC
 
 /// The Finder Sync extension lists devices, sends files and installs apps, and nothing else: a
-/// compromised extension cannot touch items, eject devices or change what this Mac connects to.
+/// compromised extension cannot touch items, eject devices, change what this Mac connects to, or
+/// read the status report (unsent-change folders, remembered addresses, recordings).
 @Test func theFinderExtensionMaySendOnlyItsThreeRequests() {
   for request in requests() {
     let expected: Bool
     switch request {
-    case .status, .sendFile, .installAPK: expected = true
+    case .devices, .sendFile, .installAPK: expected = true
     default: expected = false
     }
     #expect(ClientRole.finderSync.allows(request) == expected, "\(request)")
   }
+}
+
+/// The device list is the extension's alone: the app reads the full status instead.
+@Test func onlyTheFinderExtensionListsDevices() {
+  #expect(ClientRole.finderSync.allows(.devices))
+  #expect(!ClientRole.finderSync.allows(.status))
+  #expect(!ClientRole.app.allows(.devices))
+  #expect(!ClientRole.provider.allows(.devices))
 }
 
 /// Sending a file is the extension's alone: the app and the FileProvider extension copy files

@@ -245,7 +245,7 @@ func theFinderExtensionMayNotSendOtherRequests() async throws {
   let harness = Harness(role: .finderSync)
   defer { harness.finish() }
   for request: AgentRequest in [
-    .list(domain: "d", folder: .root), .eject(DeviceID(serial: "A")), .removeAllDomains,
+    .status, .list(domain: "d", folder: .root), .eject(DeviceID(serial: "A")), .removeAllDomains,
     .screenshot(DeviceID(serial: "A")), .deviceInfo(DeviceID(serial: "A")),
   ] {
     #expect(

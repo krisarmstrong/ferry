@@ -2,7 +2,6 @@ import AppKit
 import FerryIPC
 import FerrySyncCore
 import FinderSync
-import Synchronization
 import UserNotifications
 import os
 
@@ -15,9 +14,8 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 final class FinderSync: FIFinderSync {
   private let devices: DeviceList
   private let sender: FinderSender
-  /// The action and device name of each item of the menu Finder last asked for, by item tag:
-  /// Finder copies the menu, so only the tag comes back with the click.
-  private let actions = Mutex<[Int: (action: FinderAction, device: String)]>([:])
+  /// What each menu item does, bound to its own menu (see `FinderMenuBook`).
+  private let book = FinderMenuBook()
 
   override init() {
     // The build records the signing team in Info.plist; `make app` checks it is there.
@@ -43,34 +41,30 @@ final class FinderSync: FIFinderSync {
   override func menu(for menuKind: FIMenuKind) -> NSMenu? {
     guard menuKind == .contextualMenuForItems || menuKind == .toolbarItemMenu else { return nil }
     let selection = FIFinderSyncController.default().selectedItemURLs() ?? []
-    let attached = devices.fresh(waitingUpTo: .milliseconds(500))
-    let names = Dictionary(
-      attached.map { ($0.id, FinderMenu.displayName(of: $0)) },
-      uniquingKeysWith: { first, _ in first })
+    let listed = devices.fresh(waitingUpTo: .milliseconds(500))
+    let entries = FinderMenu.entries(devices: listed, selection: selection)
+    let tags = book.record(entries, devices: listed, selection: selection)
     let menu = NSMenu(title: "")
     menu.autoenablesItems = false
-    var table: [Int: (action: FinderAction, device: String)] = [:]
-    for (index, entry) in FinderMenu.entries(devices: attached, selection: selection).enumerated() {
-      let item = NSMenuItem(
-        title: entry.title, action: #selector(choose(_:)), keyEquivalent: "")
-      item.tag = index
-      if let action = entry.action {
-        table[index] = (action, names[action.device] ?? "")
+    for (entry, tag) in zip(entries, tags) {
+      let item = NSMenuItem(title: entry.title, action: #selector(choose(_:)), keyEquivalent: "")
+      if let tag {
+        item.tag = tag
       } else {
         item.isEnabled = false
       }
       menu.addItem(item)
     }
-    actions.withLock { $0 = table }
     return menu
   }
 
+  /// Acts on the device and the selection of the menu the item came from.
   @objc func choose(_ item: NSMenuItem) {
-    let selection = FIFinderSyncController.default().selectedItemURLs() ?? []
-    guard let chosen = actions.withLock({ $0[item.tag] }), !selection.isEmpty else { return }
+    guard let choice = book.choice(for: item.tag), !choice.selection.isEmpty else { return }
     let sender = sender
     Task {
-      let notice = await sender.perform(chosen.action, on: selection, deviceName: chosen.device)
+      let notice = await sender.perform(
+        choice.action, on: choice.selection, deviceName: choice.device)
       await Self.post(notice)
     }
   }

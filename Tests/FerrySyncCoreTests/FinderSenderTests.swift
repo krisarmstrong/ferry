@@ -208,6 +208,43 @@ struct FinderSenderTests {
     #expect(notice.body == "That file isn't an Android app (.apk).")
   }
 
+  /// Several failures: the notice names the first and counts the rest.
+  @Test func moreFailuresAreCounted() async throws {
+    let folder = try TestScratch.folder("finder-send")
+    var urls: [URL] = []
+    for name in ["a", "b", "c"] {
+      let url = folder.appending(path: name, directoryHint: .isDirectory)
+      try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+      urls.append(url)
+    }
+    let report = folder.appending(path: "Report.pdf")
+    try Data("report".utf8).write(to: report)
+
+    let notice = await FinderSender(agent: RecordingAgent(answer: sentAs("Report.pdf")))
+      .perform(.send(device), on: [report] + urls, deviceName: "LinkRunner")
+
+    #expect(notice.title == "Sent 1 of 4 to LinkRunner")
+    #expect(notice.body.hasPrefix("“a” wasn’t sent. Folders can’t be sent"))
+    #expect(notice.body.hasSuffix(" Also not sent: 2."))
+  }
+
+  /// A file named Download on the device is in the way.
+  @Test func aFileNamedDownloadIsExplained() async throws {
+    let folder = try TestScratch.folder("finder-send")
+    let report = folder.appending(path: "Report.pdf")
+    try Data("report".utf8).write(to: report)
+    let blocked = try RemotePath("/Download")
+    let agent = RecordingAgent { _ in .failure(.alreadyExists(blocked)) }
+
+    let notice = await FinderSender(agent: agent).perform(
+      .send(device), on: [report], deviceName: "LinkRunner")
+
+    #expect(
+      notice.body
+        == "The device has a file named Download where its Download folder should be. Rename or "
+        + "remove it on the device, then try again.")
+  }
+
   /// A file removed between the menu and the action is reported, not sent.
   @Test func aMissingFileIsReported() async throws {
     let folder = try TestScratch.folder("finder-send")
@@ -218,5 +255,47 @@ struct FinderSenderTests {
 
     #expect(await agent.sent.isEmpty)
     #expect(notice.title == "Couldn’t send “gone.txt” to LinkRunner")
+  }
+}
+
+/// The guards at open time catch an item swapped after it was inspected, which `LocalItem` never
+/// sees: each is tested on its own, without the inspection in front of it.
+@Suite(.timeLimit(.minutes(1)))
+struct FinderOpenTests {
+  @Test func aRegularFileOpens() throws {
+    let folder = try TestScratch.folder("finder-open")
+    let file = folder.appending(path: "a.txt")
+    try Data("a".utf8).write(to: file)
+    let handle = try FinderSender.openForSending(file).get()
+    #expect(try handle.readToEnd() == Data("a".utf8))
+  }
+
+  @Test func aSymbolicLinkIsRefused() throws {
+    let folder = try TestScratch.folder("finder-open")
+    let target = folder.appending(path: "target.txt")
+    let link = folder.appending(path: "link.txt")
+    try Data("t".utf8).write(to: target)
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+    #expect(refusal(FinderSender.openForSending(link)) == .link)
+  }
+
+  @Test func aFolderIsRefused() throws {
+    let folder = try TestScratch.folder("finder-open")
+    #expect(refusal(FinderSender.openForSending(folder)) == .folder)
+  }
+
+  /// A FIFO with no writer would block a plain open forever.
+  @Test func aFIFOIsRefusedWithoutBlocking() throws {
+    let folder = try TestScratch.folder("finder-open")
+    let fifo = folder.appending(path: "pipe")
+    #expect(mkfifo(fifo.path, 0o600) == 0)
+    #expect(refusal(FinderSender.openForSending(fifo)) == .notAFile)
+  }
+
+  private func refusal(_ result: Result<FileHandle, FinderSender.OpenFailure>)
+    -> LocalItem.Refusal?
+  {
+    if case .failure(let failure) = result { return failure.refusal }
+    return nil
   }
 }

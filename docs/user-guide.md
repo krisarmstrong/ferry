@@ -17,7 +17,6 @@ Ferry is free and open source (MIT). It needs macOS 26 or later on an Apple sili
 - [Troubleshooting](#troubleshooting)
 - [Privacy](#privacy)
 - [Uninstall](#uninstall)
-- [Coming next](#coming-next)
 
 ## Getting started
 
@@ -216,8 +215,9 @@ folder into the device's location in Finder, or compress it into a .zip first." 
 as an `.rtfd` document or an app, and a symbolic link or alias are refused with the same
 messages Finder shows when you copy them to the device.
 
-When every selected file is an `.apk` and the device is on USB debugging, the menu also has
-**Install on** the device. It installs each app as **Install App…** in the menu does.
+When every selected file is an `.apk` and Ferry reaches the device over ADB (**USB · ADB** or
+**Wi-Fi · ADB** in the menu), the menu also has **Install on** the device. It installs each app
+as **Install App…** in the menu does.
 
 Finder shows no progress for these. A notification says when the files are on the device or
 the apps are installed, or why not. The Ferry menu lists a send in progress under its device.
@@ -471,8 +471,3 @@ that device on your network and nowhere else.
 2. Drag **Ferry** from Applications to the Trash.
 
 Do step 1 first. It is the step that removes the Finder locations and stops the helper.
-
-## Coming next
-
-- **Pair and connect over Wi-Fi from Ferry**: today Ferry uses network devices that adb
-  already lists.

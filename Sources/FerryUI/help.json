@@ -143,7 +143,7 @@
             "Control-click files on the Mac and choose **Send to** and the device. Ferry copies them into the Download folder on the device's internal storage. Ferry's button in the Finder toolbar has the same menu once you add it with **View** → **Customize Toolbar**.",
             "If Download already has a file with the same name, Ferry keeps it and saves yours beside it as **name (conflict from Mac)**. Sending never replaces a file.",
             "Folders, packages and links can't be sent from this menu. Copy a folder into the device's location in Finder instead, and compress a package into a .zip first.",
-            "When every selected file is an .apk and the device is on USB debugging, the menu also has **Install on** the device, which installs the apps as Install App… does.",
+            "When every selected file is an .apk and Ferry reaches the device over ADB (USB · ADB or Wi-Fi · ADB in the menu), the menu also has **Install on** the device, which installs the apps as Install App… does.",
             "A notification says when the files are on the device or the app is installed, or why not."
           ],
           "steps": [

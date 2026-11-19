@@ -148,7 +148,7 @@ actor FakeAgent: AgentSending {
       .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
       .installAPK, .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording,
       .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward, .deviceInfo, .shellTarget,
-      .sendFile:
+      .sendFile, .devices:
       throw .unsupported("\(request)")
     }
   }

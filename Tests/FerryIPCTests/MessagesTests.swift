@@ -48,6 +48,7 @@ private func tag(_ request: AgentRequest) -> Int {
   case .deviceInfo: 34
   case .shellTarget: 35
   case .sendFile: 36
+  case .devices: 37
   }
 }
 
@@ -85,7 +86,7 @@ func requests() -> [AgentRequest] {
     .stopRecording(device), .saveRecording(device), .discardRecording(device),
   ]
   all += developerRequests()
-  all.append(.sendFile(device, name: "Report.pdf"))
+  all += [.sendFile(device, name: "Report.pdf"), .devices]
   return all
 }
 
@@ -151,6 +152,7 @@ private func tag(_ response: AgentResponse) -> Int {
   case .forwards: 11
   case .deviceInfo: 12
   case .shellTarget: 13
+  case .devices: 14
   }
 }
 
@@ -233,6 +235,12 @@ private func toolResponses() -> [AgentResponse] {
   if let target = ShellTarget(adb: "/opt/homebrew/bin/adb", serial: "192.0.2.31:5555") {
     all.append(.shellTarget(target))
   }
+  all.append(
+    .devices([
+      DeviceSummary(id: device, name: "LinkRunner 10G", method: .usbADB, ready: true),
+      DeviceSummary(id: DeviceID(serial: "B"), name: "", method: .usbFileTransfer, ready: false),
+    ]))
+  all.append(.devices([]))
   return all
 }
 
@@ -263,7 +271,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...36))
+  #expect(Set(requests().map(tag)) == Set(0...37))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
@@ -277,7 +285,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyResponseRoundTripsJSON() throws {
-  #expect(Set(try responses().map(tag)) == Set(0...13))
+  #expect(Set(try responses().map(tag)) == Set(0...14))
   for response in try responses() {
     #expect(try roundTrip(response) == response)
   }

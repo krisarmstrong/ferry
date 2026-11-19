@@ -81,7 +81,8 @@ extension AgentService {
     switch request {
     case .fetch, .replaceContents, .installAPK, .screenshot, .saveRecording, .sendFile: true
     case .create(_, _, _, let isFolder): !isFolder
-    case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .item, .list, .rename,
+    case .status, .devices, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .item,
+      .list, .rename,
       .move, .delete, .changes, .workingSet, .connectAddress, .pair, .connectWireless,
       .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless, .startRecording,
       .stopRecording, .discardRecording, .startLogcat, .stopLogcat, .forwards, .addForward,

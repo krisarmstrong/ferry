@@ -22,3 +22,11 @@ struct AttachedDeviceTests {
     #expect(decoded.id == device.info.id)
   }
 }
+
+/// A device goes by its model, or its manufacturer when it reports no model.
+@Test func aDeviceIsNamedByItsModelOrManufacturer() {
+  let id = DeviceID(serial: "A")
+  #expect(
+    DeviceInfo(id: id, manufacturer: "NetAlly", model: "LinkRunner 10G").name == "LinkRunner 10G")
+  #expect(DeviceInfo(id: id, manufacturer: "NetAlly", model: "").name == "NetAlly")
+}

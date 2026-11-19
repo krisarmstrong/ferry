@@ -101,6 +101,57 @@ struct AgentSendFileTests {
     #expect(response == .failure(.deviceDisconnected))
   }
 
+  /// The Finder extension's device list: each device's name and method, and whether a file can
+  /// go to it now, which needs its internal storage's Finder location.
+  @Test func devicesSayWhichCanTakeAFile() async throws {
+    let (harness, device) = try await ready()
+    defer { harness.finish() }
+
+    let listed = await harness.service.handle(.devices, file: nil)
+
+    #expect(
+      listed
+        == .devices([
+          DeviceSummary(id: device.info.id, name: "Phone", method: .usbFileTransfer, ready: true)
+        ]))
+  }
+
+  /// A ready device whose location is gone (Remove Ferry) cannot take a file: the list says so,
+  /// and a send is refused before anything is copied.
+  @Test func aDeviceWithoutItsLocationIsNotReady() async throws {
+    let (harness, device) = try await ready()
+    defer { harness.finish() }
+    _ = try await harness.controller.removeAll()
+
+    let listed = await harness.service.handle(.devices, file: nil)
+    let sent = await harness.service.handle(
+      .sendFile(device.info.id, name: "a.txt"), file: try harness.readable("a.txt", "a"))
+
+    #expect(
+      listed
+        == .devices([
+          DeviceSummary(id: device.info.id, name: "Phone", method: .usbFileTransfer, ready: false)
+        ]))
+    #expect(sent == .failure(.deviceDisconnected))
+    #expect(await device.allPaths(in: storageID(device, StorageKey.internal)).isEmpty)
+  }
+
+  /// A file named Download is in the way: it is left alone and nothing is sent.
+  @Test func aFileNamedDownloadIsLeftAlone() async throws {
+    let (harness, device) = try await ready()
+    defer { harness.finish() }
+    let storage = storageID(device, StorageKey.internal)
+    let download = try path("/Download")
+    try await device.seed(download, in: storage, contents: Data("file".utf8))
+
+    let response = await harness.service.handle(
+      .sendFile(device.info.id, name: "a.txt"), file: try harness.readable("a.txt", "a"))
+
+    #expect(response == .failure(.alreadyExists(download)))
+    #expect(await device.allPaths(in: storage) == [download])
+    #expect(await device.contents(of: download, in: storage) == Data("file".utf8))
+  }
+
   /// The name is one path component, as for any upload; a send needs its file.
   @Test func aBadNameOrNoFileIsRefused() async throws {
     let (harness, device) = try await ready()

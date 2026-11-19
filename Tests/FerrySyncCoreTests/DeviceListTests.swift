@@ -1,21 +1,30 @@
 import DeviceKit
 import FerryIPC
 import Foundation
+import Synchronization
 import Testing
 
 @testable import FerrySyncCore
 
-/// Answers `.status` with `devices`, after `delay`.
-private struct StatusAgent: AgentSending {
-  let devices: [AttachedDevice]
-  let delay: Duration
+/// Answers `.devices` with each call's devices, after each call's delay, and counts the calls.
+private final class ScriptedAgent: AgentSending {
+  private let replies: [(devices: [DeviceSummary], delay: Duration)]
+  private let calls = Atomic(0)
+
+  init(_ replies: [(devices: [DeviceSummary], delay: Duration)]) {
+    self.replies = replies
+  }
+
+  var count: Int { calls.load(ordering: .relaxed) }
 
   func send(_ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?)
     async throws(TransportError) -> AgentResponse
   {
-    try? await Task.sleep(for: delay)
-    guard request == .status else { return .failure(.io("unexpected")) }
-    return .status(StatusReport(devices: devices, provider: .enabled))
+    let call = calls.add(1, ordering: .relaxed).oldValue
+    let reply = replies[min(call, replies.count - 1)]
+    try? await Task.sleep(for: reply.delay)
+    guard request == .devices else { return .failure(.io("unexpected")) }
+    return .devices(reply.devices)
   }
 }
 
@@ -33,13 +42,13 @@ private struct UnreachableAgent: AgentSending {
 struct DeviceListTests {
   @Test func aQuickAgentGivesTheCurrentDevices() {
     let device = attached("A", model: "LinkRunner")
-    let list = DeviceList(agent: StatusAgent(devices: [device], delay: .zero))
+    let list = DeviceList(agent: ScriptedAgent([([device], .zero)]))
     #expect(list.fresh(waitingUpTo: .seconds(5)) == [device])
   }
 
   @Test func aSlowAgentGivesTheLastAnswer() async {
     let device = attached("A", model: "LinkRunner")
-    let list = DeviceList(agent: StatusAgent(devices: [device], delay: .seconds(2)))
+    let list = DeviceList(agent: ScriptedAgent([([device], .seconds(2))]))
     #expect(list.fresh(waitingUpTo: .milliseconds(50)) == [])
     await list.refresh()
     #expect(list.fresh(waitingUpTo: .milliseconds(50)) == [device])
@@ -50,5 +59,26 @@ struct DeviceListTests {
     let list = DeviceList(agent: UnreachableAgent())
     await list.refresh()
     #expect(list.fresh(waitingUpTo: .seconds(5)) == [])
+  }
+
+  /// A late answer to an earlier request never replaces a newer one.
+  @Test func aLateAnswerDoesNotReplaceANewerOne() async throws {
+    let device = attached("A", model: "LinkRunner")
+    let list = DeviceList(agent: ScriptedAgent([([device], .milliseconds(500)), ([], .zero)]))
+    async let first: Void = list.refresh()
+    try await Task.sleep(for: .milliseconds(100))
+    await list.refresh()
+    await first
+    #expect(list.current == [])
+  }
+
+  /// An agent that never answers holds one request, not one per right-click.
+  @Test func menusWhileARequestIsPendingAskNothingMore() {
+    let agent = ScriptedAgent([([], .seconds(10))])
+    let list = DeviceList(agent: agent)
+    for _ in 0..<5 {
+      #expect(list.fresh(waitingUpTo: .milliseconds(20)) == [])
+    }
+    #expect(agent.count == 1)
   }
 }

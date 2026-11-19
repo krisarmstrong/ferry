@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Also not installed: %lld." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also not installed: %lld."
+          }
+        }
+      }
+    },
+    "Also not sent: %lld." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also not sent: %lld."
+          }
+        }
+      }
+    },
     "Couldn’t install %lld apps on %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -250,6 +272,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device doesn’t have enough free space."
+          }
+        }
+      }
+    },
+    "The device has a file named Download where its Download folder should be. Rename or remove it on the device, then try again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device has a file named Download where its Download folder should be. Rename or remove it on the device, then try again."
           }
         }
       }

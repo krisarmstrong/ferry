@@ -60,7 +60,7 @@ public struct FinderSender: Sendable {
       return Outcome(name: shown, result: .failed(refusal.message))
     }
     let handle: FileHandle
-    switch Self.open(url) {
+    switch Self.openForSending(url) {
     case .success(let opened): handle = opened
     case .failure(let failure):
       return Outcome(name: shown, result: .failed(failure.refusal?.message ?? Self.unreadable))
@@ -81,10 +81,11 @@ public struct FinderSender: Sendable {
   }
 
   /// Opens the file for reading without following a link, then checks what was opened: the
-  /// item may have changed since it was inspected. A failure carries the refusal, if the item is
-  /// one, or `nil` when it cannot be read.
-  private static func open(_ url: URL) -> Result<FileHandle, OpenFailure> {
-    let descriptor = Darwin.open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+  /// item may have changed since `LocalItem` inspected it. Non-blocking, so a FIFO swapped in
+  /// cannot hold the open; the flag is cleared once the file is known to be regular. A failure
+  /// carries the refusal, if the item is one, or `nil` when it cannot be read.
+  static func openForSending(_ url: URL) -> Result<FileHandle, OpenFailure> {
+    let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
     guard descriptor >= 0 else {
       return .failure(OpenFailure(errno == ELOOP ? .link : nil))
     }
@@ -94,10 +95,15 @@ public struct FinderSender: Sendable {
       close(descriptor)
       return .failure(OpenFailure(isFolder ? .folder : .notAFile))
     }
+    let flags = fcntl(descriptor, F_GETFL)
+    guard flags >= 0, fcntl(descriptor, F_SETFL, flags & ~O_NONBLOCK) == 0 else {
+      close(descriptor)
+      return .failure(OpenFailure(nil))
+    }
     return .success(FileHandle(fileDescriptor: descriptor, closeOnDealloc: true))
   }
 
-  private struct OpenFailure: Error {
+  struct OpenFailure: Error {
     let refusal: LocalItem.Refusal?
 
     init(_ refusal: LocalItem.Refusal?) {
@@ -130,6 +136,13 @@ public struct FinderSender: Sendable {
       String(
         localized: LocalizedStringResource(
           "The device can’t store a file with that name.", bundle: .module))
+    case .alreadyExists(let path) where path == downloadFolder:
+      String(
+        localized: LocalizedStringResource(
+          """
+          The device has a file named Download where its Download folder should be. Rename or \
+          remove it on the device, then try again.
+          """, bundle: .module))
     case .macDiskFull:
       String(
         localized: LocalizedStringResource(
@@ -138,6 +151,9 @@ public struct FinderSender: Sendable {
       PresentationText.message(for: error)
     }
   }
+
+  /// The folder sends go into; the agent reports a file there as `.alreadyExists` of it.
+  private static let downloadFolder = try? RemotePath("/Download")
 
   private static var unreadable: String {
     String(localized: LocalizedStringResource("The file can’t be read.", bundle: .module))
@@ -184,7 +200,16 @@ extension FinderSender {
       install
       ? LocalizedStringResource("“\(name)” wasn’t installed. \(reason)", bundle: .module)
       : LocalizedStringResource("“\(name)” wasn’t sent. \(reason)", bundle: .module)
-    return FinderNotice(title: String(localized: title), body: String(localized: body))
+    var text = String(localized: body)
+    let others = failures.count - 1
+    if others > 0 {
+      let more =
+        install
+        ? LocalizedStringResource("Also not installed: \(others).", bundle: .module)
+        : LocalizedStringResource("Also not sent: \(others).", bundle: .module)
+      text += " " + String(localized: more)
+    }
+    return FinderNotice(title: String(localized: title), body: text)
   }
 
   private static func notice(for only: Outcome, install: Bool, device: String) -> FinderNotice {

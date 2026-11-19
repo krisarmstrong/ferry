@@ -104,6 +104,8 @@ public actor AgentService: AgentHandling {
         expired: changes.expired)
     case (.workingSet(let domain, let page), _):
       return try await workingSet(page, in: domain)
+    case (.devices, _):
+      return .devices(await finderDevices())
     case (.sendFile(let id, let name), let file?):
       return .entry(try await send(file, as: name, to: id, progress: progress))
     case (.fetch, nil), (.replaceContents, nil), (.status, _), (.recheck, _), (.recheckADB, _),

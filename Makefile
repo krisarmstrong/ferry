@@ -41,6 +41,10 @@ check-app:
 	    || { echo "error: no $$bundle strings in $(SYNC_RESOURCES)" >&2; exit 1; }; \
 	done
 	@echo "Finder Sync extension carries its strings"
+	@# It may send files to devices and install apps: no injected library may run in it.
+	@codesign -dv '$(APP)/Contents/PlugIns/FerrySync.appex' 2>&1 | grep -q '^CodeDirectory.*flags=.*runtime' \
+	  || { echo "error: the Finder Sync extension is not signed with the hardened runtime" >&2; exit 1; }
+	@echo "Finder Sync extension runs with the hardened runtime"
 	@# Every part reads its team from FerryTeamID, and the agent's Mach service is named for it:
 	@# all of them, and the team that signed the bundle, must be one team.
 	@agent="$(APP)/Contents/Library/LaunchAgents/io.github.krisarmstrong.ferry.agent.plist"; \

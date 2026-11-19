@@ -15,9 +15,7 @@ extension AgentService {
     progress: @escaping TransferProgressHandler
   ) async throws(TransportError) -> ProviderEntry {
     let name = try Self.creatable(name)
-    guard let storage = await sendTarget(of: device),
-      let domain = await domains.connectedDomain(of: storage)
-    else { throw .deviceDisconnected }
+    guard let domain = await sendDomain(of: device) else { throw .deviceDisconnected }
     let scratch = try await FileTransfer.copyIn(source, into: scratchFolder)
     defer { FileTransfer.remove(scratch) }
     return try await gated(domain) { route throws(TransportError) in
@@ -38,14 +36,31 @@ extension AgentService {
     }
   }
 
-  /// The device's internal storage: the one keyed `internal`, or, on an MTP device whose
-  /// primary storage kept its MTP key, the first it lists, which MTP lists as primary. `nil`
-  /// unless the device is ready.
-  private func sendTarget(of device: DeviceID) async -> StorageID? {
-    guard let attached = await hub.devices().first(where: { $0.id == device }),
-      case .ready(let storages) = attached.state
+  /// Every device, for the Finder extension's menu, with whether a file can go to it now.
+  func finderDevices() async -> [DeviceSummary] {
+    var summaries: [DeviceSummary] = []
+    for device in await hub.devices() {
+      let ready = await sendDomain(of: device) != nil
+      summaries.append(
+        DeviceSummary(id: device.id, name: device.info.name, method: device.method, ready: ready))
+    }
+    return summaries
+  }
+
+  /// The connected domain of the device's internal storage, which a send writes to; `nil` unless
+  /// the device is ready and that storage has its Finder location.
+  private func sendDomain(of device: DeviceID) async -> String? {
+    guard let attached = await hub.devices().first(where: { $0.id == device }) else { return nil }
+    return await sendDomain(of: attached)
+  }
+
+  /// The internal storage is the one keyed `internal`, or, on an MTP device whose primary
+  /// storage kept its MTP key, the first it lists, which MTP lists as primary.
+  private func sendDomain(of device: AttachedDevice) async -> String? {
+    guard case .ready(let storages) = device.state,
+      let storage = storages.first(where: { $0.id.key == StorageKey.internal }) ?? storages.first
     else { return nil }
-    return (storages.first { $0.id.key == StorageKey.internal } ?? storages.first)?.id
+    return await domains.connectedDomain(of: storage.id)
   }
 
   /// Makes `folder` unless the device has it; anything else under its name is in the way.

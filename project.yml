@@ -136,6 +136,9 @@ targets:
         INFOPLIST_FILE: Apps/FerrySync/Info.plist
         CODE_SIGN_ENTITLEMENTS: Apps/FerrySync/FerrySync.entitlements
         SKIP_INSTALL: YES
+        # It loads no Homebrew library, and it may send files to devices and install apps, so
+        # nothing may inject code into it. The other targets follow in Plan 3.
+        ENABLE_HARDENED_RUNTIME: YES
     dependencies:
       - package: Ferry
         product: FerrySyncCore

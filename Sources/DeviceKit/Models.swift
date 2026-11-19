@@ -10,6 +10,12 @@ public struct DeviceInfo: Hashable, Sendable, Codable {
     self.manufacturer = manufacturer
     self.model = model
   }
+
+  /// What the device goes by: its model, or its manufacturer when it reports no model. Device
+  /// text: escape it before showing it.
+  public var name: String {
+    model.isEmpty ? manufacturer : model
+  }
 }
 
 public struct StorageInfo: Hashable, Sendable, Codable {

@@ -985,7 +985,7 @@
     "Warning" : {
 
     },
-    "When every selected file is an .apk and the device is on USB debugging, the menu also has **Install on** the device, which installs the apps as Install App… does." : {
+    "When every selected file is an .apk and Ferry reaches the device over ADB (USB · ADB or Wi-Fi · ADB in the menu), the menu also has **Install on** the device, which installs the apps as Install App… does." : {
       "extractionState" : "manual"
     },
     "Wi-Fi · ADB" : {

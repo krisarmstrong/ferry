@@ -13,9 +13,15 @@ public enum PresentationText {
     DevicePresentation.message(for: failure)
   }
 
-  /// Whether the device is served over ADB, by USB or the network, so it can install apps.
-  public static func offersTools(_ device: AttachedDevice) -> Bool {
-    DevicePresentation.offersTools(device)
+  /// Whether a device reached this way offers the tools (installing apps among them): over ADB,
+  /// by USB or the network.
+  public static func offersTools(_ method: ConnectionMethod) -> Bool {
+    DevicePresentation.toolMethods.contains(method)
+  }
+
+  /// A device-supplied name as the menu shows it: escaped, or "Unknown device" when empty.
+  public static func deviceName(_ name: String) -> String {
+    DevicePresentation.shownName(name)
   }
 
   /// Whether a file is offered to the agent as an app. The agent checks its contents.

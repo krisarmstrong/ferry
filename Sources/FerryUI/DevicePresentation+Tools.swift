@@ -6,8 +6,10 @@ import Foundation
 extension DevicePresentation {
   /// Tools are offered on a device Ferry serves over ADB, by USB or the network.
   static func offersTools(_ device: AttachedDevice) -> Bool {
-    if case .ready = device.state { [.usbADB, .wifiADB].contains(device.method) } else { false }
+    if case .ready = device.state { toolMethods.contains(device.method) } else { false }
   }
+
+  static let toolMethods: Set<ConnectionMethod> = [.usbADB, .wifiADB]
 
   /// Whether a file the user picked or dropped is offered to the agent as an app. The agent
   /// checks its contents.
