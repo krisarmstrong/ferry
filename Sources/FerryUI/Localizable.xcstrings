@@ -993,6 +993,28 @@
     },
     "— Lines skipped: %lld. The log came faster than Ferry could show it. —" : {
 
+    },
+    "Wi-Fi" : {
+
+    },
+    "Ethernet" : {
+
+    },
+    "Mobile data" : {
+
+    },
+    "USB" : {
+
+    },
+    "%@ (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$@)"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

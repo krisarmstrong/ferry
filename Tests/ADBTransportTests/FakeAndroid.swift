@@ -60,6 +60,8 @@ final class FakeAndroid: Sendable {
     var properties: [String: String] = [:]
     /// What `ip -4 addr` prints.
     var addresses = ""
+    /// What `ip -o addr` prints.
+    var oneLineAddresses = ""
     var peers: [ADBStream] = []
     /// `sync:` connections the client has not yet closed.
     var openSyncs = 0

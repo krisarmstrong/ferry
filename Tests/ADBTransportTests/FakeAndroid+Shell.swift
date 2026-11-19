@@ -36,7 +36,7 @@ extension FakeAndroid {
     }
     let allowed: [String: Set<Character>] = [
       "mv": ["f", "i", "v", "n"], "rm": ["f", "i", "R", "r"], "mkdir": ["v", "p"],
-      "df": ["H", "P", "k", "h", "a"], "getprop": [], "ip": ["4"], "pm": ["r"], "kill": ["2"],
+      "df": ["H", "P", "k", "h", "a"], "getprop": [], "ip": ["4", "o"], "pm": ["r"], "kill": ["2"],
       "dumpsys": [],
     ]
     guard let flags = allowed[program] else {
@@ -80,6 +80,8 @@ extension FakeAndroid {
     case "mkdir": mkdir(operands, in: &state)
     case "getprop": ShellResult(stdout: (state.properties[operands.first ?? ""] ?? "") + "\n")
     case "ip" where options == ["4"] && operands == ["addr"]: ShellResult(stdout: state.addresses)
+    case "ip" where options == ["o"] && operands == ["addr"]:
+      ShellResult(stdout: state.oneLineAddresses)
     case "ip": ShellResult(status: 1, stderr: "ip: unsupported in the fake")
     default: df(operands, in: state)
     }

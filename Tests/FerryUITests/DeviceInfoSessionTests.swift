@@ -14,7 +14,13 @@ struct DeviceInfoSessionTests {
   static let info = AndroidDeviceInfo(
     model: "LinkRunner G2", androidVersion: "8.1.0", build: "OPM1.171019.026",
     serial: "0123456789abcdef", battery: .init(level: 87, state: .charging),
-    addresses: ["192.0.2.31", "198.51.100.169"],
+    addresses: [
+      .init(interface: "wlan0", address: "198.51.100.169"),
+      .init(interface: "eth0", address: "192.0.2.31"),
+      .init(interface: "rmnet_data0", address: "100.64.1.2"),
+      .init(interface: "rndis0", address: "192.168.42.129"),
+      .init(interface: "tun0", address: "10.8.0.2"),
+    ],
     storage: .init(used: 5_000_000_000, free: 17_000_000_000))
 
   @Test func theInfoIsLoaded() async {
@@ -50,7 +56,10 @@ struct DeviceInfoSessionTests {
     #expect(rows[0].value == "LinkRunner G2")
     #expect(rows[1].value == "8.1.0")
     #expect(rows[4].value == "87%, charging")
-    #expect(rows[5].value == "192.0.2.31, 198.51.100.169")
+    #expect(
+      rows[5].value
+        == "198.51.100.169 (Wi-Fi), 192.0.2.31 (Ethernet), 100.64.1.2 (Mobile data), "
+        + "192.168.42.129 (USB), 10.8.0.2 (tun0)")
     #expect(rows[6].value.contains("used") && rows[6].value.contains("free"))
   }
 
@@ -67,10 +76,11 @@ struct DeviceInfoSessionTests {
   @Test func deviceTextIsEscaped() {
     let hostile = AndroidDeviceInfo(
       model: "A\u{1B}[2Jb", androidVersion: "8\u{202E}", build: "x", serial: "S", battery: nil,
-      addresses: [], storage: nil)
+      addresses: [.init(interface: "x\u{202E}0", address: "192.0.2.1")], storage: nil)
     let rows = DevicePresentation.infoRows(hostile)
     #expect(rows[0].value == "A\\u{1B}[2Jb")
     #expect(rows[1].value == "8\\u{202E}")
+    #expect(rows[4].value == "192.0.2.1 (x\\u{202E}0)")
   }
 
   @Test func copyPutsTheRowsOnThePasteboardOnePerLine() async {
@@ -82,7 +92,7 @@ struct DeviceInfoSessionTests {
     let copied = log.all.first { $0.hasPrefix("copy ") } ?? ""
     #expect(copied.contains("Model: LinkRunner G2"))
     #expect(copied.contains("Battery: 87%, charging"))
-    #expect(copied.contains("IP addresses: 192.0.2.31, 198.51.100.169"))
+    #expect(copied.contains("IP addresses: 198.51.100.169 (Wi-Fi), 192.0.2.31 (Ethernet)"))
   }
 
   @Test func copyBeforeTheInfoIsHereDoesNothing() {

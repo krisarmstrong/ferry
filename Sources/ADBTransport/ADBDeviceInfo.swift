@@ -1,7 +1,7 @@
 import DeviceKit
 import Foundation
 
-/// What Device Info reads, all of it read-only: `getprop`, `dumpsys battery`, `ip -4 addr` and
+/// What Device Info reads, all of it read-only: `getprop`, `dumpsys battery`, `ip -o addr` and
 /// `df`. A part the device cannot answer is left out; the rest is still shown.
 enum ADBDeviceInfo {
   /// The battery's level, as a percent of its scale, and its state, from `dumpsys battery`.
@@ -24,6 +24,35 @@ enum ADBDeviceInfo {
     let product = min(level, scale).multipliedFullWidth(by: 100)
     let percent = scale.dividingFullWidth((high: product.high, low: product.low)).quotient
     return AndroidDeviceInfo.Battery(level: percent, state: state(ofStatus: status))
+  }
+
+  /// Reads `ip -o addr`: one `<n>: <interface>[@<peer>] inet|inet6 <address>/<prefix> …` line
+  /// per address. The loopback interface and link-local IPv6 addresses (`scope link`, which
+  /// every interface has and nothing outside the link can reach) are left out.
+  static func addresses(fromOneLine text: String) -> [AndroidDeviceInfo.Address] {
+    var addresses: [AndroidDeviceInfo.Address] = []
+    for line in text.split(whereSeparator: \.isNewline) {
+      let words = line.split(whereSeparator: \.isWhitespace)
+      guard words.count >= 4, words[0].count > 1, words[0].hasSuffix(":"),
+        words[0].dropLast().allSatisfy(\.isNumber), ["inet", "inet6"].contains(words[2])
+      else { continue }
+      let interface = String(words[1].prefix { $0 != "@" })
+      let scope = words.firstIndex(of: "scope").flatMap {
+        words.indices.contains($0 + 1) ? $0 + 1 : nil
+      }
+      guard interface != "lo", scope.map({ words[$0] }) != "link",
+        let address = words[3].split(separator: "/").first.map(String.init),
+        Self.isAddress(address, family: words[2] == "inet" ? AF_INET : AF_INET6)
+      else { continue }
+      addresses.append(AndroidDeviceInfo.Address(interface: interface, address: address))
+    }
+    return addresses
+  }
+
+  /// Whether `text` is a numeric address of `family`, as `inet_pton` reads one.
+  private static func isAddress(_ text: String, family: Int32) -> Bool {
+    var buffer = [UInt8](repeating: 0, count: 16)
+    return inet_pton(family, text, &buffer) == 1
   }
 
   /// `BatteryManager`'s `BATTERY_STATUS_*` constants.
@@ -49,8 +78,8 @@ extension ADBDeviceTools {
     let battery = try await output("dumpsys", ["battery"], route).flatMap {
       ADBDeviceInfo.battery(fromDumpsys: $0)
     }
-    let addresses = try await output("ip", ["-4", "addr"], route).map {
-      ADBWireless.networkAddresses(fromIPAddr: $0)
+    let addresses = try await output("ip", ["-o", "addr"], route).map {
+      ADBDeviceInfo.addresses(fromOneLine: $0)
     }
     let space = try await output("df", ["-k", "--", ADBStorages.internalRoot], route).flatMap {
       ADBStorages.space(fromDF: $0)

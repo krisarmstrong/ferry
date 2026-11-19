@@ -226,7 +226,8 @@ private func toolResponses() -> [AgentResponse] {
     .deviceInfo(
       AndroidDeviceInfo(
         model: "LinkRunner G2", androidVersion: "8.1.0", build: "OPM1", serial: "R58N12345",
-        battery: .init(level: 87, state: .charging), addresses: ["192.0.2.31"],
+        battery: .init(level: 87, state: .charging),
+        addresses: [.init(interface: "eth0", address: "192.0.2.31")],
         storage: .init(used: 5, free: 10))),
     .deviceInfo(
       AndroidDeviceInfo(

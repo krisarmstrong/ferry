@@ -67,6 +67,57 @@ struct ADBDeviceInfoTests {
     #expect(ADBDeviceInfo.battery(fromDumpsys: "level: abc\nstatus: 2\n") == nil)
   }
 
+  /// `ip -o addr` as iproute2 prints it: one line per address, its continuation after `\`.
+  static let oneLineAddresses = #"""
+    1: lo    inet 127.0.0.1/8 scope host lo\    valid_lft forever preferred_lft forever
+    1: lo    inet6 ::1/128 scope host \    valid_lft forever preferred_lft forever
+    2: dummy0    inet 10.11.12.13/30 brd 10.11.12.15 scope global dummy0\    valid_lft forever preferred_lft forever
+    3: eth0    inet 192.0.2.31/24 brd 192.0.2.255 scope global eth0\    valid_lft forever preferred_lft forever
+    5: wlan0    inet 198.51.100.169/24 brd 198.51.100.255 scope global wlan0\    valid_lft forever preferred_lft forever
+    5: wlan0    inet6 fe80::21a:2bff:fe3c:4d5e/64 scope link \    valid_lft forever preferred_lft forever
+    5: wlan0    inet6 2001:db8::5/64 scope global dynamic \    valid_lft 86000sec preferred_lft 14000sec
+    8: rmnet_data0    inet 100.64.1.2/30 scope global rmnet_data0\    valid_lft forever preferred_lft forever
+    9: ccmni1    inet 100.64.9.9/30 scope global ccmni1\    valid_lft forever preferred_lft forever
+    10: rndis0    inet 192.168.42.129/24 scope global rndis0\    valid_lft forever preferred_lft forever
+    11: usb0    inet 192.168.43.1/24 scope global usb0\    valid_lft forever preferred_lft forever
+    12: eth1@if11    inet 192.168.7.2/24 scope global eth1\    valid_lft forever preferred_lft forever
+    13: tun0    inet 10.8.0.2/24 scope global tun0\    valid_lft forever preferred_lft forever
+    """#
+
+  /// Loopback and link-local IPv6 are left out; every other address keeps its interface.
+  static let expectedAddresses: [AndroidDeviceInfo.Address] = [
+    .init(interface: "dummy0", address: "10.11.12.13"),
+    .init(interface: "eth0", address: "192.0.2.31"),
+    .init(interface: "wlan0", address: "198.51.100.169"),
+    .init(interface: "wlan0", address: "2001:db8::5"),
+    .init(interface: "rmnet_data0", address: "100.64.1.2"),
+    .init(interface: "ccmni1", address: "100.64.9.9"),
+    .init(interface: "rndis0", address: "192.168.42.129"),
+    .init(interface: "usb0", address: "192.168.43.1"),
+    .init(interface: "eth1", address: "192.168.7.2"),
+    .init(interface: "tun0", address: "10.8.0.2"),
+  ]
+
+  @Test func eachAddressKeepsItsInterface() {
+    #expect(ADBDeviceInfo.addresses(fromOneLine: Self.oneLineAddresses) == Self.expectedAddresses)
+  }
+
+  /// Lines the device garbled, or with no address, are skipped; the rest still count.
+  @Test func malformedLinesAreSkipped() {
+    let text = """
+      garbage
+      4: eth0
+      4: eth0    inet notanaddress/24 scope global eth0
+      4: eth0    inet6
+      : wlan0    inet 192.0.2.1/24 scope global wlan0
+      6: wlan0    inet 192.0.2.9/24 scope global wlan0
+      """
+    #expect(
+      ADBDeviceInfo.addresses(fromOneLine: text) == [
+        .init(interface: "wlan0", address: "192.0.2.9")
+      ])
+  }
+
   private func read(_ device: FakeAndroid) async throws -> AndroidDeviceInfo {
     let server = try await device.serve(serial: Self.serial)
     defer { server.stop() }
@@ -83,7 +134,7 @@ struct ADBDeviceInfoTests {
         "ro.product.model": "LinkRunner G2", "ro.build.version.release": "8.1.0",
         "ro.build.display.id": "OPM1.171019.026", "ro.serialno": Self.serial,
       ]
-      $0.addresses = ADBWirelessTests.etherScopeAddresses
+      $0.oneLineAddresses = Self.oneLineAddresses
       $0.tools.battery = Self.battery
     }
     return device
@@ -97,7 +148,7 @@ struct ADBDeviceInfoTests {
     #expect(info.build == "OPM1.171019.026")
     #expect(info.serial == Self.serial)
     #expect(info.battery == .init(level: 87, state: .charging))
-    #expect(info.addresses == ["192.0.2.31", "198.51.100.169", "192.0.2.166", "192.168.7.2"])
+    #expect(info.addresses == Self.expectedAddresses)
     // The fake's internal storage: 23,260,324 KB, 272,504 KB used.
     let used: UInt64 = 272_504 * 1024
     let free: UInt64 = (23_260_324 - 272_504) * 1024
@@ -113,6 +164,7 @@ struct ADBDeviceInfoTests {
     #expect(programs == ["getprop", "dumpsys", "ip", "df"])
     #expect(device.commands.contains(["dumpsys", "battery"]))
     #expect(device.commands.contains(["df", "-k", "--", "/storage/emulated/0"]))
+    #expect(device.commands.contains(["ip", "-o", "addr"]))
   }
 
   /// A device with no battery service or no `ip` still has the rest.

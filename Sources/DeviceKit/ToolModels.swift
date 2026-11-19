@@ -46,19 +46,34 @@ public struct AndroidDeviceInfo: Codable, Sendable, Equatable {
     }
   }
 
+  /// An address and the interface the device reported it on.
+  public struct Address: Codable, Sendable, Equatable {
+    /// As the device named it (`wlan0`), without any `@peer`.
+    public let interface: String
+    public let address: String
+
+    public init(interface: String, address: String) {
+      self.interface = interface
+      self.address = address
+    }
+
+    public var kind: InterfaceKind { InterfaceKind(interface: interface) }
+  }
+
   public let model: String
   public let androidVersion: String
   public let build: String
   public let serial: String
   public let battery: Battery?
-  /// Ethernet and Wi-Fi IPv4 addresses, never the loopback or dummy interfaces.
-  public let addresses: [String]
+  /// Every IPv4 and IPv6 address but the loopback's and link-local ones, in the order `ip`
+  /// lists them.
+  public let addresses: [Address]
   /// Internal shared storage.
   public let storage: Storage?
 
   public init(
     model: String, androidVersion: String, build: String, serial: String, battery: Battery?,
-    addresses: [String], storage: Storage?
+    addresses: [Address], storage: Storage?
   ) {
     self.model = model
     self.androidVersion = androidVersion
@@ -67,5 +82,23 @@ public struct AndroidDeviceInfo: Codable, Sendable, Equatable {
     self.battery = battery
     self.addresses = addresses
     self.storage = storage
+  }
+}
+
+/// The kind of link an interface is, by the names Android gives them.
+public enum InterfaceKind: Sendable, Equatable {
+  case wifi
+  case ethernet
+  case mobileData
+  case usb
+  /// Any other interface, by its name.
+  case other(String)
+
+  public init(interface: String) {
+    let prefixes: [(String, InterfaceKind)] = [
+      ("wlan", .wifi), ("eth", .ethernet), ("rmnet", .mobileData), ("ccmni", .mobileData),
+      ("rndis", .usb), ("usb", .usb),
+    ]
+    self = prefixes.first { interface.hasPrefix($0.0) }?.1 ?? .other(interface)
   }
 }

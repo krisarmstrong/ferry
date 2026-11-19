@@ -140,11 +140,25 @@ extension DevicePresentation {
     }
     add(
       LocalizedStringResource("IP addresses", bundle: .module),
-      info.addresses.map(DisplayText.escaped).joined(separator: ", "))
+      info.addresses.map(addressLine).joined(separator: ", "))
     if let storage = info.storage {
       add(LocalizedStringResource("Storage", bundle: .module), storageLine(storage))
     }
     return rows
+  }
+
+  /// The address, then the kind of link it is on, or the interface's own name for any other.
+  private static func addressLine(_ address: AndroidDeviceInfo.Address) -> String {
+    let link =
+      switch address.kind {
+      case .wifi: String(localized: LocalizedStringResource("Wi-Fi", bundle: .module))
+      case .ethernet: String(localized: LocalizedStringResource("Ethernet", bundle: .module))
+      case .mobileData: String(localized: LocalizedStringResource("Mobile data", bundle: .module))
+      case .usb: String(localized: LocalizedStringResource("USB", bundle: .module))
+      case .other(let name): DisplayText.escaped(name)
+      }
+    let value = DisplayText.escaped(address.address)
+    return String(localized: LocalizedStringResource("\(value) (\(link))", bundle: .module))
   }
 
   private static func batteryLine(_ battery: AndroidDeviceInfo.Battery) -> String {
