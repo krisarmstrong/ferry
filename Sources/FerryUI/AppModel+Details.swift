@@ -82,8 +82,19 @@ extension AppModel {
   private func readDetails(of id: DeviceID, token: UUID) async {
     var info: AndroidDeviceInfo?
     if !Task.isCancelled {
-      if case .deviceInfo(let read)? = try? await client.send(.deviceInfo(id), file: nil) {
-        info = read
+      do {
+        let reply = try await client.send(.deviceInfo(id), file: nil)
+        if case .deviceInfo(let read) = reply {
+          info = read
+        } else {
+          Self.log.debug(
+            "details of \(id.serial, privacy: .private): \(String(describing: reply), privacy: .private)"
+          )
+        }
+      } catch {
+        Self.log.debug(
+          "details of \(id.serial, privacy: .private): \(String(describing: error), privacy: .private)"
+        )
       }
     }
     if detailReads[id]?.token == token { detailReads[id] = nil }

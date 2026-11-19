@@ -1,6 +1,7 @@
 import DeviceKit
 import FerryIPC
 import Foundation
+import Observation
 import Synchronization
 import Testing
 
@@ -217,6 +218,22 @@ struct AppModelDetailsTests {
     await model.detailsSettled()
     #expect(reads == 2)
     #expect(model.shownDetails(of: id) == .loaded(Self.info))
+  }
+
+  /// No view reads the running reads, so starting one redraws nothing on their account.
+  @Test func theRunningReadsAreNotObserved() async {
+    let model = model(client())
+    await model.refresh()
+    let changed = Mutex(false)
+    withObservationTracking {
+      _ = model.detailReads
+    } onChange: {
+      changed.withLock { $0 = true }
+    }
+    model.loadExpandedDetailsIfDue()
+    #expect(model.detailReads[id] != nil)
+    #expect(!changed.withLock { $0 })
+    await model.detailsSettled()
   }
 
   /// A device that goes away takes its details with it.
