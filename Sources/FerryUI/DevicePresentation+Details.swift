@@ -39,7 +39,17 @@ extension DevicePresentation {
       lines.append(
         DetailLine(id: address.interface, label: linkName(address.kind), address: address.address))
     }
-    return lines
+    // Two links of one kind would read alike, here and in VoiceOver's copy actions.
+    let labels = lines.map(\.label)
+    return lines.map { line in
+      guard labels.filter({ $0 == line.label }).count > 1 else { return line }
+      let (label, interface) = (line.label, DisplayText.escaped(line.id))
+      return DetailLine(
+        id: line.id,
+        label: String(
+          localized: LocalizedStringResource("\(label) (\(interface))", bundle: .module)),
+        address: line.address)
+    }
   }
 
   /// "Android <version> · Battery <n>%", leaving out what the device did not say.

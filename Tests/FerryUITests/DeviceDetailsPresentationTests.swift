@@ -75,6 +75,22 @@ struct DeviceDetailsPresentationTests {
     #expect(lines.map(\.id) == ["wlan0", "eth0", "rndis0", "tun0"])
   }
 
+  /// Two links of one kind would read alike: each then names its interface, so the lines and
+  /// their copy actions can be told apart.
+  @Test func twoLinksOfOneKindNameTheirInterfaces() {
+    let lines = DevicePresentation.detailLines(
+      info(
+        model: "LinkRunner G2",
+        [
+          .init(interface: "wlan0", address: "192.0.2.10"),
+          .init(interface: "eth0", address: "192.0.2.20"),
+          .init(interface: "wlan1", address: "192.0.2.11"),
+        ]))
+    #expect(lines.map(\.label) == ["Wi-Fi (wlan0)", "Ethernet", "Wi-Fi (wlan1)"])
+    let actions = lines.map { String(localized: DevicePresentation.copyAddressResource($0)) }
+    #expect(Set(actions).count == actions.count)
+  }
+
   /// Only a dotted-decimal IPv4 address is shown and copied, never whatever else the device sent.
   @Test(arguments: [
     "192.0.2", "192.0.2.256", "::ffff:192.0.2.1", "192.0.2.1\u{202E}", "", "192.0.2.1\0",

@@ -88,5 +88,7 @@ struct CatalogKeysTests {
     #expect(keys.contains(DevicePresentation.copyAddressResource(line).key))
     #expect(keys.contains(DevicePresentation.loadingDetailsResource.key))
     #expect(keys.contains(DevicePresentation.copiedResource.key))
+    // A label that names its interface, "Wi-Fi (wlan1)".
+    #expect(keys.contains("%@ (%@)"))
   }
 }
