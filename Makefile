@@ -41,6 +41,13 @@ check-app:
 	    || { echo "error: no $$bundle strings in $(SYNC_RESOURCES)" >&2; exit 1; }; \
 	done
 	@echo "Finder Sync extension carries its strings"
+	@# The FileProvider extension's errors and the agent's words come from their own bundles,
+	@# and a missing bundle stops the process at its first string.
+	@test -d "$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Resources/Ferry_FerryProviderCore.bundle/Contents/Resources/en.lproj" \
+	  || { echo "error: no FerryProviderCore strings in the FileProvider extension" >&2; exit 1; }
+	@test -d "$(APP)/Contents/Resources/Ferry_FerryAgentCore.bundle/Contents/Resources/en.lproj" \
+	  || { echo "error: no FerryAgentCore strings in $(APP)/Contents/Resources" >&2; exit 1; }
+	@echo "FileProvider extension and agent carry their strings"
 	@# It may send files to devices and install apps: no injected library may run in it.
 	@codesign -dv '$(APP)/Contents/PlugIns/FerrySync.appex' 2>&1 | grep -q '^CodeDirectory.*flags=.*runtime' \
 	  || { echo "error: the Finder Sync extension is not signed with the hardened runtime" >&2; exit 1; }

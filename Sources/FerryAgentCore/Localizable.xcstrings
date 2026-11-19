@@ -1,0 +1,39 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Connect the device and choose Transfer files to see its files." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect the device and choose Transfer files to see its files."
+          }
+        }
+      }
+    },
+    "conflict from Mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conflict from Mac"
+          }
+        }
+      }
+    },
+    "conflict from Mac %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conflict from Mac %lld"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

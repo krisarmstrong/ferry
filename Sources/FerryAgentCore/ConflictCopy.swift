@@ -32,7 +32,7 @@ enum ConflictCopy {
   /// copy's name never starts with a space or has one before the marker. Spaces are compared as
   /// Unicode scalars, so a space carrying a combining mark counts as one.
   static func name(for name: String, attempt: Int) -> String {
-    let marker = attempt == 1 ? " (conflict from Mac)" : " (conflict from Mac \(attempt))"
+    let marker = " (" + String(localized: AgentText.conflictMarker(attempt: attempt)) + ")"
     let dot = name.lastIndex(of: ".").flatMap { dot -> String.Index? in
       let tail = name[dot...]
       let isExtension =

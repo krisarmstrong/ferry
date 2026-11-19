@@ -1,0 +1,116 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "A folder on the device can’t take a package name, such as .app or .rtfd: macOS would open it as an app or a document." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A folder on the device can’t take a package name, such as .app or .rtfd: macOS would open it as an app or a document."
+          }
+        }
+      }
+    },
+    "Folders named like an app or a document package, and what they hold, can’t be changed from this Mac. Change them on the device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folders named like an app or a document package, and what they hold, can’t be changed from this Mac. Change them on the device."
+          }
+        }
+      }
+    },
+    "Packages and app bundles can’t be copied to the device. Compress it into a .zip first." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
+          }
+        }
+      }
+    },
+    "Symbolic links and aliases can’t be copied to the device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Symbolic links and aliases can’t be copied to the device."
+          }
+        }
+      }
+    },
+    "The device does not support %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device does not support %@."
+          }
+        }
+      }
+    },
+    "The device saved “%@” as “%@”." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device saved “%1$@” as “%2$@”."
+          }
+        }
+      }
+    },
+    "The device sent %llu bytes of a file it lists as %llu bytes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device sent %1$llu bytes of a file it lists as %2$llu bytes."
+          }
+        }
+      }
+    },
+    "The device stored %llu bytes where %llu were sent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device stored %1$llu bytes where %2$llu were sent."
+          }
+        }
+      }
+    },
+    "Unexpected response from the Ferry agent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unexpected response from the Ferry agent."
+          }
+        }
+      }
+    },
+    "“%@” holds folders nested more than %lld deep, which Ferry does not delete." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” holds folders nested more than %2$lld deep, which Ferry does not delete."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

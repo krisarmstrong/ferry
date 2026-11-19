@@ -26,9 +26,12 @@ let package = Package(
     .systemLibrary(name: "CLibMTP", pkgConfig: "libmtp", providers: [.brew(["libmtp"])]),
     .target(name: "MTPTransport", dependencies: ["DeviceKit", "CLibMTP"]),
     .target(
-      name: "FerryAgentCore", dependencies: ["ADBTransport", "DeviceKit", "FerryIPC", "MTPTransport"]),
+      name: "FerryAgentCore", dependencies: ["ADBTransport", "DeviceKit", "FerryIPC", "MTPTransport"],
+      resources: [.process("Localizable.xcstrings")]),
     .target(name: "FerryIPC", dependencies: ["DeviceKit"]),
-    .target(name: "FerryProviderCore", dependencies: ["DeviceKit", "FerryIPC"]),
+    .target(
+      name: "FerryProviderCore", dependencies: ["DeviceKit", "FerryIPC"],
+      resources: [.process("Localizable.xcstrings")]),
     .target(
       name: "FerrySyncCore", dependencies: ["DeviceKit", "FerryIPC", "FerryUI"],
       resources: [.process("Localizable.xcstrings")]),

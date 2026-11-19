@@ -290,7 +290,7 @@ public actor ProviderBackend {
 
   static func unexpected(_ response: AgentResponse) -> any Error {
     log.error("unexpected response from agent: \(String(describing: response), privacy: .private)")
-    return ErrorMapping.fileProviderError(.io("Unexpected response from the Ferry agent."))
+    return ErrorMapping.fileProviderError(.io(String(localized: ProviderText.unexpectedResponse)))
   }
 
   // MARK: Local mapping
@@ -339,26 +339,17 @@ extension ProviderBackend {
   /// folder. `.cannotSynchronize` is final until the item changes.
   static let packageRefused = NSFileProviderError(
     .cannotSynchronize,
-    userInfo: [
-      NSLocalizedDescriptionKey:
-        "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
-    ])
+    userInfo: [NSLocalizedDescriptionKey: String(localized: ProviderText.package)])
 
   /// macOS would open the folder as an app or a document, read-only (see
   /// `ProviderItem.capabilities`). `.cannotSynchronize` is final until the item changes.
   static let packageNameRefused = NSFileProviderError(
     .cannotSynchronize,
-    userInfo: [
-      NSLocalizedDescriptionKey:
-        "A folder on the device can’t take a package name, such as .app or .rtfd: macOS would "
-        + "open it as an app or a document."
-    ])
+    userInfo: [NSLocalizedDescriptionKey: String(localized: ProviderText.packageName)])
 
   static let linkRefused = NSFileProviderError(
     .cannotSynchronize,
-    userInfo: [
-      NSLocalizedDescriptionKey: "Symbolic links and aliases can’t be copied to the device."
-    ])
+    userInfo: [NSLocalizedDescriptionKey: String(localized: ProviderText.link)])
 
   /// Whether the change renames a folder to a package name, which macOS would open as an app
   /// or a document (read-only, see `ProviderItem.capabilities`).

@@ -56,6 +56,17 @@ targets:
         script: |
           mkdir -p "$(dirname "$SCRIPT_OUTPUT_FILE_0")"
           sed "s/[$](FERRY_TEAM_ID)/${FERRY_TEAM_ID}/g" "$SCRIPT_INPUT_FILE_0" > "$SCRIPT_OUTPUT_FILE_0"
+      # The agent's strings. A tool target cannot carry resources, and the agent, in
+      # Contents/MacOS, finds its package's bundle in the app's Resources (Bundle.main is the app);
+      # without it, its first localised string stops the agent.
+      - name: Install the agent's strings
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/Ferry_FerryAgentCore.bundle
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Ferry_FerryAgentCore.bundle
+        script: |
+          rm -rf "$SCRIPT_OUTPUT_FILE_0"
+          ditto "$SCRIPT_INPUT_FILE_0" "$SCRIPT_OUTPUT_FILE_0"
     dependencies:
       - package: Ferry
         product: FerryUI

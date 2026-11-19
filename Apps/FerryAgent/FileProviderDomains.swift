@@ -41,7 +41,7 @@ struct FileProviderDomains: DomainManaging {
   func disconnect(_ identifier: String) async throws {
     // Not `.temporary`: the domain stays disconnected until the agent sees its device again.
     try await manager(identifier).disconnect(
-      reason: String(localized: "Connect the device and choose Transfer files to see its files."),
+      reason: String(localized: AgentText.disconnected),
       options: [])
   }
 

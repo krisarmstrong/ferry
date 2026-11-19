@@ -51,25 +51,22 @@ public enum ErrorMapping {
     // The upload landed under another name. Saying both lets the user find it.
     case .nameChangedByDevice(let requested, let actual):
       return described(
-        .fileWriteInvalidFileName, "The device saved “\(requested)” as “\(actual)”.")
+        .fileWriteInvalidFileName, ProviderText.nameChanged(requested: requested, actual: actual))
     case .unsupported(let what):
-      return described(.featureUnsupported, "The device does not support \(what).")
+      return described(.featureUnsupported, ProviderText.unsupported(what))
     case .sizeMismatch(let expected, let actual):
       return described(
-        .fileWriteUnknown, "The device stored \(actual) bytes where \(expected) were sent.")
+        .fileWriteUnknown, ProviderText.sizeMismatch(expected: expected, actual: actual))
     case .downloadSizeMismatch(let listed, let received):
       return described(
-        .fileReadCorruptFile,
-        "The device sent \(received) bytes of a file it lists as \(listed) bytes.")
+        .fileReadCorruptFile, ProviderText.downloadSizeMismatch(listed: listed, received: received))
     // Final until the item changes; `ProviderBackend.delete` makes a refused delete a rejected
     // deletion, which FileProvider puts back.
     case .readOnly:
       return readOnlyRefused
     case .folderTooDeep(let path):
       return described(
-        .featureUnsupported,
-        "“\(path.name ?? path.description)” holds folders nested more than "
-          + "\(RemotePath.maxTreeDepth) deep, which Ferry does not delete.")
+        .featureUnsupported, ProviderText.folderTooDeep(path.name ?? path.description))
     // No Cocoa code describes it: the one the FileProvider headers name for such errors, with
     // the error itself underneath, as they ask.
     case .io(let message):
@@ -99,13 +96,11 @@ public enum ErrorMapping {
 
   static let readOnlyRefused = NSFileProviderError(
     .cannotSynchronize,
-    userInfo: [
-      NSLocalizedDescriptionKey:
-        "Folders named like an app or a document package, and what they hold, can’t be changed "
-        + "from this Mac. Change them on the device."
-    ])
+    userInfo: [NSLocalizedDescriptionKey: String(localized: ProviderText.readOnly)])
 
-  private static func described(_ code: CocoaError.Code, _ description: String) -> CocoaError {
-    CocoaError(code, userInfo: [NSLocalizedDescriptionKey: description])
+  private static func described(_ code: CocoaError.Code, _ description: LocalizedStringResource)
+    -> CocoaError
+  {
+    CocoaError(code, userInfo: [NSLocalizedDescriptionKey: String(localized: description)])
   }
 }
