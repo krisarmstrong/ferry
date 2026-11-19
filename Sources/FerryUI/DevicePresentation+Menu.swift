@@ -162,3 +162,20 @@ extension DevicePresentation {
   static let rememberedActions: [MenuAction] = [.connectAgain, .forget]
   static let offerActions: [MenuAction] = [.useIt, .ignore]
 }
+
+extension DevicePresentation {
+  /// Where the device's recording has got, as the agent last said, and whether the app could
+  /// not save it.
+  static func recordingPhase(_ recording: ActiveRecording?, unsaved: Bool) -> RecordingPhase {
+    guard let recording else { return .none }
+    if recording.finished, unsaved { return .unsaved }
+    return recording.stopping || recording.finished ? .saving : .running
+  }
+
+  /// The name an offered address claims, made safe to show.
+  static func offerName(_ offer: UnconfirmedAddress) -> String {
+    offer.name.isEmpty
+      ? String(localized: LocalizedStringResource("Unknown device", bundle: .module))
+      : DisplayText.escaped(offer.name)
+  }
+}

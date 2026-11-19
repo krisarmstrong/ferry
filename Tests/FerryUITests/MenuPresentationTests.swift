@@ -164,4 +164,29 @@ struct MenuPresentationTests {
       #expect(NSImage(systemSymbolName: tile.symbol, accessibilityDescription: nil) != nil)
     }
   }
+
+  @Test(arguments: [
+    (false, false, false, DevicePresentation.RecordingPhase.running),
+    (true, false, false, .saving), (false, true, false, .saving), (false, true, true, .unsaved),
+  ])
+  func theRecordingPhaseFollowsTheAgent(
+    stopping: Bool, finished: Bool, unsaved: Bool, phase: DevicePresentation.RecordingPhase
+  ) {
+    let recording = ActiveRecording(
+      device: DeviceID(serial: "A"), started: .now, stopping: stopping, finished: finished)
+    #expect(DevicePresentation.recordingPhase(recording, unsaved: unsaved) == phase)
+  }
+
+  @Test func noRecordingIsNone() {
+    #expect(DevicePresentation.recordingPhase(nil, unsaved: false) == .none)
+  }
+
+  /// The offer's name came from the device: escaped, and never blank.
+  @Test(arguments: [("Pixel 8", "Pixel 8"), ("", "Unknown device"), ("Pixel\u{7}", "Pixel\\u{7}")])
+  func anOfferIsNamedSafely(name: String, shown: String) throws {
+    let offer = UnconfirmedAddress(
+      address: try #require(WirelessEndpoint(parsing: "192.0.2.40")), id: DeviceID(serial: "B"),
+      name: name)
+    #expect(DevicePresentation.offerName(offer) == shown)
+  }
 }

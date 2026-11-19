@@ -3,78 +3,57 @@ import FerryIPC
 import FerryText
 import SwiftUI
 
-/// One device: a header with its model and state, how Ferry reaches it, details for that state,
-/// the ADB tools when Ferry serves it over ADB (an `.apk` dropped on the row is installed), a
-/// hint about USB debugging where it applies, then its actions.
-struct DeviceRow: View {
-  let device: AttachedDevice
-  /// What the menu calls the device.
-  let name: String
-  let transfers: [ActiveTransfer]
-  let awaitingUSBDebugging: Bool
+/// What a device row does, apart from its tools.
+struct DeviceRowActions {
+  let toggle: () -> Void
   let eject: () -> Void
   let recheck: () -> Void
   let mount: () -> Void
   let showGuide: () -> Void
   let showUSBDebugging: () -> Void
-  let network: NetworkActions
+  let useOverWiFi: () -> Void
+  let forget: () -> Void
+}
+
+/// One device: its tile, name and summary, and, when expanded, how Ferry reaches it, details
+/// for its state, then its actions as rows. An `.apk` dropped on a device with tools is
+/// installed.
+struct DeviceRow: View {
+  let device: AttachedDevice
+  /// What the menu calls the device.
+  let name: String
+  let summary: String
+  let isExpanded: Bool
+  let isRemembered: Bool
+  let transfers: [ActiveTransfer]
+  let awaitingUSBDebugging: Bool
+  let actions: DeviceRowActions
   let tools: ToolActions
 
-  private var hint: DevicePresentation.Hint? {
-    DevicePresentation.hint(for: device, awaitingUSBDebugging: awaitingUSBDebugging)
+  private var recording: DevicePresentation.RecordingPhase {
+    DevicePresentation.recordingPhase(tools.recording, unsaved: tools.unsaved)
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Label {
-        HStack(spacing: 4) {
-          Text(verbatim: name)
-            .font(.headline)
-          Text(verbatim: "·")
-            .foregroundStyle(.secondary)
-            .accessibilityHidden(true)
-          Text(DevicePresentation.status(of: device))
-            .foregroundStyle(.secondary)
-        }
-        .lineLimit(1)
-      } icon: {
-        Image(systemName: symbol)
-      }
-      if let method = DevicePresentation.shownMethod(of: device) {
-        Text(DevicePresentation.method(method))
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      }
-      details
-        .font(.callout)
-      if DevicePresentation.offersTools(device) {
-        ToolRow(actions: tools)
-      }
-      switch hint {
-      case .allowUSBDebugging:
-        Text("Allow USB debugging on the device", bundle: .module)
-          .font(.callout)
-      case .moreTools:
-        Button(action: showUSBDebugging) {
-          Text("More Tools with USB Debugging…", bundle: .module)
-        }
-      case nil:
-        EmptyView()
-      }
-      HStack {
-        stateAction
-        NetworkButtons(actions: network)
-        Spacer()
-        // Only a device Ferry holds open can be ejected.
-        if case .ready = device.state {
-          Button(action: eject) {
-            Label {
-              Text("Eject", bundle: .module)
-            } icon: {
-              Image(systemName: "eject")
-            }
-          }
-          .deviceAction(LocalizedStringResource("Eject", bundle: .module), on: name)
+    VStack(alignment: .leading, spacing: 0) {
+      ExpandingRowHeader(
+        tile: DevicePresentation.tile(of: device), name: name, summary: summary,
+        isExpanded: isExpanded, toggle: actions.toggle)
+      if isExpanded {
+        DeviceDetails(
+          device: device, transfers: transfers, awaitingUSBDebugging: awaitingUSBDebugging,
+          tools: tools, recording: recording, showUSBDebugging: actions.showUSBDebugging)
+        ForEach(
+          DevicePresentation.actions(for: device, isRemembered: isRemembered, recording: recording),
+          id: \.self
+        ) { action in
+          MenuRow(
+            title: Text(action.title), symbol: action.symbol, indent: MenuMetrics.actionIndent,
+            action: perform(action)
+          )
+          .deviceAction(action.title, on: name)
+          // One app at a time: Install App… waits for the one on its way.
+          .disabled(action == .installApp && tools.install != nil)
         }
       }
     }
@@ -83,22 +62,96 @@ struct DeviceRow: View {
     }
   }
 
+  private func perform(_ action: DevicePresentation.MenuAction) -> () -> Void {
+    switch action {
+    case .takeScreenshot: tools.screenshot
+    case .recordScreen: tools.record
+    case .stopRecording: tools.stopRecording
+    case .logcat: tools.openLogcat
+    case .deviceInfo: tools.openInfo
+    case .portForwarding: tools.openForwards
+    case .sendFile: tools.sendFiles
+    case .installApp: tools.chooseAPK
+    case .openShell: tools.openShell
+    case .useOverWiFi: actions.useOverWiFi
+    case .forget: actions.forget
+    case .howToTurnOnFileTransfer: actions.showGuide
+    case .mount: actions.mount
+    case .checkAgain: actions.recheck
+    case .eject: actions.eject
+    // Rows of remembered devices and offers, never a device's.
+    case .connectAgain, .useIt, .ignore: {}
+    }
+  }
+
   /// One `.apk` dropped on the row of a device with tools is installed; anything else is not.
   private func install(_ urls: [URL]) {
     guard urls.count == 1, let url = urls.first, PresentationText.isAPK(url) else { return }
     tools.install(url)
   }
+}
 
-  private var symbol: String {
-    switch device.state {
-    case .ready: "externaldrive.connected.to.line.below"
-    case .notSharingFiles: "cable.connector"
-    case .ejected: "eject"
-    case .busy, .failed: "exclamationmark.triangle"
+/// The lines an expanded device shows above its actions: the method, its storage and transfers,
+/// what its state means, an app on its way, the recording, and USB debugging.
+private struct DeviceDetails: View {
+  let device: AttachedDevice
+  let transfers: [ActiveTransfer]
+  let awaitingUSBDebugging: Bool
+  let tools: ToolActions
+  let recording: DevicePresentation.RecordingPhase
+  let showUSBDebugging: () -> Void
+
+  private var hint: DevicePresentation.Hint? {
+    DevicePresentation.hint(for: device, awaitingUSBDebugging: awaitingUSBDebugging)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      if let method = DevicePresentation.shownMethod(of: device) {
+        Text(DevicePresentation.method(method))
+          .foregroundStyle(.secondary)
+      }
+      stateLines
+      if let install = tools.install {
+        Text(verbatim: DevicePresentation.installingLine(install))
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+      recordingLine
+      if hint == .allowUSBDebugging {
+        Text("Allow USB debugging on the device", bundle: .module)
+      }
+    }
+    .font(.callout)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.leading, MenuMetrics.rowPadding + MenuMetrics.actionIndent)
+    .padding(.trailing, MenuMetrics.rowPadding)
+    .padding(.bottom, 2)
+    // Once the app is on the device, pm is installing it, which cannot be stopped.
+    if let install = tools.install, DevicePresentation.offersCancel(install) {
+      MenuRow(
+        title: Text("Cancel", bundle: .module), symbol: "xmark.circle",
+        indent: MenuMetrics.actionIndent, action: tools.cancelInstall
+      )
+      .deviceAction(LocalizedStringResource("Cancel", bundle: .module), on: tools.name)
+    }
+    if recording == .unsaved {
+      MenuRow(
+        title: Text("Choose Folder…", bundle: .module), symbol: "folder",
+        indent: MenuMetrics.actionIndent, action: tools.chooseFolder)
+      MenuRow(
+        title: Text("Discard", bundle: .module), symbol: "trash",
+        indent: MenuMetrics.actionIndent, action: tools.discard)
+    }
+    if hint == .moreTools {
+      MenuRow(
+        title: Text("More Tools with USB Debugging…", bundle: .module),
+        symbol: "wrench.and.screwdriver", indent: MenuMetrics.actionIndent,
+        action: showUSBDebugging)
     }
   }
 
-  @ViewBuilder private var details: some View {
+  @ViewBuilder private var stateLines: some View {
     switch device.state {
     case .ready(let storages):
       ForEach(storages, id: \.id) { storage in
@@ -127,26 +180,25 @@ struct DeviceRow: View {
     }
   }
 
-  @ViewBuilder private var stateAction: some View {
-    switch device.state {
-    case .ready:
-      EmptyView()
-    case .notSharingFiles:
-      if DevicePresentation.needsFileTransferSteps(device) {
-        Button(action: showGuide) {
-          Text("How to Turn On File Transfer", bundle: .module)
+  @ViewBuilder private var recordingLine: some View {
+    if let started = tools.recording?.started {
+      Label {
+        switch recording {
+        case .unsaved:
+          Text("Recording couldn't be saved", bundle: .module)
+        case .saving:
+          Text("Saving recording…", bundle: .module)
+        case .running, .none:
+          HStack(spacing: 4) {
+            Text("Recording", bundle: .module)
+            Text(timerInterval: started...Date.distantFuture, countsDown: false)
+              .monospacedDigit()
+          }
         }
+      } icon: {
+        Image(systemName: recording == .unsaved ? "exclamationmark.triangle" : "record.circle")
+          .foregroundStyle(recording == .unsaved ? .yellow : .red)
       }
-    case .ejected:
-      Button(action: mount) {
-        Text("Mount", bundle: .module)
-      }
-      .deviceAction(LocalizedStringResource("Mount", bundle: .module), on: name)
-    case .busy, .failed:
-      Button(action: recheck) {
-        Text("Try Again", bundle: .module)
-      }
-      .deviceAction(LocalizedStringResource("Try Again", bundle: .module), on: name)
     }
   }
 }

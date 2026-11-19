@@ -2,98 +2,28 @@ import DeviceKit
 import FerryIPC
 import SwiftUI
 
-/// What a device row offers for the network: Use over Wi-Fi on a device on USB debugging, and
-/// Forget on one Ferry reconnects over the network.
-struct NetworkActions {
-  /// The device as the menu names it, for VoiceOver.
-  let name: String
-  let offersWiFi: Bool
-  let isRemembered: Bool
-  let useOverWiFi: () -> Void
-  let forget: () -> Void
-}
-
-/// A device row's network buttons.
-struct NetworkButtons: View {
-  let actions: NetworkActions
-
-  var body: some View {
-    if actions.offersWiFi {
-      Button(action: actions.useOverWiFi) {
-        Text("Use over Wi-Fi", bundle: .module)
-      }
-      .deviceAction(LocalizedStringResource("Use over Wi-Fi", bundle: .module), on: actions.name)
-    }
-    if actions.isRemembered {
-      Button(action: actions.forget) {
-        Text("Forget", bundle: .module)
-      }
-      .deviceAction(LocalizedStringResource("Forget", bundle: .module), on: actions.name)
-    }
-  }
-}
-
-/// A device Ferry reconnects over the network that is not attached now.
+/// A device Ferry reconnects over the network that is not attached now: a neutral tile, and
+/// Connect Again and Forget in its expansion.
 struct RememberedRow: View {
   let device: RememberedDevice
+  let isExpanded: Bool
+  let toggle: () -> Void
   let connect: () -> Void
   let forget: () -> Void
   private var name: String { DevicePresentation.rememberedName(device) }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Label {
-        HStack(spacing: 4) {
-          Text(verbatim: name)
-            .font(.headline)
-          Text(verbatim: "·")
-            .foregroundStyle(.secondary)
-            .accessibilityHidden(true)
-          Text("Not connected", bundle: .module)
-            .foregroundStyle(.secondary)
-        }
-        .lineLimit(1)
-      } icon: {
-        Image(systemName: "wifi")
-      }
-      HStack {
-        Button(action: connect) {
-          Text("Connect", bundle: .module)
-        }
-        .deviceAction(LocalizedStringResource("Connect", bundle: .module), on: name)
-        Spacer()
-        Button(action: forget) {
-          Text("Forget", bundle: .module)
-        }
-        .deviceAction(LocalizedStringResource("Forget", bundle: .module), on: name)
-      }
-    }
-  }
-}
-
-/// What the last network request said, and the two ways onto the network adb offers.
-struct NetworkRow: View {
-  let message: String?
-  let offersForms: Bool
-  let open: (WirelessForm) -> Void
-
-  var body: some View {
-    if let message {
-      Text(verbatim: message)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    }
-    if offersForms {
-      HStack {
-        Button {
-          open(.address)
-        } label: {
-          Text("Connect by Address…", bundle: .module)
-        }
-        Button {
-          open(.code)
-        } label: {
-          Text("Pair with Code…", bundle: .module)
+    VStack(alignment: .leading, spacing: 0) {
+      ExpandingRowHeader(
+        tile: DevicePresentation.rememberedTile, name: name,
+        summary: DevicePresentation.rememberedSummary, isExpanded: isExpanded, toggle: toggle)
+      if isExpanded {
+        ForEach(DevicePresentation.rememberedActions, id: \.self) { action in
+          MenuRow(
+            title: Text(action.title), symbol: action.symbol, indent: MenuMetrics.actionIndent,
+            action: action == .connectAgain ? connect : forget
+          )
+          .deviceAction(action.title, on: name)
         }
       }
     }
@@ -101,28 +31,45 @@ struct NetworkRow: View {
 }
 
 /// "Is <address> your <model>?": an address that claims a device Ferry knows, which Ferry will
-/// not use until the user says so.
+/// not use until the user says so. Use It and Ignore are in its expansion.
 struct UnconfirmedRow: View {
   let offer: UnconfirmedAddress
+  let isExpanded: Bool
+  let toggle: () -> Void
   let confirm: () -> Void
   let ignore: () -> Void
+  private var name: String { DevicePresentation.offerName(offer) }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Label {
+    VStack(alignment: .leading, spacing: 0) {
+      ExpandingRowHeader(
+        tile: DevicePresentation.offerTile, name: name,
+        summary: DevicePresentation.offerSummary(offer), isExpanded: isExpanded, toggle: toggle)
+      if isExpanded {
         Text(verbatim: DevicePresentation.confirmQuestion(offer))
           .font(.callout)
-      } icon: {
-        Image(systemName: "questionmark.circle")
-      }
-      HStack {
-        Button(action: confirm) {
-          Text("Use It", bundle: .module)
-        }
-        Button(action: ignore) {
-          Text("Ignore", bundle: .module)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.leading, MenuMetrics.rowPadding + MenuMetrics.actionIndent)
+          .padding(.trailing, MenuMetrics.rowPadding)
+          .padding(.bottom, 2)
+        ForEach(DevicePresentation.offerActions, id: \.self) { action in
+          MenuRow(
+            title: Text(action.title), symbol: action.symbol, indent: MenuMetrics.actionIndent,
+            action: action == .useIt ? confirm : ignore
+          )
+          .deviceAction(action.title, on: name)
         }
       }
     }
+  }
+}
+
+/// The two ways onto the network adb offers, as menu rows.
+struct NetworkFormRows: View {
+  let open: (WirelessForm) -> Void
+
+  var body: some View {
+    MenuRow(title: Text("Connect by Address…", bundle: .module)) { open(.address) }
+    MenuRow(title: Text("Pair with Code…", bundle: .module)) { open(.code) }
   }
 }

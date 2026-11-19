@@ -331,9 +331,6 @@
     "Delete" : {
       "extractionState" : "manual"
     },
-    "Developer Tools" : {
-
-    },
     "Device" : {
 
     },
@@ -342,9 +339,6 @@
     },
     "Device info" : {
       "extractionState" : "manual"
-    },
-    "Device Info…" : {
-
     },
     "Discard" : {
 
@@ -558,9 +552,6 @@
     "Logcat" : {
 
     },
-    "Logcat…" : {
-
-    },
     "Menu items" : {
       "extractionState" : "manual"
     },
@@ -586,9 +577,6 @@
 
     },
     "No forwards" : {
-
-    },
-    "Not connected" : {
 
     },
     "Not in Finder until you mount it again or plug it back in." : {
@@ -684,9 +672,6 @@
     "Port Forwarding" : {
 
     },
-    "Port Forwarding…" : {
-
-    },
     "Port on the device" : {
 
     },
@@ -765,9 +750,6 @@
     "Saving recording…" : {
 
     },
-    "Screenshot" : {
-
-    },
     "Screenshots and screen recordings" : {
       "extractionState" : "manual"
     },
@@ -788,9 +770,6 @@
     },
     "Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds." : {
       "extractionState" : "manual"
-    },
-    "Stop" : {
-
     },
     "Storage" : {
 
@@ -854,9 +833,6 @@
     },
     "Troubleshooting" : {
       "extractionState" : "manual"
-    },
-    "Try Again" : {
-
     },
     "Try another cable. Some carry power only." : {
       "extractionState" : "manual"
@@ -1041,6 +1017,21 @@
 
     },
     "Send" : {
+
+    },
+    "Ferry" : {
+
+    },
+    "Devices" : {
+
+    },
+    "Quit Ferry" : {
+
+    },
+    "Expanded" : {
+
+    },
+    "Collapsed" : {
 
     }
   },

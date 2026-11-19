@@ -20,6 +20,11 @@ extension AppModel {
     remembered.contains { $0.id == id }
   }
 
+  /// Where Ferry last reached a remembered device, which the menu shows under a device on Wi-Fi.
+  func wirelessAddress(of id: DeviceID) -> WirelessEndpoint? {
+    remembered.first { $0.id == id }?.addresses.first
+  }
+
   /// Remembered devices not attached now, which get their own row with Connect and Forget.
   public var rememberedOffline: [RememberedDevice] {
     let attached = Set(devices.map(\.id))

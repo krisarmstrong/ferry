@@ -17,6 +17,19 @@ struct AppModelWirelessTests {
     id: DeviceID(serial: "fedcba9876543210"), name: "EtherScope nXG",
     addresses: [WirelessEndpoint(parsing: "192.0.2.31")!])
 
+  /// A device on Wi-Fi shows the address Ferry last reached it at; one Ferry has no address for
+  /// shows none.
+  @Test func aWiFiDeviceIsShownAtItsRememberedAddress() async {
+    let client = FakeClient(log: log)
+    client.setStatus(
+      [device(Self.etherScope.id.serial, model: "EtherScope nXG", .ready([]), method: .wifiADB)],
+      remembered: [Self.etherScope])
+    let model = model(client)
+    await model.refresh()
+    #expect(model.wirelessAddress(of: Self.etherScope.id) == Self.etherScope.addresses.first)
+    #expect(model.wirelessAddress(of: DeviceID(serial: "other")) == nil)
+  }
+
   @Test func connectByAddressSendsTheValidatedAddress() async {
     let client = FakeClient(log: log)
     let model = model(client)

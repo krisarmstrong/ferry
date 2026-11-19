@@ -8,15 +8,12 @@ struct PreservedChangesRow: View {
   let reveal: () -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      ForEach(locations, id: \.self) { location in
-        Text("Unsent changes were saved to \(Self.shown(location))", bundle: .module)
-          .font(.callout)
-      }
-      Button(action: reveal) {
-        Text("Reveal in Finder", bundle: .module)
-      }
+    ForEach(locations, id: \.self) { location in
+      StatusRow(
+        symbol: "doc.on.doc",
+        title: Text("Unsent changes were saved to \(Self.shown(location))", bundle: .module))
     }
+    StatusAction(title: Text("Reveal in Finder", bundle: .module), action: reveal)
   }
 
   /// The path with the home folder as `~`. The folder can be named after a device, which
