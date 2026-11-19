@@ -52,6 +52,8 @@ actor FakeRecording: ScreenRecordingControl {
   private(set) var discards = 0
   /// Whether SIGINT stops it, as it stops `screenrecord`.
   var endsOnInterrupt = true
+  /// Whether `kill` itself never answers.
+  var interruptHangs = false
   var outcome = ADBScreenRecording.End.exited(status: 0, detail: "")
   var video = FakeRecording.mp4
   var pullFailure: ADBError?
@@ -74,6 +76,11 @@ actor FakeRecording: ScreenRecordingControl {
 
   func interrupt() async throws(ADBError) {
     interrupts += 1
+    if interruptHangs {
+      // A wedged device: the kill never answers until the recording is closed.
+      if !ended { await withCheckedContinuation { waiters.append($0) } }
+      return
+    }
     if endsOnInterrupt { end() }
   }
 

@@ -33,17 +33,22 @@ public struct ADBDeviceTools: Sendable {
   static let defaultCaptureLimit = 128 << 20
 
   let host: ADBHost
-  private let answerLimit: Duration
+  let answerLimit: Duration
   private let captureLimit: Int
+  /// `screencap` answers in a second or two; a device that never finishes the image is given up.
+  private let captureWait: Duration
 
   public init(host: ADBHost) {
-    self.init(host: host, answerLimit: .seconds(10), captureLimit: Self.defaultCaptureLimit)
+    self.init(
+      host: host, answerLimit: .seconds(10), captureLimit: Self.defaultCaptureLimit,
+      captureWait: .seconds(30))
   }
 
-  init(host: ADBHost, answerLimit: Duration, captureLimit: Int) {
+  init(host: ADBHost, answerLimit: Duration, captureLimit: Int, captureWait: Duration) {
     self.host = host
     self.answerLimit = answerLimit
     self.captureLimit = captureLimit
+    self.captureWait = captureWait
   }
 
   // MARK: Installing
@@ -118,17 +123,20 @@ public struct ADBDeviceTools: Sendable {
 
   /// The screen as `screencap -p` writes it (a PNG), streamed with no file on the device.
   public func screenshot(serial: String) async throws(ADBError) -> Data {
-    let stream = try await host.connect(
-      serial, service: "exec:" + (try ADBShell.command("screencap", ["-p"])))
-    defer { stream.cancel() }
-    var image = Data()
-    while let chunk = try await stream.readSome(upTo: 64 * 1024) {
-      guard image.count + chunk.count <= captureLimit else {
-        throw .protocolViolation("screenshot exceeds \(captureLimit) bytes")
+    let service = "exec:" + (try ADBShell.command("screencap", ["-p"]))
+    let (host, limit) = (host, captureLimit)
+    return try await ADBTransport.within(captureWait) { () async throws(ADBError) in
+      let stream = try await host.connect(serial, service: service)
+      defer { stream.cancel() }
+      var image = Data()
+      while let chunk = try await stream.readSome(upTo: 64 * 1024) {
+        guard image.count + chunk.count <= limit else {
+          throw .protocolViolation("screenshot exceeds \(limit) bytes")
+        }
+        image.append(chunk)
       }
-      image.append(chunk)
+      return image
     }
-    return image
   }
 
   // MARK: Recording
@@ -263,8 +271,11 @@ public actor ADBScreenRecording {
   /// process's).
   public func interrupt() async throws(ADBError) {
     guard end == nil, let pid else { return }
-    let result = try await tools.host.run(
-      serial: serial, command: try ADBShell.command("kill", ["-2", pid]))
+    let command = try ADBShell.command("kill", ["-2", pid])
+    let (host, serial) = (tools.host, serial)
+    let result = try await ADBTransport.within(tools.answerLimit) { () async throws(ADBError) in
+      try await host.run(serial: serial, command: command)
+    }
     guard result.status == 0 || end != nil else {
       throw .failed(
         "kill failed: "
@@ -297,102 +308,5 @@ public actor ADBScreenRecording {
   /// Removes the recording from the device; best effort, and logged when it fails.
   public func discard() async {
     await tools.remove(devicePath, on: serial)
-  }
-}
-
-/// A shell command's output as it arrives, over `shell,v2` (framed, with an exit packet) or the
-/// legacy `shell:` service (raw, with the wrapper's status line at the end).
-final class ShellOutput: Sendable {
-  let stream: ADBStream
-  /// The legacy wrapper's token; `nil` over `shell,v2`.
-  let token: String?
-  private let state = OSAllocatedUnfairLock(initialState: Buffers())
-
-  private struct Buffers {
-    var stdout = Data()
-    var stderr = Data()
-  }
-
-  /// Kept from each stream; a recording prints little, and only the start is shown.
-  private static let keep = 64 * 1024
-
-  init(stream: ADBStream, token: String?) {
-    self.stream = stream
-    self.token = token
-  }
-
-  /// The first line of stdout, without its line ending; `nil` if the command ended before
-  /// printing one.
-  func firstLine() async throws(ADBError) -> String? {
-    var exited = false
-    while true {
-      let line: String? = state.withLock { buffers in
-        guard let newline = buffers.stdout.firstIndex(of: UInt8(ascii: "\n")) else { return nil }
-        var text = ADBDeviceTools.text(Data(buffers.stdout[..<newline]))
-        if text.hasSuffix("\r") { text.removeLast() }
-        buffers.stdout.removeSubrange(...newline)
-        return text
-      }
-      if let line { return line }
-      if exited { return nil }
-      exited = try await readMore() != nil
-    }
-  }
-
-  /// Reads until the command exits, and returns its status (`nil` when the legacy trailer is
-  /// missing).
-  func waitForExit() async throws(ADBError) -> Int32? {
-    while true {
-      if let status = try await readMore() { return status }
-    }
-  }
-
-  /// The first line of what the command printed besides its pid: stderr over `shell,v2`, the
-  /// merged output over the legacy service.
-  var detail: String {
-    state.withLock { buffers in
-      var text = ADBDeviceTools.text(buffers.stderr.isEmpty ? buffers.stdout : buffers.stderr)
-      if let token, let trailer = text.range(of: "\n" + token) {
-        text = String(text[..<trailer.lowerBound])
-      }
-      let first = text.split(whereSeparator: \.isNewline).first { !$0.allSatisfy(\.isWhitespace) }
-      return first.map { String($0.prefix(200)) } ?? ""
-    }
-  }
-
-  /// Reads the next piece of output. Returns the exit status once the command has exited:
-  /// from the exit packet, or from the legacy trailer when the connection closes.
-  private func readMore() async throws(ADBError) -> Int32?? {
-    if let token {
-      guard let chunk = try await stream.readSome(upTo: 64 * 1024) else {
-        let all = state.withLock { $0.stdout }
-        return .some(try? ADBShell.parseLegacy(all, token: token).status)
-      }
-      append(chunk, stderr: false)
-      return nil
-    }
-    let header = try await stream.read(exactly: 5)
-    let length = Int(ADBWire.u32(header.suffix(4)))
-    guard length <= 64 * 1024 else { throw .protocolViolation("shell packet of \(length) bytes") }
-    let body = try await stream.read(exactly: length)
-    switch header[header.startIndex] {
-    case 1: append(body, stderr: false)
-    case 2: append(body, stderr: true)
-    case 3:
-      guard let code = body.first else { throw .protocolViolation("empty exit packet") }
-      return .some(Int32(code))
-    default: break
-    }
-    return nil
-  }
-
-  private func append(_ data: Data, stderr: Bool) {
-    state.withLock { buffers in
-      if stderr {
-        if buffers.stderr.count < Self.keep { buffers.stderr.append(data.prefix(Self.keep)) }
-      } else if buffers.stdout.count < Self.keep {
-        buffers.stdout.append(data.prefix(Self.keep))
-      }
-    }
   }
 }

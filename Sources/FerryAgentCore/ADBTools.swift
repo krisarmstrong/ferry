@@ -209,7 +209,8 @@ public actor ADBTools {
       // screenrecord stops at its own limit; this is for one that does not.
       guard (try? await Task.sleep(for: limits.recording + limits.grace)) != nil else { return }
       log.error("a recording outlived its time limit; stopping it")
-      try? await control.interrupt()
+      // The kill may never answer on a wedged device; the close below does not wait for it.
+      Task { try? await control.interrupt() }
       guard (try? await Task.sleep(for: limits.stopWait)) != nil else { return }
       await control.abandon()
     }
@@ -231,17 +232,18 @@ public actor ADBTools {
   }
 
   /// Sends SIGINT, and closes the recording if it has not ended `stopWait` later.
+  /// The close is armed first, so a kill that never answers still frees the device.
   private func stop(_ id: DeviceID, token: UUID, _ control: any ScreenRecordingControl)
     async throws(TransportError)
   {
+    Task { [limits] in
+      guard (try? await Task.sleep(for: limits.stopWait)) != nil else { return }
+      await self.abandon(id, token: token, control)
+    }
     do throws(ADBError) {
       try await control.interrupt()
     } catch {
       throw Self.transportError(error)
-    }
-    Task { [limits] in
-      guard (try? await Task.sleep(for: limits.stopWait)) != nil else { return }
-      await self.abandon(id, token: token, control)
     }
   }
 
@@ -279,10 +281,10 @@ public actor ADBTools {
     let write: Writer = { handle throws(SaveError) in
       do throws(ADBError) {
         _ = try await control.pull(into: handle) { _, _ in true }
-      } catch .failed {
-        // The device refused the pull: there is no file.
-        throw .tool(.recordingFailed(detail))
       } catch {
+        // The device refused the pull (there is no file), as against a device that went away.
+        let lost = Self.transportError(error) == .deviceDisconnected
+        if case .failed = error, !lost { throw .tool(.recordingFailed(detail)) }
         throw .transport(Self.transportError(error))
       }
     }

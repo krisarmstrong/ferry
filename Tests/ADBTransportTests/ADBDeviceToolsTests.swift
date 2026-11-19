@@ -26,13 +26,13 @@ struct ADBDeviceToolsTests {
   /// Runs `body` with tools on a server for `device`, then stops the server.
   private func withTools<T>(
     _ device: FakeAndroid, captureLimit: Int = ADBDeviceTools.defaultCaptureLimit,
-    _ body: (ADBDeviceTools) async throws -> T
+    captureWait: Duration = .seconds(5), _ body: (ADBDeviceTools) async throws -> T
   ) async throws -> T {
     let server = try await device.serve(serial: Self.serial)
     defer { server.stop() }
     let tools = ADBDeviceTools(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: .seconds(5),
-      captureLimit: captureLimit)
+      captureLimit: captureLimit, captureWait: captureWait)
     return try await body(tools)
   }
 
@@ -191,6 +191,17 @@ struct ADBDeviceToolsTests {
     let device = FakeAndroid()
     await #expect(throws: ADBError.protocolViolation("screenshot exceeds 1000 bytes")) {
       try await withTools(device, captureLimit: 1000) { tools in
+        try await tools.screenshot(serial: Self.serial)
+      }
+    }
+  }
+
+  /// A device that never finishes the image does not hold the request forever.
+  @Test func aScreenshotThatNeverEndsTimesOut() async throws {
+    let device = FakeAndroid()
+    device.state.withLock { $0.hangingPrograms = ["screencap"] }
+    await #expect(throws: ADBError.self) {
+      try await withTools(device, captureWait: .milliseconds(200)) { tools in
         try await tools.screenshot(serial: Self.serial)
       }
     }

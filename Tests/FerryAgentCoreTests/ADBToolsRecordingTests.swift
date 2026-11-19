@@ -149,4 +149,32 @@ struct ADBToolsRecordingTests {
     #expect(try names(folder).isEmpty)
     #expect(await tools.recordingsRunning().isEmpty)
   }
+
+  /// A kill that never answers still ends in the connection being closed, so the device's slot
+  /// is freed.
+  @Test func aStopWhoseKillHangsStillClosesTheRecording() async throws {
+    let fake = FakeToolDevice()
+    await fake.recording.set { $0.interruptHangs = true }
+    var limits = ADBTools.Limits()
+    limits.stopWait = .milliseconds(20)
+    let tools = makeTools(fake, limits: limits)
+    let recording = Task { try await tools.startRecording(device) }
+    try await whenRecording(tools)
+    let stop = Task { try await tools.stopRecording(device) }
+    _ = try await recording.value
+    _ = try await stop.value
+    #expect(await fake.recording.abandons == 1)
+    #expect(await tools.recordingsRunning().isEmpty)
+  }
+
+  /// A device that goes offline during the pull is disconnected, not a failed recording.
+  @Test func aPullLostToTheDeviceIsDisconnected() async throws {
+    let fake = FakeToolDevice()
+    await fake.recording.set { $0.pullFailure = .failed("device offline") }
+    let tools = makeTools(fake)
+    let recording = Task { try await tools.startRecording(device) }
+    try await whenRecording(tools)
+    await fake.recording.end()
+    await #expect(throws: TransportError.deviceDisconnected) { try await recording.value }
+  }
 }
