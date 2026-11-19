@@ -36,6 +36,8 @@ public protocol SystemServicing {
   func relaunch()
   /// Puts `text` on the pasteboard.
   func copy(_ text: String)
+  /// Has VoiceOver say `text`, for a change away from its focus.
+  func announce(_ text: String)
   /// Asks the user for an `.apk`; `nil` if they cancel.
   func chooseAPK() async -> URL?
   /// Asks the user for files to send to a device; empty if they cancel.
@@ -155,6 +157,12 @@ public final class SystemServices: SystemServicing {
   public func copy(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
+  }
+
+  public func announce(_ text: String) {
+    NSAccessibility.post(
+      element: NSApp as Any, notification: .announcementRequested,
+      userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
   }
 
   public func chooseAPK() async -> URL? {

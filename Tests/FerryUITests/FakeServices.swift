@@ -59,6 +59,10 @@ final class FakeServices: SystemServicing {
     log.record("copy \(text)")
   }
 
+  func announce(_ text: String) {
+    log.record("announce \(text)")
+  }
+
   /// What the open panel returns: `nil` is Cancel.
   var pickedAPK: URL?
   /// Where captures go.

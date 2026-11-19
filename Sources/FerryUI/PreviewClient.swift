@@ -67,6 +67,7 @@ private final class PreviewServices: SystemServicing {
   func appWasReplaced() -> Bool { false }
   func relaunch() {}
   func copy(_ text: String) {}
+  func announce(_ text: String) {}
   func chooseAPK() async -> URL? { nil }
   func chooseFilesToSend() async -> [URL] { [] }
   func captureFolders() -> [URL] { [] }

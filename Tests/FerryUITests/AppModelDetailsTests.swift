@@ -237,6 +237,8 @@ struct AppModelDetailsTests {
     async let copied: Void = model.copyAddress(Self.line, on: id)
     await sleeps.waitForSleeper()
     #expect(log.all.contains("copy 192.0.2.159"))
+    // VoiceOver hears it too: the line's new value is not where its focus is.
+    #expect(log.all.contains("announce Copied"))
     #expect(model.isCopied(Self.line, on: id))
     #expect(sleeps.durations == [.milliseconds(1500)])
     sleeps.wakeAll()

@@ -116,6 +116,7 @@ extension AppModel {
   func copyAddress(_ line: DevicePresentation.DetailLine, on device: DeviceID) async {
     guard let address = line.address else { return }
     services.copy(address)
+    services.announce(String(localized: DevicePresentation.copiedResource))
     let copied = CopiedAddress(device: device, line: line.id)
     copiedAddress = copied
     // Cancelled or not, the word goes.

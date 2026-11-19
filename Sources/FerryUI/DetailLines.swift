@@ -51,9 +51,7 @@ struct DetailLines: View {
       DetailLineContent(line: line, copied: copied)
     }
     .buttonStyle(MenuRowStyle(verticalPadding: 2))
-    .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(verbatim: DevicePresentation.detailLabel(line, copied: copied)))
-    .accessibilityAddTraits(.isButton)
     .accessibilityAction(named: Text(DevicePresentation.copyAddressResource(line))) {
       tools.copyAddress(line)
     }
