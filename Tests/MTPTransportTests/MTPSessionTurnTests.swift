@@ -6,11 +6,12 @@ import Testing
 @testable import MTPTransport
 
 /// A turn that refuses, as the agent's does for a request cancelled while it queued.
-struct RefusedTurn: DeviceTurn {
+private struct RefusedTurn: DeviceTurn {
   func takeTurn() throws(TransportError) { throw .cancelled }
 }
 
 /// The session asks for the request's turn once it holds its gate, before any device call.
+@Suite(.timeLimit(.minutes(1)))
 struct MTPSessionTurnTests {
   @Test func aRefusedTurnTouchesNoDevice() async throws {
     let device = SessionFixture.makeDevice()

@@ -12,7 +12,8 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct AgentQueueDeadlineTests {
   /// The agent's service behind an anonymous listener, a client with a short deadline, and an
-  /// upload parked on the device, holding the domain's gate, until `release`.
+  /// upload parked on the device until `release`, holding its domain's gate and, on a device
+  /// that serialises its operations, the device's session gate.
   private struct Setup {
     let harness: AgentHarness
     let device: FakeDevice
@@ -185,5 +186,32 @@ struct AgentQueueDeadlineTests {
     _ = try await client.send(.list(domain: domain, folder: .root), file: nil)
 
     #expect(try await setup.device.list(.root, in: storageID(setup.device)).isEmpty)
+  }
+
+  /// A list queued at the device behind the SD card's upload has no deadline while it waits,
+  /// and gets one once it holds the device: when the device then never answers, it times out.
+  @Test func aListThatReachesTheDeviceAfterQueueingStillTimesOut() async throws {
+    let setup = try await parkedUpload(onCard: true)
+    defer { setup.finish() }
+    let (client, domain, device) = (setup.client, setup.domain, setup.device)
+    await device.suspendNext(.list)
+    let listing = Task { try await client.send(.list(domain: domain, folder: .root), file: nil) }
+    try await setup.queuedAtTheDevice(1)
+
+    // Queued behind the card's upload for four deadlines, then the device is its.
+    try await Task.sleep(for: .milliseconds(400))
+    setup.release.finish()
+
+    // If no deadline ever starts, the time limit cancels the list rather than hang the run.
+    await #expect(throws: TransportError.agentNotResponding) {
+      try await withTaskCancellationHandler {
+        try await listing.value
+      } onCancel: {
+        listing.cancel()
+      }
+    }
+    // The list still holds the device; the upload finishes once it lets go.
+    await device.resume(.list)
+    #expect(await setup.upload.value.isEntry)
   }
 }
