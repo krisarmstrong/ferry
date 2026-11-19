@@ -1,7 +1,8 @@
 import FerryIPC
 import Foundation
 
-/// Open Shell: what Terminal is given to run `adb -s <serial> shell`.
+/// Open Shell: what Terminal is given to run `adb -t <transport_id> shell`, or
+/// `adb -s <serial> shell` where adb names no connection.
 ///
 /// Terminal opens a `.command` file and runs it; the file is written to a private folder (mode
 /// 0700, named for this launch) with the one command in it, so there is one layer of quoting, for
@@ -27,9 +28,15 @@ enum ShellLaunch {
     #!/bin/zsh
     rm -f -- \(quoted(file.path))
     rmdir -- \(quoted(file.deletingLastPathComponent().path)) 2>/dev/null
-    \(quoted(target.adb)) -s \(quoted(target.serial)) shell
+    \(quoted(target.adb)) \(select(target)) shell
 
     """
+  }
+
+  /// `-t <id>` when adb named the unit's connection, so the shell never reaches another unit
+  /// that took the address since; `-s <serial>` otherwise.
+  static func select(_ target: ShellTarget) -> String {
+    target.transportID.map { "-t \(quoted($0))" } ?? "-s \(quoted(target.serial))"
   }
 
   /// Writes the script into a new private folder under `base` and returns its URL.

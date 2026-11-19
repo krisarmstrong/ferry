@@ -26,6 +26,20 @@ struct ShellLaunchTests {
     #expect(script.contains("'/opt/homebrew/bin/adb' -s '0123456789abcdef' shell\n"))
   }
 
+  /// A route adb gave a connection id selects the unit by it; one without uses the serial.
+  @Test func thePinnedConnectionIsSelectedByItsID() throws {
+    let file = URL(filePath: "/tmp/ferry-shell-X/shell.command")
+    let pinned = try #require(
+      ShellTarget(adb: "/opt/homebrew/bin/adb", serial: "192.0.2.31:5555", transportID: "7"))
+    let script = ShellLaunch.script(for: pinned, file: file)
+    #expect(script.contains("'/opt/homebrew/bin/adb' -t '7' shell\n"))
+    #expect(!script.contains(" -s "))
+    let unpinned = try target("/opt/homebrew/bin/adb", "192.0.2.31:5555")
+    #expect(
+      ShellLaunch.script(for: unpinned, file: file)
+        .contains("'/opt/homebrew/bin/adb' -s '192.0.2.31:5555' shell\n"))
+  }
+
   /// A path with a quote in it cannot end its quoting, in the adb path or the script's own.
   @Test func aQuoteInAPathStaysInsideItsQuoting() throws {
     let script = ShellLaunch.script(

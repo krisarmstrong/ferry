@@ -43,3 +43,9 @@ func shellTargetsAreValidated(adb: String, serial: String, valid: Bool) throws {
   let decoded = try? JSONDecoder().decode(ShellTarget.self, from: Data(json.utf8))
   #expect((decoded != nil) == valid)
 }
+
+/// A connection id is adb's number for it: anything else (an option, a command) is refused.
+@Test(arguments: [("7", true), ("12345", true), ("", false), ("-1", false), ("7; rm", false)])
+func shellTransportIDsAreDigits(_ id: String, _ valid: Bool) {
+  #expect((ShellTarget(adb: "/opt/homebrew/bin/adb", serial: "S", transportID: id) != nil) == valid)
+}

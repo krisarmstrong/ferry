@@ -75,7 +75,10 @@ extension ADBTools {
   {
     guard let route = await target(id) else { return .failure(.notOverADB) }
     guard let adb = device.adbPath() else { return .failure(.adbNotFound) }
-    guard let shell = ShellTarget(adb: adb.path, serial: route.serial) else {
+    guard
+      let shell = ShellTarget(
+        adb: adb.path, serial: route.serial, transportID: route.transportID)
+    else {
       throw .unsupported("a shell for this device")
     }
     return .success(shell)

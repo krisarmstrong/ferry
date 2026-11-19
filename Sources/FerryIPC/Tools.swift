@@ -90,18 +90,26 @@ public typealias LogBatchHandler = @Sendable (LogBatch) async -> Void
 public struct ShellTarget: Codable, Sendable, Equatable {
   public let adb: String
   public let serial: String
+  /// The adb server's connection to the unit (`transport_id`), when adb reports one: the shell
+  /// then selects the unit by it (`adb -t`), so it never reaches another unit that took the
+  /// address since. Digits only.
+  public let transportID: String?
 
-  public init?(adb: String, serial: String) {
-    guard Self.isValid(adb: adb), Self.isValid(serial: serial) else { return nil }
+  public init?(adb: String, serial: String, transportID: String? = nil) {
+    guard Self.isValid(adb: adb), Self.isValid(serial: serial),
+      transportID.map(Self.isValid(transportID:)) != false
+    else { return nil }
     self.adb = adb
     self.serial = serial
+    self.transportID = transportID
   }
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let adb = try container.decode(String.self, forKey: .adb)
     let serial = try container.decode(String.self, forKey: .serial)
-    guard let target = ShellTarget(adb: adb, serial: serial) else {
+    let transportID = try container.decodeIfPresent(String.self, forKey: .transportID)
+    guard let target = ShellTarget(adb: adb, serial: serial, transportID: transportID) else {
       throw DecodingError.dataCorrupted(
         .init(codingPath: decoder.codingPath, debugDescription: "invalid shell target"))
     }
@@ -111,6 +119,11 @@ public struct ShellTarget: Codable, Sendable, Equatable {
   static func isValid(adb path: String) -> Bool {
     path.hasPrefix("/") && path.utf8.count <= 1024
       && path.unicodeScalars.allSatisfy { $0.value >= 0x20 && $0.value != 0x7F }
+  }
+
+  static func isValid(transportID: String) -> Bool {
+    (1...20).contains(transportID.utf8.count)
+      && transportID.unicodeScalars.allSatisfy { ("0"..."9").contains($0) }
   }
 
   static func isValid(serial: String) -> Bool {
