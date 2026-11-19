@@ -125,7 +125,12 @@ extension AppModel {
     userInitiated: Bool = true
   ) async -> AgentResponse? {
     guard userInitiated else {
-      return try? await client.send(request, file: file, progress: progress)
+      do {
+        return try await client.send(request, file: file, progress: progress)
+      } catch {
+        Self.log.info("background request failed: \(String(describing: error), privacy: .private)")
+        return nil
+      }
     }
     preservedChanges = []
     toolMessage = nil

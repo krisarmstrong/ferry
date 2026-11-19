@@ -22,7 +22,7 @@ import os
   static let loginItemsSettings = URL(
     string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!
 
-  private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "AppModel")
+  static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "AppModel")
   private static let pollInterval = Duration.seconds(2)
   static let emptyGuideDelay = Duration.seconds(10)
 

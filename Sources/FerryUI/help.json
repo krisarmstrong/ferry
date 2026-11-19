@@ -129,7 +129,7 @@
           "title": "Use over Wi-Fi",
           "paragraphs": [
             "With the device on USB debugging and connected by cable, click **Use over Wi-Fi** under its name. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the network if it is off, and connects to the first address that answers. Connect the device to Ethernet or Wi-Fi first.",
-            "Turning it on restarts ADB on the device, so Ferry waits until the device has no transfer, screen recording or log running."
+            "Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again."
           ]
         },
         {
@@ -155,7 +155,7 @@
         {
           "title": "Is this address your device?",
           "paragraphs": [
-            "Anyone on a network can claim a device's serial number. So when a new address answers as a device Ferry already knows, Ferry does not use it on its own: the menu asks **Is <address> your <device>?**",
+            "Anyone on a network can claim a device's serial number. So when a new address answers as a device Ferry already knows, Ferry does not use it on its own: the menu asks “Is *address* your *device*?”",
             "**Use It** connects the address and remembers it for that device. **Ignore** leaves it unused until Ferry restarts."
           ]
         }
