@@ -109,8 +109,8 @@ transfer, **More Tools with USB Debugging…** in the menu opens the steps below
 2. After that, on the tester: **Settings** → **System** → **About tester**. Tap
    **Build number** until developer mode is on.
 3. Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.
-4. With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester
-   offers ADB only after this.
+4. With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The
+   tester offers ADB only after this.
 5. On the device, tick **Always allow from this computer** and tap **OK**.
 
 ### Android 8 or 9
@@ -149,9 +149,9 @@ debugging reports for itself. A device that is also on a cable is always served 
 ### Use over Wi-Fi
 
 With the device on USB debugging and connected by cable, click the device in the menu, then
-**Use over Wi-Fi**. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the network if it
-is off, and connects to the first address that answers. Connect the device to Ethernet or Wi-Fi
-first.
+**Use over Wi-Fi**. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the
+network if it is off, and connects to the first address that answers. Connect the device to
+Ethernet or Wi-Fi first.
 
 Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a
 screen recording or a log running: let it finish, then try again.
@@ -159,9 +159,9 @@ screen recording or a log running: let it finish, then try again.
 ### Pair with Code
 
 On the device, open **Developer options** → **Wireless debugging** and choose **Pair device with
-pairing code**. In Ferry's menu, click **Pair with Code…**, enter the IP address and port and the
-code the device shows, and click **Pair**. Ferry then connects to the address the device offers
-for connections, which is not the one it paired on.
+pairing code**. In Ferry's menu, click **Pair with Code…**, enter the IP address and port and
+the code the device shows, and click **Pair**. Ferry then connects to the address the device
+offers for connections, which is not the one it paired on.
 
 ### Connect by Address
 
@@ -172,8 +172,8 @@ Ferry uses adb's usual port unless you add another after a colon. If the device 
 ### Remembered devices
 
 Ferry remembers each device it connects this way by its serial number, and connects to it again
-when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered · not
-nearby**: click it, then **Connect Again** to try again.
+when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered
+· not nearby**: click it, then **Connect Again** to try again.
 
 **Forget** disconnects the device and forgets its addresses. Ferry no longer connects to it by
 itself.
@@ -279,8 +279,9 @@ When every selected file is an `.apk` and Ferry reaches the device over ADB (wit
 on, or over Wi-Fi), the menu also has **Install on** the device. It installs each app
 as **Install App…** in the menu does.
 
-Finder shows no progress for these. A notification says when the files are on the device or
-the apps are installed, or why not. The Ferry menu lists a send in progress under its device.
+Finder shows no progress for these. A notification says when the files are on the device or the
+apps are installed, or why not. The Ferry menu shows a send in progress when you click its
+device.
 
 To turn on the Finder menu, once:
 
@@ -307,9 +308,9 @@ level, as it is now on the device. If anything inside it is new or changed on th
 folder inside it was never opened in Finder, the whole folder stays and Finder puts it back,
 showing what is there; delete it again to remove it. A folder nested more than 64 levels deep,
 or holding more than 100,000 items, also stays, and so does a folder that holds a file whose
-name the Mac can't show (Finder leaves that file out of the folder): delete it on the device. A file
-the device changed since Finder last showed it is not deleted either: Finder puts it back with
-the device's version.
+name the Mac can't show (Finder leaves that file out of the folder): delete it on the device. A
+file the device changed since Finder last showed it is not deleted either: Finder puts it back
+with the device's version.
 
 ### Free up space on the Mac
 
@@ -319,10 +320,10 @@ the device, Control-click the file and choose **Remove Download**.
 ## The menu
 
 Click the Ferry icon in the menu bar to see each connected device. Each one is a row with a
-round tile (in color while Ferry serves the device, grey otherwise), its name, and a line under the
-name: how Ferry reaches it and its free space, such as **USB · 21 GB free**, its address over
-Wi-Fi, or its state. Click a device to see what you can do with it, and click it again to close
-it. One device is open at a time; the first ready one is open when the menu opens.
+round tile (in color while Ferry serves the device, grey otherwise), its name, and a line under
+the name: how Ferry reaches it and its free space, such as **USB · 21 GB free**, its address
+over Wi-Fi, or its state. Click a device to see what you can do with it, and click it again to
+close it. One device is open at a time; the first ready one is open when the menu opens.
 
 | State | Meaning |
 | ----- | ------- |
@@ -339,20 +340,21 @@ Above the devices, the menu can also show:
   shows only once a device has been connected, since there is nothing to turn on before.
 - **Allow Ferry's helper** or **macOS can't find Ferry's helper**: macOS is not letting the
   helper run. See [Ferry's helper is not responding](#ferrys-helper-is-not-responding).
-- A copy in progress, under its device: **Copying "name" to the device** or **to this Mac**,
-  with how far it has got.
-- **No device connected**, with a **How to Connect** button. The first time the menu stays
+- A copy in progress, when you click its device: **Copying "name" to the device** or **to this
+  Mac**, with how far it has got.
+- **No device connected**, with **How to Connect** under it. The first time the menu stays
   open for about 10 seconds with no device, Ferry opens the setup guide.
 
 While the menu is open, Ferry checks for devices every 2 seconds.
 
-A device over ADB (with USB debugging on, or over Wi-Fi) lists the [tools](#tools-over-usb-debugging) when you click it. A device on
-file transfer also shows **More Tools with USB Debugging…**, which opens the
-[steps](#usb-debugging-adb), or **Allow USB debugging on the device** once USB debugging is on
-and waits for you to tap **Allow**. When `adb` is not installed and a device is connected, the
-menu shows **Install adb for more tools…**. When `adb` is installed but its server is not
-answering, it shows **adb isn't running** with **Check Again**. A device on your network that
-waits for you to allow this Mac shows **Waiting for you to allow this Mac on** its address.
+A device over ADB (with USB debugging on, or over Wi-Fi) lists the
+[tools](#tools-over-usb-debugging) when you click it. A device on file transfer also shows
+**More Tools with USB Debugging…**, which opens the [steps](#usb-debugging-adb), or **Allow USB
+debugging on the device** once USB debugging is on and waits for you to tap **Allow**. When
+`adb` is not installed and a device is connected, the menu shows **Install adb for more
+tools…**. When `adb` is installed but its server is not answering, it shows **adb isn't
+running** with **Check Again**. A device on your network that waits for you to allow this Mac
+shows **Waiting for you to allow this Mac on** its address.
 
 Menu items:
 
@@ -361,10 +363,10 @@ Menu items:
   mode; mounts every device you ejected; and checks again a device that is not sharing files.
 - **Eject** (in a ready device's list): removes the device from Finder and releases it, so you
   can unplug it or use it with another app. The device then shows **Ejected** until you click
-  **Mount**, choose **Refresh**, or unplug it and plug it back in. Changes that had not reached the device
-  are saved to a folder on the Mac: the menu says **Unsent changes were saved to** that folder
-  and offers **Reveal in Finder**. Deletes and renames that had not reached the device are
-  dropped, so the device keeps those files under their old names.
+  **Mount**, choose **Refresh**, or unplug it and plug it back in. Changes that had not reached
+  the device are saved to a folder on the Mac: the menu says **Unsent changes were saved to**
+  that folder and offers **Reveal in Finder**. Deletes and renames that had not reached the
+  device are dropped, so the device keeps those files under their old names.
 - **Mount** (in an ejected device's list): puts it back in Finder.
 - **Check Again** (in the list of a device that is in use or can't open): asks Ferry to open
   the device again.
@@ -372,7 +374,8 @@ Menu items:
   `Download` folder, as **Send to** does in Finder.
 - **Help** (⌘?): opens Ferry Help.
 - **Settings…** (⌘,): opens Settings.
-- **Quit Ferry** (⌘Q): closes the menu-bar item. The helper keeps running, so devices stay in Finder.
+- **Quit Ferry** (⌘Q): closes the menu-bar item. The helper keeps running, so devices stay in
+  Finder.
 
 Settings:
 
@@ -408,8 +411,8 @@ Recording** ends it.
 Ferry saves them in `Documents/Ferry/<device>/`, screenshots in `Screenshots` and recordings in
 `Screen Recordings`, named like macOS's own, such as
 `Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png`, and shows them in Finder. macOS asks
-whether Ferry may use Documents the first time it saves one. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit
-Ferry meanwhile; Ferry then removes it from the device.
+whether Ferry may use Documents the first time it saves one. It never replaces a file. A recording waits on the device until Ferry has
+saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device.
 
 If Ferry can't save a recording, the menu shows **Recording couldn't be saved**:
 **Choose Folder…** saves it where you pick, and **Discard** deletes it from the device.
