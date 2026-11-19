@@ -65,7 +65,7 @@ struct ADBMinorFixTests {
     }
     defer { server.stop() }
     let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
-    let stream = try await host.connect("S", service: "sync:")
+    let stream = try await host.connect("S", service: "sync:", transportID: nil)
     let sync = ADBSync(stream: stream, features: [], entryLimit: 3)
     await #expect {
       _ = try await sync.list("/x")
@@ -88,7 +88,7 @@ struct ADBMinorFixTests {
     }
     defer { server.stop() }
     let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
-    let stream = try await host.connect("S", service: "sync:")
+    let stream = try await host.connect("S", service: "sync:", transportID: nil)
     let sync = ADBSync(
       stream: stream, features: ["stat_v2"], entryLimit: ADBSync.defaultEntryLimit,
       growthAllowance: 4096)
@@ -115,7 +115,7 @@ struct ADBMinorFixTests {
     }
     defer { server.stop() }
     let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
-    let stream = try await host.connect("S", service: "sync:")
+    let stream = try await host.connect("S", service: "sync:", transportID: nil)
     let sync = ADBSync(stream: stream, features: ["stat_v2"])
     let (url, handle) = try SyncFixture.scratchFile()
     defer { try? FileManager.default.removeItem(at: url) }
@@ -138,7 +138,7 @@ struct ADBMinorFixTests {
     }
     defer { server.stop() }
     let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
-    let stream = try await host.connect("S", service: "sync:")
+    let stream = try await host.connect("S", service: "sync:", transportID: nil)
     let sync = ADBSync(
       stream: stream, features: ["stat_v2"], entryLimit: ADBSync.defaultEntryLimit,
       growthAllowance: 4096)
@@ -165,7 +165,8 @@ struct ADBMinorFixTests {
     defer { server.stop() }
     let session = ADBSession(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), serial: ADBFixture.serial,
-      info: ADBFixture.info, features: Set(features.split(separator: ",").map(String.init)),
+      transportID: nil, info: ADBFixture.info,
+      features: Set(features.split(separator: ",").map(String.init)),
       method: .usbADB)
     let link = try RemotePath("/Link")
     await #expect(throws: TransportError.notFound(link)) {

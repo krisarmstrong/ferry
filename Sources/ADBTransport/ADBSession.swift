@@ -40,7 +40,7 @@ public actor ADBSession: DeviceSession {
   private var onRelease: (@Sendable () async -> Void)?
 
   public init(
-    host: ADBHost, serial: String, transportID: String? = nil, info: DeviceInfo,
+    host: ADBHost, serial: String, transportID: String?, info: DeviceInfo,
     features: Set<String>, method: ConnectionMethod, partials: PartialRegistry = PartialRegistry(),
     onRelease: @escaping @Sendable () async -> Void = {}
   ) {

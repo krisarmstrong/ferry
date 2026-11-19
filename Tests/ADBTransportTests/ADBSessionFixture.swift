@@ -20,7 +20,8 @@ enum ADBFixture {
   ) async throws -> T {
     let server = try await device.serve(serial: serial)
     let session = ADBSession(
-      host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), serial: serial, info: info,
+      host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), serial: serial,
+      transportID: nil, info: info,
       features: ["cmd", "shell_v2", "stat_v2"], method: .usbADB)
     do {
       let result = try await body(session)

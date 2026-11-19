@@ -25,7 +25,8 @@ struct ADBLimitsTests {
     let fixture = ADBHostRunTests()
     let server = try await fixture.server(features: features, service: service, shell: script)
     defer { server.stop() }
-    return try await fixture.host(server).run(serial: "S", command: "x", token: Self.token)
+    return try await fixture.host(server).run(
+      serial: "S", command: "x", token: Self.token, transportID: nil)
   }
 
   @Test(arguments: [Self.packetLimit, Self.packetLimit + 1])

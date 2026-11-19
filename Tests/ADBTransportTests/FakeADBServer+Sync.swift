@@ -117,7 +117,7 @@ enum SyncFixture {
       try await script(peer)
     }
     let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
-    let stream = try await host.connect("S", service: "sync:")
+    let stream = try await host.connect("S", service: "sync:", transportID: nil)
     return (ADBSync(stream: stream, features: features), server)
   }
 

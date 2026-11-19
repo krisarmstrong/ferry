@@ -72,7 +72,7 @@ extension ADBHost {
   /// `features` is the device's feature set when the caller already has it; otherwise it is
   /// asked for.
   public func run(
-    serial: String, command: String, features: Set<String>? = nil, transportID: String? = nil
+    serial: String, command: String, features: Set<String>? = nil, transportID: String?
   ) async throws(ADBError) -> ADBShellResult {
     try await run(
       serial: serial, command: command, token: ADBShell.newToken(), features: features,
@@ -86,7 +86,7 @@ extension ADBHost {
 
   func run(
     serial: String, command: String, token: String, features: Set<String>? = nil,
-    transportID: String? = nil
+    transportID: String?
   ) async throws(ADBError) -> ADBShellResult {
     let channel = try await openShell(
       serial, command, token: token, features: features, transportID: transportID)
@@ -100,7 +100,7 @@ extension ADBHost {
   /// that carries the status on a final line. The token is the wrapper's, `nil` over `shell,v2`.
   func openShell(
     _ serial: String, _ command: String, token: String, features: Set<String>?,
-    transportID: String? = nil
+    transportID: String?
   ) async throws(ADBError) -> (stream: ADBStream, token: String?) {
     let known: Set<String>
     if let features {

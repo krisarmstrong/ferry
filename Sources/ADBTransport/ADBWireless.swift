@@ -133,7 +133,7 @@ public struct ADBWireless: Sendable {
   public func networkAddresses(of adbSerial: String) async throws(ADBError) -> [String] {
     let command = try ADBShell.command("ip", ["-4", "addr"])
     let result = try await bounded { [host] () async throws(ADBError) in
-      try await host.run(serial: adbSerial, command: command)
+      try await host.run(serial: adbSerial, command: command, transportID: nil)
     }
     guard result.status == 0 else { throw .failed("ip exited with status \(result.status)") }
     return Self.networkAddresses(fromIPAddr: String(bytes: result.stdout, encoding: .utf8) ?? "")
@@ -143,7 +143,7 @@ public struct ADBWireless: Sendable {
   /// while it restarts.
   public func restartInTCPMode(_ adbSerial: String, port: UInt16) async throws(ADBError) {
     let reply = try await bounded { [host] () async throws(ADBError) in
-      let stream = try await host.connect(adbSerial, service: "tcpip:\(port)")
+      let stream = try await host.connect(adbSerial, service: "tcpip:\(port)", transportID: nil)
       defer { stream.cancel() }
       var reply = Data()
       while let chunk = try await stream.readSome(upTo: 4096), reply.count < 4096 {

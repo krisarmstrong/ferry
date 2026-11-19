@@ -44,7 +44,7 @@ struct ADBHostRunTests {
       try await peer.raw(Peer.shellPacket(3, Data([7])))
     }
     defer { server.stop() }
-    let result = try await host(server).run(serial: "S", command: "ls /x")
+    let result = try await host(server).run(serial: "S", command: "ls /x", transportID: nil)
     #expect(result.status == 7)
     #expect(String(bytes: result.stdout, encoding: .utf8) == "out1out2")
     #expect(String(bytes: result.stderr, encoding: .utf8) == "err")
@@ -56,7 +56,7 @@ struct ADBHostRunTests {
     }
     defer { server.stop() }
     await #expect(throws: ADBError.connectionClosed) {
-      _ = try await host(server).run(serial: "S", command: "x")
+      _ = try await host(server).run(serial: "S", command: "x", transportID: nil)
     }
   }
 
@@ -71,7 +71,8 @@ struct ADBHostRunTests {
       try await peer.send("a\nb\n\n\(Self.token) 3\n")
     }
     defer { server.stop() }
-    let result = try await host(server).run(serial: "S", command: "ls /x", token: Self.token)
+    let result = try await host(server).run(
+      serial: "S", command: "ls /x", token: Self.token, transportID: nil)
     #expect(result.status == 3)
     #expect(String(bytes: result.stdout, encoding: .utf8) == "a\nb\n")
     #expect(result.stderr.isEmpty)
@@ -84,7 +85,7 @@ struct ADBHostRunTests {
     }
     defer { server.stop() }
     await #expect {
-      _ = try await host(server).run(serial: "S", command: "x", token: Self.token)
+      _ = try await host(server).run(serial: "S", command: "x", token: Self.token, transportID: nil)
     } throws: {
       if case .protocolViolation = $0 as? ADBError { return true }
       return false
@@ -99,7 +100,7 @@ struct ADBHostRunTests {
       try await peer.raw(Peer.shellPacket(3, Data([0])))
     }
     defer { server.stop() }
-    _ = try await host(server).run(serial: "S", command: "cat")
+    _ = try await host(server).run(serial: "S", command: "cat", transportID: nil)
     #expect(await first.value == Data([4, 0, 0, 0, 0]))
   }
 }

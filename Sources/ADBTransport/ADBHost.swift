@@ -105,7 +105,7 @@ public actor ADBHost {
     }
   }
 
-  public func features(_ serial: String, transportID: String? = nil) async throws(ADBError)
+  public func features(_ serial: String, transportID: String?) async throws(ADBError)
     -> Set<String>
   {
     let prefix =
@@ -127,7 +127,7 @@ public actor ADBHost {
   /// one, and starts `service` on it; what follows on the returned stream is the service's own
   /// protocol.
   public func connect(
-    _ serial: String, service: String, transportID: String? = nil
+    _ serial: String, service: String, transportID: String?
   ) async throws(ADBError) -> ADBStream {
     let target =
       transportID.map { "host:transport-id:\($0)" }

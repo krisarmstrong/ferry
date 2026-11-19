@@ -56,7 +56,8 @@ struct ADBWireGoldenTests {
     }
     defer { server.stop() }
     let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
-    let sync = ADBSync(stream: try await host.connect("S", service: "sync:"), features: [])
+    let sync = ADBSync(
+      stream: try await host.connect("S", service: "sync:", transportID: nil), features: [])
 
     let stat = try #require(try await sync.stat("/a"))
     #expect(stat.mode == 0o100644 && stat.size == 3)

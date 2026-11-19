@@ -204,7 +204,8 @@ struct ADBHostTests {
       try await peer.answer("cmd,stat_v2,shell_v2")
     }
     defer { server.stop() }
-    #expect(try await host(server).features("abc") == ["cmd", "stat_v2", "shell_v2"])
+    #expect(
+      try await host(server).features("abc", transportID: nil) == ["cmd", "stat_v2", "shell_v2"])
   }
 
   @Test func missingDeviceIsDeviceGone() async throws {
@@ -214,7 +215,7 @@ struct ADBHostTests {
     }
     defer { server.stop() }
     await #expect(throws: ADBError.deviceGone("abc")) {
-      _ = try await host(server).features("abc")
+      _ = try await host(server).features("abc", transportID: nil)
     }
   }
 
@@ -227,7 +228,7 @@ struct ADBHostTests {
       try await peer.send("DONE")
     }
     defer { server.stop() }
-    let stream = try await host(server).connect("abc", service: "sync:")
+    let stream = try await host(server).connect("abc", service: "sync:", transportID: nil)
     #expect(try await stream.read(exactly: 4) == Data("DONE".utf8))
     await stream.close()
   }
@@ -239,7 +240,7 @@ struct ADBHostTests {
     }
     defer { server.stop() }
     await #expect(throws: ADBError.deviceGone("abc")) {
-      _ = try await host(server).connect("abc", service: "sync:")
+      _ = try await host(server).connect("abc", service: "sync:", transportID: nil)
     }
   }
 
@@ -292,10 +293,11 @@ struct ADBHostTests {
     }
     defer { server.stop() }
     await #expect(throws: ADBError.self) {
-      _ = try await host(server).features(String(repeating: "x", count: 70_000))
+      _ = try await host(server).features(String(repeating: "x", count: 70_000), transportID: nil)
     }
     await #expect(throws: ADBError.self) {
-      _ = try await host(server).connect(String(repeating: "x", count: 70_000), service: "sync:")
+      _ = try await host(server).connect(
+        String(repeating: "x", count: 70_000), service: "sync:", transportID: nil)
     }
     try await Task.sleep(for: .milliseconds(100))
     #expect(await connections.value == 0)

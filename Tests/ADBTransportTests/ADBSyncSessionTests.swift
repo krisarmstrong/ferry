@@ -171,7 +171,7 @@ struct ADBSyncSessionTests {
     }
     defer { server.stop() }
     let host = ADBHost(port: server.port, locator: ADBHostTests.noAdb)
-    let stream = try await host.connect("S", service: "sync:")
+    let stream = try await host.connect("S", service: "sync:", transportID: nil)
     let sync = ADBSync(stream: stream, features: [], entryLimit: limit)
     if extra == 0 {
       #expect(try await sync.list("/x").entries.count == limit)
