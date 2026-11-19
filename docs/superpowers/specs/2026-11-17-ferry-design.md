@@ -262,8 +262,13 @@ Replicated FileProvider honours signals only on the working set. The agent keeps
 change log (anchored, in memory, bounded) fed by its own mutations and by listing diffs, and
 signals the working set; the extension's working-set enumerator reports changes since an
 anchor. An anchor from an earlier agent process is reported expired, so the system
-re-enumerates. Phone-side changes surface when a folder is listed again (menu "Refresh"
-re-lists known folders). No polling loops.
+re-enumerates. Phone-side changes surface on their own (amended 2026-11-19, owner request after
+the live run): over ADB the agent watches the folders it has listed with the device's `inotifyd`
+and re-lists a folder when it reports any event (events are treated as hints, since shared
+storage reports them incompletely); over MTP it reads the device's object events; and while a
+device is connected the agent re-lists its most recently listed folders every 30 s (at most 32
+folders, skipped while a transfer is running, paused while the Mac sleeps), signalling only
+when a listing differs. Menu "Refresh" stays as the manual re-list.
 
 ## Item identity (amended 2026-11-17)
 
