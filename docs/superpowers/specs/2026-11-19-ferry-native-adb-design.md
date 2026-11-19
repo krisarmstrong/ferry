@@ -776,3 +776,11 @@ Fetched 2026-11-19. AOSP paths are under
   `docs/spikes/2026-11-adb.md`, `2026-11-ptpcamerad.md`; `Sources/ADBTransport/*`,
   `Sources/FerryAgentCore/{WirelessADB*,WirelessVouching,USBWatcher,CompositeTransport}.swift`,
   `Sources/MTPTransport/{USBCandidates,USBRegistry}.swift`, `Tests/ADBTransportTests/`.
+
+## Owner decisions (2026-11-19)
+
+- O1 Budget: 30 working days in five phases, hard stop 2027-02-26, per-phase kill criteria as written.
+- O2 `~/.android/adbkey`: reused read-only as a second key for authorisation; never written. Ferry's own key lives in the Keychain.
+- O3 Local Network prompt: accepted; asked on first use of a network feature, never at launch.
+- O4 Android 11+ test phone: available; phase P4 (TLS pairing) stays in.
+- Controller calls (owner may override): O5 Ferry keeps a device it holds when an adb server starts and offers "Let adb Use This Device"; O6 a provisioning profile may be added for FerryAgent's Keychain access if required, else login keychain bound to the agent's signature; delayed ACK and `reverse` deferred (no target device supports delayed ACK; Ferry has no `reverse` caller).
