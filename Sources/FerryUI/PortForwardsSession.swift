@@ -3,8 +3,8 @@ import FerryIPC
 import Foundation
 import Observation
 
-/// One device's port forwarding window: the forwards adb holds for it, adding one and removing
-/// one. A port is checked here before anything is sent (the agent checks again), and an error
+/// One device's Port Forwarding, in its expansion: the forwards adb holds for it, adding one
+/// and removing one. A port is checked here before anything is sent (the agent checks again), and an error
 /// is shown where the user is looking, in adb's words when adb refused.
 @Observable @MainActor final class PortForwardsSession {
   let device: DeviceID

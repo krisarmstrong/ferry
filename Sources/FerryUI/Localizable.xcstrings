@@ -1,6 +1,18 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "If the port on this Mac is already in use, adb's message shows under the ports. Ferry lists only the TCP forwards adb holds for this device." : {
+      "extractionState" : "manual"
+    },
+    "Click Port Forwarding under the device to send connections to a port on this Mac to a port on the device. It opens in place and lists each forward as Mac 8080 → Device 80. Type the port on this Mac (1024 or higher) and the port on the device, then click Add or press Return. The remove button beside a forward ends it." : {
+      "extractionState" : "manual"
+    },
+    "Remove forward %@" : {
+
+    },
+    "Mac %@ → Device %@" : {
+
+    },
     "Click an address to copy it; the line shows Copied for a moment. Copy Device Details, just under the details, copies everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage." : {
       "extractionState" : "manual"
     },
@@ -249,9 +261,6 @@
     "Click Open Shell to open Terminal with a shell on the device (adb shell). Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it." : {
       "extractionState" : "manual"
     },
-    "Click Port Forwarding to send connections to a port on this Mac to a port on the device. Type the port on this Mac (1024 or higher) and the port on the device, then click Add. Remove ends a forward." : {
-      "extractionState" : "manual"
-    },
     "Choose Folder…" : {
 
     },
@@ -307,9 +316,6 @@
 
     },
     "Connect the device with a cable and allow USB debugging first." : {
-
-    },
-    "Connections to a port on this Mac reach a port on the device." : {
 
     },
     "Control-click a file you opened and choose **Remove Download**. The file stays on the device." : {
@@ -487,9 +493,6 @@
     },
     "How to Turn On File Transfer" : {
 
-    },
-    "If the port on this Mac is already in use, the window shows adb's message. Ferry lists only the TCP forwards adb holds for this device." : {
-      "extractionState" : "manual"
     },
     "Info" : {
 
@@ -742,9 +745,6 @@
     "Refresh" : {
 
     },
-    "Remove" : {
-
-    },
     "Remove Ferry" : {
 
     },
@@ -752,9 +752,6 @@
 
     },
     "Remove Ferry…" : {
-
-    },
-    "Remove the forward from port %@" : {
 
     },
     "Removes a ready device from Finder and releases it; it then shows **Ejected**. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names." : {
@@ -846,9 +843,6 @@
     },
     "The sidebar says \"Ferry\"" : {
       "extractionState" : "manual"
-    },
-    "This Mac port %@ → device port %@" : {
-
     },
     "Over USB debugging or Wi-Fi, changes made on the device show up in Finder on their own. In file transfer mode, new and deleted files show up within about 30 seconds; to see a file that was changed in place or renamed on the device, choose **Refresh** in the Ferry menu." : {
       "extractionState" : "manual"

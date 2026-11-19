@@ -50,13 +50,17 @@ struct DeviceRow: View {
           DevicePresentation.actions(for: device, isRemembered: isRemembered, recording: recording),
           id: \.self
         ) { action in
-          MenuRow(
-            title: Text(action.title), symbol: action.symbol, indent: MenuMetrics.actionIndent,
-            action: perform(action)
-          )
-          .deviceAction(action.title, on: name)
-          // One app at a time: Install App… waits for the one on its way.
-          .disabled(action == .installApp && tools.install != nil)
+          if action == .portForwarding {
+            PortForwardRows(tools: tools)
+          } else {
+            MenuRow(
+              title: Text(action.title), symbol: action.symbol, indent: MenuMetrics.actionIndent,
+              action: perform(action)
+            )
+            .deviceAction(action.title, on: name)
+            // One app at a time: Install App… waits for the one on its way.
+            .disabled(action == .installApp && tools.install != nil)
+          }
         }
       }
     }
@@ -71,7 +75,7 @@ struct DeviceRow: View {
     case .recordScreen: tools.record
     case .stopRecording: tools.stopRecording
     case .logcat: tools.openLogcat
-    case .portForwarding: tools.openForwards
+    case .portForwarding: tools.toggleForwards
     case .sendFile: tools.sendFiles
     case .installApp: tools.chooseAPK
     case .openShell: tools.openShell

@@ -22,7 +22,9 @@ struct ToolActions {
   let discard: () -> Void
   let openLogcat: () -> Void
   let openShell: () -> Void
-  let openForwards: () -> Void
+  /// The forwards while Port Forwarding is open; `nil` while it is closed.
+  let forwards: PortForwardsSession?
+  let toggleForwards: () -> Void
   /// The device's details as the menu shows them, and the line just copied.
   let details: DetailsShown
   let isCopied: (DevicePresentation.DetailLine) -> Bool
@@ -46,7 +48,8 @@ struct ToolActions {
     discard = { Task { await model.discardRecording(on: device) } }
     openLogcat = { open(.logcat) }
     openShell = { Task { await model.openShell(on: device) } }
-    openForwards = { open(.portForwarding) }
+    forwards = model.openForwards(of: device)
+    toggleForwards = { Task { await model.toggleForwards(of: device) } }
     details = model.shownDetails(of: device)
     isCopied = { model.isCopied($0, on: device) }
     copyAddress = { line in Task { await model.copyAddress(line, on: device) } }

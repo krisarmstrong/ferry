@@ -46,9 +46,10 @@ struct MenuExpansion: Equatable, Sendable {
 
 extension AppModel {
   /// The user opened or closed a row. A device opened shows its details, read now unless they
-  /// were read in the last 10 s.
+  /// were read in the last 10 s, with its Port Forwarding closed.
   func toggleExpansion(_ row: MenuExpansion.Row) {
     expansion.toggle(row)
+    forwardsOpen = nil
     loadExpandedDetailsIfDue()
   }
 
@@ -68,6 +69,7 @@ extension AppModel {
 
   func resetExpansion() {
     expansion.reset()
+    forwardsOpen = nil
   }
 
   func updateExpansion() {

@@ -93,6 +93,11 @@ import os
   @ObservationIgnored var detailReads: [DeviceID: DetailReadTask] = [:]
   /// The address line just copied, which shows "Copied" for a moment.
   var copiedAddress: CopiedAddress?
+  /// Each device's port forwards, kept while it is listed: the menu redraws its rows on every
+  /// status, and the ports typed must outlive them (see `AppModel+Developer`).
+  var forwardSessions: [DeviceID: PortForwardsSession] = [:]
+  /// The device whose Port Forwarding disclosure is open, one at most.
+  var forwardsOpen: DeviceID?
   /// Read from the system once launched (see `launch()`); `false` until then.
   public private(set) var opensAtLogin = false
   /// The login item change being applied, and how many have been requested.
@@ -318,6 +323,7 @@ import os
     collectFinishedRecordings()
     updateExpansion()
     forgetDetailsOfGoneDevices()
+    forgetForwardsOfGoneDevices()
     agent = .running
     let states = devices.map { "\(DevicePresentation.kind(of: $0.state))/\($0.method.rawValue)" }
       .joined(separator: ",")

@@ -46,9 +46,8 @@ struct CatalogKeysTests {
 
   @Test func theForwardStringsReadInPlainWords() {
     let forward = PortForward(local: 8080, remote: 80)
-    #expect(DevicePresentation.forwardLine(forward) == "This Mac port 8080 → device port 80")
-    #expect(
-      DevicePresentation.removeForwardLabel(forward) == "Remove the forward from port 8080")
+    #expect(DevicePresentation.forwardLine(forward) == "Mac 8080 → Device 80")
+    #expect(DevicePresentation.removeForwardLabel(forward) == "Remove forward 8080")
   }
 
   /// Every row the menu lists, and the summary of a remembered device, has its catalog entry.

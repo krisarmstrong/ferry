@@ -388,8 +388,8 @@ Settings:
 
 Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details,
 **Copy Device Details**, and its tools: **Take Screenshot**, **Record Screen**, **Logcat**,
-**Port Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows **More Tools
-with USB Debugging…** instead.
+**Port Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows
+**More Tools with USB Debugging…** instead.
 
 ### Install an app
 
@@ -441,12 +441,13 @@ changes unless you type a command that changes it.
 
 ### Forward a port
 
-Click **Port Forwarding** to send connections to a port on this Mac
-to a port on the device. Type the port on this Mac (1024 or higher) and the port on the device,
-then click **Add**. **Remove** ends a forward.
+Click **Port Forwarding** under the device to send connections to a port on this Mac to a port
+on the device. It opens in place and lists each forward as **Mac 8080 → Device 80**. Type the
+port on this Mac (1024 or higher) and the port on the device, then click **Add** or press
+Return. The remove button beside a forward ends it.
 
-If the port on this Mac is already in use, the window shows adb's message. Ferry lists only the
-TCP forwards adb holds for this device.
+If the port on this Mac is already in use, adb's message shows under the ports. Ferry lists only
+the TCP forwards adb holds for this device.
 
 ### Device details
 

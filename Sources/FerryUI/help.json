@@ -358,8 +358,8 @@
         {
           "title": "Forward a port",
           "paragraphs": [
-            "Click Port Forwarding to send connections to a port on this Mac to a port on the device. Type the port on this Mac (1024 or higher) and the port on the device, then click Add. Remove ends a forward.",
-            "If the port on this Mac is already in use, the window shows adb's message. Ferry lists only the TCP forwards adb holds for this device."
+            "Click Port Forwarding under the device to send connections to a port on this Mac to a port on the device. It opens in place and lists each forward as Mac 8080 → Device 80. Type the port on this Mac (1024 or higher) and the port on the device, then click Add or press Return. The remove button beside a forward ends it.",
+            "If the port on this Mac is already in use, adb's message shows under the ports. Ferry lists only the TCP forwards adb holds for this device."
           ]
         },
         {

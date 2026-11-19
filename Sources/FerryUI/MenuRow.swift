@@ -47,12 +47,14 @@ enum MenuMetrics {
 }
 
 /// A row that runs an action: an optional symbol, the title, and an optional shortcut hint on
-/// the trailing edge.
+/// the trailing edge. A row that discloses more below it has a chevron there instead, and
+/// VoiceOver reads whether it is expanded.
 struct MenuRow: View {
   let title: Text
   var symbol: String?
   var shortcut: String?
   var indent: CGFloat = 0
+  var isExpanded: Bool?
   let action: () -> Void
 
   var body: some View {
@@ -72,10 +74,35 @@ struct MenuRow: View {
             .foregroundStyle(.secondary)
             .accessibilityHidden(true)
         }
+        if let isExpanded {
+          DisclosureChevron(isExpanded: isExpanded)
+        }
       }
       .padding(.leading, indent)
     }
     .buttonStyle(MenuRowStyle())
+    .accessibilityValue(expandedValue)
+  }
+
+  private var expandedValue: Text {
+    switch isExpanded {
+    case true?: Text("Expanded", bundle: .module)
+    case false?: Text("Collapsed", bundle: .module)
+    case nil: Text(verbatim: "")
+    }
+  }
+}
+
+/// Points right while what it discloses is hidden, and down while it shows.
+struct DisclosureChevron: View {
+  let isExpanded: Bool
+
+  var body: some View {
+    Image(systemName: "chevron.right")
+      .font(.caption.weight(.semibold))
+      .foregroundStyle(.secondary)
+      .rotationEffect(.degrees(isExpanded ? 90 : 0))
+      .accessibilityHidden(true)
   }
 }
 
@@ -176,11 +203,7 @@ struct ExpandingRowHeader: View {
             .lineLimit(1)
         }
         Spacer(minLength: 8)
-        Image(systemName: "chevron.right")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(.secondary)
-          .rotationEffect(.degrees(isExpanded ? 90 : 0))
-          .accessibilityHidden(true)
+        DisclosureChevron(isExpanded: isExpanded)
       }
     }
     .buttonStyle(MenuRowStyle())

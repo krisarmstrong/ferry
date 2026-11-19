@@ -3,15 +3,37 @@ import FerryIPC
 import Foundation
 
 /// The developer tools: a log window, Open Shell and port forwarding, for a device Ferry serves
-/// over ADB. Each window has a session of its own that talks to the agent.
+/// over ADB. The log window and each device's forwards have a session of their own that talks
+/// to the agent.
 extension AppModel {
   func logcatSession(for device: DeviceID) -> LogcatSession {
     LogcatSession(
       device: device, name: fileName(of: device), client: client, services: services)
   }
 
-  func portForwardsSession(for device: DeviceID) -> PortForwardsSession {
-    PortForwardsSession(device: device, client: client)
+  /// The forwards the expanded device's open Port Forwarding disclosure shows; `nil` while it
+  /// is closed.
+  func openForwards(of device: DeviceID) -> PortForwardsSession? {
+    guard forwardsOpen == device, isExpanded(.device(device)) else { return nil }
+    return forwardSessions[device]
+  }
+
+  /// Opens the expanded device's Port Forwarding, reading its list again, or closes it.
+  func toggleForwards(of device: DeviceID) async {
+    guard openForwards(of: device) == nil, isExpanded(.device(device)) else {
+      forwardsOpen = nil
+      return
+    }
+    let session = forwardSessions[device] ?? PortForwardsSession(device: device, client: client)
+    forwardSessions[device] = session
+    forwardsOpen = device
+    await session.refresh()
+  }
+
+  func forgetForwardsOfGoneDevices() {
+    let listed = Set(devices.map(\.id))
+    forwardSessions = forwardSessions.filter { listed.contains($0.key) }
+    if let open = forwardsOpen, !listed.contains(open) { forwardsOpen = nil }
   }
 
   /// The name the windows show for `device`, as the menu shows it: two units of one model are

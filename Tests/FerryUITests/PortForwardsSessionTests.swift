@@ -5,7 +5,7 @@ import Testing
 
 @testable import FerryUI
 
-/// The port forwarding window: the list, adding with the ports checked before anything is sent,
+/// A device's port forwards, in its expansion: the list, adding with the ports checked before anything is sent,
 /// removing, and adb's words when a port is taken.
 @MainActor
 struct PortForwardsSessionTests {

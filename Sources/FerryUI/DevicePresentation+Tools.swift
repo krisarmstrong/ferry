@@ -40,7 +40,7 @@ extension DevicePresentation {
 
 }
 
-/// Text for the developer tools' windows: the log and port forwarding.
+/// Text for the developer tools: the log window and port forwarding.
 extension DevicePresentation {
   static var logEndedLine: String {
     String(localized: LocalizedStringResource("The device ended the log.", bundle: .module))
@@ -73,10 +73,6 @@ extension DevicePresentation {
     windowTitle(LocalizedStringResource("Logcat", bundle: .module), name)
   }
 
-  static func forwardsTitle(name: String) -> String {
-    windowTitle(LocalizedStringResource("Port Forwarding", bundle: .module), name)
-  }
-
   /// One format, so a language can put the device first.
   private static func windowTitle(_ tool: LocalizedStringResource, _ name: String) -> String {
     let tool = String(localized: tool)
@@ -92,8 +88,7 @@ extension DevicePresentation {
   /// Ports are interpolated as text: as numbers they would be grouped, `8,080`.
   static func forwardLineResource(_ forward: PortForward) -> LocalizedStringResource {
     let (local, remote) = (String(forward.local), String(forward.remote))
-    return LocalizedStringResource(
-      "This Mac port \(local) → device port \(remote)", bundle: .module)
+    return LocalizedStringResource("Mac \(local) → Device \(remote)", bundle: .module)
   }
 
   /// What VoiceOver reads for a button every device row repeats: the action, then the device as
@@ -109,6 +104,6 @@ extension DevicePresentation {
 
   static func removeForwardResource(_ forward: PortForward) -> LocalizedStringResource {
     let local = String(forward.local)
-    return LocalizedStringResource("Remove the forward from port \(local)", bundle: .module)
+    return LocalizedStringResource("Remove forward \(local)", bundle: .module)
   }
 }
