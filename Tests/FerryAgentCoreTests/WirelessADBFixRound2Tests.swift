@@ -24,13 +24,13 @@ struct WirelessADBFixRound2Tests {
     let file = WirelessADBTests.storeFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let devices = (1...5).map { index in
-      #""U\#(index)":{"name":"Unit","addresses":[{"address":"192.0.2.\#(index):5555","learnt":"usb"}]}"#
+      #""U\#(index)":{"name":"Unit","addresses":[{"address":"203.0.113.\#(index):5555","learnt":"usb"}]}"#
     }
     try Data(#"{"devices":{\#(devices.joined(separator: ","))}}"#.utf8).write(to: file)
     let adb = FakeWirelessADB()
     await adb.set {
       for index in 1...5 {
-        let address = "192.0.2.\(index):5555"
+        let address = "203.0.113.\(index):5555"
         $0.connectDelay[address] = .milliseconds(500)
         $0.units[address] = .init(
           info: DeviceInfo(id: DeviceID(serial: "U\(index)"), manufacturer: "", model: "Unit"))
@@ -44,7 +44,7 @@ struct WirelessADBFixRound2Tests {
     // Whichever one is still queued: the order of the remembered list is not fixed.
     let tried = await adb.calls
     let queued = try #require(
-      (1...5).first { !tried.contains(.connect("192.0.2.\($0):5555")) })
+      (1...5).first { !tried.contains(.connect("203.0.113.\($0):5555")) })
     let fifth = DeviceID(serial: "U\(queued)")
     await wireless.forget(fifth)
     #expect(
@@ -54,8 +54,8 @@ struct WirelessADBFixRound2Tests {
         return connects.count >= 4 && busy == 0
       })
     try await Task.sleep(for: .milliseconds(700))
-    #expect(!(await adb.calls.contains(.connect("192.0.2.\(queued):5555"))))
-    #expect(await adb.calls.contains(.disconnect("192.0.2.\(queued):5555")))
+    #expect(!(await adb.calls.contains(.connect("203.0.113.\(queued):5555"))))
+    #expect(await adb.calls.contains(.disconnect("203.0.113.\(queued):5555")))
     #expect(await !wireless.remembered().map(\.id).contains(fifth))
   }
 
@@ -139,21 +139,21 @@ struct WirelessADBFixRound2Tests {
       $0.mdns = [
         ADBMDNSService(
           name: guid, type: ADBMDNSService.connectType,
-          endpoint: Self.endpoint("192.0.2.66:40000"))
+          endpoint: Self.endpoint("198.51.100.66:40000"))
       ]
       if withGenuine {
         $0.mdns.append(
           ADBMDNSService(
             name: guid, type: ADBMDNSService.connectType,
-            endpoint: Self.endpoint("192.0.2.169:41235")))
+            endpoint: Self.endpoint("198.51.100.169:41235")))
       }
-      $0.units["192.0.2.66:40000"] = .init(info: pixel)
-      $0.units["192.0.2.169:41235"] = .init(info: pixel)
+      $0.units["198.51.100.66:40000"] = .init(info: pixel)
+      $0.units["198.51.100.169:41235"] = .init(info: pixel)
     }
     let wireless = WirelessADB(adb: adb, store: WirelessADBTests.storeFile(), timing: Self.fast)
-    let outcome = await wireless.pair(Self.endpoint("192.0.2.169:37123"), code: Self.code)
+    let outcome = await wireless.pair(Self.endpoint("198.51.100.169:37123"), code: Self.code)
     #expect(outcome == (withGenuine ? .connected : .failed(.noConnectService)))
-    #expect(!(await adb.calls.contains(.connect("192.0.2.66:40000"))))
+    #expect(!(await adb.calls.contains(.connect("198.51.100.66:40000"))))
   }
 
   @Test func hostsCompareAsAddresses() throws {

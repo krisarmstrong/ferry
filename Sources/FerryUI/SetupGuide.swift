@@ -38,8 +38,8 @@ public struct SetupGuide: View {
       }
       if let family = model.guideFamily {
         NumberedSteps(steps: GuideSteps.steps(for: family, topic: model.guideTopic))
-        if model.guideTopic == .usbDebugging, let note = GuideSteps.debuggingNote(for: family) {
-          Text(note)
+        if model.guideTopic == .usbDebugging {
+          Text(AttributedString(localized: GuideSteps.debuggingNote))
             .font(.callout)
         }
       } else {

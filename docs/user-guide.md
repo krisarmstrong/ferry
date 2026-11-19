@@ -12,8 +12,10 @@ Ferry is free and open source (MIT). It needs macOS 26 or later on an Apple sili
 - [Connect a NetAlly unit](#connect-a-netally-unit)
 - [Connect another Android phone](#connect-another-android-phone)
 - [USB debugging (ADB)](#usb-debugging-adb)
+- [Connect over the network](#connect-over-the-network)
 - [Using Ferry in Finder](#using-ferry-in-finder)
 - [The menu](#the-menu)
+- [Tools over USB debugging](#tools-over-usb-debugging)
 - [Troubleshooting](#troubleshooting)
 - [Privacy](#privacy)
 - [Uninstall](#uninstall)
@@ -111,11 +113,10 @@ transfer, **More tools with USB debugging…** in the menu opens the steps below
    offers ADB only after this.
 5. On the device, tick **Always allow from this computer** and tap **OK**.
 
-Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555.
-
 ### Android 8 or 9
 
-1. Unlock the phone and connect it to the Mac with a USB cable.
+1. Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while
+   it is locked.
 2. Open **Settings** → **System** → **About phone** and tap **Build number** until developer
    mode is on.
 3. Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.
@@ -123,10 +124,63 @@ Once ADB is enabled, NetAlly testers also listen for ADB over the network on por
 
 ### Android 10 or newer
 
-1. Unlock the phone and connect it to the Mac with a USB cable.
+1. Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while
+   it is locked.
 2. Open **Settings** → **About phone** and tap **Build number** until developer mode is on.
 3. Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.
 4. On the device, tick **Always allow from this computer** and tap **Allow**.
+
+If the device accepts ADB over the network, use **Connect by Address…**.
+
+## Connect over the network
+
+Ferry can reach a device over ADB on your network as well as by cable. It never searches the
+network: it connects only to addresses you give it, and to the addresses a device on USB
+debugging reports for itself. A device that is also on a cable is always served by the cable.
+
+- **Use over Wi-Fi** suits a device already on USB debugging, such as a NetAlly tester or a
+  phone with Android 8 to 10.
+- **Pair with Code** is for Android 11 and newer.
+- **Connect by Address** is for a device that already accepts ADB over the network.
+
+### Use over Wi-Fi
+
+With the device on USB debugging and connected by cable, click **Use over Wi-Fi** under its
+name. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the network if it
+is off, and connects to the first address that answers. Connect the device to Ethernet or Wi-Fi
+first.
+
+Turning it on restarts ADB on the device, so Ferry waits until the device has no transfer,
+screen recording or log running.
+
+### Pair with Code
+
+On the device, open **Developer options** → **Wireless debugging** and choose **Pair device with
+pairing code**. In Ferry's menu, click **Pair with Code…**, enter the IP address and port and the
+code the device shows, and click **Pair**. Ferry then connects to the address the device offers
+for connections, which is not the one it paired on.
+
+### Connect by Address
+
+Click **Connect by Address…**, type the device's IP address or name, and click **Connect**.
+Ferry uses adb's usual port unless you add another after a colon. If the device asks, tap
+**Allow** on it: the menu shows that it is waiting until you do.
+
+### Remembered devices
+
+Ferry remembers each device it connects this way by its serial number, and connects to it again
+when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Not
+connected**, with **Connect** to try again.
+
+**Forget** disconnects the device and forgets its addresses. Ferry no longer connects to it by
+itself.
+
+### "Is <address> your <device>?"
+
+Anyone on a network can claim a device's serial number. So when a new address answers as a
+device Ferry already knows, Ferry does not use it on its own: the menu asks
+**Is <address> your <device>?** **Use it** connects the address and remembers it for that
+device. **Ignore** leaves it unused until Ferry restarts.
 
 Menu names vary a little between phone makers. Look for Developer options and the USB
 debugging switch.

@@ -4,15 +4,17 @@
 
 <h1 align="center">Ferry</h1>
 
-<p align="center">Android devices in Finder, over USB.</p>
+<p align="center">Android devices in Finder, over USB and Wi-Fi.</p>
 
 Ferry is a small menu-bar app that shows Android devices as locations in Finder. It was built
 for field engineers who carry NetAlly network testers (LinkRunner 10G, EtherScope nXG,
 LinkRunner 100G) and need to move test results, captures and files between the tester and a
 Mac. It works with other Android phones too. macOS has no built-in way to browse an Android
 device over USB; Ferry adds one that uses Finder itself, so you browse, open, copy, rename and
-delete with the tools you already know, including any app's Open and Save dialogs. It is free
-and open source (MIT), and it sends nothing to any server.
+delete with the tools you already know, including any app's Open and Save dialogs. With USB
+debugging and `adb`, Ferry also reaches devices over ADB, by cable or over Wi-Fi, which is faster
+and adds tools: installing apps, screenshots, screen recordings, logcat, a shell and port
+forwarding. It is free and open source (MIT), and it sends nothing to any server.
 
 <!-- Screenshots: add once captured on macOS 26, as docs/screenshots/{finder,menu,guide}.png.
 
@@ -27,6 +29,8 @@ and open source (MIT), and it sends nothing to any server.
 - A USB cable that carries data
 - An Android device with file transfer (MTP): NetAlly LinkRunner 10G, EtherScope nXG,
   LinkRunner 100G, or an Android 8+ phone
+- Optional, for USB debugging, Wi-Fi and the tools: `adb`, from Google's Android platform tools
+  (`brew install --cask android-platform-tools`). Ferry never installs or bundles it.
 
 ## Install
 
@@ -36,6 +40,8 @@ There is no published release yet; build Ferry from source (below).
    **Applications** and open it.
 2. In **System Settings → General → Login Items & Extensions**, turn on **Ferry** under
    **File Providers**. The Ferry menu has a button that opens the right page.
+3. For **Send to** in Finder's Control-click menu, turn on Ferry's Finder extension on the same
+   page, under **Extensions**.
 
 A signed release DMG and a Homebrew cask are planned.
 
@@ -53,6 +59,12 @@ A signed release DMG and a Homebrew cask are planned.
 The device appears in Finder's sidebar under **Locations**. If it does not, see
 [Troubleshooting](docs/user-guide.md#troubleshooting).
 
+**With USB debugging:** turn on USB debugging on the device and allow this Mac when it asks;
+Ferry then serves the device over ADB and shows its tools in the menu. From there, **Use over
+Wi-Fi**, **Pair with Code…** and **Connect by Address…** reach a device over the network. See
+[USB debugging](docs/user-guide.md#usb-debugging-adb) and
+[Connect over the network](docs/user-guide.md#connect-over-the-network).
+
 Full instructions: [User guide](docs/user-guide.md). The same help is in the app: click the
 question-mark button in the Ferry menu.
 
@@ -64,7 +76,7 @@ SwiftLint and Homebrew's libmtp.
 ```sh
 brew install libmtp swiftlint xcodegen
 
-make app     # Ferry.app, with its helper and Finder extension, in .build/xcode/Build/Products/Debug
+make app     # Ferry.app, with its helper and extensions, in .build/xcode/Build/Products/Debug
 make test    # unit tests, no device needed
 make lint fmt-check
 ```
@@ -77,10 +89,10 @@ ten-character team ID:
 make app TEAM=ABCDE12345
 ```
 
-The team ID also names Ferry's app group and its helper's XPC service, and the app, helper and
-Finder extension only talk to each other when signed by that team, so all three take it from the
-build (each records it as `FerryTeamID` in its Info.plist). `make app` checks that every part
-carries it. Device integration tests are off by default; see [docs/TESTING.md](docs/TESTING.md).
+The team ID also names Ferry's app group and its helper's XPC service, and Ferry's four parts
+(the app, its helper, the FileProvider extension and the Finder extension) only talk to each
+other when signed by that team, so all four take it from the build (each records it as
+`FerryTeamID` in its Info.plist). `make app` checks that every part carries it. Device integration tests are off by default; see [docs/TESTING.md](docs/TESTING.md).
 
 `ferryctl` is a command-line front end for testing against a real device. Turn on file
 transfer first, then:

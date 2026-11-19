@@ -103,23 +103,25 @@ struct WirelessADBTests {
       $0.mdns = [
         ADBMDNSService(
           name: "adb-OTHER-Zz", type: "_adb-tls-connect._tcp",
-          endpoint: Self.endpoint("192.0.2.50:40000")),
+          endpoint: Self.endpoint("198.51.100.50:40000")),
         ADBMDNSService(
-          name: guid, type: "_adb-tls-pairing._tcp", endpoint: Self.endpoint("192.0.2.169:37123")),
+          name: guid, type: "_adb-tls-pairing._tcp", endpoint: Self.endpoint("198.51.100.169:37123")
+        ),
         ADBMDNSService(
-          name: guid, type: "_adb-tls-connect._tcp", endpoint: Self.endpoint("192.0.2.169:41235")),
+          name: guid, type: "_adb-tls-connect._tcp", endpoint: Self.endpoint("198.51.100.169:41235")
+        ),
       ]
-      $0.units["192.0.2.169:41235"] = .init(info: pixel)
-      $0.units["192.0.2.50:40000"] = .init(info: Self.etherScope)
+      $0.units["198.51.100.169:41235"] = .init(info: pixel)
+      $0.units["198.51.100.50:40000"] = .init(info: Self.etherScope)
     }
     let wireless = WirelessADB(adb: adb, store: Self.storeFile(), timing: Self.fast)
     let outcome = await wireless.pair(
-      Self.endpoint("192.0.2.169:37123"), code: PairingCode("482913")!)
+      Self.endpoint("198.51.100.169:37123"), code: PairingCode("482913")!)
     #expect(outcome == .connected)
     let calls = await adb.calls
-    #expect(calls.first == .pair("192.0.2.169:37123"))
-    #expect(calls.contains(.connect("192.0.2.169:41235")))
-    #expect(!calls.contains(.connect("192.0.2.50:40000")))
+    #expect(calls.first == .pair("198.51.100.169:37123"))
+    #expect(calls.contains(.connect("198.51.100.169:41235")))
+    #expect(!calls.contains(.connect("198.51.100.50:40000")))
     #expect(await wireless.remembered().map(\.id) == [pixel.id])
   }
 
@@ -129,7 +131,7 @@ struct WirelessADBTests {
     await adb.set { $0.pairOutcome = .paired(guid: "adb-X-1") }
     let wireless = WirelessADB(adb: adb, store: Self.storeFile(), timing: Self.fast)
     #expect(
-      await wireless.pair(Self.endpoint("192.0.2.169:37123"), code: PairingCode("482913")!)
+      await wireless.pair(Self.endpoint("198.51.100.169:37123"), code: PairingCode("482913")!)
         == .failed(.noConnectService))
   }
 
@@ -139,9 +141,9 @@ struct WirelessADBTests {
     await adb.set { $0.pairOutcome = .failed("Failed: Wrong password or connection was dropped.") }
     let wireless = WirelessADB(adb: adb, store: Self.storeFile(), timing: Self.fast)
     #expect(
-      await wireless.pair(Self.endpoint("192.0.2.169:37123"), code: PairingCode("000000")!)
+      await wireless.pair(Self.endpoint("198.51.100.169:37123"), code: PairingCode("000000")!)
         == .failed(.adb("Failed: Wrong password or connection was dropped.")))
-    #expect(await adb.calls == [.pair("192.0.2.169:37123")])
+    #expect(await adb.calls == [.pair("198.51.100.169:37123")])
   }
 
   // MARK: Use over Wi-Fi (Android 8–10, from USB)
@@ -155,7 +157,7 @@ struct WirelessADBTests {
       $0.listed[serial] = .device
       $0.usb[serial] = .init(info: Self.etherScope)
       $0.tcpPorts[serial] = 5555
-      $0.addresses[serial] = ["192.0.2.31", "192.0.2.169"]
+      $0.addresses[serial] = ["192.0.2.31", "198.51.100.169"]
       $0.units["192.0.2.31:5555"] = .init(info: Self.etherScope)
     }
     let wireless = WirelessADB(adb: adb, store: Self.storeFile(), timing: Self.fast)
@@ -165,7 +167,7 @@ struct WirelessADBTests {
     #expect(calls == [.connect("192.0.2.31:5555")])
     #expect(
       await wireless.remembered().first?.addresses == [
-        Self.endpoint("192.0.2.31:5555"), Self.endpoint("192.0.2.169:5555"),
+        Self.endpoint("192.0.2.31:5555"), Self.endpoint("198.51.100.169:5555"),
       ])
   }
 

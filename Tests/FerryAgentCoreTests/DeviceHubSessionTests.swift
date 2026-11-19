@@ -38,14 +38,14 @@ struct DeviceHubSessionTests {
   /// apart by their serials.
   @Test func shownNamesTellSameModelsApart() async throws {
     let first = await makeDevice("0123456789abcdef", model: "LinkRunner-100G")
-    let second = await makeDevice("0b1771d6dd935e72", model: "LinkRunner-100G")
+    let second = await makeDevice("0b23456789abcdef", model: "LinkRunner-100G")
     let harness = try AgentHarness(devices: [first, second])
     defer { harness.finish() }
     _ = await harness.manager.waitForCalls(2)
     #expect(
       await harness.hub.shownNames() == [
-        first.info.id: "LinkRunner-100G (a1771d6dd935e72)",
-        second.info.id: "LinkRunner-100G (b1771d6dd935e72)",
+        first.info.id: "LinkRunner-100G (123456789abcdef)",
+        second.info.id: "LinkRunner-100G (b23456789abcdef)",
       ])
   }
 }

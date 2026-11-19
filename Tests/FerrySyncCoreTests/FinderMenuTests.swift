@@ -45,12 +45,12 @@ struct FinderMenuTests {
   /// Finder locations name them; a device that is not ready still counts, as the menu lists it.
   @Test func sameNamedDevicesAreToldApart() {
     let first = attached("0123456789abcdef", model: "LinkRunner-100G")
-    let second = attached("0b1771d6dd935e72", model: "LinkRunner-100G")
-    let away = attached("0c1771d6dd935e72", model: "LinkRunner-100G", ready: false)
+    let second = attached("0b23456789abcdef", model: "LinkRunner-100G")
+    let away = attached("0c23456789abcdef", model: "LinkRunner-100G", ready: false)
     let entries = FinderMenu.entries(devices: [first, second, away], selection: [report])
     #expect(
       entries.map(\.title) == [
-        "Send to LinkRunner-100G (a1771d6dd935e72)", "Send to LinkRunner-100G (b1771d6dd935e72)",
+        "Send to LinkRunner-100G (123456789abcdef)", "Send to LinkRunner-100G (b23456789abcdef)",
       ])
   }
 

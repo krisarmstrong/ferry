@@ -65,18 +65,10 @@ public enum GuideSteps {
     }
   }
 
-  /// A line under the family's USB debugging steps, if it has one: NetAlly testers also listen
-  /// for ADB over the network once ADB is enabled.
-  public static func debuggingNote(for family: DeviceFamily) -> LocalizedStringResource? {
-    switch family {
-    case .netAllyAndroid8Board:
-      LocalizedStringResource(
-        "Once ADB is enabled, NetAlly testers also listen for ADB over the network on port 5555.",
-        bundle: .module)
-    case .otherAndroid8to9, .otherAndroid10Plus:
-      nil
-    }
-  }
+  /// The line under every family's USB debugging steps: a device that already accepts ADB over
+  /// the network needs no cable.
+  public static let debuggingNote = LocalizedStringResource(
+    "If the device accepts ADB over the network, use **Connect by Address…**.", bundle: .module)
 
   private static func debuggingSteps(for family: DeviceFamily) -> [LocalizedStringResource] {
     switch family {

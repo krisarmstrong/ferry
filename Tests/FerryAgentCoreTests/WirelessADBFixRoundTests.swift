@@ -198,13 +198,13 @@ struct WirelessADBFixRoundTests {
     let file = WirelessADBTests.storeFile()
     defer { try? FileManager.default.removeItem(at: file) }
     let devices = (1...6).map { index in
-      #""U\#(index)":{"name":"Unit","addresses":[{"address":"192.0.2.\#(index):5555","learnt":"user"}]}"#
+      #""U\#(index)":{"name":"Unit","addresses":[{"address":"203.0.113.\#(index):5555","learnt":"user"}]}"#
     }
     try Data(#"{"devices":{\#(devices.joined(separator: ","))}}"#.utf8).write(to: file)
     let adb = FakeWirelessADB()
     let address = Self.endpoint("192.0.2.50")
     await adb.set {
-      for index in 1...6 { $0.connectDelay["192.0.2.\(index):5555"] = .seconds(2) }
+      for index in 1...6 { $0.connectDelay["203.0.113.\(index):5555"] = .seconds(2) }
       $0.units[address.argument] = .init(info: Self.stranger)
     }
     let wireless = WirelessADB(adb: adb, store: file, timing: Self.fast)

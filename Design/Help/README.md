@@ -34,12 +34,14 @@ A standard macOS window, opened from a **Help** item in the menu and in Settings
 │ [checklist] Getting…  │  Connect a NetAlly unit              │
 │ [cable] Connect a N…  │  For the LinkRunner 10G, …           │
 │ [phone] Connect ano…  │                                      │
-│ [folder] Using Ferr…  │  1. Connect a USB-C cable to the …   │
-│ [menubar] The menu    │  2. On the unit: Settings → …        │
-│ [wrench] Troublesho…  │  3. Tap Transfer files.              │
+│ [terminal] USB debu…  │  1. Connect a USB-C cable to the …   │
+│ [wifi] Connect over…  │  2. On the unit: Settings → …        │
+│ [folder] Using Ferr…  │  3. Tap Transfer files.              │
+│ [menubar] The menu    │                                      │
+│ [wrench] Tools over…  │  The device appears in Finder once … │
+│ [wrench] Troublesho…  │                     [ How to connect ]│
 │ [hand] Privacy        │                                      │
-│ [trash] Uninstall     │  The device appears in Finder once … │
-│ [calendar] Coming n…  │                     [ How to connect ]│
+│ [trash] Uninstall     │                                      │
 └───────────────────────┴──────────────────────────────────────┘
 ```
 

@@ -14,7 +14,7 @@ struct DomainControllerTests {
   /// apart, not one name for two locations.
   @Test func namesDisambiguateSerialsThatEndAlike() async throws {
     let first = await makeDevice("0123456789abcdef", model: "LinkRunner-100G")
-    let second = await makeDevice("0b1771d6dd935e72", model: "LinkRunner-100G")
+    let second = await makeDevice("0b23456789abcdef", model: "LinkRunner-100G")
     var devices: [AttachedDevice] = []
     for device in [first, second] {
       devices.append(
@@ -23,7 +23,7 @@ struct DomainControllerTests {
     }
     #expect(
       DomainNaming.specs(for: devices).map(\.displayName) == [
-        "LinkRunner-100G (a1771d6dd935e72)", "LinkRunner-100G (b1771d6dd935e72)",
+        "LinkRunner-100G (123456789abcdef)", "LinkRunner-100G (b23456789abcdef)",
       ])
   }
 

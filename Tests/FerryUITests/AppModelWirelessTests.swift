@@ -36,14 +36,14 @@ struct AppModelWirelessTests {
   }
 
   @Test func pairingNeedsAPortAndSixDigits() async {
-    #expect(AppModel.isValidPairing(address: "192.0.2.169:37123", code: "482913"))
-    #expect(!AppModel.isValidPairing(address: "192.0.2.169", code: "482913"))
-    #expect(!AppModel.isValidPairing(address: "192.0.2.169:37123", code: "48291"))
+    #expect(AppModel.isValidPairing(address: "198.51.100.169:37123", code: "482913"))
+    #expect(!AppModel.isValidPairing(address: "198.51.100.169", code: "482913"))
+    #expect(!AppModel.isValidPairing(address: "198.51.100.169:37123", code: "48291"))
     #expect(!AppModel.isValidPairing(address: "pixel.lan:37123", code: "482913"))
     let client = FakeClient(log: log)
     let model = model(client)
-    #expect(await model.pair(address: "192.0.2.169:37123", code: "482913") == true)
-    #expect(log.all.first == "pair 192.0.2.169:37123")
+    #expect(await model.pair(address: "198.51.100.169:37123", code: "482913") == true)
+    #expect(log.all.first == "pair 198.51.100.169:37123")
   }
 
   /// Waiting for Allow is a step for the user, not a failure: the form closes and the menu shows

@@ -98,9 +98,7 @@ struct HelpContentTests {
         == keys(.netAllyAndroid8Board))
     #expect(groups["Android 8 or 9"]?.steps == keys(.otherAndroid8to9))
     #expect(groups["Android 10 or newer"]?.steps == keys(.otherAndroid10Plus))
-    let note = try #require(GuideSteps.debuggingNote(for: .netAllyAndroid8Board))
-    #expect(
-      groups["NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG"]?.note == note.key)
+    for group in section.groups { #expect(group.body.note == GuideSteps.debuggingNote.key) }
     #expect(section.body.link?.topic == .usbDebugging)
     #expect(section.body.link?.family == nil)
   }

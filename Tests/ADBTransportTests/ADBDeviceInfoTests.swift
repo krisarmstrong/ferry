@@ -97,7 +97,7 @@ struct ADBDeviceInfoTests {
     #expect(info.build == "OPM1.171019.026")
     #expect(info.serial == Self.serial)
     #expect(info.battery == .init(level: 87, state: .charging))
-    #expect(info.addresses == ["192.0.2.31", "192.0.2.169", "192.0.2.166", "192.168.7.2"])
+    #expect(info.addresses == ["192.0.2.31", "198.51.100.169", "192.0.2.166", "192.168.7.2"])
     // The fake's internal storage: 23,260,324 KB, 272,504 KB used.
     let used: UInt64 = 272_504 * 1024
     let free: UInt64 = (23_260_324 - 272_504) * 1024

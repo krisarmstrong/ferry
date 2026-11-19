@@ -206,14 +206,14 @@ struct AppModelTests {
   /// are: by as much of the serial as it takes.
   @Test func sameNamedDevicesAreToldApartAsInFinder() async {
     let first = device("0123456789abcdef", model: "LinkRunner-100G", .busy)
-    let second = device("0b1771d6dd935e72", model: "LinkRunner-100G", .busy)
+    let second = device("0b23456789abcdef", model: "LinkRunner-100G", .busy)
     let other = device("ZZZZ", model: "Phone", .busy)
     let client = FakeClient(log: log)
     client.setStatus([first, second, other])
     let model = AppModel(client: client, services: FakeServices(log: log))
     await model.refresh()
-    #expect(model.displayName(of: first) == "LinkRunner-100G (a1771d6dd935e72)")
-    #expect(model.displayName(of: second) == "LinkRunner-100G (b1771d6dd935e72)")
+    #expect(model.displayName(of: first) == "LinkRunner-100G (123456789abcdef)")
+    #expect(model.displayName(of: second) == "LinkRunner-100G (b23456789abcdef)")
     #expect(model.displayName(of: other) == "Phone")
   }
 }

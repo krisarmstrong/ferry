@@ -25,11 +25,11 @@ struct DeviceNamesTests {
   @Test func sameEndingsTakeMoreCharactersUntilUnique() {
     #expect(
       names([
-        ("0123456789abcdef", "LinkRunner-100G"), ("0b1771d6dd935e72", "LinkRunner-100G"),
-        ("99999999dd935e72", "LinkRunner-100G"), ("ZZZZ", "Phone"),
+        ("0123456789abcdef", "LinkRunner-100G"), ("0b23456789abcdef", "LinkRunner-100G"),
+        ("9999999989abcdef", "LinkRunner-100G"), ("ZZZZ", "Phone"),
       ]) == [
-        "LinkRunner-100G (a1771d6dd935e72)", "LinkRunner-100G (b1771d6dd935e72)",
-        "LinkRunner-100G (9999999dd935e72)", "Phone",
+        "LinkRunner-100G (123456789abcdef)", "LinkRunner-100G (b23456789abcdef)",
+        "LinkRunner-100G (999999989abcdef)", "Phone",
       ])
     #expect(
       names([("A5e72", "X"), ("B5e72", "X"), ("C1234", "X")])
