@@ -356,6 +356,16 @@ public actor DeviceHub {
 // MARK: Session numbers
 
 extension DeviceHub {
+  /// What each device the hub lists is called, told apart from another of the same name by its
+  /// serial as the menus and Finder name it (see `DeviceNames`): for the network-offer prompt.
+  public func shownNames() -> [DeviceID: String] {
+    let listed = devices().map { (id: $0.id, name: $0.info.name) }
+    let suffixes = DeviceNames.suffixes(for: listed)
+    return Dictionary(
+      listed.map { ($0.id, DeviceNames.named($0.name, suffix: suffixes[$0.id])) },
+      uniquingKeysWith: { first, _ in first })
+  }
+
   /// The number of each held device's session: a new one means the device was reached again
   /// (replugged, the adb server restarted, another method), so work that failed with the old
   /// one may be tried again.

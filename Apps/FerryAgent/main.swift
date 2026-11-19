@@ -53,9 +53,8 @@ let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 // claiming the serial of a device the hub serves is not believed without the user.
 let wireless = WirelessADB(
   adb: ADBWireless(), store: wirelessStore,
-  known: {
-    Dictionary(await hub.devices().map { ($0.id, $0.info.model) }) { first, _ in first }
-  }, located: { await domains.location(of: $0) }, vouching: vouching)
+  known: { await hub.shownNames() }, located: { await domains.location(of: $0) }, vouching: vouching
+)
 Task { await wireless.run() }
 Task {
   // Before adoption, so the locations reach the serving check the moment they are known.

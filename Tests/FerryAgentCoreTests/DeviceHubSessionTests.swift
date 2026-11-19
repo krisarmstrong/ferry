@@ -33,4 +33,19 @@ struct DeviceHubSessionTests {
     let second = try #require(await harness.hub.heldSessions()[device.info.id])
     #expect(second != first)
   }
+
+  /// The network-offer prompt names devices as the menus do: two units of one model are told
+  /// apart by their serials.
+  @Test func shownNamesTellSameModelsApart() async throws {
+    let first = await makeDevice("0123456789abcdef", model: "LinkRunner-100G")
+    let second = await makeDevice("0b1771d6dd935e72", model: "LinkRunner-100G")
+    let harness = try AgentHarness(devices: [first, second])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(2)
+    #expect(
+      await harness.hub.shownNames() == [
+        first.info.id: "LinkRunner-100G (a1771d6dd935e72)",
+        second.info.id: "LinkRunner-100G (b1771d6dd935e72)",
+      ])
+  }
 }
