@@ -58,7 +58,13 @@ final class FakeADBServer: Sendable {
     port: UInt16? = nil, script: @escaping @Sendable (Peer) async throws -> Void
   ) async throws -> FakeADBServer {
     if let port {
-      // Rebinding a port the test had (a server restart): its own TIME_WAIT sockets may hold it.
+      // A server restart on the port the test had, as `adb kill-server` then the server coming
+      // back on 5037: the restart tests are about exactly that port, so they keep it. Reuse is
+      // needed because the old server's side of its closed connections (port ↔ a client's
+      // local port) sits in TIME_WAIT. The original flake cannot recur here: a client's local
+      // port is ephemeral and this port is not, so no new connection can form one of those
+      // pairs. A new client could only meet its own earlier pair if the kernel gave it the same
+      // local port within 30 s, which is the real adb server's risk on 5037 too.
       guard let server = try await listen(on: port, reuse: true, script: script) else {
         throw POSIXError(.EADDRINUSE)
       }
