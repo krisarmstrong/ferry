@@ -329,15 +329,24 @@ extension AgentService {
   /// The menu's status, once the hub has scanned.
   func status() async -> StatusReport {
     await hub.firstScan()
+    let devices = await hub.devices()
+    // Only a network route has an address (`ADBTools.networkAddress(of:)`).
+    var addresses: [DeviceID: WirelessEndpoint] = [:]
+    if let tools {
+      for device in devices {
+        addresses[device.id] = await tools.networkAddress(of: device.id)
+      }
+    }
     return StatusReport(
-      devices: await hub.devices(), provider: await domains.providerState(),
+      devices: devices, provider: await domains.providerState(),
       transfers: await transfers.list(),
       awaitingAuthorization: await hub.awaitingAuthorization(),
       adbStatus: await hub.adbStatus(), awaitingUSBDebugging: await hub.awaitingUSBDebugging(),
       remembered: await wireless?.remembered() ?? [],
       unconfirmed: await wireless?.unconfirmed() ?? [],
       recordings: await tools?.recordingsRunning() ?? [],
-      usbWatchFailed: usbWatch?.failed ?? false, sessions: await hub.heldSessions())
+      usbWatchFailed: usbWatch?.failed ?? false, sessions: await hub.heldSessions(),
+      connectedAddresses: addresses)
   }
 }
 

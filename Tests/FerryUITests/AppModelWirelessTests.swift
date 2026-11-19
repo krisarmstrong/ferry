@@ -30,6 +30,18 @@ struct AppModelWirelessTests {
     #expect(model.wirelessAddress(of: DeviceID(serial: "other")) == nil)
   }
 
+  /// adb's own address for the connection wins over the remembered ones, which can be stale.
+  @Test func aWiFiDeviceIsShownAtTheAddressAdbConnectedOn() async throws {
+    let connected = try #require(WirelessEndpoint(parsing: "192.0.2.77:37123"))
+    let client = FakeClient(log: log)
+    client.setStatus(
+      [device(Self.etherScope.id.serial, model: "EtherScope nXG", .ready([]), method: .wifiADB)],
+      remembered: [Self.etherScope], connectedAddresses: [Self.etherScope.id: connected])
+    let model = model(client)
+    await model.refresh()
+    #expect(model.wirelessAddress(of: Self.etherScope.id) == connected)
+  }
+
   @Test func connectByAddressSendsTheValidatedAddress() async {
     let client = FakeClient(log: log)
     let model = model(client)

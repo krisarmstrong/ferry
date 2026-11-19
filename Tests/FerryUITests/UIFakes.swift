@@ -54,7 +54,7 @@ final class FakeClient: AgentSending {
     awaitingUSBDebugging: [DeviceID] = [], awaitingAuthorization: [String] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
-    sessions: [DeviceID: UInt64] = [:]
+    sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:]
   ) {
     status.withLock {
       $0 = .status(
@@ -63,7 +63,8 @@ final class FakeClient: AgentSending {
           awaitingAuthorization: awaitingAuthorization, adbStatus: adb,
           awaitingUSBDebugging: awaitingUSBDebugging,
           remembered: remembered, unconfirmed: unconfirmed, recordings: recordings,
-          usbWatchFailed: usbWatchFailed, sessions: sessions))
+          usbWatchFailed: usbWatchFailed, sessions: sessions,
+          connectedAddresses: connectedAddresses))
     }
   }
 

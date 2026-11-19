@@ -48,6 +48,8 @@ import os
   public private(set) var awaitingAuthorization: [String] = []
   /// Devices the agent reconnects over the network.
   public private(set) var remembered: [RememberedDevice] = []
+  /// The address adb serves each network device on now.
+  private(set) var connectedAddresses: [DeviceID: WirelessEndpoint] = [:]
   /// New addresses for known devices, waiting for the user to say Use It or Ignore.
   public private(set) var unconfirmed: [UnconfirmedAddress] = []
   /// What the last network request said, for the form and the menu; `nil` once it connected.
@@ -298,6 +300,7 @@ import os
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered
+    connectedAddresses = report.connectedAddresses
     unconfirmed = report.unconfirmed
     recordings = report.recordings
     collectFinishedRecordings()

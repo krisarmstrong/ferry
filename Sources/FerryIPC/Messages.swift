@@ -154,6 +154,9 @@ public struct StatusReport: Codable, Sendable, Equatable {
   /// The number of each served device's session (`DeviceHub.heldSessions()`): it changes when
   /// the device is reached again.
   public let sessions: [DeviceID: UInt64]
+  /// The address adb serves each network device on now, for the menu; a device on USB, or one
+  /// adb reaches by an mDNS name, has none.
+  public let connectedAddresses: [DeviceID: WirelessEndpoint]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
@@ -161,7 +164,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     awaitingUSBDebugging: [DeviceID] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
-    sessions: [DeviceID: UInt64] = [:]
+    sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:]
   ) {
     self.devices = devices
     self.provider = provider
@@ -174,6 +177,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.recordings = recordings
     self.usbWatchFailed = usbWatchFailed
     self.sessions = sessions
+    self.connectedAddresses = connectedAddresses
   }
 }
 
