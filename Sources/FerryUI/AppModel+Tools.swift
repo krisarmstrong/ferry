@@ -12,8 +12,9 @@ public struct AppInstall: Sendable, Equatable {
 }
 
 /// The ADB tools: Install App…, a screenshot and a screen recording, for a device Ferry serves
-/// over ADB. The app creates each screenshot and recording file where macOS saves its own, the
-/// agent fills it through its descriptor, and the app names it and shows it in Finder.
+/// over ADB. The app creates each screenshot and recording file in the device's folder (see
+/// `CaptureFiles`), the agent fills it through its descriptor, and the app names it and shows it
+/// in Finder.
 extension AppModel {
   /// Install App…: asks for an `.apk`, then installs it.
   public func chooseAndInstallAPK(on device: DeviceID) async {
@@ -61,7 +62,7 @@ extension AppModel {
   public func takeScreenshot(on device: DeviceID) async {
     await capture(
       .screenshot, named: captureName(.screenshot, of: device, at: Date()),
-      in: services.captureFolders(), request: .screenshot(device))
+      in: captureFolders(CaptureFiles.screenshotsFolder, of: device), request: .screenshot(device))
     await refresh()
   }
 
@@ -74,11 +75,11 @@ extension AppModel {
     case notSent(AgentResponse?)
   }
 
-  /// Creates the capture's file in the first of `folders` that takes one (where macOS saves
-  /// screenshots, then the Desktop), has the agent fill it through its descriptor, then names it
-  /// `base` (or the next free name) and shows it in Finder. Any failure removes the file. The
-  /// file is created off the main thread: a folder macOS protects can hold the call while it asks
-  /// the user. A capture the user did not ask for now (`userInitiated` false: a recording saved
+  /// Creates the capture's file in the first of `folders` that takes one, making the folder if
+  /// it is missing, has the agent fill it through its descriptor, then names it `base` (or the
+  /// next free name) and shows it in Finder. Any failure removes the file. The folder and file
+  /// are made off the main thread: a folder macOS protects can hold the call while it asks the
+  /// user. A capture the user did not ask for now (`userInitiated` false: a recording saved
   /// on its own) leaves what the menu shows alone; its outcome shows in its own row.
   @discardableResult
   func capture(
@@ -87,6 +88,7 @@ extension AppModel {
   ) async -> CaptureResult {
     let opened = await Task.detached { () -> (url: URL, handle: FileHandle)? in
       for folder in folders {
+        CaptureFiles.make(folder)
         guard let file = CaptureFiles.temporary(in: folder) else { continue }
         // Ferry has access to this folder now: clear what a quit or crash mid-save left here.
         CaptureFiles.sweep([folder])
@@ -112,6 +114,18 @@ extension AppModel {
       unlink(temporary.path)
       if userInitiated { actionError = DevicePresentation.message(for: error) }
       return .noFolder
+    }
+  }
+
+  /// The device's `name` folder (Screenshots, Screen Recordings) under each capture folder,
+  /// named for the device as the menu names it.
+  func captureFolders(_ name: String, of device: DeviceID) -> [URL] {
+    let named = devices.map { ($0.id, $0.info.name) }
+    let suffix = DeviceNames.suffixes(for: named)[device]
+    let deviceName = DeviceNames.named(
+      devices.first { $0.id == device }?.info.name ?? "", suffix: suffix)
+    return services.captureFolders().map {
+      CaptureFiles.folder(name, device: deviceName, in: $0)
     }
   }
 

@@ -81,12 +81,12 @@
         }
       }
     },
-    "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security." : {
+    "Ferry can't save to its folder in Documents. Allow Ferry in Privacy & Security." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security."
+            "value" : "Ferry can't save to its folder in Documents. Allow Ferry in Privacy & Security."
           }
         }
       }

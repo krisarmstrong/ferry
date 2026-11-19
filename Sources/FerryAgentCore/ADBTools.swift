@@ -67,7 +67,7 @@ extension ADBDeviceTools: ADBToolDevice {
 /// serves over ADB (USB or the network) can use them, by the route its session uses.
 ///
 /// The agent never opens a file on the Mac a client named, and never touches the user's folders:
-/// the app creates each screenshot or recording file where macOS saves its own and sends it as a
+/// the app creates each screenshot or recording file in the device's capture folder and sends it as a
 /// writable descriptor, as `.fetch` does. The agent checks what the device sent in its own
 /// scratch folder first (a PNG, an MP4), so the client's file receives only a whole, checked
 /// capture. An APK arrives as a readable descriptor, is copied into the scratch folder, and is

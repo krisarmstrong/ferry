@@ -406,7 +406,7 @@
     "Ferry reaches the device over USB file transfer. Turn on USB debugging to use ADB instead." : {
       "extractionState" : "manual"
     },
-    "Ferry saves them where macOS saves its own screenshots (the Desktop, unless you chose another folder in the Screenshot app), named like macOS's own, such as Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png, and shows them in Finder. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device." : {
+    "Ferry saves them in Documents, in Ferry, then a folder for each device with Screenshots and Screen Recordings in it, named like macOS's own, such as Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png, and shows them in Finder. macOS asks whether Ferry may use Documents the first time it saves one. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device." : {
       "extractionState" : "manual"
     },
     "Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon." : {

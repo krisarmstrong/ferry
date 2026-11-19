@@ -215,7 +215,7 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// Answered with `.done` once installed.
   case installAPK(DeviceID, name: String)
   /// Writes a screenshot (a PNG) into the writable file sent with the request, which the app
-  /// created where macOS saves screenshots. Answered with `.done`.
+  /// created in the device's capture folder. Answered with `.done`.
   case screenshot(DeviceID)
   /// Records the device's screen, for up to three minutes. Answered with `.done` once the
   /// recording has ended (Stop, or the time limit); it then waits on the device, listed in the

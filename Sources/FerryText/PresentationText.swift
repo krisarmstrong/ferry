@@ -83,7 +83,7 @@ public enum PresentationText {
         "The recording is still being finished. Try again in a moment.", bundle: .module)
     case .cannotSave:
       LocalizedStringResource(
-        "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security.",
+        "Ferry can't save to its folder in Documents. Allow Ferry in Privacy & Security.",
         bundle: .module)
     case .invalidPort:
       LocalizedStringResource(

@@ -1,9 +1,11 @@
 import DeviceKit
 import Foundation
 
-/// Where the app saves screenshots and screen recordings: where macOS saves its own (the
-/// `location` the Screenshot app sets in `com.apple.screencapture`), else the Desktop, under
-/// names like macOS's own: `Screenshot <model> 2026-11-18 at 17.09.27.png`.
+/// Where the app saves screenshots and screen recordings: `~/Documents/Ferry`, a folder per
+/// device named as the menu names it, `Screenshots` and `Screen Recordings` in it, made by the
+/// first save (macOS asks for Documents then, never before), under names like macOS's own:
+/// `Screenshot <model> 2026-11-18 at 17.09.27.png`. Choose Folder… saves a waiting recording in
+/// the folder the user picks instead.
 ///
 /// The app creates a hidden temporary file in the folder and sends it to the agent as a writable
 /// descriptor; once the agent has filled it, the file is given the first free name (`… 2.png`,
@@ -34,35 +36,25 @@ enum CaptureFiles {
   }
 
   static let temporaryPrefix = ".ferry-capture-"
+  static let screenshotsFolder = "Screenshots"
+  static let recordingsFolder = "Screen Recordings"
 
-  /// Where macOS saves screenshots now. Read from the preferences, never by running `defaults`.
-  static func current() -> URL {
-    let location =
-      CFPreferencesCopyAppValue(
-        "location" as CFString, "com.apple.screencapture" as CFString) as? String
-    return folder(location: location, home: FileManager.default.homeDirectoryForCurrentUser)
+  /// `~/Documents/Ferry`, which holds a folder per device.
+  static func documentsRoot(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+    home.appending(path: "Documents/Ferry", directoryHint: .isDirectory)
   }
 
-  static func desktop(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
-    home.appending(path: "Desktop", directoryHint: .isDirectory)
+  /// `<root>/<device>/<name>`, the device's name made one safe path component.
+  static func folder(_ name: String, device: String, in root: URL) -> URL {
+    root.appending(path: fileSafe(device), directoryHint: .isDirectory)
+      .appending(path: name, directoryHint: .isDirectory)
   }
 
-  /// `location` with `~` expanded, if it is an absolute path to a folder the agent can write;
-  /// otherwise the Desktop.
-  static func folder(
-    location: String?, home: URL, usable: (URL) -> Bool = isWritableFolder
-  ) -> URL {
-    guard var path = location, !path.isEmpty else { return desktop(home: home) }
-    if path == "~" || path.hasPrefix("~/") { path = home.path + path.dropFirst() }
-    guard path.hasPrefix("/") else { return desktop(home: home) }
-    let url = URL(filePath: path, directoryHint: .isDirectory)
-    return usable(url) ? url : desktop(home: home)
-  }
-
-  static func isWritableFolder(_ url: URL) -> Bool {
-    var isFolder: ObjCBool = false
-    return FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder)
-      && isFolder.boolValue && access(url.path, W_OK) == 0
+  /// Makes `folder` and the folders above it, if they are missing; a folder that cannot be made
+  /// is left to fail when a file is created in it. Asks the user when macOS protects the folder,
+  /// so never call it on the main thread.
+  static func make(_ folder: URL) {
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
   }
 
   /// Whether a new file can be created in `folder`: one is created and removed. Unlike a
@@ -114,8 +106,8 @@ enum CaptureFiles {
 
   /// Deletes the hidden capture files older than `age` in `folders`: ones an app that quit or
   /// crashed mid-save left behind (a recording can be hundreds of MB). A capture under way is
-  /// younger than any save takes. Run only on a folder Ferry is about to save into: the
-  /// Desktop is protected, and listing it otherwise could ask the user for access.
+  /// younger than any save takes. Run only on a folder Ferry is about to save into: Documents is
+  /// protected, and listing it otherwise could ask the user for access.
   static func sweep(_ folders: [URL], olderThan age: TimeInterval = 3600, now: Date = Date()) {
     let manager = FileManager.default
     for folder in Set(folders) {

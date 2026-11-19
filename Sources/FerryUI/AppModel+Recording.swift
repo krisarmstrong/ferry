@@ -17,8 +17,8 @@ enum UnsavedRecording: Equatable {
   case refused
 }
 
-/// Screen recordings: Record Screen, the indicator with Stop, then saving the video where
-/// macOS saves screenshots. A video the app could not save waits on the device, with Choose
+/// Screen recordings: Record Screen, the indicator with Stop, then saving the video in the
+/// device's Screen Recordings folder. A video the app could not save waits on the device, with Choose
 /// Folder… and Discard, and is tried again on its own only once a capture folder becomes
 /// writable or the device comes back, never on every refresh.
 extension AppModel {
@@ -94,7 +94,7 @@ extension AppModel {
         else { continue }
         let waiting = UnsavedRecording.noFolder(failedWith, checked: checked)
         Task {
-          let found = await writableCaptureFolders()
+          let found = await writableCaptureFolders(of: id)
           probingRecordings.remove(id)
           guard unsavedRecordings[id] == waiting else { return }
           guard !found.isSubset(of: failedWith) else {
@@ -121,13 +121,15 @@ extension AppModel {
     defer { collectingRecordings.remove(device) }
     let result = await capture(
       .recording, named: captureName(.recording, of: device, at: recording.started),
-      in: folders ?? services.captureFolders(), request: .saveRecording(device),
+      in: folders ?? captureFolders(CaptureFiles.recordingsFolder, of: device),
+      request: .saveRecording(device),
       userInitiated: userInitiated)
     switch result {
     case .saved:
       unsavedRecordings[device] = nil
     case .noFolder:
-      unsavedRecordings[device] = .noFolder(await writableCaptureFolders(), checked: now())
+      unsavedRecordings[device] = .noFolder(
+        await writableCaptureFolders(of: device), checked: now())
     case .notSent(let response):
       unsavedRecordings[device] =
         Self.lostDevice(response) ? .deviceLost(session: sessions[device]) : .refused
@@ -147,11 +149,18 @@ extension AppModel {
     }
   }
 
-  /// The capture folders that take a new file now. Checked by creating one, off the main
-  /// thread: a folder macOS protects passes a permission check but refuses the file, and can
-  /// hold the call while it asks the user.
-  private func writableCaptureFolders() async -> Set<URL> {
-    let folders = services.captureFolders()
-    return await Task.detached { Set(folders.filter(CaptureFiles.takesNewFiles)) }.value
+  /// The device's recording folders that take a new file now, made if they are missing (the
+  /// user may have allowed Documents since the save failed). Checked by creating a file, off the
+  /// main thread: a folder macOS protects passes a permission check but refuses the file, and
+  /// can hold the call while it asks the user.
+  private func writableCaptureFolders(of device: DeviceID) async -> Set<URL> {
+    let folders = captureFolders(CaptureFiles.recordingsFolder, of: device)
+    return await Task.detached {
+      Set(
+        folders.filter {
+          CaptureFiles.make($0)
+          return CaptureFiles.takesNewFiles($0)
+        })
+    }.value
   }
 }

@@ -39,13 +39,14 @@ struct AppModelToolsTests {
     let model = model(client, services: services)
     await model.refresh()
     await model.takeScreenshot(on: id)
-    let saved = try names(folder)
+    let shots = folder.appending(path: "LinkRunner-100G/Screenshots", directoryHint: .isDirectory)
+    let saved = try names(shots)
     #expect(saved.count == 1)
     let name = try #require(saved.first)
     #expect(name.hasPrefix("Screenshot LinkRunner-100G ") && name.hasSuffix(".png"))
-    #expect(try Data(contentsOf: folder.appending(path: name)) == png)
+    #expect(try Data(contentsOf: shots.appending(path: name)) == png)
     #expect(log.all.contains("screenshot \(id.serial) file:true"))
-    #expect(log.all.contains("reveal \(folder.appending(path: name).path)"))
+    #expect(log.all.contains("reveal \(shots.appending(path: name).path)"))
     #expect(model.actionError == nil)
   }
 
@@ -58,18 +59,55 @@ struct AppModelToolsTests {
     let model = model(client, services: services)
     await model.takeScreenshot(on: id)
     #expect(model.actionError == "The device didn't send a screenshot. Unlock it and try again.")
-    #expect(try names(folder).isEmpty)
+    #expect(try names(folder.appending(path: "Android/Screenshots")).isEmpty)
     #expect(!log.all.contains { $0.hasPrefix("reveal") })
   }
 
-  /// The first folder that takes a file is used: where macOS saves screenshots, else the Desktop.
+  /// The device's folders are made by the first save, not before: Documents is asked for only
+  /// then.
+  @Test func theDevicesFolderIsMadeByTheFirstSave() async throws {
+    let client = FakeClient(log: log)
+    client.setStatus([device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB)])
+    let services = FakeServices(log: log)
+    let root = try TestScratch.folder("documents").appending(
+      path: "Ferry", directoryHint: .isDirectory)
+    services.folders = [root]
+    let model = model(client, services: services)
+    await model.refresh()
+    #expect(!FileManager.default.fileExists(atPath: root.path))
+    await model.takeScreenshot(on: id)
+    #expect(try names(root.appending(path: "LinkRunner-100G/Screenshots")).count == 1)
+  }
+
+  /// Two units of one model each get their own folder, named as the menu names them.
+  @Test func twoUnitsOfOneModelHaveTheirOwnFolders() async throws {
+    let client = FakeClient(log: log)
+    let other = DeviceID(serial: "fedcba9876543210")
+    client.setStatus([
+      device(id.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB),
+      device(other.serial, model: "LinkRunner-100G", .ready([]), method: .usbADB),
+    ])
+    let services = FakeServices(log: log)
+    let root = try TestScratch.folder("two-units")
+    services.folders = [root]
+    let model = model(client, services: services)
+    await model.refresh()
+    await model.takeScreenshot(on: id)
+    await model.takeScreenshot(on: other)
+    #expect(try names(root) == ["LinkRunner-100G (3210)", "LinkRunner-100G (cdef)"])
+  }
+
+  /// A folder that cannot be made is passed over for the next.
   @Test func anUnusableFolderFallsBackToTheNext() async throws {
     let client = FakeClient(log: log)
     let services = FakeServices(log: log)
-    let desktop = try TestScratch.folder("desktop")
-    services.folders = [desktop.appending(path: "gone", directoryHint: .isDirectory), desktop]
+    let scratch = try TestScratch.folder("fallback")
+    let blocker = scratch.appending(path: "a-file")
+    try Data().write(to: blocker)
+    let usable = scratch.appending(path: "usable", directoryHint: .isDirectory)
+    services.folders = [blocker.appending(path: "Ferry", directoryHint: .isDirectory), usable]
     await model(client, services: services).takeScreenshot(on: id)
-    #expect(try names(desktop).count == 1)
+    #expect(try names(usable.appending(path: "Android/Screenshots")).count == 1)
   }
 
   @Test func withNowhereToSaveNothingIsSent() async throws {
@@ -159,10 +197,11 @@ struct AppModelToolsTests {
     await model.startRecording(on: id)
     #expect(log.all.contains("startRecording \(id.serial)"))
     #expect(log.all.contains("saveRecording \(id.serial) file:true"))
-    let name = try #require(try names(folder).first)
+    let recordings = folder.appending(path: "LinkRunner-100G/Screen Recordings")
+    let name = try #require(try names(recordings).first)
     #expect(name.hasPrefix("Screen Recording LinkRunner-100G ") && name.hasSuffix(".mp4"))
-    #expect(try Data(contentsOf: folder.appending(path: name)) == mp4)
-    #expect(log.all.contains("reveal \(folder.appending(path: name).path)"))
+    #expect(try Data(contentsOf: recordings.appending(path: name)) == mp4)
+    #expect(log.all.contains("reveal \(recordings.appending(path: name).path)"))
     #expect(log.all.filter { $0.hasPrefix("saveRecording") }.count == 1)
   }
 
@@ -229,18 +268,20 @@ struct CaptureFilesTests {
     #expect(CaptureFiles.fileSafe(model) == safe)
   }
 
-  @Test func theFolderIsWhereMacOSSavesScreenshots() {
+  /// `~/Documents/Ferry/<device>/Screenshots` and `…/Screen Recordings`.
+  @Test func capturesGoInDocumentsByDevice() {
     let home = URL(filePath: "/Users/someone", directoryHint: .isDirectory)
-    let desktop = home.appending(path: "Desktop", directoryHint: .isDirectory)
+    let root = CaptureFiles.documentsRoot(home: home)
+    #expect(root.path == "/Users/someone/Documents/Ferry")
     #expect(
-      CaptureFiles.folder(location: "~/Pictures/Shots", home: home) { _ in true }.path
-        == "/Users/someone/Pictures/Shots")
+      CaptureFiles.folder(CaptureFiles.screenshotsFolder, device: "LinkRunner-100G", in: root).path
+        == "/Users/someone/Documents/Ferry/LinkRunner-100G/Screenshots")
     #expect(
-      CaptureFiles.folder(location: "/Volumes/Shots", home: home) { _ in true }.path
-        == "/Volumes/Shots")
-    #expect(CaptureFiles.folder(location: nil, home: home) { _ in true } == desktop)
-    #expect(CaptureFiles.folder(location: "Shots", home: home) { _ in true } == desktop)
-    #expect(CaptureFiles.folder(location: "/Volumes/Gone", home: home) { _ in false } == desktop)
+      CaptureFiles.folder(CaptureFiles.recordingsFolder, device: "EtherScope nXG", in: root).path
+        == "/Users/someone/Documents/Ferry/EtherScope nXG/Screen Recordings")
+    #expect(
+      CaptureFiles.folder(CaptureFiles.screenshotsFolder, device: "a/b:c", in: root).path
+        == "/Users/someone/Documents/Ferry/a-b-c/Screenshots")
   }
 
   @Test func anExistingFileIsNeverReplaced() throws {

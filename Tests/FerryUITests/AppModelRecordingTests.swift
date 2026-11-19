@@ -64,14 +64,18 @@ struct AppModelRecordingTests {
     #expect(model.recording(on: id) != nil)
   }
 
+  /// Documents granted after a save failed: the device's folder, not made then, is made by the
+  /// next check, and the recording is saved in it.
   @Test func aFolderThatBecomesWritableIsTriedAgain() async throws {
     let model = setUp()
-    services.folders = []
+    let root = try TestScratch.folder("now-writable")
+    services.folders = [root]
+    #expect(chmod(root.path, 0o500) == 0)
+    defer { chmod(root.path, 0o700) }
     await model.refresh()
     await model.collectRecording(on: id)
     #expect(model.recordingUnsaved(on: id))
-    let folder = try TestScratch.folder("now-writable")
-    services.folders = [folder]
+    #expect(chmod(root.path, 0o700) == 0)
     clock.advance(.seconds(30))
     await model.refresh()
     let deadline = ContinuousClock.now + .seconds(5)
@@ -79,7 +83,8 @@ struct AppModelRecordingTests {
       try await Task.sleep(for: .milliseconds(10))
     }
     #expect(saves() == 1)
-    #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).count == 1)
+    let recordings = root.appending(path: "LinkRunner-100G/Screen Recordings")
+    #expect(try FileManager.default.contentsOfDirectory(atPath: recordings.path).count == 1)
   }
 
   @Test func chooseFolderSavesWhereTheUserSays() async throws {

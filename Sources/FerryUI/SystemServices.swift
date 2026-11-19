@@ -33,8 +33,8 @@ public protocol SystemServicing {
   func copy(_ text: String)
   /// Asks the user for an `.apk`; `nil` if they cancel.
   func chooseAPK() async -> URL?
-  /// Where screenshots and recordings go, in order of preference: where macOS saves its own,
-  /// then the Desktop.
+  /// The folders screenshots and recordings go under, in order of preference, each holding a
+  /// folder per device. Touches no disk.
   func captureFolders() -> [URL]
   /// Asks the user for a folder to save in; `nil` if they cancel.
   func chooseFolder() async -> URL?
@@ -166,7 +166,7 @@ public final class SystemServices: SystemServicing {
   }
 
   public func captureFolders() -> [URL] {
-    [CaptureFiles.current(), CaptureFiles.desktop()]
+    [CaptureFiles.documentsRoot()]
   }
 
   private nonisolated static func describe(_ status: SMAppService.Status) -> String {

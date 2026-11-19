@@ -44,7 +44,7 @@ public enum ToolFailure: Error, Codable, Sendable, Equatable {
   case recordingStalled
   /// The recording is still being finished or saved.
   case recordingBusy
-  /// The app could not create the file where macOS saves screenshots, nor on the Desktop.
+  /// The app could not create the file in any capture folder.
   case cannotSave
   /// A port forward needs a port on the Mac from 1024 to 65535 and one on the device from 1 to
   /// 65535.

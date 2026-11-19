@@ -24,7 +24,7 @@ struct CaptureFilesSweepTests {
     #expect(left == [fresh.lastPathComponent, other.lastPathComponent].sorted())
   }
 
-  /// Launch touches no capture folder: the Desktop is protected, and asking for it would put a
+  /// Launch touches no capture folder: Documents is protected, and asking for it would put a
   /// prompt ahead of the menu.
   @MainActor @Test func launchListsNoCaptureFolder() async {
     let log = CallLog()
@@ -35,7 +35,10 @@ struct CaptureFilesSweepTests {
 
   /// A save sweeps the folder it saves into, which it has access to by then.
   @MainActor @Test func aSaveSweepsItsFolder() async throws {
-    let folder = try TestScratch.folder("save-sweep")
+    let root = try TestScratch.folder("save-sweep")
+    let folder = CaptureFiles.folder(
+      CaptureFiles.screenshotsFolder, device: "LinkRunner-100G", in: root)
+    CaptureFiles.make(folder)
     let stale = folder.appending(path: CaptureFiles.temporaryPrefix + "stale")
     try Data("x".utf8).write(to: stale)
     try FileManager.default.setAttributes(
@@ -46,7 +49,7 @@ struct CaptureFilesSweepTests {
     client.setStatus([unit])
     client.setTool(.done, writes: Data([0x89, 0x50, 0x4E, 0x47]))
     let services = FakeServices(log: log)
-    services.folders = [folder]
+    services.folders = [root]
     let model = AppModel(client: client, services: services)
     await model.refresh()
     await model.takeScreenshot(on: unit.id)
