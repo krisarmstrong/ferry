@@ -1,5 +1,6 @@
 import DeviceKit
 import FerryIPC
+import FerryText
 import Foundation
 import Testing
 
@@ -124,7 +125,7 @@ struct ToolPresentationTests {
     ("/tmp/a.apk", true), ("/tmp/A.APK", true), ("/tmp/a.apk.zip", false), ("/tmp/apk", false),
   ])
   func onlyAnAPKIsOffered(path: String, offered: Bool) {
-    #expect(DevicePresentation.isAPK(URL(filePath: path)) == offered)
+    #expect(PresentationText.isAPK(URL(filePath: path)) == offered)
   }
 
   @Test(arguments: [
@@ -184,5 +185,13 @@ struct ToolPresentationTests {
     #expect(
       DevicePresentation.message(for: .forwardFailed("a\u{1B}[2Jb"))
         == "adb couldn't forward the port: a\\u{1B}[2Jb")
+  }
+
+  /// VoiceOver reads which device a repeated button acts on.
+  @Test func repeatedButtonsNameTheirDevice() {
+    #expect(
+      DevicePresentation.actionLabel(
+        LocalizedStringResource("Eject", bundle: .module), on: "LinkRunner-100G")
+        == "Eject, LinkRunner-100G")
   }
 }

@@ -112,6 +112,25 @@ enum CaptureFiles {
     return text.isEmpty ? "Android" : text
   }
 
+  /// Deletes the hidden capture files older than `age` in `folders`: ones an app that quit or
+  /// crashed mid-save left behind (a recording can be hundreds of MB). A capture under way is
+  /// younger than any save takes.
+  static func sweep(_ folders: [URL], olderThan age: TimeInterval = 3600, now: Date = Date()) {
+    let manager = FileManager.default
+    for folder in Set(folders) {
+      guard let names = try? manager.contentsOfDirectory(atPath: folder.path) else { continue }
+      for name in names where name.hasPrefix(temporaryPrefix) {
+        let file = folder.appending(path: name)
+        guard
+          let modified = (try? manager.attributesOfItem(atPath: file.path))?[.modificationDate]
+            as? Date,
+          now.timeIntervalSince(modified) > age
+        else { continue }
+        unlink(file.path)
+      }
+    }
+  }
+
   /// A new hidden file in `folder`, open for writing; `nil` if the folder cannot take one (it is
   /// gone, read-only, or macOS denies Ferry access to it).
   static func temporary(in folder: URL) -> (url: URL, handle: FileHandle)? {

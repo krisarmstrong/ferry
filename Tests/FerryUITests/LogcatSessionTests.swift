@@ -21,7 +21,7 @@ struct LogcatSessionTests {
   }
 
   private func session() -> LogcatSession {
-    LogcatSession(device: id, model: "LinkRunner-100G", client: client, services: services)
+    LogcatSession(device: id, name: "LinkRunner-100G", client: client, services: services)
   }
 
   /// Runs the session until `condition` holds, then stops it as closing the window does.
@@ -41,6 +41,22 @@ struct LogcatSessionTests {
       try await Task.sleep(for: .milliseconds(5))
     }
     #expect(condition())
+  }
+
+  /// A stream that ended (the device was lost) can be started again in the same window, as a
+  /// new stream.
+  @Test func anEndedStreamRestarts() async throws {
+    let session = session()
+    client.endStream(with: .failure(.deviceDisconnected))
+    await session.run()
+    guard case .ended = session.state else {
+      Issue.record("not ended: \(session.state)")
+      return
+    }
+    let first = session.stream
+    await session.run()
+    #expect(log.all.filter { $0 == "startLogcat \(id.serial)" }.count == 2)
+    #expect(session.stream != first)
   }
 
   @Test func batchesAreShownInOrder() async throws {

@@ -5,6 +5,8 @@ import SwiftUI
 /// What a device row's tools show and do.
 @MainActor
 struct ToolActions {
+  /// The device as the menu names it, for VoiceOver.
+  let name: String
   let install: AppInstall?
   let recording: ActiveRecording?
   /// The finished recording could not be saved and waits for Choose Folder… or Discard.
@@ -24,6 +26,7 @@ struct ToolActions {
 
   /// `open` shows one of the developer windows for the device.
   init(model: AppModel, device: DeviceID, open: @escaping (DeveloperWindow) -> Void) {
+    name = model.windowName(of: device)
     install = model.installs[device]
     recording = model.recording(on: device)
     unsaved = model.recordingUnsaved(on: device)
@@ -111,14 +114,17 @@ struct ToolRow: View {
       Button(action: actions.chooseAPK) {
         Text("Install App…", bundle: .module)
       }
+      .deviceAction(LocalizedStringResource("Install App…", bundle: .module), on: actions.name)
       .disabled(actions.install != nil)
       Button(action: actions.screenshot) {
         Text("Screenshot", bundle: .module)
       }
+      .deviceAction(LocalizedStringResource("Screenshot", bundle: .module), on: actions.name)
       if actions.recording == nil {
         Button(action: actions.record) {
           Text("Record Screen", bundle: .module)
         }
+        .deviceAction(LocalizedStringResource("Record Screen", bundle: .module), on: actions.name)
       }
     }
     .controlSize(.small)
@@ -138,6 +144,7 @@ struct ToolRow: View {
     } label: {
       Text("Developer Tools", bundle: .module)
     }
+    .deviceAction(LocalizedStringResource("Developer Tools", bundle: .module), on: actions.name)
     .controlSize(.small)
     .fixedSize()
   }

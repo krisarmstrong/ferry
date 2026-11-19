@@ -1,39 +1,27 @@
 import DeviceKit
 import FerryIPC
+import FerryText
 import Foundation
 
-extension DevicePresentation {
-  /// What each device is called, made safe to show (a hostile device can name itself with
-  /// control characters or bidi overrides), with the end of its serial where another device has
-  /// the same name: the name its Finder location has.
-  static func shownNames(_ devices: [(id: DeviceID, name: String)]) -> [DeviceID: String] {
-    let suffixes = DeviceNames.suffixes(for: devices)
-    var names: [DeviceID: String] = [:]
-    for device in devices {
-      names[device.id] = DeviceNames.named(
-        shownName(device.name), suffix: suffixes[device.id].map(DisplayText.escaped))
-    }
-    return names
-  }
-
-  /// A device-supplied name made safe to show, or "Unknown device" when there is none.
-  static func shownName(_ name: String) -> String {
-    name.isEmpty
-      ? String(localized: LocalizedStringResource("Unknown device", bundle: .module))
-      : DisplayText.escaped(name)
-  }
-}
-
 extension AppModel {
-  /// What the menu calls `device` (see `DevicePresentation.shownNames(_:)`).
+  /// What the menu calls `device` (see `PresentationText.shownNames(_:)`).
   public func displayName(of device: AttachedDevice) -> String {
-    DevicePresentation.shownNames(devices.map { ($0.id, $0.info.name) })[device.id]
-      ?? DevicePresentation.shownName(device.info.name)
+    PresentationText.shownNames(devices.map { ($0.id, $0.info.name) })[device.id]
+      ?? PresentationText.shownName(device.info.name)
   }
 }
 
-/// Text the menu shows for device states and errors.
+/// Text the menu shows for device states and errors. Agent and tool errors are worded in
+/// `PresentationText`, which the Finder Sync extension shares.
 enum DevicePresentation {
+  static func message(for error: TransportError) -> String {
+    PresentationText.message(for: error)
+  }
+
+  static func message(for failure: ToolFailure) -> String {
+    PresentationText.message(for: failure)
+  }
+
   /// The status word for `device`: one only adb lists, as unauthorised, waits for Allow rather
   /// than for file transfer.
   static func status(of device: AttachedDevice) -> LocalizedStringResource {
@@ -145,7 +133,7 @@ enum DevicePresentation {
     case .adbUnavailable:
       String(
         localized: LocalizedStringResource(
-          "adb isn't running. Install it, or choose Check again.", bundle: .module))
+          "adb isn't running. Install it, or choose Check Again.", bundle: .module))
     case .notOverUSB:
       String(
         localized: LocalizedStringResource(
@@ -217,41 +205,6 @@ enum DevicePresentation {
       String(
         localized: LocalizedStringResource(
           "Copying “\(name)” to this Mac · \(percent)%", bundle: .module))
-    }
-  }
-
-  /// A short explanation of an agent error. Device-supplied detail is escaped, and the result
-  /// is shown verbatim so the detail is never parsed as Markdown.
-  static func message(for error: TransportError) -> String {
-    String(localized: resource(for: error))
-  }
-
-  private static func resource(for error: TransportError) -> LocalizedStringResource {
-    switch error {
-    case .deviceBusy:
-      LocalizedStringResource(
-        "Another app is using the device. Quit Image Capture or Android File Transfer.",
-        bundle: .module)
-    case .deviceLocked:
-      LocalizedStringResource("The device is not sharing files.", bundle: .module)
-    case .deviceDisconnected, .deviceNotFound, .noDeviceConnected:
-      LocalizedStringResource("The device was disconnected.", bundle: .module)
-    case .noStorage, .storageNotFound:
-      LocalizedStringResource("The device reports no storage.", bundle: .module)
-    case .unsupported(let what):
-      LocalizedStringResource(
-        "The device does not support this: \(DisplayText.escaped(what)).", bundle: .module)
-    case .io(let detail):
-      LocalizedStringResource("Error: \(DisplayText.escaped(detail))", bundle: .module)
-    case .cancelled:
-      LocalizedStringResource("Cancelled.", bundle: .module)
-    case .agentNotResponding:
-      LocalizedStringResource(
-        "Ferry's helper didn't answer in time. Try again in a moment.", bundle: .module)
-    case .notFound, .unknownItem, .alreadyExists, .invalidName, .insufficientSpace,
-      .fileTooLargeForStorage, .sizeMismatch, .downloadSizeMismatch, .nameChangedByDevice,
-      .directoryNotEmpty, .changedOnDevice, .macDiskFull, .folderTooDeep, .readOnly:
-      LocalizedStringResource("The device reported an error.", bundle: .module)
     }
   }
 

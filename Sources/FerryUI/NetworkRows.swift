@@ -5,6 +5,8 @@ import SwiftUI
 /// What a device row offers for the network: Use over Wi-Fi on a device on USB debugging, and
 /// Forget on one Ferry reconnects over the network.
 struct NetworkActions {
+  /// The device as the menu names it, for VoiceOver.
+  let name: String
   let offersWiFi: Bool
   let isRemembered: Bool
   let useOverWiFi: () -> Void
@@ -20,11 +22,13 @@ struct NetworkButtons: View {
       Button(action: actions.useOverWiFi) {
         Text("Use over Wi-Fi", bundle: .module)
       }
+      .deviceAction(LocalizedStringResource("Use over Wi-Fi", bundle: .module), on: actions.name)
     }
     if actions.isRemembered {
       Button(action: actions.forget) {
         Text("Forget", bundle: .module)
       }
+      .deviceAction(LocalizedStringResource("Forget", bundle: .module), on: actions.name)
     }
   }
 }
@@ -34,15 +38,17 @@ struct RememberedRow: View {
   let device: RememberedDevice
   let connect: () -> Void
   let forget: () -> Void
+  private var name: String { DevicePresentation.rememberedName(device) }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       Label {
         HStack(spacing: 4) {
-          Text(verbatim: DevicePresentation.rememberedName(device))
+          Text(verbatim: name)
             .font(.headline)
           Text(verbatim: "·")
             .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
           Text("Not connected", bundle: .module)
             .foregroundStyle(.secondary)
         }
@@ -54,10 +60,12 @@ struct RememberedRow: View {
         Button(action: connect) {
           Text("Connect", bundle: .module)
         }
+        .deviceAction(LocalizedStringResource("Connect", bundle: .module), on: name)
         Spacer()
         Button(action: forget) {
           Text("Forget", bundle: .module)
         }
+        .deviceAction(LocalizedStringResource("Forget", bundle: .module), on: name)
       }
     }
   }
@@ -109,7 +117,7 @@ struct UnconfirmedRow: View {
       }
       HStack {
         Button(action: confirm) {
-          Text("Use it", bundle: .module)
+          Text("Use It", bundle: .module)
         }
         Button(action: ignore) {
           Text("Ignore", bundle: .module)

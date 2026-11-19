@@ -51,15 +51,13 @@ extension AppModel {
     await refresh()
   }
 
-  /// Choose Folder…: saves the waiting video where the user says.
+  /// Choose Folder…: saves the waiting video in the folder the user picks, under its usual
+  /// name, or the next free one: it never replaces a file.
   public func chooseRecordingDestination(on device: DeviceID) async {
-    guard let recording = recordings.first(where: { $0.device == device && $0.finished }),
-      let url = await services.chooseDestination(
-        suggestedName: captureName(.recording, of: device, at: recording.started) + ".mp4")
+    guard recordings.contains(where: { $0.device == device && $0.finished }),
+      let folder = await services.chooseFolder()
     else { return }
-    await collectRecording(
-      on: device, into: [url.deletingLastPathComponent()],
-      named: url.deletingPathExtension().lastPathComponent)
+    await collectRecording(on: device, into: [folder])
   }
 
   /// Discard: the agent deletes the waiting video from the device, and Record Screen returns.
@@ -85,10 +83,10 @@ extension AppModel {
       else { continue }
       switch unsavedRecordings[id] {
       case nil:
-        Task { await collectRecording(on: id) }
+        Task { await collectRecording(on: id, userInitiated: false) }
       case .deviceLost(let lostIn):
         guard let session = sessions[id], session != lostIn else { continue }
-        Task { await collectRecording(on: id) }
+        Task { await collectRecording(on: id, userInitiated: false) }
       case .refused:
         continue
       case .noFolder(let failedWith, let checked):
@@ -103,7 +101,7 @@ extension AppModel {
             unsavedRecordings[id] = .noFolder(failedWith, checked: now())
             return
           }
-          await collectRecording(on: id)
+          await collectRecording(on: id, userInitiated: false)
         }
       }
     }
@@ -114,16 +112,17 @@ extension AppModel {
 
   /// Saves a finished recording and shows it. A recording that finished while no request
   /// waited for it (the app was relaunched) is collected when the status lists it.
-  func collectRecording(on device: DeviceID, into folders: [URL]? = nil, named name: String? = nil)
-    async
-  {
+  func collectRecording(
+    on device: DeviceID, into folders: [URL]? = nil, userInitiated: Bool = true
+  ) async {
     guard let recording = recordings.first(where: { $0.device == device && $0.finished }),
       collectingRecordings.insert(device).inserted
     else { return }
     defer { collectingRecordings.remove(device) }
     let result = await capture(
-      .recording, named: name ?? captureName(.recording, of: device, at: recording.started),
-      in: folders ?? services.captureFolders(), request: .saveRecording(device))
+      .recording, named: captureName(.recording, of: device, at: recording.started),
+      in: folders ?? services.captureFolders(), request: .saveRecording(device),
+      userInitiated: userInitiated)
     switch result {
     case .saved:
       unsavedRecordings[device] = nil

@@ -41,7 +41,7 @@ struct AppModelADBTests {
     #expect(model.showsInstallADB == shows)
   }
 
-  /// adb is installed but its server does not answer: Check again is how the user retries.
+  /// adb is installed but its server does not answer: Check Again is how the user retries.
   @Test(arguments: [
     (ADBStatus?.some(.serverDown), true, true), (.some(.serverDown), false, false),
     (.some(.notInstalled), true, false), (.some(.available), true, false), (nil, true, false),
@@ -56,7 +56,7 @@ struct AppModelADBTests {
     #expect(model.showsADBNotRunning == shows)
   }
 
-  /// Check again is no reason to drop the notice of unsent changes.
+  /// Check Again is no reason to drop the notice of unsent changes.
   @Test func checkAgainKeepsTheUnsentChangesNotice() async throws {
     let folder = FileManager.default.temporaryDirectory.appending(path: "ferry-kept-\(UUID())")
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -123,5 +123,35 @@ struct AppModelADBTests {
     let model = model(client)
     await model.refresh()
     #expect(!model.isGuidePresented)
+  }
+
+  /// A Wi-Fi-only user (a device remembered on the network, nothing on USB) gets the install
+  /// hint, and no "No device connected" or file-transfer guide.
+  @Test func aRememberedNetworkDeviceCountsAsADevice() async {
+    let client = FakeClient(log: log)
+    let address = WirelessEndpoint(parsing: "192.0.2.31")!
+    client.setStatus(
+      [], adb: .notInstalled,
+      remembered: [
+        RememberedDevice(id: DeviceID(serial: "W1"), name: "EtherScope nXG", addresses: [address])
+      ])
+    let model = model(client)
+    await model.refresh()
+    #expect(model.showsInstallADB)
+    #expect(!model.showsNoDevice)
+    model.considerEmptyGuide(openFor: .seconds(60))
+    #expect(!model.isGuidePresented)
+  }
+
+  /// With nothing at all, opening a network form is what asks for adb.
+  @Test func openingANetworkFormOffersAdb() async {
+    let client = FakeClient(log: log)
+    client.setStatus([], adb: .notInstalled)
+    let model = model(client)
+    await model.refresh()
+    #expect(model.showsNoDevice)
+    #expect(!model.showsInstallADB)
+    model.openNetworkForm(.address)
+    #expect(model.showsInstallADB)
   }
 }

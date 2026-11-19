@@ -1,6 +1,6 @@
 import DeviceKit
 import FerryIPC
-import FerryUI
+import FerryText
 import Foundation
 
 /// What the user is told when a Finder action ends. Finder Sync has no progress UI, so this is

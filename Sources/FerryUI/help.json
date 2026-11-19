@@ -35,7 +35,7 @@
       ],
       "note": "The device appears in Finder once it shares files.",
       "link": {
-        "title": "How to connect",
+        "title": "How to Connect",
         "target": "guide:netAllyAndroid8Board"
       }
     },
@@ -65,7 +65,7 @@
         }
       ],
       "link": {
-        "title": "How to connect",
+        "title": "How to Connect",
         "target": "guide"
       }
     },
@@ -75,7 +75,7 @@
       "symbol": "terminal",
       "paragraphs": [
         "With USB debugging on, Ferry serves the device over ADB, which is faster than file transfer and adds more tools. File transfer keeps working without it.",
-        "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check again** once it is installed.",
+        "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check Again** once it is installed.",
         "Menu names vary a little between phone makers. Look for Developer options and the USB debugging switch."
       ],
       "groups": [
@@ -156,7 +156,7 @@
           "title": "Is this address your device?",
           "paragraphs": [
             "Anyone on a network can claim a device's serial number. So when a new address answers as a device Ferry already knows, Ferry does not use it on its own: the menu asks **Is <address> your <device>?**",
-            "**Use it** connects the address and remembers it for that device. **Ignore** leaves it unused until Ferry restarts."
+            "**Use It** connects the address and remembers it for that device. **Ignore** leaves it unused until Ferry restarts."
           ]
         }
       ]
@@ -267,7 +267,7 @@
               "detail": "Ferry reaches the device over USB file transfer. Turn on USB debugging to use ADB instead."
             },
             {
-              "term": "More tools with USB debugging…",
+              "term": "More Tools with USB Debugging…",
               "detail": "Opens the steps that turn on USB debugging."
             },
             {
@@ -284,11 +284,11 @@
             },
             {
               "term": "Install adb for more tools…",
-              "detail": "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check again**."
+              "detail": "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check Again**."
             },
             {
               "term": "adb isn't running",
-              "detail": "adb is installed but its server is not answering. Click **Check again**."
+              "detail": "adb is installed but its server is not answering. Click **Check Again**."
             }
           ]
         },
@@ -313,7 +313,7 @@
             },
             {
               "term": "Settings…",
-              "detail": "Open at login, How to connect, Help and Remove Ferry."
+              "detail": "Open at login, How to Connect, Help and Remove Ferry."
             },
             {
               "term": "Quit",
@@ -328,7 +328,7 @@
       "title": "Tools over USB debugging",
       "symbol": "wrench.and.screwdriver",
       "paragraphs": [
-        "A device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) shows Install App…, Screenshot and Record Screen under its name, and a Developer Tools menu. A device on file transfer shows More tools with USB debugging… instead."
+        "A device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) shows Install App…, Screenshot and Record Screen under its name, and a Developer Tools menu. A device on file transfer shows More Tools with USB Debugging… instead."
       ],
       "groups": [
         {

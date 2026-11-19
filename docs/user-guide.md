@@ -62,7 +62,7 @@ same way.
 The unit appears in Finder a few seconds later. Until you tap **Transfer files**, the menu
 shows **No device connected** (the unit offers the Mac no file-transfer connection at all) or
 **Not sharing files** (the unit stays visible but shares no storage). Either way, click **How to
-connect** or **How to turn on file transfer** for these steps.
+connect** or **How to Turn On File Transfer** for these steps.
 
 AirCheck G3 support is planned; it uses different steps.
 
@@ -94,14 +94,14 @@ Ferry falls back to it whenever ADB is off.
 
 Ferry needs `adb`, from Google's Android platform tools. It never installs or bundles it. If it
 is missing, the menu shows **Install adb for more tools…** with the command to run in Terminal,
-a **Copy** button and a **Check again** button:
+a **Copy** button and a **Check Again** button:
 
 ```text
 brew install --cask android-platform-tools
 ```
 
-Click **Check again** once it is installed. From a device that is serving files over file
-transfer, **More tools with USB debugging…** in the menu opens the steps below for its model.
+Click **Check Again** once it is installed. From a device that is serving files over file
+transfer, **More Tools with USB Debugging…** in the menu opens the steps below for its model.
 
 ### NetAlly LinkRunner 10G, LinkRunner 100G and EtherScope nXG
 
@@ -179,7 +179,7 @@ itself.
 
 Anyone on a network can claim a device's serial number. So when a new address answers as a
 device Ferry already knows, Ferry does not use it on its own: the menu asks
-**Is <address> your <device>?** **Use it** connects the address and remembers it for that
+**Is <address> your <device>?** **Use It** connects the address and remembers it for that
 device. **Ignore** leaves it unused until Ferry restarts.
 
 Menu names vary a little between phone makers. Look for Developer options and the USB
@@ -318,7 +318,7 @@ storage and free space, and its state.
 | State | Meaning |
 | ----- | ------- |
 | **Ready** | The device is sharing files and is in Finder. The menu lists each storage and its free space. |
-| **Not sharing files** | The device is connected but file transfer is off or it is locked. Click **How to turn on file transfer** for the steps. |
+| **Not sharing files** | The device is connected but file transfer is off or it is locked. Click **How to Turn On File Transfer** for the steps. |
 | **Ejected** | You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in. |
 | **In use by another app** | Another app has the device. Quit it, then click **Try Again**. See [Troubleshooting](#in-use-by-another-app). |
 | **Can't open** | The device reported an error, shown under its name. Click **Try Again**, or unplug it and plug it back in. |
@@ -332,7 +332,7 @@ Above the devices, the menu can also show:
   helper run. See [Ferry's helper is not responding](#ferrys-helper-is-not-responding).
 - A copy in progress, under its device: **Copying "name" to the device** or **to this Mac**,
   with how far it has got.
-- **No device connected**, with a **How to connect** button. The first time the menu stays
+- **No device connected**, with a **How to Connect** button. The first time the menu stays
   open for about 10 seconds with no device, Ferry opens the setup guide.
 
 While the menu is open, Ferry checks for devices every 2 seconds.
@@ -346,11 +346,11 @@ Under each ready device, the menu says how Ferry reaches it:
 | **USB · File transfer** | USB file transfer, with USB debugging off or not yet allowed. |
 
 A device over ADB shows the [tools](#tools-over-usb-debugging) under its name. A device on
-file transfer also shows **More tools with USB debugging…**, which opens the
+file transfer also shows **More Tools with USB Debugging…**, which opens the
 [steps](#usb-debugging-adb), or **Allow USB debugging on the device** once USB debugging is on
 and waits for you to tap **Allow**. When `adb` is not installed and a device is connected, the
 menu shows **Install adb for more tools…**. When `adb` is installed but its server is not
-answering, it shows **adb isn't running** with **Check again**. A device on your network that
+answering, it shows **adb isn't running** with **Check Again**. A device on your network that
 waits for you to allow this Mac shows **Waiting for you to allow this Mac on** its address.
 
 Menu items:
@@ -374,7 +374,7 @@ Menu items:
 Settings:
 
 - **Open at login**: starts the Ferry menu-bar item when you log in.
-- **How to connect**: opens the setup guide, on file transfer or USB debugging.
+- **How to Connect**: opens the setup guide, on file transfer or USB debugging.
 - **Help**: opens Ferry Help.
 - **Remove Ferry…**: see [Uninstall](#uninstall).
 
@@ -382,7 +382,7 @@ Settings:
 
 A device Ferry reaches over ADB (**USB · ADB** or **Wi-Fi · ADB** in the menu) shows
 **Install App…**, **Screenshot** and **Record Screen** under its name, and a **Developer
-Tools** menu. A device on file transfer shows **More tools with USB debugging…** instead.
+Tools** menu. A device on file transfer shows **More Tools with USB Debugging…** instead.
 
 ### Install an app
 

@@ -1,5 +1,6 @@
 import DeviceKit
 import FerryIPC
+import FerryText
 import SwiftUI
 
 /// One device: a header with its model and state, how Ferry reaches it, details for that state,
@@ -31,6 +32,7 @@ struct DeviceRow: View {
             .font(.headline)
           Text(verbatim: "·")
             .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
           Text(DevicePresentation.status(of: device))
             .foregroundStyle(.secondary)
         }
@@ -54,7 +56,7 @@ struct DeviceRow: View {
           .font(.callout)
       case .moreTools:
         Button(action: showUSBDebugging) {
-          Text("More tools with USB debugging…", bundle: .module)
+          Text("More Tools with USB Debugging…", bundle: .module)
         }
       case nil:
         EmptyView()
@@ -72,6 +74,7 @@ struct DeviceRow: View {
               Image(systemName: "eject")
             }
           }
+          .deviceAction(LocalizedStringResource("Eject", bundle: .module), on: name)
         }
       }
     }
@@ -82,7 +85,7 @@ struct DeviceRow: View {
 
   /// One `.apk` dropped on the row of a device with tools is installed; anything else is not.
   private func install(_ urls: [URL]) {
-    guard urls.count == 1, let url = urls.first, DevicePresentation.isAPK(url) else { return }
+    guard urls.count == 1, let url = urls.first, PresentationText.isAPK(url) else { return }
     tools.install(url)
   }
 
@@ -131,17 +134,19 @@ struct DeviceRow: View {
     case .notSharingFiles:
       if DevicePresentation.needsFileTransferSteps(device) {
         Button(action: showGuide) {
-          Text("How to turn on file transfer", bundle: .module)
+          Text("How to Turn On File Transfer", bundle: .module)
         }
       }
     case .ejected:
       Button(action: mount) {
         Text("Mount", bundle: .module)
       }
+      .deviceAction(LocalizedStringResource("Mount", bundle: .module), on: name)
     case .busy, .failed:
       Button(action: recheck) {
         Text("Try Again", bundle: .module)
       }
+      .deviceAction(LocalizedStringResource("Try Again", bundle: .module), on: name)
     }
   }
 }

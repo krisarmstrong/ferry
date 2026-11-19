@@ -1,0 +1,416 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "A newer version of the app is installed. Uninstall it first." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A newer version of the app is installed. Uninstall it first."
+          }
+        }
+      }
+    },
+    "Another app is using the device. Quit Image Capture or Android File Transfer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another app is using the device. Quit Image Capture or Android File Transfer."
+          }
+        }
+      }
+    },
+    "Another app on the device already defines one of this app's permissions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another app on the device already defines one of this app's permissions."
+          }
+        }
+      }
+    },
+    "Another app on the device already uses this app's content provider." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another app on the device already uses this app's content provider."
+          }
+        }
+      }
+    },
+    "Cancelled." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled."
+          }
+        }
+      }
+    },
+    "Couldn't install the app: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't install the app: %@"
+          }
+        }
+      }
+    },
+    "Error: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error: %@"
+          }
+        }
+      }
+    },
+    "Ferry can't find adb. Install it, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry can't find adb. Install it, then try again."
+          }
+        }
+      }
+    },
+    "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security."
+          }
+        }
+      }
+    },
+    "Ferry's helper didn't answer in time. Try again in a moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry's helper didn't answer in time. Try again in a moment."
+          }
+        }
+      }
+    },
+    "That app is larger than 4 GB." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That app is larger than 4 GB."
+          }
+        }
+      }
+    },
+    "That file isn't an Android app (.apk)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That file isn't an Android app (.apk)."
+          }
+        }
+      }
+    },
+    "That forward is already gone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That forward is already gone."
+          }
+        }
+      }
+    },
+    "The app couldn't be read by the device. It may be damaged or unsigned." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app couldn't be read by the device. It may be damaged or unsigned."
+          }
+        }
+      }
+    },
+    "The app doesn't support this device's processor." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app doesn't support this device's processor."
+          }
+        }
+      }
+    },
+    "The app is a test build, which the device won't install." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app is a test build, which the device won't install."
+          }
+        }
+      }
+    },
+    "The app is already installed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app is already installed."
+          }
+        }
+      }
+    },
+    "The app needs a library the device doesn't have." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app needs a library the device doesn't have."
+          }
+        }
+      }
+    },
+    "The app needs a newer version of Android." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app needs a newer version of Android."
+          }
+        }
+      }
+    },
+    "The device didn't record its screen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device didn't record its screen."
+          }
+        }
+      }
+    },
+    "The device didn't record its screen: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device didn't record its screen: %@"
+          }
+        }
+      }
+    },
+    "The device didn't send a screenshot. Unlock it and try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device didn't send a screenshot. Unlock it and try again."
+          }
+        }
+      }
+    },
+    "The device does not support this: %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device does not support this: %@."
+          }
+        }
+      }
+    },
+    "The device doesn't allow installing apps over USB." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device doesn't allow installing apps over USB."
+          }
+        }
+      }
+    },
+    "The device doesn't have enough space for the app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device doesn't have enough space for the app."
+          }
+        }
+      }
+    },
+    "The device is already recording its screen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device is already recording its screen."
+          }
+        }
+      }
+    },
+    "The device is not sharing files." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device is not sharing files."
+          }
+        }
+      }
+    },
+    "The device isn't recording its screen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device isn't recording its screen."
+          }
+        }
+      }
+    },
+    "The device reported an error." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device reported an error."
+          }
+        }
+      }
+    },
+    "The device reports no storage." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device reports no storage."
+          }
+        }
+      }
+    },
+    "The device sent more than a recording can be, so Ferry deleted it." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device sent more than a recording can be, so Ferry deleted it."
+          }
+        }
+      }
+    },
+    "The device was disconnected." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device was disconnected."
+          }
+        }
+      }
+    },
+    "The device's app verification refused the app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device's app verification refused the app."
+          }
+        }
+      }
+    },
+    "The install was cancelled on the device." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The install was cancelled on the device."
+          }
+        }
+      }
+    },
+    "The installed app is signed differently. Uninstall it first." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The installed app is signed differently. Uninstall it first."
+          }
+        }
+      }
+    },
+    "The recording is still being finished. Try again in a moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording is still being finished. Try again in a moment."
+          }
+        }
+      }
+    },
+    "The recording stopped arriving. It's still on the device: choose a folder, or discard it." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording stopped arriving. It's still on the device: choose a folder, or discard it."
+          }
+        }
+      }
+    },
+    "This needs USB debugging. Turn it on, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This needs USB debugging. Turn it on, then try again."
+          }
+        }
+      }
+    },
+    "Unknown device" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown device"
+          }
+        }
+      }
+    },
+    "Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device."
+          }
+        }
+      }
+    },
+    "adb couldn't forward the port: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "adb couldn't forward the port: %@"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

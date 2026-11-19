@@ -32,7 +32,7 @@ struct InstallADBRow: View {
           copied = false
         }
         Button(action: checkAgain) {
-          Text("Check again", bundle: .module)
+          Text("Check Again", bundle: .module)
         }
       }
     }
@@ -54,7 +54,7 @@ struct ADBNotRunningRow: View {
           .foregroundStyle(.yellow)
       }
       Button(action: checkAgain) {
-        Text("Check again", bundle: .module)
+        Text("Check Again", bundle: .module)
       }
     }
     .accessibilityElement(children: .contain)

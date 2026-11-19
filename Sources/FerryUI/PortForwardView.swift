@@ -13,7 +13,7 @@ public struct PortForwardView: View {
 
   public init(model: AppModel, device: DeviceID) {
     _session = State(initialValue: model.portForwardsSession(for: device))
-    title = model.modelName(of: device)
+    title = model.windowName(of: device)
   }
 
   public var body: some View {
@@ -75,7 +75,7 @@ public struct PortForwardView: View {
     }
     .padding(20)
     .frame(width: 460)
-    .navigationTitle(Text(verbatim: DevicePresentation.forwardsTitle(model: title)))
+    .navigationTitle(Text(verbatim: DevicePresentation.forwardsTitle(name: title)))
     .task { await session.refresh() }
   }
 }

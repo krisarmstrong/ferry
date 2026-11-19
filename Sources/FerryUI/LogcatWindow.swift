@@ -13,7 +13,7 @@ public struct LogcatWindow: View {
 
   public init(model: AppModel, device: DeviceID) {
     _session = State(initialValue: model.logcatSession(for: device))
-    title = model.modelName(of: device)
+    title = model.windowName(of: device)
   }
 
   public var body: some View {
@@ -75,6 +75,11 @@ public struct LogcatWindow: View {
         if case .ended(let message) = session.state {
           Text(verbatim: message)
             .foregroundStyle(.red)
+          Button {
+            Task { await session.run() }
+          } label: {
+            Text("Restart", bundle: .module)
+          }
         }
         if let error = session.saveError {
           Text(verbatim: error)
@@ -86,7 +91,7 @@ public struct LogcatWindow: View {
       .padding(8)
     }
     .frame(minWidth: 560, minHeight: 320)
-    .navigationTitle(Text(verbatim: DevicePresentation.logTitle(model: title)))
+    .navigationTitle(Text(verbatim: DevicePresentation.logTitle(name: title)))
     .task { await session.run() }
     .onDisappear { Task { await session.close() } }
   }

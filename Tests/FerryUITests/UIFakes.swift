@@ -359,12 +359,12 @@ final class FakeServices: SystemServicing {
 
   func captureFolders() -> [URL] { folders }
 
-  /// What the save panel returns: `nil` is Cancel.
-  var destination: URL?
+  /// What the folder panel returns: `nil` is Cancel.
+  var chosenFolder: URL?
 
-  func chooseDestination(suggestedName: String) async -> URL? {
-    log.record("chooseDestination \(suggestedName)")
-    return destination
+  func chooseFolder() async -> URL? {
+    log.record("chooseFolder")
+    return chosenFolder
   }
 
   func chooseAPK() async -> URL? {

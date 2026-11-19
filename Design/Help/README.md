@@ -39,7 +39,7 @@ A standard macOS window, opened from a **Help** item in the menu and in Settings
 │ [folder] Using Ferr…  │  3. Tap Transfer files.              │
 │ [menubar] The menu    │                                      │
 │ [wrench] Tools over…  │  The device appears in Finder once … │
-│ [wrench] Troublesho…  │                     [ How to connect ]│
+│ [wrench] Troublesho…  │                     [ How to Connect ]│
 │ [hand] Privacy        │                                      │
 │ [trash] Uninstall     │                                      │
 └───────────────────────┴──────────────────────────────────────┘
@@ -59,7 +59,7 @@ Bracketed names stand for each section's SF Symbol (`symbol` in `help.json`).
 - A `link` renders as a bordered button at the end of the block. `"guide"` opens the setup
   guide window with the model picker; `"guide:<case>"` opens it preselected to that
   `DeviceFamily`. `"debugging"` and `"debugging:<case>"` do the same on the USB debugging steps
-  instead of the file-transfer steps. This is the "How to connect" deep link.
+  instead of the file-transfer steps. This is the "How to Connect" deep link.
 - The window opens on the section the reader last chose, kept with `@AppStorage`, and on
   **Getting started** the first time (or when the remembered section no longer exists). The
   window itself is not restored at launch. The sidebar's selection and the detail always

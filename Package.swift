@@ -13,6 +13,7 @@ let package = Package(
     .library(name: "FerryIPC", targets: ["FerryIPC"]),
     .library(name: "FerryProviderCore", targets: ["FerryProviderCore"]),
     .library(name: "FerrySyncCore", targets: ["FerrySyncCore"]),
+    .library(name: "FerryText", targets: ["FerryText"]),
     .library(name: "FerryUI", targets: ["FerryUI"]),
     .library(name: "MTPTransport", targets: ["MTPTransport"]),
   ],
@@ -33,10 +34,13 @@ let package = Package(
       name: "FerryProviderCore", dependencies: ["DeviceKit", "FerryIPC"],
       resources: [.process("Localizable.xcstrings")]),
     .target(
-      name: "FerrySyncCore", dependencies: ["DeviceKit", "FerryIPC", "FerryUI"],
+      name: "FerrySyncCore", dependencies: ["DeviceKit", "FerryIPC", "FerryText"],
       resources: [.process("Localizable.xcstrings")]),
     .target(
-      name: "FerryUI", dependencies: ["DeviceKit", "FerryIPC"],
+      name: "FerryText", dependencies: ["DeviceKit", "FerryIPC"],
+      resources: [.process("Localizable.xcstrings")]),
+    .target(
+      name: "FerryUI", dependencies: ["DeviceKit", "FerryIPC", "FerryText"],
       resources: [.process("Localizable.xcstrings"), .process("help.json")]),
     .executableTarget(
       name: "ferryctl",
@@ -62,10 +66,13 @@ let package = Package(
       dependencies: ["FerryProviderCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),
     .testTarget(
       name: "FerrySyncCoreTests",
-      dependencies: ["FerrySyncCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),
+      dependencies: [
+        "FerrySyncCore", "FerryIPC", "FerryProviderCore", "FerryText", "DeviceKit",
+        "DeviceKitTestSupport",
+      ]),
     .testTarget(
       name: "FerryUITests",
-      dependencies: ["FerryUI", "FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),
+      dependencies: ["FerryUI", "FerryIPC", "FerryText", "DeviceKit", "DeviceKitTestSupport"]),
   ],
   swiftLanguageModes: [.v6]
 )

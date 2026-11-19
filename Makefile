@@ -35,12 +35,17 @@ check-app:
 	@test -f "$(UI_RESOURCES)/help.json" || { echo "error: no help.json in $(UI_RESOURCES)" >&2; exit 1; }
 	@test -d "$(UI_RESOURCES)/en.lproj" || { echo "error: no en.lproj in $(UI_RESOURCES)" >&2; exit 1; }
 	@echo "app bundle carries help.json and en.lproj"
-	@# The Finder Sync extension reads its own strings, and the menu's for failures.
-	@for bundle in Ferry_FerrySyncCore Ferry_FerryUI; do \
+	@# The Finder Sync extension reads its own strings, and the shared ones for failures. It runs
+	@# in every Finder window, so it must not carry the menu's UI.
+	@for bundle in Ferry_FerrySyncCore Ferry_FerryText; do \
 	  test -d "$(SYNC_RESOURCES)/$$bundle.bundle/Contents/Resources/en.lproj" \
 	    || { echo "error: no $$bundle strings in $(SYNC_RESOURCES)" >&2; exit 1; }; \
 	done
-	@echo "Finder Sync extension carries its strings"
+	@! test -e "$(SYNC_RESOURCES)/Ferry_FerryUI.bundle" \
+	  || { echo "error: the Finder Sync extension carries FerryUI" >&2; exit 1; }
+	@echo "Finder Sync extension carries its strings and not the menu UI"
+	@test -d "$(APP)/Contents/Resources/Ferry_FerryText.bundle/Contents/Resources/en.lproj" \
+	  || { echo "error: no FerryText strings in $(APP)/Contents/Resources" >&2; exit 1; }
 	@# The FileProvider extension's errors and the agent's words come from their own bundles,
 	@# and a missing bundle stops the process at its first string.
 	@test -d "$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Resources/Ferry_FerryProviderCore.bundle/Contents/Resources/en.lproj" \

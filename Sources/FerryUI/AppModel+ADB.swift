@@ -6,36 +6,25 @@ extension AppModel {
     awaitingUSBDebugging.contains(device)
   }
 
-  /// adb is missing and a device is attached that could use it. With no device the menu stays
-  /// quiet: a Mac that never meets an Android device has no use for adb.
+  /// adb is missing and Ferry has a device that could use it, attached or on the network, or the
+  /// user opened a network form. With neither the menu stays quiet: a Mac that never meets an
+  /// Android device has no use for adb.
   public var showsInstallADB: Bool {
-    agent == .running && adbStatus == .notInstalled && !devices.isEmpty
+    agent == .running && adbStatus == .notInstalled && (hasDevices || wantsNetwork)
   }
 
-  /// adb is installed but its server does not answer, and a device is attached that could use
-  /// it: the same rule as `showsInstallADB`.
+  /// adb is installed but its server does not answer: the same rule as `showsInstallADB`.
   public var showsADBNotRunning: Bool {
-    agent == .running && adbStatus == .serverDown && !devices.isEmpty
+    agent == .running && adbStatus == .serverDown && (hasDevices || wantsNetwork)
   }
 
-  /// The Check again button: the agent looks for adb and starts its server.
+  /// The Check Again button: the agent looks for adb and starts its server.
   public func recheckADB() async {
     await perform(.recheckADB)
   }
 
   public func copyInstallCommand() {
     services.copy(DevicePresentation.installCommand)
-  }
-
-  /// Opens the guide, with the model picker, once per app run when the agent is running but
-  /// has seen no device for 10 s of the menu being open, counted from the agent's first
-  /// answer.
-  func considerEmptyGuide(openFor: Duration) {
-    guard agent == .running, devices.isEmpty, openFor >= Self.emptyGuideDelay,
-      !emptyGuideShown
-    else { return }
-    emptyGuideShown = true
-    showGuide(for: nil)
   }
 
   /// Opens the guide at the device's USB debugging steps, or the model picker if Ferry does not

@@ -46,13 +46,15 @@ import os
   public private(set) var awaitingAuthorization: [String] = []
   /// Devices the agent reconnects over the network.
   public private(set) var remembered: [RememberedDevice] = []
-  /// New addresses for known devices, waiting for the user to say Use it or Ignore.
+  /// New addresses for known devices, waiting for the user to say Use It or Ignore.
   public private(set) var unconfirmed: [UnconfirmedAddress] = []
   /// What the last network request said, for the form and the menu; `nil` once it connected.
   /// It can carry adb's words, so it is shown verbatim.
   public internal(set) var wirelessMessage: String?
   /// The form the network window shows.
   public var wirelessForm = WirelessForm.address
+  /// Set once the user opens a network form this run: a Wi-Fi-only user needs adb too.
+  var wantsNetwork = false
   /// The last failed action, shown until the next one succeeds. It can carry device-supplied
   /// detail, so it is shown verbatim, never parsed as Markdown.
   public internal(set) var actionError: String?
@@ -220,6 +222,9 @@ import os
   /// Registers the agent, reads its status, then whether Ferry opens at login. The system calls
   /// run off the main actor (see `SystemServices`), so the app opens without waiting on them.
   public func launch() async {
+    // Hidden capture files a crash or a quit mid-save left behind.
+    let folders = services.captureFolders()
+    await Task.detached { CaptureFiles.sweep(folders) }.value
     await services.registerAgent()
     await refresh()
     opensAtLogin = await services.opensAtLogin()

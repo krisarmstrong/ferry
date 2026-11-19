@@ -32,7 +32,7 @@ public struct MenuContent: View {
       if model.showsTurnOnRow {
         TurnOnRow { model.turnOnInFinder() }
       }
-      if model.agent == .running, model.devices.isEmpty {
+      if model.showsNoDevice {
         NoDeviceRow { openGuide(for: nil) }
       }
       ForEach(model.devices) { device in
@@ -46,7 +46,7 @@ public struct MenuContent: View {
           showGuide: { openGuide(for: device) },
           showUSBDebugging: { openUSBDebuggingGuide(for: device) },
           network: NetworkActions(
-            offersWiFi: DevicePresentation.offersWiFi(device),
+            name: model.displayName(of: device), offersWiFi: DevicePresentation.offersWiFi(device),
             isRemembered: model.isRemembered(device.id),
             useOverWiFi: { Task { await model.useOverWiFi(device.id) } },
             forget: { Task { await model.forget(device.id) } }),
@@ -74,7 +74,7 @@ public struct MenuContent: View {
       }
       NetworkRow(
         message: model.wirelessMessage,
-        offersForms: model.agent == .running && model.adbStatus == .available,
+        offersForms: model.agent == .running && model.adbStatus != nil,
         open: openNetworkForm)
       if model.agent == .running, model.usbWatchFailed {
         Text(
@@ -167,7 +167,7 @@ public struct MenuContent: View {
   }
 
   private func openNetworkForm(_ form: WirelessForm) {
-    model.wirelessForm = form
+    model.openNetworkForm(form)
     NSApp.activate()
     openWindow(id: PairDeviceView.windowID)
   }
@@ -249,7 +249,7 @@ private struct NoDeviceRow: View {
         .font(.callout)
         .foregroundStyle(.secondary)
       Button(action: showGuide) {
-        Text("How to connect", bundle: .module)
+        Text("How to Connect", bundle: .module)
       }
     }
   }

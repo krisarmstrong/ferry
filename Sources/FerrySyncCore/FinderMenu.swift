@@ -1,6 +1,6 @@
 import DeviceKit
 import FerryIPC
-import FerryUI
+import FerryText
 import Foundation
 
 /// What a Finder menu item does.
@@ -65,7 +65,7 @@ public enum FinderMenu {
   /// escaped, since the device supplies it, and told apart from another of the same name as
   /// there. `devices` is every device the agent listed, ready or not, as the Ferry menu lists.
   public static func displayNames(of devices: [DeviceSummary]) -> [DeviceID: String] {
-    PresentationText.deviceNames(devices.map { ($0.id, $0.name) })
+    PresentationText.shownNames(devices.map { ($0.id, $0.name) })
   }
 
   private static func text(_ key: String.LocalizationValue) -> String {

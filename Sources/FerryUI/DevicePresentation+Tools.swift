@@ -1,20 +1,17 @@
 import DeviceKit
 import FerryIPC
+import FerryText
 import Foundation
 
 /// Text the menu shows for the ADB tools.
 extension DevicePresentation {
   /// Tools are offered on a device Ferry serves over ADB, by USB or the network.
   static func offersTools(_ device: AttachedDevice) -> Bool {
-    if case .ready = device.state { toolMethods.contains(device.method) } else { false }
-  }
-
-  static let toolMethods: Set<ConnectionMethod> = [.usbADB, .wifiADB]
-
-  /// Whether a file the user picked or dropped is offered to the agent as an app. The agent
-  /// checks its contents.
-  static func isAPK(_ url: URL) -> Bool {
-    url.isFileURL && url.pathExtension.lowercased() == "apk"
+    if case .ready = device.state {
+      PresentationText.toolMethods.contains(device.method)
+    } else {
+      false
+    }
   }
 
   /// An app on its way to the device: its name, escaped since the user's file named it, and how
@@ -41,115 +38,6 @@ extension DevicePresentation {
     return String(localized: LocalizedStringResource("Installed “\(name)”.", bundle: .module))
   }
 
-  static func message(for failure: ToolFailure) -> String {
-    String(localized: resource(for: failure))
-  }
-
-  private static func resource(for failure: ToolFailure) -> LocalizedStringResource {
-    switch failure {
-    case .notOverADB:
-      LocalizedStringResource(
-        "This needs USB debugging. Turn it on, then try again.", bundle: .module)
-    case .notAnAPK:
-      LocalizedStringResource("That file isn't an Android app (.apk).", bundle: .module)
-    case .apkTooLarge:
-      LocalizedStringResource("That app is larger than 4 GB.", bundle: .module)
-    case .installFailed(let reason):
-      installFailureResource(reason)
-    case .alreadyRecording:
-      LocalizedStringResource("The device is already recording its screen.", bundle: .module)
-    case .notRecording:
-      LocalizedStringResource("The device isn't recording its screen.", bundle: .module)
-    case .noImage:
-      LocalizedStringResource(
-        "The device didn't send a screenshot. Unlock it and try again.", bundle: .module)
-    case .recordingFailed(let detail):
-      recordingFailure(detail)
-    case .recordingTooLarge:
-      LocalizedStringResource(
-        "The device sent more than a recording can be, so Ferry deleted it.", bundle: .module)
-    case .recordingStalled:
-      LocalizedStringResource(
-        "The recording stopped arriving. It's still on the device: choose a folder, or discard it.",
-        bundle: .module)
-    case .recordingBusy:
-      LocalizedStringResource(
-        "The recording is still being finished. Try again in a moment.", bundle: .module)
-    case .cannotSave:
-      LocalizedStringResource(
-        "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security.",
-        bundle: .module)
-    case .invalidPort:
-      LocalizedStringResource(
-        "Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device.",
-        bundle: .module)
-    case .forwardFailed(let detail):
-      // adb's own words, escaped, since a device or a program wrote them.
-      LocalizedStringResource(
-        "adb couldn't forward the port: \(DisplayText.escaped(detail))", bundle: .module)
-    case .adbNotFound:
-      LocalizedStringResource("Ferry can't find adb. Install it, then try again.", bundle: .module)
-    case .forwardNotFound:
-      LocalizedStringResource("That forward is already gone.", bundle: .module)
-    }
-  }
-
-  private static func recordingFailure(_ detail: String) -> LocalizedStringResource {
-    if detail.isEmpty {
-      return LocalizedStringResource("The device didn't record its screen.", bundle: .module)
-    }
-    let shown = DisplayText.escaped(detail)
-    return LocalizedStringResource(
-      "The device didn't record its screen: \(shown)", bundle: .module)
-  }
-
-  /// pm's refusal in plain words where the code is a common one; otherwise the code (or pm's
-  /// line), escaped, since the device wrote it.
-  static func installFailure(_ reason: String) -> String {
-    String(localized: installFailureResource(reason))
-  }
-
-  private static func installFailureResource(_ reason: String) -> LocalizedStringResource {
-    if let known = installReasons[reason] { return known }
-    if reason.hasPrefix("INSTALL_PARSE_FAILED_") {
-      return LocalizedStringResource(
-        "The app couldn't be read by the device. It may be damaged or unsigned.", bundle: .module)
-    }
-    let shown = DisplayText.escaped(reason)
-    return LocalizedStringResource("Couldn't install the app: \(shown)", bundle: .module)
-  }
-
-  private static let installReasons: [String: LocalizedStringResource] = [
-    "INSTALL_FAILED_ALREADY_EXISTS": LocalizedStringResource(
-      "The app is already installed.", bundle: .module),
-    "INSTALL_FAILED_INSUFFICIENT_STORAGE": LocalizedStringResource(
-      "The device doesn't have enough space for the app.", bundle: .module),
-    "INSTALL_FAILED_VERSION_DOWNGRADE": LocalizedStringResource(
-      "A newer version of the app is installed. Uninstall it first.", bundle: .module),
-    "INSTALL_FAILED_UPDATE_INCOMPATIBLE": LocalizedStringResource(
-      "The installed app is signed differently. Uninstall it first.", bundle: .module),
-    "INSTALL_FAILED_OLDER_SDK": LocalizedStringResource(
-      "The app needs a newer version of Android.", bundle: .module),
-    "INSTALL_FAILED_NO_MATCHING_ABIS": LocalizedStringResource(
-      "The app doesn't support this device's processor.", bundle: .module),
-    "INSTALL_FAILED_TEST_ONLY": LocalizedStringResource(
-      "The app is a test build, which the device won't install.", bundle: .module),
-    "INSTALL_FAILED_DUPLICATE_PERMISSION": LocalizedStringResource(
-      "Another app on the device already defines one of this app's permissions.",
-      bundle: .module),
-    "INSTALL_FAILED_CONFLICTING_PROVIDER": LocalizedStringResource(
-      "Another app on the device already uses this app's content provider.", bundle: .module),
-    "INSTALL_FAILED_MISSING_SHARED_LIBRARY": LocalizedStringResource(
-      "The app needs a library the device doesn't have.", bundle: .module),
-    "INSTALL_FAILED_INVALID_APK": LocalizedStringResource(
-      "The app couldn't be read by the device. It may be damaged or unsigned.", bundle: .module),
-    "INSTALL_FAILED_USER_RESTRICTED": LocalizedStringResource(
-      "The device doesn't allow installing apps over USB.", bundle: .module),
-    "INSTALL_FAILED_VERIFICATION_FAILURE": LocalizedStringResource(
-      "The device's app verification refused the app.", bundle: .module),
-    "INSTALL_FAILED_ABORTED": LocalizedStringResource(
-      "The install was cancelled on the device.", bundle: .module),
-  ]
 }
 
 /// Text for the developer tools: the log window, Device Info.
@@ -184,22 +72,25 @@ extension DevicePresentation {
     String(localized: LocalizedStringResource("Lines shown: \(shown) of \(held)", bundle: .module))
   }
 
-  /// A window title: the tool, then the device's model (escaped, the device named itself).
-  static func logTitle(model: String) -> String {
-    windowTitle(LocalizedStringResource("Logcat", bundle: .module), model)
+  /// A window title: the tool, then the device as the menu names it (`name`, already escaped:
+  /// the device named itself).
+  static func logTitle(name: String) -> String {
+    windowTitle(LocalizedStringResource("Logcat", bundle: .module), name)
   }
 
-  static func forwardsTitle(model: String) -> String {
-    windowTitle(LocalizedStringResource("Port Forwarding", bundle: .module), model)
+  static func forwardsTitle(name: String) -> String {
+    windowTitle(LocalizedStringResource("Port Forwarding", bundle: .module), name)
   }
 
-  static func infoTitle(model: String) -> String {
-    windowTitle(LocalizedStringResource("Device Info", bundle: .module), model)
+  static func infoTitle(name: String) -> String {
+    windowTitle(LocalizedStringResource("Device Info", bundle: .module), name)
   }
 
-  private static func windowTitle(_ tool: LocalizedStringResource, _ model: String) -> String {
-    let name = String(localized: tool)
-    return model.isEmpty ? name : "\(name) · \(DisplayText.escaped(model))"
+  /// One format, so a language can put the device first.
+  private static func windowTitle(_ tool: LocalizedStringResource, _ name: String) -> String {
+    let tool = String(localized: tool)
+    guard !name.isEmpty else { return tool }
+    return String(localized: LocalizedStringResource("\(tool) · \(name)", bundle: .module))
   }
 
   /// A forward as the list shows it: the Mac port, an arrow, the device port.
@@ -212,6 +103,13 @@ extension DevicePresentation {
     let (local, remote) = (String(forward.local), String(forward.remote))
     return LocalizedStringResource(
       "This Mac port \(local) → device port \(remote)", bundle: .module)
+  }
+
+  /// What VoiceOver reads for a button every device row repeats: the action, then the device as
+  /// the menu names it (already escaped), so two rows' Eject buttons can be told apart.
+  static func actionLabel(_ action: LocalizedStringResource, on name: String) -> String {
+    let action = String(localized: action)
+    return String(localized: LocalizedStringResource("\(action), \(name)", bundle: .module))
   }
 
   static func removeForwardLabel(_ forward: PortForward) -> String {

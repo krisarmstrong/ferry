@@ -88,13 +88,36 @@ struct AppModelRecordingTests {
     await model.refresh()
     await model.collectRecording(on: id)
     let folder = try TestScratch.folder("chosen")
-    services.destination = folder.appending(path: "Field test.mp4")
+    services.chosenFolder = folder
     await model.chooseRecordingDestination(on: id)
-    #expect(log.all.contains { $0.hasPrefix("chooseDestination Screen Recording LinkRunner-100G") })
+    #expect(log.all.contains("chooseFolder"))
+    let saved = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+    #expect(saved.count == 1)
+    #expect(saved.first?.hasPrefix("Screen Recording LinkRunner-100G") == true)
+    #expect(saved.first?.hasSuffix(".mp4") == true)
     #expect(
-      try Data(contentsOf: folder.appending(path: "Field test.mp4")) == Data("....ftypmp42".utf8))
+      try Data(contentsOf: folder.appending(path: try #require(saved.first)))
+        == Data("....ftypmp42".utf8))
     #expect(!model.recordingUnsaved(on: id))
     #expect(model.recording(on: id) == nil)
+  }
+
+  /// A recording saved on its own, as a status lists it, leaves what the menu shows alone: the
+  /// user may be about to act on it.
+  @Test func aBackgroundSaveKeepsTheMenuAsItWas() async throws {
+    let model = setUp()
+    services.folders = [try TestScratch.folder("background")]
+    let kept = URL(filePath: "/tmp/kept-\(UUID().uuidString)")
+    model.preservedChanges = [kept]
+    model.toolMessage = "Installed “a.apk”."
+    await model.refresh()
+    let deadline = ContinuousClock.now + .seconds(5)
+    while saves() == 0 || model.recording(on: id) != nil, ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(saves() == 1)
+    #expect(model.preservedChanges == [kept])
+    #expect(model.toolMessage == "Installed “a.apk”.")
   }
 
   @Test func discardFreesTheDevice() async throws {

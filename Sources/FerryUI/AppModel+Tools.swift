@@ -1,5 +1,6 @@
 import DeviceKit
 import FerryIPC
+import FerryText
 import Foundation
 
 /// An app the menu is installing.
@@ -23,7 +24,7 @@ extension AppModel {
   /// Installs the `.apk` at `url`, sent to the agent as an open file. Anything else (a file
   /// dropped on the row) is not sent; the agent checks the contents again.
   public func installAPK(_ url: URL, on device: DeviceID) async {
-    guard DevicePresentation.isAPK(url), installs[device] == nil else { return }
+    guard PresentationText.isAPK(url), installs[device] == nil else { return }
     let handle: FileHandle
     do {
       handle = try FileHandle(forReadingFrom: url)
@@ -77,10 +78,12 @@ extension AppModel {
   /// screenshots, then the Desktop), has the agent fill it through its descriptor, then names it
   /// `base` (or the next free name) and shows it in Finder. Any failure removes the file. The
   /// file is created off the main thread: a folder macOS protects can hold the call while it asks
-  /// the user.
+  /// the user. A capture the user did not ask for now (`userInitiated` false: a recording saved
+  /// on its own) leaves what the menu shows alone; its outcome shows in its own row.
   @discardableResult
   func capture(
-    _ kind: CaptureFiles.Kind, named base: String, in folders: [URL], request: AgentRequest
+    _ kind: CaptureFiles.Kind, named base: String, in folders: [URL], request: AgentRequest,
+    userInitiated: Bool = true
   ) async -> CaptureResult {
     let opened = await Task.detached { () -> (url: URL, handle: FileHandle)? in
       for folder in folders {
@@ -89,10 +92,10 @@ extension AppModel {
       return nil
     }.value
     guard let (temporary, handle) = opened else {
-      actionError = DevicePresentation.message(for: .cannotSave)
+      if userInitiated { actionError = DevicePresentation.message(for: .cannotSave) }
       return .noFolder
     }
-    let response = await sendTool(request, file: handle)
+    let response = await sendTool(request, file: handle, userInitiated: userInitiated)
     try? handle.close()
     guard response == .done else {
       unlink(temporary.path)
@@ -104,7 +107,7 @@ extension AppModel {
       return .saved
     } catch {
       unlink(temporary.path)
-      actionError = DevicePresentation.message(for: error)
+      if userInitiated { actionError = DevicePresentation.message(for: error) }
       return .noFolder
     }
   }
@@ -115,10 +118,15 @@ extension AppModel {
     return CaptureFiles.baseName(kind, model: model, at: date)
   }
 
-  /// Sends a tool request and shows a failure as the menu's error. Returns the response.
+  /// Sends a tool request and shows a failure as the menu's error. Returns the response. One
+  /// the user did not ask for now (`userInitiated` false) leaves what the menu shows alone.
   func sendTool(
-    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler? = nil
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler? = nil,
+    userInitiated: Bool = true
   ) async -> AgentResponse? {
+    guard userInitiated else {
+      return try? await client.send(request, file: file, progress: progress)
+    }
     preservedChanges = []
     toolMessage = nil
     do {

@@ -36,8 +36,8 @@ public protocol SystemServicing {
   /// Where screenshots and recordings go, in order of preference: where macOS saves its own,
   /// then the Desktop.
   func captureFolders() -> [URL]
-  /// Asks the user where to save a file, suggesting `suggestedName`; `nil` if they cancel.
-  func chooseDestination(suggestedName: String) async -> URL?
+  /// Asks the user for a folder to save in; `nil` if they cancel.
+  func chooseFolder() async -> URL?
   /// Asks the user where to save a log (plain text); `nil` if they cancel.
   func chooseLogDestination(suggestedName: String) async -> URL?
   /// Opens the `.command` file in Terminal, which runs it. False if Terminal could not.
@@ -132,10 +132,12 @@ public final class SystemServices: SystemServicing {
     return panel.runModal() == .OK ? panel.url : nil
   }
 
-  public func chooseDestination(suggestedName: String) async -> URL? {
-    let panel = NSSavePanel()
-    panel.nameFieldStringValue = suggestedName
-    panel.allowedContentTypes = [.mpeg4Movie]
+  public func chooseFolder() async -> URL? {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.canCreateDirectories = true
+    panel.allowsMultipleSelection = false
     NSApp.activate()
     return panel.runModal() == .OK ? panel.url : nil
   }

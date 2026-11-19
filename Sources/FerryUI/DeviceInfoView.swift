@@ -12,7 +12,7 @@ public struct DeviceInfoView: View {
 
   public init(model: AppModel, device: DeviceID) {
     _session = State(initialValue: model.deviceInfoSession(for: device))
-    title = model.modelName(of: device)
+    title = model.windowName(of: device)
   }
 
   public var body: some View {
@@ -59,7 +59,7 @@ public struct DeviceInfoView: View {
     }
     .padding(20)
     .frame(minWidth: 380, alignment: .leading)
-    .navigationTitle(Text(verbatim: DevicePresentation.infoTitle(model: title)))
+    .navigationTitle(Text(verbatim: DevicePresentation.infoTitle(name: title)))
     .task { await session.load() }
   }
 

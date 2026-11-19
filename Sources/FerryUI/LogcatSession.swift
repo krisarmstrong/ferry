@@ -17,7 +17,8 @@ import Observation
   }
 
   let device: DeviceID
-  private let model: String
+  /// The device as the menu names it, unescaped: it only names the saved file.
+  private let name: String
   private let client: any AgentSending
   private let services: any SystemServicing
 
@@ -39,14 +40,15 @@ import Observation
   /// While paused, only lines before this identifier are shown.
   private var pausedBefore: Int?
   private var closing = false
-  /// Names this window's stream to the agent, so closing a window never ends a newer one.
-  private let stream = UUID()
+  /// Names this window's current stream to the agent, so closing a window never ends a newer
+  /// one; each run has its own.
+  private(set) var stream = UUID()
 
   init(
-    device: DeviceID, model: String, client: any AgentSending, services: any SystemServicing
+    device: DeviceID, name: String, client: any AgentSending, services: any SystemServicing
   ) {
     self.device = device
-    self.model = model
+    self.name = name
     self.client = client
     self.services = services
   }
@@ -54,8 +56,10 @@ import Observation
   /// How many lines are held.
   var held: Int { buffer.count }
 
-  /// Streams until the stream ends or the window closes.
+  /// Streams until the stream ends or the window closes. Run again after it ended (Restart), it
+  /// starts a new stream.
   func run() async {
+    stream = UUID()
     state = .running
     closing = false
     let response: AgentResponse?
@@ -113,7 +117,7 @@ import Observation
 
   /// Save…: asks where, then writes the held lines that pass the filters, one per line.
   func save() async {
-    let name = CaptureFiles.baseName(.logcat, model: model, at: Date()) + ".txt"
+    let name = CaptureFiles.baseName(.logcat, model: name, at: Date()) + ".txt"
     guard let url = await services.chooseLogDestination(suggestedName: name) else { return }
     let lines = buffer.shown(minimum: minimumLevel, matching: filterText).map(\.text)
     let text = lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"

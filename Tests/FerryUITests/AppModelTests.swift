@@ -216,4 +216,24 @@ struct AppModelTests {
     #expect(model.displayName(of: second) == "LinkRunner-100G (b23456789abcdef)")
     #expect(model.displayName(of: other) == "Phone")
   }
+
+  /// The developer windows name the device as the menu does, so two units of one model have two
+  /// titles; the title is one format a language can reorder.
+  @Test func developerWindowsAreNamedAsTheMenuNamesTheDevice() async {
+    let first = device("0123456789abcdef", model: "LinkRunner-100G", .busy)
+    let second = device("0b23456789abcdef", model: "LinkRunner-100G", .busy)
+    let client = FakeClient(log: log)
+    client.setStatus([first, second])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.refresh()
+    let titles = [first, second].map {
+      DevicePresentation.logTitle(name: model.windowName(of: $0.id))
+    }
+    #expect(
+      titles == [
+        "Logcat · LinkRunner-100G (123456789abcdef)", "Logcat · LinkRunner-100G (b23456789abcdef)",
+      ])
+    #expect(model.fileName(of: second.id) == "LinkRunner-100G (b23456789abcdef)")
+    #expect(DevicePresentation.logTitle(name: "") == "Logcat")
+  }
 }

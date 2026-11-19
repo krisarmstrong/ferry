@@ -26,7 +26,7 @@ public struct SettingsView: View {
           _ = model.takeGuideOpenRequest()
           openWindow(id: SetupGuide.windowID)
         } label: {
-          Text("How to connect", bundle: .module)
+          Text("How to Connect", bundle: .module)
         }
       } label: {
         Text("File transfer", bundle: .module)

@@ -125,7 +125,7 @@ struct AppModelWirelessTests {
     #expect(DevicePresentation.rememberedName(hostile) == "Evil\\u{202E}gpj")
   }
 
-  /// A new address for a device Ferry knows waits for the user: the menu asks, and only Use it
+  /// A new address for a device Ferry knows waits for the user: the menu asks, and only Use It
   /// or Ignore answers.
   @Test func unconfirmedAddressesAreAskedAboutAndAnswered() async throws {
     let client = FakeClient(log: log)

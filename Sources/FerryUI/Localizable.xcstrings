@@ -1,7 +1,33 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "**Use it** connects the address and remembers it for that device. **Ignore** leaves it unused until Ferry restarts." : {
+    "How to turn on file transfer" : {
+      "extractionState" : "manual"
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "Restart" : {
+
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "**Use It** connects the address and remembers it for that device. **Ignore** leaves it unused until Ferry restarts." : {
       "extractionState" : "manual"
     },
     "Anyone on a network can claim a device's serial number. So when a new address answers as a device Ferry already knows, Ferry does not use it on its own: the menu asks **Is <address> your <device>?**" : {
@@ -59,9 +85,6 @@
         }
       }
     },
-    "Ferry's helper didn't answer in time. Try again in a moment." : {
-
-    },
     "Ferry can't watch USB for devices, so it looks for them every 30 seconds." : {
 
     },
@@ -98,7 +121,7 @@
     "%lld." : {
 
     },
-    "A device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) shows Install App…, Screenshot and Record Screen under its name, and a Developer Tools menu. A device on file transfer shows More tools with USB debugging… instead." : {
+    "A device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) shows Install App…, Screenshot and Record Screen under its name, and a Developer Tools menu. A device on file transfer shows More Tools with USB Debugging… instead." : {
       "extractionState" : "manual"
     },
     "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device." : {
@@ -119,17 +142,11 @@
     "A folder on the device named like an app or a document package, such as Tool.app or Notes.rtfd, shows in Finder as an app or a document, because macOS goes by the name. It is read-only on the Mac, with everything in it: edit it on the device, or copy it to the Mac. Something put inside one stays on the Mac, and Finder shows an error for it. Saving one from a Mac app can leave a copy beside it, such as Notes 2.rtfd, which Finder marks with an error, with the edit only on the Mac: copy it to the Mac to keep it. A folder can't be renamed to such a name. To remove one, delete it on the device, or delete the folder that holds it; Finder may put that folder back once, so delete it again." : {
       "extractionState" : "manual"
     },
-    "A newer version of the app is installed. Uninstall it first." : {
-
-    },
     "A package, such as an .rtfd document or an app, can't be copied to the device: compress it into a .zip first. Symbolic links and aliases can't be copied to the device either; Finder shows an error for them." : {
       "extractionState" : "manual"
     },
     "A package, such as an .rtfd or Keynote document, an app, a plug-in or a framework, is one item on the Mac but a folder on the device, so Ferry does not copy it. Control-click it, choose **Compress**, and copy the .zip instead." : {
       "extractionState" : "manual"
-    },
-    "adb couldn't forward the port: %@" : {
-
     },
     "Add" : {
 
@@ -168,15 +185,6 @@
     "Another app has the device. Quit that app, then click **Try Again**." : {
       "extractionState" : "manual"
     },
-    "Another app is using the device. Quit Image Capture or Android File Transfer." : {
-
-    },
-    "Another app on the device already defines one of this app's permissions." : {
-
-    },
-    "Another app on the device already uses this app's content provider." : {
-
-    },
     "Ask NetAlly to enable ADB on the tester." : {
       "extractionState" : "manual"
     },
@@ -192,10 +200,7 @@
     "Cancel" : {
 
     },
-    "Cancelled." : {
-
-    },
-    "Check again" : {
+    "Check Again" : {
 
     },
     "Check that Ferry is on under File Providers in Login Items & Extensions." : {
@@ -317,9 +322,6 @@
     "Could not remove Ferry. Make sure Ferry is running, then try again." : {
 
     },
-    "Couldn't install the app: %@" : {
-
-    },
     "Couldn't save the log: %@" : {
 
     },
@@ -371,22 +373,13 @@
     "Error" : {
 
     },
-    "Error: %@" : {
-
-    },
     "Fatal" : {
-
-    },
-    "Ferry can't find adb. Install it, then try again." : {
 
     },
     "Ferry couldn't open Terminal." : {
 
     },
     "Ferry Help" : {
-
-    },
-    "Ferry can't save to your screenshot folder or the Desktop. Allow Ferry in Privacy & Security." : {
 
     },
     "Ferry has no address for this device. Connect it by address." : {
@@ -401,7 +394,7 @@
     "Ferry knows this device at another address. Confirm the new one in the menu." : {
 
     },
-    "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check again** once it is installed." : {
+    "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check Again** once it is installed." : {
       "extractionState" : "manual"
     },
     "Ferry reaches the device over ADB on a USB cable." : {
@@ -476,13 +469,13 @@
     "Help isn't available" : {
 
     },
-    "How to connect" : {
+    "How to Connect" : {
 
     },
     "How to turn on USB debugging" : {
       "extractionState" : "manual"
     },
-    "How to turn on file transfer" : {
+    "How to Turn On File Transfer" : {
 
     },
     "If the port on this Mac is already in use, the window shows adb's message. Ferry lists only the TCP forwards adb holds for this device." : {
@@ -577,7 +570,7 @@
     "Model" : {
 
     },
-    "More tools with USB debugging…" : {
+    "More Tools with USB Debugging…" : {
       "extractionState" : "manual"
     },
     "Mount" : {
@@ -643,7 +636,7 @@
     "Open at login" : {
 
     },
-    "Open at login, How to connect, Help and Remove Ferry." : {
+    "Open at login, How to Connect, Help and Remove Ferry." : {
       "extractionState" : "manual"
     },
     "To turn on this menu, open System Settings, then **General** → **Login Items & Extensions**." : {
@@ -814,59 +807,14 @@
     "That address changed. Check the menu and try again." : {
 
     },
-    "That app is larger than 4 GB." : {
-
-    },
-    "That file isn't an Android app (.apk)." : {
-
-    },
-    "That forward is already gone." : {
-
-    },
-    "The app couldn't be read by the device. It may be damaged or unsigned." : {
-
-    },
-    "The app doesn't support this device's processor." : {
-
-    },
-    "The app is a test build, which the device won't install." : {
-
-    },
-    "The app is already installed." : {
-
-    },
-    "The app needs a library the device doesn't have." : {
-
-    },
-    "The app needs a newer version of Android." : {
-
-    },
     "The device appears in Finder once it shares files." : {
-
-    },
-    "The device didn't record its screen." : {
-
-    },
-    "The device didn't record its screen: %@" : {
 
     },
     "The device didn't say which device it is, so Ferry disconnected it." : {
 
     },
-    "The device didn't send a screenshot. Unlock it and try again." : {
-
-    },
     "The device does not show up" : {
       "extractionState" : "manual"
-    },
-    "The device does not support this: %@." : {
-
-    },
-    "The device doesn't allow installing apps over USB." : {
-
-    },
-    "The device doesn't have enough space for the app." : {
-
     },
     "The device ended the log." : {
 
@@ -877,64 +825,25 @@
     "The device has no network address. Connect it to Ethernet or Wi-Fi first." : {
 
     },
-    "The device is already recording its screen." : {
-
-    },
-    "The device is not sharing files." : {
-
-    },
     "The device is sharing files and is in Finder." : {
       "extractionState" : "manual"
-    },
-    "The device isn't recording its screen." : {
-
-    },
-    "The device reported an error." : {
-
     },
     "The device reported an error. Click **Try Again**, or unplug it and plug it back in." : {
       "extractionState" : "manual"
     },
-    "The device reports no storage." : {
-
-    },
-    "The device sent more than a recording can be, so Ferry deleted it." : {
-
-    },
-    "The recording stopped arriving. It's still on the device: choose a folder, or discard it." : {
-
-    },
-    "The device was disconnected." : {
-
-    },
     "The device's IP address or name. Ferry uses port 5555 unless you add another." : {
-
-    },
-    "The device's app verification refused the app." : {
 
     },
     "The first time Ferry opens, it starts a small helper that talks to your devices. The helper keeps running after you quit the menu, so devices stay in Finder." : {
       "extractionState" : "manual"
     },
-    "The install was cancelled on the device." : {
-
-    },
-    "The installed app is signed differently. Uninstall it first." : {
-
-    },
     "The menu" : {
       "extractionState" : "manual"
-    },
-    "The recording is still being finished. Try again in a moment." : {
-
     },
     "The sidebar says \"Ferry\"" : {
       "extractionState" : "manual"
     },
     "This Mac port %@ → device port %@" : {
-
-    },
-    "This needs USB debugging. Turn it on, then try again." : {
 
     },
     "To see files added on the device while it is connected, choose **Refresh** in the Ferry menu." : {
@@ -963,9 +872,6 @@
     },
     "USB debugging" : {
 
-    },
-    "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **Allow**." : {
-      "extractionState" : "manual"
     },
     "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **OK** or **Allow**." : {
       "extractionState" : "manual"
@@ -1006,10 +912,7 @@
     "Unsent changes were saved to %@" : {
 
     },
-    "Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device." : {
-
-    },
-    "Use it" : {
+    "Use It" : {
 
     },
     "Use over Wi-Fi" : {
@@ -1060,16 +963,16 @@
     "Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched. You can then move Ferry to the Trash." : {
 
     },
-    "adb is installed but its server is not answering. Click **Check again**." : {
+    "adb is installed but its server is not answering. Click **Check Again**." : {
       "extractionState" : "manual"
     },
-    "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check again**." : {
+    "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check Again**." : {
       "extractionState" : "manual"
     },
     "adb isn't running" : {
       "extractionState" : "manual"
     },
-    "adb isn't running. Install it, or choose Check again." : {
+    "adb isn't running. Install it, or choose Check Again." : {
 
     },
     "adb: %@" : {
