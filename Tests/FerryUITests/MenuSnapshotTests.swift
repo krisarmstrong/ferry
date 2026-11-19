@@ -14,6 +14,7 @@ import Testing
 /// `FERRY_MENU_SNAPSHOTS` naming a folder, the images are also written there as
 /// `menu-light.png` and `menu-dark.png`.
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct MenuSnapshotTests {
   private static let usb = AttachedDevice(
     info: DeviceInfo(id: DeviceID(serial: "ES1"), manufacturer: "", model: "EtherScope-nXG"),
@@ -47,10 +48,11 @@ struct MenuSnapshotTests {
       [Self.usb, Self.wifi], adb: .available,
       connectedAddresses: [Self.wifi.id: try #require(WirelessEndpoint(parsing: "192.0.2.42"))])
     client.infoReply.withLock { $0 = .deviceInfo(Self.details) }
+    // The menu stays open while it is drawn: a sleep that throws would close it, and closing
+    // cancels the details read the drawing waits for.
     let model = AppModel(
-      client: client, services: FakeServices(log: CallLog()),
-      sleep: { _ in throw CancellationError() })
-    await model.watchWhileMenuOpen()
+      client: client, services: FakeServices(log: CallLog()), sleep: HeldSleeps().sleep)
+    await model.refresh()
     let appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
     let view = NSHostingView(
       rootView: MenuContent(model: model)
