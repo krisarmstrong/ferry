@@ -20,6 +20,32 @@ struct WirelessADBFixRound4Tests {
     DomainNaming.identifier(for: StorageID(device: located, key: "internal"))
   }
 
+  // MARK: Unknown owners
+
+  /// A Ferry domain whose identifier is not one this Ferry names could belong to any device:
+  /// while it is there, every claimed serial may be located, so no unvouched network route is
+  /// served. Its removal is retried, and once it is gone the normal rules apply.
+  @Test(.timeLimit(.minutes(1)))
+  func aDomainOfUnknownOwnerBlocksUnvouchedRoutesUntilItIsRemoved() async throws {
+    let unknown = "0123456789abcdef|Internal shared storage|65537"
+    let manager = FakeDomainManager(existing: [unknown], removalFailures: 1)
+    let harness = try AgentHarness(manager: manager)
+    defer { harness.finish() }
+    let vouching = WirelessVouching()
+    vouching.remember([:])
+    await harness.controller.publishLocations(to: vouching)
+    // `location(of:)` waits for adoption, so the locations are published by then.
+    #expect(await harness.controller.location(of: Self.stranger) != nil)
+    #expect(!vouching.serves(Self.address, as: Self.stranger))
+    // The retry removes it.
+    #expect(
+      try await eventually(timeout: .seconds(20)) {
+        vouching.serves(Self.address, as: Self.stranger)
+      })
+    #expect(await harness.controller.location(of: Self.stranger) == nil)
+    #expect(await manager.calls.filter { $0 == .remove(unknown) }.count == 2)
+  }
+
   // MARK: N1
 
   /// The system's domains could not be listed: until a retry succeeds the location set is

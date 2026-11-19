@@ -31,9 +31,13 @@ actor FakeDomainManager: DomainManaging {
   /// How many listings of the system's domains fail before one succeeds.
   private var listingFailures: Int
 
-  init(existing: [String] = [], listingFailures: Int = 0) {
+  /// How many removals fail before one succeeds.
+  private var removalFailures: Int
+
+  init(existing: [String] = [], listingFailures: Int = 0, removalFailures: Int = 0) {
     preexisting = existing
     self.listingFailures = listingFailures
+    self.removalFailures = removalFailures
   }
 
   func add(_ spec: DomainSpec) async throws { record(.add(spec)) }
@@ -41,6 +45,10 @@ actor FakeDomainManager: DomainManaging {
   func reconnect(_ identifier: String) async throws { record(.reconnect(identifier)) }
   func remove(_ identifier: String) async throws -> URL? {
     record(.remove(identifier))
+    if removalFailures > 0 {
+      removalFailures -= 1
+      throw CocoaError(.featureUnsupported)
+    }
     return preserved[identifier]
   }
   func removeAll() async throws -> [URL] {

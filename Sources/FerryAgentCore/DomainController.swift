@@ -211,32 +211,6 @@ public actor DomainController {
     return await current.value
   }
 
-  /// Records the system's domains as disconnected, so a ready device reconnects its domain
-  /// rather than adding it again. One named by serial, as an earlier Ferry did, is removed first
-  /// (keeping unsent changes) with its item table. Returns whether the domains could be listed.
-  func adoptExisting() async -> Bool {
-    let identifiers: [String]
-    do {
-      identifiers = try await manager.existing()
-    } catch {
-      log.error("listing existing domains failed: \(error, privacy: .private)")
-      return false
-    }
-    for identifier in identifiers.filter({ !DomainNaming.isIdentifier($0) }).sorted() {
-      ItemTable.discard(domain: identifier, in: itemStore)
-      _ = await remove(identifier)
-    }
-    let adopted = identifiers.filter { DomainNaming.isIdentifier($0) && domains[$0] == nil }
-      .sorted()
-    for identifier in adopted {
-      domains[identifier] = Domain(spec: nil, storage: nil, connected: true)
-    }
-    for identifier in adopted {
-      await disconnect(identifier)
-    }
-    return true
-  }
-
   private func handle(_ event: HubEvent) async {
     guard !retired else { return }
     // A device that left is disconnected here even if it is back by the time the list is read,
@@ -329,7 +303,7 @@ public actor DomainController {
     }
   }
 
-  private func disconnect(_ identifier: String) async {
+  func disconnect(_ identifier: String) async {
     guard let domain = domains[identifier], domain.connected else { return }
     domains[identifier]?.connected = false
     do {
