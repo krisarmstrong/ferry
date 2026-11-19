@@ -41,12 +41,13 @@ struct NetworkFormView: View {
           .textFieldStyle(.roundedBorder)
           .controlSize(.small)
           .labelsHidden()
-          .disabled(form.isSending)
+          // Not disabled while sending: a disabled field gives up focus, and Escape then never
+          // reaches the form. A second send waits on `isSending` instead.
           .onSubmit { Task { await model.submitNetworkForm() } }
         hint(form.kind)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
-        if let message = model.wirelessMessage {
+        if let message = form.message {
           Text(verbatim: message)
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
