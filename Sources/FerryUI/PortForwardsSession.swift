@@ -4,8 +4,8 @@ import Foundation
 import Observation
 
 /// One device's Port Forwarding, in its expansion: the forwards adb holds for it, adding one
-/// and removing one. A port is checked here before anything is sent (the agent checks again), and an error
-/// is shown where the user is looking, in adb's words when adb refused.
+/// and removing one. A port is checked here before anything is sent (the agent checks again),
+/// and an error is shown where the user is looking, in adb's words when adb refused.
 @Observable @MainActor final class PortForwardsSession {
   let device: DeviceID
   private let client: any AgentSending
@@ -38,7 +38,9 @@ import Observation
     }
   }
 
+  /// Return can call it while a request is on its way: one request at a time, as the buttons.
   func add() async {
+    guard !isBusy else { return }
     guard let forward = parsed(), forward.isAllowed else {
       error = DevicePresentation.message(for: .invalidPort)
       return

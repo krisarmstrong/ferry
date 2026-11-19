@@ -1,12 +1,13 @@
 import DeviceKit
 import FerryIPC
 import Foundation
+import Synchronization
 import Testing
 
 @testable import FerryUI
 
-/// A device's port forwards, in its expansion: the list, adding with the ports checked before anything is sent,
-/// removing, and adb's words when a port is taken.
+/// A device's port forwards, in its expansion: the list, adding with the ports checked before
+/// anything is sent, removing, and adb's words when a port is taken.
 @MainActor
 struct PortForwardsSessionTests {
   let log = CallLog()
@@ -103,9 +104,71 @@ struct PortForwardsSessionTests {
     #expect(session.forwards == [PortForward(local: 9090, remote: 90)])
   }
 
+  /// Return while a forward is on its way sends nothing more: one request at a time, as the Add
+  /// button, disabled while busy, already allows.
+  @Test func returnWhileAddingSendsNothingMore() async {
+    let client = HeldForwardClient()
+    let session = PortForwardsSession(device: id, client: client)
+    session.localPort = "8080"
+    session.remotePort = "80"
+    let first = Task { await session.add() }
+    var arrivals = client.arrivals.makeAsyncIterator()
+    await arrivals.next()
+    #expect(session.isBusy)
+    await session.add()
+    #expect(client.adds == 1)
+    client.release()
+    await first.value
+  }
+
   @Test func aLostDeviceIsShownAsAnError() async {
     let session = PortForwardsSession(device: id, client: UnreachableClient())
     await session.refresh()
     #expect(session.error == DevicePresentation.message(for: .deviceDisconnected))
+  }
+}
+
+/// Holds the first forward added until the test releases it, and counts every add: a second add
+/// answers at once, so it shows in the count instead of hanging.
+private final class HeldForwardClient: AgentSending {
+  private struct State {
+    var adds = 0
+    var held: CheckedContinuation<Void, Never>?
+  }
+
+  private let state = Mutex(State())
+  let (arrivals, arrived) = AsyncStream<Void>.makeStream()
+
+  var adds: Int { state.withLock { $0.adds } }
+
+  func release() {
+    let held = state.withLock { state in
+      defer { state.held = nil }
+      return state.held
+    }
+    held?.resume()
+  }
+
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError) -> AgentResponse {
+    switch request {
+    case .addForward:
+      let first = state.withLock { state in
+        state.adds += 1
+        return state.adds == 1
+      }
+      if first {
+        await withCheckedContinuation { continuation in
+          state.withLock { $0.held = continuation }
+          arrived.yield()
+        }
+      }
+      return .done
+    case .forwards:
+      return .forwards([])
+    default:
+      return .done
+    }
   }
 }
