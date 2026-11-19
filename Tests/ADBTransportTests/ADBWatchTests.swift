@@ -80,6 +80,35 @@ struct ADBWatchTests {
     #expect(watchArguments(device) == [["/storage/emulated/0/Music:nwdDM"]])
   }
 
+  /// A folder stored in NFD is watched under the device's own spelling, and its events are
+  /// hints for the folder Ferry knows; a folder the device no longer has is left out rather
+  /// than ending the watch for the others.
+  @Test func foldersAreWatchedAsTheDeviceSpellsThem() async throws {
+    let device = device()
+    let nfd = "Cafe\u{301}"
+    device.addRaw("/", name: Array(nfd.utf8), node: .folder(mtime: 1))
+    device.setTools {
+      $0.inotify = [Data("n\t/storage/emulated/0/\(nfd)\tx\n".utf8)]
+      $0.inotifyEnds = true
+    }
+    let cafe = hint("/Caf\u{E9}")
+    let hints = try await ADBFixture.withSession(device) { session in
+      let stream = try #require(await session.watch([cafe, hint("/Gone"), hint("/Download")]))
+      var hints: [FolderHint] = []
+      for await hint in stream { hints.append(hint) }
+      return hints
+    }
+    // By bytes: `String` equality would take the NFC spelling for the NFD one.
+    #expect(
+      watchArguments(device).map { $0.map { Array($0.utf8) } } == [
+        [
+          Array("/storage/emulated/0/\(nfd):nwdDM".utf8),
+          Array("/storage/emulated/0/Download:nwdDM".utf8),
+        ]
+      ])
+    #expect(hints == [cafe])
+  }
+
   /// A new watch (the folders changed) never leaves the previous inotifyd running.
   @Test func aRewatchKillsThePreviousProcess() async throws {
     let device = device(["/Download", "/Music"])

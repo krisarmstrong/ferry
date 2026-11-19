@@ -37,20 +37,21 @@ extension ADBSession {
   static let watchAnswerLimit = Duration.seconds(10)
 
   /// Watches `folders` with the device's `inotifyd -`, which prints `<event>\t<folder>[\t<name>]`
-  /// for each event, on one `exec:` connection of the session's route. inotifyd reads its
-  /// arguments as `<path>:<mask>` and exits if any folder is missing, so a folder whose path has
-  /// a `:`, or a tab or newline that would break its lines, is left to the periodic listing.
-  /// When the stream ends, for any reason, the process is killed by its pid.
+  /// for each event, on one `exec:` connection of the session's route. Each folder is given as
+  /// the device spells it, since the device compares names byte for byte. inotifyd exits if any
+  /// folder is missing, so a folder the device no longer has, or whose path has a `:` (inotifyd
+  /// reads `<path>:<mask>`) or a tab or newline that would break its lines, is left to the
+  /// periodic listing. When the stream ends, for any reason, the process is killed by its pid.
   public func watch(_ folders: [FolderHint]) async -> AsyncStream<FolderHint>? {
-    var found: [String: FolderHint] = [:]
-    for hint in folders where hint.storage.device == info.id {
-      guard let root = ADBStorages.root(forKey: hint.storage.key) else { continue }
-      let path = ([root] + hint.folder.components).joined(separator: "/")
-      guard !path.contains(where: { $0 == ":" || $0 == "\t" || $0 == "\n" || $0 == "\r" })
-      else { continue }
-      found[path] = hint
+    let watched: [String: FolderHint]
+    do throws(TransportError) {
+      watched = try await operation { () throws(TransportError) in
+        try await deviceLocations(of: folders)
+      }
+    } catch {
+      Self.log.info("watching folders: \(String(describing: error), privacy: .private)")
+      return nil
     }
-    let watched = found
     guard !disconnected, !watched.isEmpty else { return nil }
     let process: WatchProcess
     do throws(ADBError) {
@@ -65,6 +66,30 @@ extension ADBSession {
       return nil
     }
     return events(of: process, watched)
+  }
+
+  /// Each folder that still exists, keyed by its path as the device spells it.
+  private func deviceLocations(of folders: [FolderHint]) async throws(TransportError)
+    -> [String: FolderHint]
+  {
+    var watched: [String: FolderHint] = [:]
+    for hint in folders where hint.storage.device == info.id {
+      let location: String
+      do throws(TransportError) {
+        let root = try await root(for: hint.storage)
+        location = try await self.location(of: hint.folder, under: root)
+        guard try await stat(at: location, as: hint.folder)?.kind == .folder else { continue }
+      } catch .deviceDisconnected {
+        throw .deviceDisconnected
+      } catch {
+        // Gone, or its storage is: the others are still watched.
+        continue
+      }
+      guard !location.contains(where: { $0 == ":" || $0 == "\t" || $0 == "\n" || $0 == "\r" })
+      else { continue }
+      watched[location] = hint
+    }
+    return watched
   }
 
   /// Starts the script over `exec:` and reads the pid it prints first.
