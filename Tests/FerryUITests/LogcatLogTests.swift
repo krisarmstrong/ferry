@@ -5,47 +5,28 @@ import Testing
 
 /// Threadtime lines read into fields, the level and text filters, and the buffer's bound.
 struct LogcatLogTests {
-  @Test func aThreadtimeLineIsReadIntoItsFields() throws {
-    let line =
-      "11-18 17:09:27.123  1234  1301 I ActivityManager: Start proc 1234:com.foo for service"
-    let parsed = try #require(ThreadtimeLine(line))
-    #expect(parsed.date == "11-18")
-    #expect(parsed.time == "17:09:27.123")
-    #expect(parsed.pid == 1234)
-    #expect(parsed.tid == 1301)
-    #expect(parsed.level == .info)
-    #expect(parsed.tag == "ActivityManager")
-    #expect(parsed.message == "Start proc 1234:com.foo for service")
-  }
-
   @Test(arguments: [
     ("V", LogcatEntry.Level.verbose), ("D", .debug), ("I", .info), ("W", .warning), ("E", .error),
     ("F", .fatal),
   ])
   func eachLetterIsALevel(letter: String, level: LogcatEntry.Level) {
-    #expect(ThreadtimeLine("01-02 03:04:05.678     1     2 \(letter) T: m")?.level == level)
+    #expect(LogcatEntry.Level(threadtime: "01-02 03:04:05.678     1     2 \(letter) T: m") == level)
   }
 
-  /// A tag may hold spaces and a message colons: the tag ends at the first colon and space.
-  @Test func theTagEndsAtTheFirstColonAndSpace() {
-    let spaced = ThreadtimeLine("01-02 03:04:05.678  1  2 D My Tag: a: b")
-    #expect(spaced?.tag == "My Tag")
-    #expect(spaced?.message == "a: b")
-    let empty = ThreadtimeLine("01-02 03:04:05.678  1  2 W Tag:")
-    #expect(empty?.tag == "Tag")
-    #expect(empty?.message == "")
-    #expect(ThreadtimeLine("01-02 03:04:05.678  1  2 W Tag: ")?.message == "")
+  @Test func aTagWithSpacesOrAnEmptyMessageStillHasALevel() {
+    #expect(LogcatEntry.Level(threadtime: "01-02 03:04:05.678  1  2 D My Tag: a: b") == .debug)
+    #expect(LogcatEntry.Level(threadtime: "01-02 03:04:05.678  1  2 W Tag:") == .warning)
+    #expect(LogcatEntry.Level(threadtime: "01-02 03:04:05.678  1  2 W Tag: ") == .warning)
   }
 
   @Test(arguments: [
     "--------- beginning of main", "", "garbage", "01-02 03:04:05.678 x 2 I T: m",
     "01-02 03:04:05.678  1  2 S T: m", "01-02 03:04:05.678  1  2 I",
-    "1-2 03:04:05.678  1  2 I T: m",
-    "01-02 03:04:05  1  2 I T: m", "01-02 03:04:05.678  1  2 II T: m",
-    "01-02 03:04:05.678  1  2 I no colon here",
+    "1-2 03:04:05.678  1  2 I T: m", "01-02 03:04:05  1  2 I T: m",
+    "01-02 03:04:05.678  1  2 II T: m", "01-02 03:04:05.678  1  2 I no colon here",
   ])
   func anythingElseIsNotAThreadtimeLine(line: String) {
-    #expect(ThreadtimeLine(line) == nil)
+    #expect(LogcatEntry.Level(threadtime: line) == nil)
   }
 
   private func buffer(_ lines: [String]) -> LogcatBuffer {
@@ -115,5 +96,16 @@ struct LogcatLogTests {
     #expect(buffer.count == 0)
     buffer.append(["c"])
     #expect((buffer.shown(minimum: .verbose, matching: "").first?.id ?? -1) > before)
+  }
+
+  /// Text is held within a byte budget as well as a line count: a few huge lines cannot fill
+  /// the app's memory, and the newest line always stays.
+  @Test func theBufferKeepsWithinItsByteBudget() {
+    var buffer = LogcatBuffer(capacity: 100, byteBudget: 10)
+    buffer.append(["aaaa", "bbbb", "cccc"])
+    #expect(buffer.shown(minimum: .verbose, matching: "").map(\.text) == ["bbbb", "cccc"])
+    buffer.append([String(repeating: "x", count: 50)])
+    #expect(buffer.shown(minimum: .verbose, matching: "").map(\.text.count) == [50])
+    #expect(buffer.firstID == 3)
   }
 }

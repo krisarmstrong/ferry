@@ -80,6 +80,8 @@ extension DevicePresentation {
         "adb couldn't forward the port: \(DisplayText.escaped(detail))", bundle: .module)
     case .adbNotFound:
       LocalizedStringResource("Ferry can't find adb. Install it, then try again.", bundle: .module)
+    case .forwardNotFound:
+      LocalizedStringResource("That forward is already gone.", bundle: .module)
     }
   }
 
@@ -155,7 +157,7 @@ extension DevicePresentation {
   static func skippedLinesLine(_ count: Int) -> String {
     String(
       localized: LocalizedStringResource(
-        "— \(count) lines skipped, the log came faster than Ferry could show it —",
+        "— Lines skipped: \(count). The log came faster than Ferry could show it. —",
         bundle: .module))
   }
 
@@ -170,7 +172,7 @@ extension DevicePresentation {
   }
 
   static func logCountLine(shown: Int, held: Int) -> String {
-    String(localized: LocalizedStringResource("\(shown) of \(held) lines", bundle: .module))
+    String(localized: LocalizedStringResource("Lines shown: \(shown) of \(held)", bundle: .module))
   }
 
   /// A window title: the tool, then the device's model (escaped, the device named itself).

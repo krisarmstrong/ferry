@@ -22,6 +22,9 @@ actor LogQueue {
     self.maxBytes = maxBytes
   }
 
+  /// Nothing is waiting to be taken.
+  var isEmpty: Bool { lines.count == head }
+
   func push(_ chunk: [Data]) {
     for line in chunk {
       lines.append(line)
@@ -97,15 +100,16 @@ actor LogQueue {
 ///
 /// A reader task moves lines from the device into a bounded queue; this actor's request takes
 /// batches from it and hands each to the client, then waits for the client to say it took it
-/// before sending the next, so the stream goes at the client's pace. It ends when the client
-/// says it wants no more or stops listening, when `stopLogcat` is called, when a new stream for
-/// the device replaces it, when the device is no longer served over ADB by the route it began
-/// on (an eject or a switch of method closes nothing on the adb connection), or when the device
-/// or the adb server goes away.
+/// before sending the next, so the stream goes at the client's pace. A watchdog checks every
+/// `routeWatch` that the device is still served over ADB by the route the stream began on (an
+/// eject or a switch of method closes nothing on the adb connection) and closes the stream if
+/// not, which ends a read waiting on a silent log. It also ends when the client says it wants
+/// no more, when its own stop arrives, when a new stream for the device replaces it, or when
+/// the device or the adb server goes away.
 extension ADBTools {
   /// Runs until the stream ends. A device lost meanwhile throws, as for any tool.
-  public func streamLogcat(_ id: DeviceID, to sink: LogSink) async throws(TransportError)
-    -> Outcome
+  public func streamLogcat(_ id: DeviceID, stream: UUID, to sink: LogSink)
+    async throws(TransportError) -> Outcome
   {
     guard let serial = await target(id) else { return .failed(.notOverADB) }
     let source: any LogcatSource
@@ -114,12 +118,35 @@ extension ADBTools {
     } catch {
       throw Self.transportError(error)
     }
-    let run = LogcatRun(source: source)
+    let run = LogcatRun(id: stream, source: source)
+    // A stop that came while this was connecting ends it before it starts.
+    if pendingStops.remove(stream) != nil {
+      run.stop()
+      return .done
+    }
     // One stream per device: this one replaces any other, which answers as stopped.
     logcats[id]?.stop()
     logcats[id] = run
     let queue = LogQueue(maxLines: limits.logQueueLines, maxBytes: limits.logQueueBytes)
-    let reader = Task {
+    let reader = Self.read(source, into: queue)
+    let watchdog = watch(id, serial: serial, run, every: limits.routeWatch)
+    let clientLeft = await deliver(queue, run, to: sink)
+    // Whether somebody ended it, read before this ends it too.
+    let (stopped, lost) = (run.isStopped, run.isRouteLost)
+    watchdog.cancel()
+    reader.cancel()
+    run.stop()
+    if logcats[id] === run { logcats[id] = nil }
+    if lost, !stopped { return .failed(.notOverADB) }
+    if !stopped, !clientLeft, let failure = await queue.failure {
+      throw Self.transportError(failure)
+    }
+    return .done
+  }
+
+  /// Moves lines from the device into the queue until the log ends or fails.
+  private static func read(_ source: any LogcatSource, into queue: LogQueue) -> Task<Void, Never> {
+    Task {
       do throws(ADBError) {
         while let lines = try await source.next() { await queue.push(lines) }
         await queue.finish(nil)
@@ -127,35 +154,47 @@ extension ADBTools {
         await queue.finish(error)
       }
     }
-    var outcome = Outcome.done
-    var clientLeft = false
-    let (batchLines, batchBytes) = (limits.logBatchLines, limits.logBatchBytes)
-    while let batch = await queue.take(maxLines: batchLines, maxBytes: batchBytes) {
-      if run.isStopped { break }
-      guard await target(id) == serial else {
-        outcome = .failed(.notOverADB)
-        break
-      }
-      guard await sink(batch) else {
-        clientLeft = true
-        break
-      }
-      try? await Task.sleep(for: limits.logInterval)
-    }
-    // Whether somebody ended it, read before this ends it too.
-    let stopped = run.isStopped
-    reader.cancel()
-    run.stop()
-    if logcats[id] === run { logcats[id] = nil }
-    if case .done = outcome, !stopped, !clientLeft, let failure = await queue.failure {
-      throw Self.transportError(failure)
-    }
-    return outcome
   }
 
-  /// Ends the device's log stream; answers `.done` even when none runs.
-  public func stopLogcat(_ id: DeviceID) -> Outcome {
-    logcats[id]?.stop()
+  /// Closes the stream, which ends a read waiting on a silent log, once the device is no longer
+  /// served over ADB by `serial`'s route.
+  private func watch(_ id: DeviceID, serial: String, _ run: LogcatRun, every interval: Duration)
+    -> Task<Void, Never>
+  {
+    let target = target
+    return Task {
+      while (try? await Task.sleep(for: interval)) != nil {
+        if await target(id) != serial {
+          run.routeLost()
+          return
+        }
+      }
+    }
+  }
+
+  /// Sends batches to `sink` until the queue ends, the stream is stopped or lost, or the client
+  /// wants no more (then true).
+  private func deliver(_ queue: LogQueue, _ run: LogcatRun, to sink: LogSink) async -> Bool {
+    let (batchLines, batchBytes) = (limits.logBatchLines, limits.logBatchBytes)
+    while let batch = await queue.take(maxLines: batchLines, maxBytes: batchBytes) {
+      if run.isStopped || run.isRouteLost { return false }
+      guard await sink(batch) else { return true }
+      // A backlog goes out at once; the pause only batches up a log that is keeping pace.
+      if await queue.isEmpty { try? await Task.sleep(for: limits.logInterval) }
+    }
+    return false
+  }
+
+  /// Ends the device's log stream `stream`, if it is the one running or still connecting; a
+  /// stop for a stream already replaced or ended does nothing.
+  public func stopLogcat(_ id: DeviceID, stream: UUID) -> Outcome {
+    if let run = logcats[id], run.id == stream {
+      run.stop()
+    } else if logcats[id]?.id != stream {
+      // Not running (yet): remembered, so a stream still connecting ends when it is up.
+      if pendingStops.count >= 64 { pendingStops.removeAll() }
+      pendingStops.insert(stream)
+    }
     return .done
   }
 }

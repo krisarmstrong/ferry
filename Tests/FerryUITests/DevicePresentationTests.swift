@@ -165,6 +165,11 @@ struct ToolPresentationTests {
         == "Installing “a.apk”…")
   }
 
+  @Test func aMissingForwardReadsAsGone() {
+    #expect(
+      DevicePresentation.message(for: .forwardNotFound) == "That forward is already gone.")
+  }
+
   @Test func developerToolFailuresReadInPlainWords() {
     #expect(
       DevicePresentation.message(for: .invalidPort)

@@ -36,7 +36,7 @@ extension ADBTools {
     guard let serial = await target(id) else { return .failed(.notOverADB) }
     do throws(ADBError) {
       guard try await device.forwards(serial: serial).contains(where: { $0.local == local }) else {
-        return .failed(.forwardFailed("listener 'tcp:\(local)' not found"))
+        return .failed(.forwardNotFound)
       }
       try await device.removeForward(serial: serial, local: local)
       return .done
@@ -49,9 +49,12 @@ extension ADBTools {
   /// disconnected device, as for every tool.
   private static func forwardOutcome(_ error: ADBError) throws(TransportError) -> Outcome {
     guard case .failed(let message) = error else { throw transportError(error) }
+    // The device went between the list and the request: a lost device, not a refused forward.
+    if message.hasPrefix("device ") { throw .deviceDisconnected }
     if message.contains("offline") || message.contains("unauthorized") {
       throw transportError(error)
     }
+    if message.hasPrefix("listener ") { return .failed(.forwardNotFound) }
     return .failed(.forwardFailed(String(message.prefix(200))))
   }
 

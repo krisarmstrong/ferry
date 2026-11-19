@@ -28,6 +28,7 @@ public struct DeveloperScenes: Scene {
       logcat($0.wrappedValue)
     }
     .defaultSize(width: 900, height: 560)
+    .commandsRemoved()
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
 
@@ -35,6 +36,7 @@ public struct DeveloperScenes: Scene {
       forwarding($0.wrappedValue)
     }
     .windowResizability(.contentSize)
+    .commandsRemoved()
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
 
@@ -42,6 +44,7 @@ public struct DeveloperScenes: Scene {
       info($0.wrappedValue)
     }
     .windowResizability(.contentSize)
+    .commandsRemoved()
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
   }

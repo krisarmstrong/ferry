@@ -224,9 +224,11 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   /// Streams the device's log (`logcat -v threadtime`) to the client on the reverse channel, in
   /// batches. Answered with `.done` when it was stopped or the device ended it, and with a
   /// failure when the device was lost. One stream per device: starting another ends the first.
-  case startLogcat(DeviceID)
-  /// Ends the device's log stream. Answered with `.done`.
-  case stopLogcat(DeviceID)
+  /// `stream` names this stream, so a late stop for an earlier one cannot end it.
+  case startLogcat(DeviceID, stream: UUID)
+  /// Ends the log stream `stream` of the device, if it is still the one running. Answered with
+  /// `.done`.
+  case stopLogcat(DeviceID, stream: UUID)
   /// The device's TCP port forwards. Answered with `.forwards`.
   case forwards(DeviceID)
   /// Forwards a port on this Mac to one on the device. Answered with `.done`.

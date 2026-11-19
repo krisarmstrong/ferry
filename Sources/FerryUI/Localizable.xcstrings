@@ -14,7 +14,7 @@
         }
       }
     },
-    "%lld of %lld lines" : {
+    "Lines shown: %lld of %lld" : {
 
     },
     "%lld%%" : {
@@ -751,6 +751,9 @@
     "That file isn't an Android app (.apk)." : {
 
     },
+    "That forward is already gone." : {
+
+    },
     "The app couldn't be read by the device. It may be damaged or unsigned." : {
 
     },
@@ -1010,7 +1013,7 @@
     "macOS is not letting Ferry's helper run. Click **Open System Settings** and turn on Ferry under Allow in the Background." : {
       "extractionState" : "manual"
     },
-    "— %lld lines skipped, the log came faster than Ferry could show it —" : {
+    "— Lines skipped: %lld. The log came faster than Ferry could show it. —" : {
 
     }
   },

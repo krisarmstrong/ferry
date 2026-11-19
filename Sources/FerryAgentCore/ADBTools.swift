@@ -78,19 +78,28 @@ extension ADBDeviceTools: ADBToolDevice {
 /// then, and the recording waits on the device, listed as finished, until the app collects it
 /// with `.saveRecording`, even after the app was relaunched.
 public actor ADBTools {
-  /// A log stream running for a device, ended by `stop()`.
+  /// A log stream running for a device, ended by `stop()`, or by `routeLost()` when the device is
+  /// no longer served by the route it began on.
   final class LogcatRun: Sendable {
+    let id: UUID
     let source: any LogcatSource
-    private let stopped = Mutex(false)
+    private let state = Mutex((stopped: false, routeLost: false))
 
-    init(source: any LogcatSource) {
+    init(id: UUID, source: any LogcatSource) {
+      self.id = id
       self.source = source
     }
 
-    var isStopped: Bool { stopped.withLock { $0 } }
+    var isStopped: Bool { state.withLock { $0.stopped } }
+    var isRouteLost: Bool { state.withLock { $0.routeLost } }
 
     func stop() {
-      stopped.withLock { $0 = true }
+      state.withLock { $0.stopped = true }
+      source.close()
+    }
+
+    func routeLost() {
+      state.withLock { $0.routeLost = true }
       source.close()
     }
   }
@@ -119,6 +128,8 @@ public actor ADBTools {
     /// The least time between two batches, so a busy log is sent in a few large batches rather
     /// than many small ones.
     public var logInterval = Duration.milliseconds(100)
+    /// How often a log stream checks that its device is still served by its route.
+    public var routeWatch = Duration.milliseconds(250)
 
     public init() {}
   }
@@ -157,6 +168,8 @@ public actor ADBTools {
   let limits: Limits
   var recordings: [DeviceID: Recording] = [:]
   var logcats: [DeviceID: LogcatRun] = [:]
+  /// Streams a stop came for before they were up.
+  var pendingStops: Set<UUID> = []
 
   public init(
     device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> String?,

@@ -109,7 +109,7 @@ final class FakeClient: AgentSending {
     _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?,
     logs: LogBatchHandler?
   ) async throws(TransportError) -> AgentResponse {
-    guard case .startLogcat(let id) = request else {
+    guard case .startLogcat(let id, _) = request else {
       return try await send(request, file: file, progress: progress)
     }
     logHandler.withLock { $0 = logs }
@@ -218,7 +218,7 @@ final class FakeClient: AgentSending {
 
   private func developerReply(_ request: AgentRequest) -> AgentResponse {
     switch request {
-    case .stopLogcat(let id):
+    case .stopLogcat(let id, _):
       log.record("stopLogcat \(id.serial)")
       endStream(with: .done)
       return .done

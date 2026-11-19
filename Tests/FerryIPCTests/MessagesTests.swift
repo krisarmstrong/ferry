@@ -199,6 +199,7 @@ private func toolResponses() -> [AgentResponse] {
     .notOverADB, .notAnAPK, .apkTooLarge, .installFailed("INSTALL_FAILED_OLDER_SDK"),
     .alreadyRecording, .notRecording, .noImage, .recordingFailed("no encoder"), .cannotSave,
     .recordingTooLarge, .recordingStalled, .recordingBusy, .invalidPort, .adbNotFound,
+    .forwardNotFound,
     .forwardFailed("cannot bind listener: Address already in use"),
   ] {
     all.append(.toolFailed(failure))

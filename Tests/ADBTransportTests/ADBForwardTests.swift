@@ -11,9 +11,9 @@ struct ADBForwardTests {
   static let serial = "0123456789abcdef"
 
   private func withHost<T>(
-    _ device: FakeAndroid, _ body: (ADBHost) async throws -> T
+    _ device: FakeAndroid, serial: String = Self.serial, _ body: (ADBHost) async throws -> T
   ) async throws -> T {
-    let server = try await device.serve(serial: Self.serial)
+    let server = try await device.serve(serial: serial)
     defer { server.stop() }
     return try await body(ADBHost(port: server.port, locator: ADBHostTests.noAdb))
   }
@@ -116,6 +116,19 @@ struct ADBForwardTests {
       try await withHost(FakeAndroid()) { host in
         try await host.removeForward(serial: Self.serial, local: 8080)
       }
+    }
+  }
+
+  /// A network device's serial is `host:port`: the colon inside `host-serial:<serial>:<command>`
+  /// must not confuse the request.
+  @Test func aNetworkSerialWorksForEveryRequest() async throws {
+    let wifi = "192.0.2.31:5555"
+    let device = FakeAndroid()
+    try await withHost(device, serial: wifi) { host in
+      try await host.addForward(serial: wifi, PortForward(local: 8080, remote: 80))
+      #expect(try await host.forwards(serial: wifi) == [PortForward(local: 8080, remote: 80)])
+      try await host.removeForward(serial: wifi, local: 8080)
+      #expect(try await host.forwards(serial: wifi) == [])
     }
   }
 

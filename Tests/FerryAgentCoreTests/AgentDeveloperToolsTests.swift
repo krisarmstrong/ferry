@@ -10,6 +10,7 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct AgentDeveloperToolsTests {
   private let device = DeviceID(serial: "0123456789abcdef")
+  private let stream = UUID()
   private let route = "0123456789abcdef"
 
   private func service(_ harness: AgentHarness, _ fake: FakeToolDevice) -> AgentService {
@@ -25,7 +26,8 @@ struct AgentDeveloperToolsTests {
 
   private var requests: [AgentRequest] {
     [
-      .startLogcat(device), .stopLogcat(device), .forwards(device),
+      .startLogcat(device, stream: stream), .stopLogcat(device, stream: stream),
+      .forwards(device),
       .addForward(device, PortForward(local: 8080, remote: 80)),
       .removeForward(device, local: 8080), .deviceInfo(device), .shellTarget(device),
     ]
@@ -43,12 +45,12 @@ struct AgentDeveloperToolsTests {
   @Test func withoutAdbTheyAreUnavailable() async throws {
     let harness = try AgentHarness()
     defer { harness.finish() }
-    for request in requests where request != .stopLogcat(device) {
+    for request in requests where request != .stopLogcat(device, stream: stream) {
       let response = await harness.service.handle(
         request, file: nil, progress: { _, _ in }, logs: { _ in true })
       #expect(response == .toolFailed(.notOverADB))
     }
-    #expect(await harness.service.handle(.stopLogcat(device), file: nil) == .done)
+    #expect(await harness.service.handle(.stopLogcat(device, stream: stream), file: nil) == .done)
   }
 
   /// A log stream is sent to the client that asked: with nowhere to send it, the request is bad.
@@ -56,7 +58,9 @@ struct AgentDeveloperToolsTests {
     let harness = try AgentHarness()
     defer { harness.finish() }
     let service = service(harness, FakeToolDevice())
-    #expect(await service.handle(.startLogcat(device), file: nil) == .failure(.io("bad request")))
+    #expect(
+      await service.handle(.startLogcat(device, stream: stream), file: nil)
+        == .failure(.io("bad request")))
   }
 
   @Test func aLogStreamRunsUntilTheDeviceEndsIt() async throws {
@@ -69,7 +73,7 @@ struct AgentDeveloperToolsTests {
     let received = ReceivedBatches()
     let run = Task {
       await service.handle(
-        .startLogcat(device), file: nil, progress: { _, _ in },
+        .startLogcat(device, stream: stream), file: nil, progress: { _, _ in },
         logs: { batch in
           await received.add(batch)
           return true
@@ -90,10 +94,10 @@ struct AgentDeveloperToolsTests {
     let service = service(harness, fake)
     let run = Task {
       await service.handle(
-        .startLogcat(device), file: nil, progress: { _, _ in }, logs: { _ in true })
+        .startLogcat(device, stream: stream), file: nil, progress: { _, _ in }, logs: { _ in true })
     }
     #expect(try await eventually { await fake.logcatsOpened.count == 1 })
-    #expect(await service.handle(.stopLogcat(device), file: nil) == .done)
+    #expect(await service.handle(.stopLogcat(device, stream: stream), file: nil) == .done)
     #expect(await run.value == .done)
   }
 

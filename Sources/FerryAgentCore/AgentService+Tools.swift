@@ -49,13 +49,13 @@ extension AgentService {
     async throws(TransportError) -> AgentResponse?
   {
     switch request {
-    case .startLogcat(let id):
+    case .startLogcat(let id, let stream):
       // The lines go to the client that asked: with no way to send them there is no stream.
       guard let logs else { throw .io("bad request") }
       guard let tools else { return .toolFailed(.notOverADB) }
-      return try await tools.streamLogcat(id, to: logs).response
-    case .stopLogcat(let id):
-      return await tools?.stopLogcat(id).response ?? .done
+      return try await tools.streamLogcat(id, stream: stream, to: logs).response
+    case .stopLogcat(let id, let stream):
+      return await tools?.stopLogcat(id, stream: stream).response ?? .done
     case .forwards(let id):
       guard let tools else { return .toolFailed(.notOverADB) }
       switch try await tools.forwards(id) {

@@ -51,6 +51,8 @@ public enum ToolFailure: Error, Codable, Sendable, Equatable {
   case invalidPort
   /// adb refused a forward (the port is taken, say): adb's own words.
   case forwardFailed(String)
+  /// The forward to remove is not there (another tool removed it first).
+  case forwardNotFound
   /// Ferry could not find the `adb` program, which a shell in Terminal runs.
   case adbNotFound
 }

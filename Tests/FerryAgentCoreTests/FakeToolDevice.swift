@@ -33,6 +33,8 @@ actor FakeToolDevice: ADBToolDevice {
     model: "LinkRunner G2", androidVersion: "8.1.0", build: "OPM1", serial: "S", battery: nil,
     addresses: [], storage: nil)
   var forwardList: [PortForward] = []
+  /// What removing a forward fails with, after the list showed it.
+  var removeFailure: ADBError?
   /// Every forward request, as `add <local> <remote>` or `remove <local>`, with its serial.
   private(set) var forwardCalls: [String] = []
   var image = FakeToolDevice.png
@@ -99,6 +101,7 @@ actor FakeToolDevice: ADBToolDevice {
 
   func removeForward(serial: String, local: UInt16) async throws(ADBError) {
     if let failure { throw failure }
+    if let removeFailure { throw removeFailure }
     forwardCalls.append("remove \(serial) \(local)")
     forwardList.removeAll { $0.local == local }
   }

@@ -79,11 +79,14 @@ struct ADBToolsLogcatTests {
   static var fast: ADBTools.Limits {
     var limits = ADBTools.Limits()
     limits.logInterval = .milliseconds(1)
+    limits.routeWatch = .milliseconds(5)
     return limits
   }
 
-  private func start(_ tools: ADBTools, _ client: Client) -> Task<ADBTools.Outcome, any Error> {
-    Task { try await tools.streamLogcat(device, to: client.sink) }
+  private func start(
+    _ tools: ADBTools, _ client: Client, stream: UUID = UUID()
+  ) -> Task<ADBTools.Outcome, any Error> {
+    Task { try await tools.streamLogcat(device, stream: stream, to: client.sink) }
   }
 
   @Test func linesReachTheSinkInOrderAndTheStreamEndsWhenTheDeviceEndsIt() async throws {
@@ -163,14 +166,31 @@ struct ADBToolsLogcatTests {
     await fake.set { $0.logcats = [log] }
     let tools = makeTools(fake)
     let client = Client()
-    let run = start(tools, client)
+    let id = UUID()
+    let run = start(tools, client, stream: id)
     await log.send(["one"])
     #expect(try await eventually { client.lines == ["one"] })
-    #expect(await tools.stopLogcat(device) == .done)
+    // A stop for another stream (a window closed late) leaves this one running.
+    #expect(await tools.stopLogcat(device, stream: UUID()) == .done)
+    await log.send(["two"])
+    #expect(try await eventually { client.lines == ["one", "two"] })
+    #expect(await tools.stopLogcat(device, stream: id) == .done)
     #expect(try await run.value == .done)
     #expect(try await eventually { await log.closed })
-    // Nothing to stop now.
-    #expect(await tools.stopLogcat(device) == .done)
+  }
+
+  /// A stop that arrives while the stream is still connecting ends it as soon as it is up.
+  @Test func aStopBeforeTheStreamIsUpEndsIt() async throws {
+    let fake = FakeToolDevice()
+    let log = FakeLogcat()
+    await fake.set { $0.logcats = [log] }
+    let tools = makeTools(fake)
+    let id = UUID()
+    #expect(await tools.stopLogcat(device, stream: id) == .done)
+    let client = Client()
+    #expect(try await start(tools, client, stream: id).value == .done)
+    #expect(try await eventually { await log.closed })
+    #expect(client.lines.isEmpty)
   }
 
   /// One stream per device: a new one ends the old, which answers as stopped.
@@ -181,15 +201,20 @@ struct ADBToolsLogcatTests {
     await fake.set { $0.logcats = [first, second] }
     let tools = makeTools(fake)
     let firstClient = Client()
-    let firstRun = start(tools, firstClient)
+    let (firstID, secondID) = (UUID(), UUID())
+    let firstRun = start(tools, firstClient, stream: firstID)
     await first.send(["a"])
     #expect(try await eventually { firstClient.lines == ["a"] })
     let secondClient = Client()
-    let secondRun = start(tools, secondClient)
+    let secondRun = start(tools, secondClient, stream: secondID)
     #expect(try await firstRun.value == .done)
     await second.send(["b"])
     #expect(try await eventually { secondClient.lines == ["b"] })
-    _ = await tools.stopLogcat(device)
+    // The first window's stop, arriving late, does not end the second stream.
+    _ = await tools.stopLogcat(device, stream: firstID)
+    await second.send(["c"])
+    #expect(try await eventually { secondClient.lines == ["b", "c"] })
+    _ = await tools.stopLogcat(device, stream: secondID)
     #expect(try await secondRun.value == .done)
     #expect(firstClient.lines == ["a"])
   }
@@ -210,14 +235,16 @@ struct ADBToolsLogcatTests {
     let fake = FakeToolDevice()
     await fake.set { $0.failure = .deviceGone(serial) }
     await #expect(throws: TransportError.deviceDisconnected) {
-      try await makeTools(fake).streamLogcat(device, to: Client().sink)
+      try await makeTools(fake).streamLogcat(device, stream: UUID(), to: Client().sink)
     }
   }
 
   @Test func aDeviceNotOnADBGetsNoLog() async throws {
     let fake = FakeToolDevice()
     let tools = makeTools(fake, target: { _ in nil })
-    #expect(try await tools.streamLogcat(device, to: Client().sink) == .failed(.notOverADB))
+    #expect(
+      try await tools.streamLogcat(device, stream: UUID(), to: Client().sink)
+        == .failed(.notOverADB))
     #expect(await fake.logcatsOpened.isEmpty)
   }
 
@@ -234,8 +261,8 @@ struct ADBToolsLogcatTests {
     let run = start(tools, client)
     await log.send(["one"])
     #expect(try await eventually { client.lines == ["one"] })
+    // The log is silent: the stream must end without waiting for another line.
     route.withLock { $0 = now }
-    await log.send(["two"])
     #expect(try await run.value == .failed(.notOverADB))
     #expect(try await eventually { await log.closed })
   }
@@ -265,52 +292,26 @@ struct ADBToolsLogcatTests {
     #expect(last.lines == (450..<500).map { "burst \($0)" })
   }
 
-  // MARK: The queue
-
-  @Test func theQueueKeepsTheNewestLinesWithinItsLimit() async {
-    let queue = LogQueue(maxLines: 4, maxBytes: 1_000)
-    await queue.push((0..<10).map { Data("l\($0)".utf8) })
-    let batch = await queue.take(maxLines: 100, maxBytes: 1_000)
-    #expect(batch?.lines == ["l6", "l7", "l8", "l9"])
-    #expect(batch?.skipped == 6)
-    await queue.push([Data("next".utf8)])
-    #expect(
-      await queue.take(maxLines: 100, maxBytes: 1_000) == LogBatch(lines: ["next"], skipped: 0))
-  }
-
-  @Test func theQueueKeepsWithinItsByteLimit() async {
-    let queue = LogQueue(maxLines: 1_000, maxBytes: 10)
-    await queue.push(["aaaa", "bbbb", "cccc"].map { Data($0.utf8) })
-    let batch = await queue.take(maxLines: 100, maxBytes: 1_000)
-    #expect(batch?.lines == ["bbbb", "cccc"])
-    #expect(batch?.skipped == 1)
-  }
-
-  @Test func aTakeEndsAtItsBatchLimitsButAlwaysTakesOneLine() async {
-    let queue = LogQueue(maxLines: 100, maxBytes: 1_000)
-    await queue.push(["aaaa", "bbbb", "cccc"].map { Data($0.utf8) })
-    #expect(await queue.take(maxLines: 2, maxBytes: 1_000)?.lines == ["aaaa", "bbbb"])
-    #expect(await queue.take(maxLines: 10, maxBytes: 1)?.lines == ["cccc"])
-  }
-
-  @Test func aTakeWaitsForLinesAndEndsWhenTheQueueIsFinished() async {
-    let queue = LogQueue(maxLines: 10, maxBytes: 1_000)
-    let waiting = Task { await queue.take(maxLines: 10, maxBytes: 100) }
-    try? await Task.sleep(for: .milliseconds(20))
-    await queue.push([Data("hello".utf8)])
-    #expect(await waiting.value?.lines == ["hello"])
-    let ending = Task { await queue.take(maxLines: 10, maxBytes: 100) }
-    try? await Task.sleep(for: .milliseconds(20))
-    await queue.finish(.connectionClosed)
-    #expect(await ending.value == nil)
-    #expect(await queue.failure == .connectionClosed)
-  }
-
-  @Test func linesQueuedBeforeTheEndAreStillTaken() async {
-    let queue = LogQueue(maxLines: 10, maxBytes: 1_000)
-    await queue.push([Data("last".utf8)])
-    await queue.finish(nil)
-    #expect(await queue.take(maxLines: 10, maxBytes: 100)?.lines == ["last"])
-    #expect(await queue.take(maxLines: 10, maxBytes: 100) == nil)
+  /// The device's existing log arrives in a rush when logcat starts: it goes out at the pace of
+  /// the client, with nothing dropped and no pause between full batches.
+  @Test func aBacklogArrivesWholeAndQuickly() async throws {
+    let fake = FakeToolDevice()
+    let log = FakeLogcat()
+    await fake.set { $0.logcats = [log] }
+    let defaults = ADBTools.Limits()
+    let tools = makeTools(fake, limits: defaults)
+    let client = Client()
+    let clock = ContinuousClock()
+    let began = clock.now
+    let run = start(tools, client)
+    for chunk in 0..<100 {
+      await log.send((0..<100).map { "line \(chunk * 100 + $0)" })
+    }
+    await log.end()
+    #expect(try await run.value == .done)
+    #expect(client.lines == (0..<10_000).map { "line \($0)" })
+    #expect(client.batches.allSatisfy { $0.skipped == 0 })
+    // Twenty full batches behind the default 100 ms pause each would take over two seconds.
+    #expect(clock.now - began < .seconds(1))
   }
 }

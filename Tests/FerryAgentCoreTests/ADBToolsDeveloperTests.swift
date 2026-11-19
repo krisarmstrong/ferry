@@ -92,8 +92,31 @@ struct ADBToolsDeveloperTests {
     let fake = FakeToolDevice()
     #expect(
       try await makeTools(fake).removeForward(device, local: 8080)
-        == .failed(.forwardFailed("listener 'tcp:8080' not found")))
+        == .failed(.forwardNotFound))
     #expect(await fake.forwardCalls.isEmpty)
+  }
+
+  /// The device went between the list and the request: a lost device, not a refused forward.
+  @Test func aDeviceThatLeftBetweenTheListAndTheRequestIsDisconnected() async throws {
+    let fake = FakeToolDevice()
+    await fake.set {
+      $0.forwardList = [PortForward(local: 8080, remote: 80)]
+      $0.removeFailure = .failed("device '192.0.2.31:5555' not found")
+    }
+    await #expect(throws: TransportError.deviceDisconnected) {
+      try await makeTools(fake).removeForward(device, local: 8080)
+    }
+  }
+
+  /// Another tool removed the forward first: it is gone, which is what was asked.
+  @Test func aForwardAnotherToolRemovedFirstIsReportedGone() async throws {
+    let fake = FakeToolDevice()
+    await fake.set {
+      $0.forwardList = [PortForward(local: 8080, remote: 80)]
+      $0.removeFailure = .failed("listener 'tcp:8080' not found")
+    }
+    #expect(
+      try await makeTools(fake).removeForward(device, local: 8080) == .failed(.forwardNotFound))
   }
 
   // MARK: Info and shell

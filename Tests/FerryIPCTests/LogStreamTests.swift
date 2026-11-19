@@ -73,7 +73,8 @@ func batchesReachTheClientInOrderBeforeTheReply() async throws {
   let client = served.client
   let received = Received()
   let response = try await client.send(
-    .startLogcat(device), file: nil, progress: nil, logs: { await received.add($0) })
+    .startLogcat(device, stream: UUID()), file: nil, progress: nil, logs: { await received.add($0) }
+  )
   #expect(response == .done)
   let batches = await received.batches
   #expect(
@@ -93,7 +94,7 @@ func theSinkSaysStopOnceTheClientsRequestEnded() async throws {
   defer { served.finish() }
   let client = served.client
   _ = try await client.send(
-    .startLogcat(device), file: nil, progress: nil, logs: { _ in })
+    .startLogcat(device, stream: UUID()), file: nil, progress: nil, logs: { _ in })
   let sink = try #require(streamer.heldSink)
   #expect(await sink(LogBatch(lines: ["late"], skipped: 0)) == false)
 }
@@ -105,7 +106,7 @@ func aRequestWithNoHandlerStopsTheStream() async throws {
   let served = Served(streamer)
   defer { served.finish() }
   let client = served.client
-  _ = try await client.send(.startLogcat(device), file: nil)
+  _ = try await client.send(.startLogcat(device, stream: UUID()), file: nil)
   #expect(streamer.sinkAnswers == [false, false, false])
 }
 

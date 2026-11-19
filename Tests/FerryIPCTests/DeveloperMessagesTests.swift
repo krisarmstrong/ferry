@@ -5,10 +5,11 @@ import Testing
 @testable import FerryIPC
 
 private let device = DeviceID(serial: "R58N12345")
+private let stream = UUID()
 
 func developerRequests() -> [AgentRequest] {
   [
-    .startLogcat(device), .stopLogcat(device), .forwards(device),
+    .startLogcat(device, stream: stream), .stopLogcat(device, stream: stream), .forwards(device),
     .addForward(device, PortForward(local: 8080, remote: 80)),
     .removeForward(device, local: 8080), .deviceInfo(device), .shellTarget(device),
   ]

@@ -146,18 +146,7 @@ actor FakeAgent: AgentSending {
       try requireFree(moved, except: nil)
       return .entry(try entry(relocate(source, to: moved, id: id), id: id))
     case .replaceContents(_, let id, _, _):
-      let old = try existing(try path(id))
-      if keepDeviceVersion {
-        keepDeviceVersion = false
-        return .keptOnDevice(try entry(old, id: id))
-      }
-      let data = (try? file?.readToEnd()) ?? Data()
-      let item = RemoteItem(
-        path: old.path, kind: .file, size: UInt64(data.count),
-        modified: old.modified.addingTimeInterval(60))
-      items[old.path] = item
-      contents[old.path] = data
-      return .entry(try entry(item, id: id))
+      return try replaced(id, with: file)
     case .delete(_, let id, _, _):
       try delete(id)
       return .done
@@ -165,10 +154,29 @@ actor FakeAgent: AgentSending {
       return changeReply(since)
     case .workingSet(_, let page):
       return try workingSetPage(page)
-    default:
-      // Everything else is the app's: the extension never sends it.
+    case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
+      .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
+      .installAPK, .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording,
+      .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward, .deviceInfo, .shellTarget:
       throw .unsupported("\(request)")
     }
+  }
+
+  private func replaced(_ id: ItemID, with file: FileHandle?) throws(TransportError)
+    -> AgentResponse
+  {
+    let old = try existing(try path(id))
+    if keepDeviceVersion {
+      keepDeviceVersion = false
+      return .keptOnDevice(try entry(old, id: id))
+    }
+    let data = (try? file?.readToEnd()) ?? Data()
+    let item = RemoteItem(
+      path: old.path, kind: .file, size: UInt64(data.count),
+      modified: old.modified.addingTimeInterval(60))
+    items[old.path] = item
+    contents[old.path] = data
+    return .entry(try entry(item, id: id))
   }
 
   /// Writes the file into `file` and returns it as received.

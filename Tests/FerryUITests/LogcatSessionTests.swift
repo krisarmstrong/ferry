@@ -132,6 +132,61 @@ struct LogcatSessionTests {
     #expect(session.shown.first?.text == "line 10")
   }
 
+  /// A batch costs its own lines, not the ring's: the lines already held are not looked at
+  /// again, and what the ring drops leaves the front of what is shown.
+  @Test func aBatchFiltersOnlyItsOwnLines() {
+    let session = session()
+    session.receive(LogBatch(lines: (0..<50_000).map { "line \($0)" }, skipped: 0))
+    session.filterText = "line"
+    let before = session.evaluations
+    session.receive(LogBatch(lines: (50_000..<50_100).map { "line \($0)" }, skipped: 0))
+    #expect(session.evaluations - before == 100)
+    #expect(session.shown.count == 50_000)
+    #expect(session.shown.first?.text == "line 100")
+    #expect(session.shown.last?.text == "line 50099")
+  }
+
+  @Test func newLinesThatFailTheFilterAreNotShown() {
+    let session = session()
+    session.filterText = "keep"
+    session.receive(LogBatch(lines: ["keep 1", "drop", "KEEP 2"], skipped: 0))
+    #expect(session.shown.map(\.text) == ["keep 1", "KEEP 2"])
+  }
+
+  /// Paused, a batch is only held: nothing is filtered until Resume.
+  @Test func aPausedBatchIsNotFiltered() {
+    let session = session()
+    session.receive(LogBatch(lines: ["a"], skipped: 0))
+    session.togglePause()
+    let before = session.evaluations
+    session.receive(LogBatch(lines: ["b", "c"], skipped: 0))
+    #expect(session.evaluations == before)
+    #expect(session.shown.map(\.text) == ["a"])
+    session.togglePause()
+    #expect(session.shown.map(\.text) == ["a", "b", "c"])
+  }
+
+  /// The cost of a batch with the ring full and a filter set, measured on the main actor: the
+  /// agent sends up to ten batches a second, so a batch must take a small part of 100 ms. The
+  /// whole-ring filter it replaces took several times the bound here (50,000 case-insensitive
+  /// searches a batch); filtering only the batch takes a few milliseconds in a debug build.
+  @Test func aBatchWithAFullRingAndAFilterIsCheap() {
+    let session = session()
+    session.receive(
+      LogBatch(lines: (0..<50_000).map { "01-02 03:04:05.678  1  2 I T: \($0)" }, skipped: 0))
+    session.filterText = "t:"
+    let batches = 20
+    let clock = ContinuousClock()
+    let elapsed = clock.measure {
+      for batch in 0..<batches {
+        let lines = (0..<500).map { "01-02 03:04:05.678  1  2 I T: n\(batch * 500 + $0)" }
+        session.receive(LogBatch(lines: lines, skipped: 0))
+      }
+    }
+    #expect(elapsed / batches < .milliseconds(25))
+    #expect(session.shown.count == 50_000)
+  }
+
   @Test func closingStopsTheAgentsStream() async throws {
     let session = session()
     try await running(session) {}

@@ -111,7 +111,8 @@ extension FakeAndroid {
       let local = String(service.dropFirst("killforward:".count))
       let removed = state.withLock { state in
         let before = state.tools.forwards.count
-        state.tools.forwards.removeAll { $0.local == local && $0.serial == serial }
+        // adb's `remove_listener` matches the Mac port alone, whichever device owns it.
+        state.tools.forwards.removeAll { $0.local == local }
         return state.tools.forwards.count != before
       }
       guard removed else {

@@ -1,54 +1,31 @@
 import Foundation
 
-/// A `logcat -v threadtime` line read into its fields:
-/// `MM-DD HH:MM:SS.mmm  PID  TID L Tag: message`. The tag ends at the first colon followed by a
-/// space (or the end of the line), so a tag may hold spaces and a message colons. Anything that
-/// does not have this shape is not one.
-struct ThreadtimeLine: Equatable {
-  let date: String
-  let time: String
-  let pid: Int
-  let tid: Int
-  let level: LogcatEntry.Level
-  let tag: String
-  let message: String
-
-  init?(_ line: String) {
-    let parts = line.split(separator: " ", maxSplits: 5, omittingEmptySubsequences: true)
-    guard parts.count == 6, Self.matches(parts[0], "dd-dd"), Self.matches(parts[1], "dd:dd:dd.ddd"),
-      let pid = Int(parts[2]), let tid = Int(parts[3]), parts[4].count == 1,
-      let level = parts[4].first.flatMap(LogcatEntry.Level.init(letter:))
-    else { return nil }
-    let rest = parts[5]
-    if let separator = rest.range(of: ": ") {
-      tag = String(rest[..<separator.lowerBound])
-      message = String(rest[separator.upperBound...])
-    } else if rest.hasSuffix(":") {
-      tag = String(rest.dropLast())
-      message = ""
-    } else {
-      return nil
-    }
-    date = String(parts[0])
-    time = String(parts[1])
-    (self.pid, self.tid, self.level) = (pid, tid, level)
-  }
-
-  /// `d` is a digit and any other character stands for itself.
-  private static func matches(_ text: Substring, _ pattern: String) -> Bool {
-    guard text.count == pattern.count else { return false }
-    return zip(text, pattern).allSatisfy { character, expected in
-      expected == "d" ? character.isASCII && character.isNumber : character == expected
-    }
-  }
-}
-
 /// A line of the log as the window holds it: the text as the device sent it, its level when it
 /// is a threadtime line, and an identifier that is never used twice, even after older lines are
 /// dropped or the log is cleared.
 struct LogcatEntry: Identifiable, Equatable {
   enum Level: Int, CaseIterable, Comparable {
     case verbose, debug, info, warning, error, fatal
+
+    /// The level of a `logcat -v threadtime` line, `MM-DD HH:MM:SS.mmm  PID  TID L Tag: message`;
+    /// `nil` for anything that does not have that shape (a marker, or text Ferry cannot place).
+    init?(threadtime line: String) {
+      let parts = line.split(separator: " ", maxSplits: 5, omittingEmptySubsequences: true)
+      guard parts.count == 6, Self.matches(parts[0], "dd-dd"),
+        Self.matches(parts[1], "dd:dd:dd.ddd"), Int(parts[2]) != nil, Int(parts[3]) != nil,
+        parts[4].count == 1, let level = parts[4].first.flatMap(Level.init(letter:)),
+        parts[5].contains(": ") || parts[5].hasSuffix(":")
+      else { return nil }
+      self = level
+    }
+
+    /// `d` is a digit and any other character stands for itself.
+    private static func matches(_ text: Substring, _ pattern: String) -> Bool {
+      guard text.count == pattern.count else { return false }
+      return zip(text, pattern).allSatisfy { character, expected in
+        expected == "d" ? character.isASCII && character.isNumber : character == expected
+      }
+    }
 
     init?(letter: Character) {
       guard let level = Self.allCases.first(where: { $0.letter == letter }) else { return nil }
@@ -78,47 +55,76 @@ struct LogcatEntry: Identifiable, Equatable {
   init(id: Int, text: String) {
     self.id = id
     self.text = text
-    level = ThreadtimeLine(text)?.level
+    level = Level(threadtime: text)
   }
 }
 
-/// The newest `capacity` lines of the log; older ones are dropped.
+/// The newest lines of the log, within `capacity` lines and `byteBudget` bytes of text; older
+/// ones are dropped.
 struct LogcatBuffer {
   static let defaultCapacity = 50_000
+  /// 50,000 lines at the 8 KB line limit would be 400 MB; this is the most text held.
+  static let defaultByteBudget = 48 << 20
 
   private let capacity: Int
+  private let byteBudget: Int
   private var entries: [LogcatEntry] = []
+  private var bytes = 0
   private(set) var nextID = 0
 
-  init(capacity: Int = Self.defaultCapacity) {
+  init(capacity: Int = Self.defaultCapacity, byteBudget: Int = Self.defaultByteBudget) {
     self.capacity = capacity
+    self.byteBudget = byteBudget
   }
 
   var count: Int { entries.count }
 
-  mutating func append(_ lines: [String]) {
+  /// The identifier of the oldest line held; `nextID` when none is.
+  var firstID: Int { entries.first?.id ?? nextID }
+
+  /// Adds the lines and returns them as entries (a line the budget then dropped included).
+  @discardableResult
+  mutating func append(_ lines: [String]) -> [LogcatEntry] {
+    var added: [LogcatEntry] = []
+    added.reserveCapacity(lines.count)
     for line in lines {
-      entries.append(LogcatEntry(id: nextID, text: line))
+      let entry = LogcatEntry(id: nextID, text: line)
       nextID += 1
+      added.append(entry)
+      bytes += line.utf8.count
     }
-    if entries.count > capacity { entries.removeFirst(entries.count - capacity) }
+    entries.append(contentsOf: added)
+    // The newest line stays, however large.
+    var drop = 0
+    while entries.count - drop > 1, entries.count - drop > capacity || bytes > byteBudget {
+      bytes -= entries[drop].text.utf8.count
+      drop += 1
+    }
+    if drop > 0 { entries.removeFirst(drop) }
+    return added
   }
 
   mutating func removeAll() {
     entries.removeAll()
+    bytes = 0
   }
 
-  /// The lines at `minimum` or above, and every line that has no level, that contain `text`
-  /// (case-insensitively; no text matches all), as they arrived; only lines before `limit`
-  /// (an identifier) when it is given.
+  /// Whether `entry` is at `minimum` or above (a line with no level always is) and contains
+  /// `text`, ignoring case; no text matches all.
+  static func passes(_ entry: LogcatEntry, minimum: LogcatEntry.Level, matching text: String)
+    -> Bool
+  {
+    if let level = entry.level, level < minimum { return false }
+    return text.isEmpty || entry.text.range(of: text, options: [.caseInsensitive, .literal]) != nil
+  }
+
+  /// The lines that pass, as they arrived; only lines before `limit` (an identifier) when given.
   func shown(minimum: LogcatEntry.Level, matching text: String, before limit: Int? = nil)
     -> [LogcatEntry]
   {
     entries.filter { entry in
       if let limit, entry.id >= limit { return false }
-      if let level = entry.level, level < minimum { return false }
-      return text.isEmpty
-        || entry.text.range(of: text, options: [.caseInsensitive, .literal]) != nil
+      return Self.passes(entry, minimum: minimum, matching: text)
     }
   }
 }
