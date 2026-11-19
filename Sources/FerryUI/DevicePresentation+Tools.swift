@@ -40,7 +40,7 @@ extension DevicePresentation {
 
 }
 
-/// Text for the developer tools: the log window, Device Info.
+/// Text for the developer tools' windows: the log and port forwarding.
 extension DevicePresentation {
   static var logEndedLine: String {
     String(localized: LocalizedStringResource("The device ended the log.", bundle: .module))
@@ -75,10 +75,6 @@ extension DevicePresentation {
 
   static func forwardsTitle(name: String) -> String {
     windowTitle(LocalizedStringResource("Port Forwarding", bundle: .module), name)
-  }
-
-  static func infoTitle(name: String) -> String {
-    windowTitle(LocalizedStringResource("Device Info", bundle: .module), name)
   }
 
   /// One format, so a language can put the device first.

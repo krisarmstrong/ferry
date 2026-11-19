@@ -15,8 +15,8 @@ struct DeviceRowActions {
   let forget: () -> Void
 }
 
-/// One device: its tile, name and summary, and, when expanded, details for its state, then its
-/// actions as rows. An `.apk` dropped on a device with tools is
+/// One device: its tile, name and summary, and, when expanded, details for its state, what it
+/// says about itself, then its actions as rows. An `.apk` dropped on a device with tools is
 /// installed.
 struct DeviceRow: View {
   let device: AttachedDevice
@@ -40,6 +40,9 @@ struct DeviceRow: View {
         tile: DevicePresentation.tile(of: device), name: name, summary: summary,
         isExpanded: isExpanded, toggle: actions.toggle)
       if isExpanded {
+        if DevicePresentation.offersTools(device) {
+          DetailLines(tools: tools)
+        }
         DeviceDetails(
           device: device, transfers: transfers, awaitingUSBDebugging: awaitingUSBDebugging,
           tools: tools, recording: recording, showUSBDebugging: actions.showUSBDebugging)
@@ -54,6 +57,8 @@ struct DeviceRow: View {
           .deviceAction(action.title, on: name)
           // One app at a time: Install App… waits for the one on its way.
           .disabled(action == .installApp && tools.install != nil)
+          // There is nothing to copy until the device has said it.
+          .disabled(action == .copyAllDetails && !tools.details.isLoaded)
         }
       }
     }
@@ -68,7 +73,7 @@ struct DeviceRow: View {
     case .recordScreen: tools.record
     case .stopRecording: tools.stopRecording
     case .logcat: tools.openLogcat
-    case .deviceInfo: tools.openInfo
+    case .copyAllDetails: tools.copyAllDetails
     case .portForwarding: tools.openForwards
     case .sendFile: tools.sendFiles
     case .installApp: tools.chooseAPK

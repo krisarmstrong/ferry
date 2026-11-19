@@ -5,47 +5,19 @@ import Testing
 
 @testable import FerryUI
 
-/// The Device Info sheet: what it asks, what it shows, and the text Copy puts on the pasteboard.
-@MainActor
-struct DeviceInfoSessionTests {
-  let log = CallLog()
-  let id = DeviceID(serial: "0123456789abcdef")
-
+/// Everything a device said about itself, a row each, as Copy All Details copies it.
+struct InfoRowsTests {
   static let info = AndroidDeviceInfo(
     model: "LinkRunner G2", androidVersion: "8.1.0", build: "OPM1.171019.026",
     serial: "0123456789abcdef", battery: .init(level: 87, state: .charging),
     addresses: [
-      .init(interface: "wlan0", address: "198.51.100.169"),
+      .init(interface: "wlan0", address: "192.0.2.169"),
       .init(interface: "eth0", address: "192.0.2.31"),
-      .init(interface: "rmnet_data0", address: "100.64.1.2"),
-      .init(interface: "rndis0", address: "192.168.42.129"),
-      .init(interface: "tun0", address: "10.8.0.2"),
+      .init(interface: "rmnet_data0", address: "192.0.2.2"),
+      .init(interface: "rndis0", address: "192.0.2.129"),
+      .init(interface: "tun0", address: "192.0.2.8"),
     ],
     storage: .init(used: 5_000_000_000, free: 17_000_000_000))
-
-  @Test func theInfoIsLoaded() async {
-    let client = FakeClient(log: log)
-    client.infoReply.withLock { $0 = .deviceInfo(Self.info) }
-    let session = DeviceInfoSession(device: id, client: client, services: FakeServices(log: log))
-    await session.load()
-    #expect(session.state == .loaded(Self.info))
-    #expect(log.all.contains("deviceInfo \(id.serial)"))
-  }
-
-  @Test func aFailureIsShown() async {
-    let client = FakeClient(log: log)
-    client.infoReply.withLock { $0 = .toolFailed(.notOverADB) }
-    let session = DeviceInfoSession(device: id, client: client, services: FakeServices(log: log))
-    await session.load()
-    #expect(session.state == .failed(DevicePresentation.message(for: .notOverADB)))
-  }
-
-  @Test func aLostDeviceIsShown() async {
-    let session = DeviceInfoSession(
-      device: id, client: UnreachableClient(), services: FakeServices(log: log))
-    await session.load()
-    #expect(session.state == .failed(DevicePresentation.message(for: .deviceDisconnected)))
-  }
 
   @Test func theRowsNameWhatTheDeviceSaid() {
     let rows = DevicePresentation.infoRows(Self.info)
@@ -58,8 +30,8 @@ struct DeviceInfoSessionTests {
     #expect(rows[4].value == "87%, charging")
     #expect(
       rows[5].value
-        == "198.51.100.169 (Wi-Fi), 192.0.2.31 (Ethernet), 100.64.1.2 (Mobile data), "
-        + "192.168.42.129 (USB), 10.8.0.2 (tun0)")
+        == "192.0.2.169 (Wi-Fi), 192.0.2.31 (Ethernet), 192.0.2.2 (Mobile data), "
+        + "192.0.2.129 (USB), 192.0.2.8 (tun0)")
     #expect(rows[6].value.contains("used") && rows[6].value.contains("free"))
   }
 
@@ -84,13 +56,13 @@ struct DeviceInfoSessionTests {
         .init(interface: "wlan0", address: "192.0.2.159"),
         .init(interface: "wlan0", address: "2001:db8::159"),
         .init(interface: "eth0", address: "192.0.2.10"),
-        .init(interface: "tun0", address: "10.8.0.2"),
+        .init(interface: "tun0", address: "192.0.2.8"),
       ],
       [
         "Wi-Fi Management": "192.0.2.159, 2001:db8::159", "Wired Management": "192.0.2.10",
         "Wired Test": "Not connected", "Wi-Fi Test": "Not connected",
       ],
-      "10.8.0.2 (tun0)"
+      "192.0.2.8 (tun0)"
     ),
     (
       [],
@@ -146,24 +118,5 @@ struct DeviceInfoSessionTests {
     #expect(rows[0].value == "A\\u{1B}[2Jb")
     #expect(rows[1].value == "8\\u{202E}")
     #expect(rows[4].value == "192.0.2.1 (x\\u{202E}0)")
-  }
-
-  @Test func copyPutsTheRowsOnThePasteboardOnePerLine() async {
-    let client = FakeClient(log: log)
-    client.infoReply.withLock { $0 = .deviceInfo(Self.info) }
-    let session = DeviceInfoSession(device: id, client: client, services: FakeServices(log: log))
-    await session.load()
-    session.copy()
-    let copied = log.all.first { $0.hasPrefix("copy ") } ?? ""
-    #expect(copied.contains("Model: LinkRunner G2"))
-    #expect(copied.contains("Battery: 87%, charging"))
-    #expect(copied.contains("IP addresses: 198.51.100.169 (Wi-Fi), 192.0.2.31 (Ethernet)"))
-  }
-
-  @Test func copyBeforeTheInfoIsHereDoesNothing() {
-    let session = DeviceInfoSession(
-      device: id, client: FakeClient(log: log), services: FakeServices(log: log))
-    session.copy()
-    #expect(!log.all.contains { $0.hasPrefix("copy ") })
   }
 }

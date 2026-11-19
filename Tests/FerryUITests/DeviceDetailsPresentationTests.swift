@@ -26,7 +26,7 @@ struct DeviceDetailsPresentationTests {
   @Test(arguments: [
     (
       [
-        AndroidDeviceInfo.Address(interface: "dummy0", address: "10.11.12.13"),
+        AndroidDeviceInfo.Address(interface: "dummy0", address: "192.0.2.13"),
         .init(interface: "wlan0", address: "192.0.2.159"),
         .init(interface: "wlan0", address: "2001:db8::159"),
         .init(interface: "eno0", address: "192.0.2.156"),
@@ -120,7 +120,7 @@ struct DeviceDetailsPresentationTests {
   @Test func theFullTextHasEveryAddress() {
     let text = DevicePresentation.detailsText(
       info([
-        .init(interface: "dummy0", address: "10.11.12.13"),
+        .init(interface: "dummy0", address: "192.0.2.13"),
         .init(interface: "wlan0", address: "192.0.2.159"),
         .init(interface: "wlan0", address: "2001:db8::159"),
       ]))
@@ -135,7 +135,7 @@ struct DeviceDetailsPresentationTests {
         Wired Management: Not connected
         Wired Test: Not connected
         Wi-Fi Test: Not connected
-        IP addresses: 10.11.12.13 (dummy0)
+        IP addresses: 192.0.2.13 (dummy0)
         """)
   }
 

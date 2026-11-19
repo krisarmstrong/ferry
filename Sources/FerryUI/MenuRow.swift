@@ -3,12 +3,16 @@ import SwiftUI
 /// The menu's rows, after Control Center's Wi-Fi and Bluetooth menus: full width, highlighted
 /// under the pointer or keyboard focus, with no border.
 struct MenuRowStyle: ButtonStyle {
+  /// Above and below the label: a detail line is tighter than an action row.
+  var verticalPadding: CGFloat = 4
+
   func makeBody(configuration: Configuration) -> some View {
-    Highlighted(configuration: configuration)
+    Highlighted(configuration: configuration, verticalPadding: verticalPadding)
   }
 
   private struct Highlighted: View {
     let configuration: Configuration
+    let verticalPadding: CGFloat
     @State private var hovering = false
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.isFocused) private var isFocused
@@ -16,7 +20,7 @@ struct MenuRowStyle: ButtonStyle {
     var body: some View {
       configuration.label
         .padding(.horizontal, MenuMetrics.rowPadding)
-        .padding(.vertical, 4)
+        .padding(.vertical, verticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .background {

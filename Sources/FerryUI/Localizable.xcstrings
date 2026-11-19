@@ -359,9 +359,6 @@
     "Device" : {
 
     },
-    "Device Info" : {
-
-    },
     "Device info" : {
       "extractionState" : "manual"
     },
@@ -726,9 +723,6 @@
     },
     "Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then click **Check Again**." : {
       "extractionState" : "manual"
-    },
-    "Reading the device…" : {
-
     },
     "Ready" : {
 

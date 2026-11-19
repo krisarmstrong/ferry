@@ -2,7 +2,7 @@ import DeviceKit
 import FerryIPC
 import SwiftUI
 
-/// What a device row's tools show and do, and Send File….
+/// What a device row's tools show and do, its inline details, and Send File….
 @MainActor
 struct ToolActions {
   /// The device as the menu names it, for VoiceOver.
@@ -23,7 +23,11 @@ struct ToolActions {
   let openLogcat: () -> Void
   let openShell: () -> Void
   let openForwards: () -> Void
-  let openInfo: () -> Void
+  /// The device's details as the menu shows them, and the line just copied.
+  let details: DetailsShown
+  let isCopied: (DevicePresentation.DetailLine) -> Bool
+  let copyAddress: (DevicePresentation.DetailLine) -> Void
+  let copyAllDetails: () -> Void
 
   /// `open` shows one of the developer windows for the device.
   init(model: AppModel, device: DeviceID, open: @escaping (DeveloperWindow) -> Void) {
@@ -43,7 +47,10 @@ struct ToolActions {
     openLogcat = { open(.logcat) }
     openShell = { Task { await model.openShell(on: device) } }
     openForwards = { open(.portForwarding) }
-    openInfo = { open(.deviceInfo) }
+    details = model.shownDetails(of: device)
+    isCopied = { model.isCopied($0, on: device) }
+    copyAddress = { line in Task { await model.copyAddress(line, on: device) } }
+    copyAllDetails = { model.copyAllDetails(of: device) }
   }
 
   func install(_ url: URL) { installDropped(url) }

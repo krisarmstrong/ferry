@@ -2,8 +2,8 @@ import DeviceKit
 import FerryIPC
 import Foundation
 
-/// The developer tools: a log window, Open Shell, port forwarding and Device Info, for a device
-/// Ferry serves over ADB. Each window has a session of its own that talks to the agent.
+/// The developer tools: a log window, Open Shell and port forwarding, for a device Ferry serves
+/// over ADB. Each window has a session of its own that talks to the agent.
 extension AppModel {
   func logcatSession(for device: DeviceID) -> LogcatSession {
     LogcatSession(
@@ -12,10 +12,6 @@ extension AppModel {
 
   func portForwardsSession(for device: DeviceID) -> PortForwardsSession {
     PortForwardsSession(device: device, client: client)
-  }
-
-  func deviceInfoSession(for device: DeviceID) -> DeviceInfoSession {
-    DeviceInfoSession(device: device, client: client, services: services)
   }
 
   /// The name the windows show for `device`, as the menu shows it: two units of one model are

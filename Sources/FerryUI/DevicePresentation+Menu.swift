@@ -84,17 +84,17 @@ extension DevicePresentation {
 
   /// A row in a device's expansion.
   enum MenuAction: Hashable, CaseIterable, Sendable {
-    case takeScreenshot, recordScreen, stopRecording, logcat, deviceInfo, portForwarding
+    case copyAllDetails, takeScreenshot, recordScreen, stopRecording, logcat, portForwarding
     case sendFile, installApp, openShell, useOverWiFi, forget, howToTurnOnFileTransfer, mount
     case checkAgain, eject, connectAgain, useIt, ignore
 
     var title: LocalizedStringResource {
       switch self {
+      case .copyAllDetails: LocalizedStringResource("Copy All Details", bundle: .module)
       case .takeScreenshot: LocalizedStringResource("Take Screenshot", bundle: .module)
       case .recordScreen: LocalizedStringResource("Record Screen", bundle: .module)
       case .stopRecording: LocalizedStringResource("Stop Recording", bundle: .module)
       case .logcat: LocalizedStringResource("Logcat", bundle: .module)
-      case .deviceInfo: LocalizedStringResource("Device Info", bundle: .module)
       case .portForwarding: LocalizedStringResource("Port Forwarding", bundle: .module)
       case .sendFile: LocalizedStringResource("Send File…", bundle: .module)
       case .installApp: LocalizedStringResource("Install App…", bundle: .module)
@@ -114,11 +114,11 @@ extension DevicePresentation {
 
     var symbol: String {
       switch self {
+      case .copyAllDetails: "doc.on.doc"
       case .takeScreenshot: "camera"
       case .recordScreen: "video"
       case .stopRecording: "stop.circle"
       case .logcat: "doc.text"
-      case .deviceInfo: "info.circle"
       case .portForwarding: "arrow.left.arrow.right"
       case .sendFile: "paperplane"
       case .installApp: "arrow.down.app"
@@ -133,20 +133,20 @@ extension DevicePresentation {
     }
   }
 
-  /// The rows a device's expansion lists, in menu order: the ADB tools, Send File…, the network
-  /// rows, the one its state needs, then Eject.
+  /// The rows a device's expansion lists, in menu order: Copy All Details under the details it
+  /// copies, the ADB tools, Send File…, the network rows, the one its state needs, then Eject.
   static func actions(
     for device: AttachedDevice, isRemembered: Bool, recording: RecordingPhase
   ) -> [MenuAction] {
     var actions: [MenuAction] = []
     if offersTools(device) {
-      actions.append(.takeScreenshot)
+      actions += [.copyAllDetails, .takeScreenshot]
       switch recording {
       case .none: actions.append(.recordScreen)
       case .running: actions.append(.stopRecording)
       case .saving, .unsaved: break
       }
-      actions += [.logcat, .deviceInfo, .portForwarding]
+      actions += [.logcat, .portForwarding]
     }
     // Sending is a file write through the agent, so any method serves it.
     if case .ready = device.state { actions.append(.sendFile) }

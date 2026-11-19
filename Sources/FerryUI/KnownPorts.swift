@@ -2,7 +2,7 @@ import Foundation
 
 /// The network ports of models whose interfaces Ferry knows, keyed on `ro.product.model` as
 /// `getprop` prints it (adb's device list rewrites `-` as `_`), in the order the unit labels
-/// them. Device Info lists every one, connected or not.
+/// them. A device's details list every one, connected or not.
 enum KnownPorts {
   struct Port {
     /// As the device names it (`wlan0`).
