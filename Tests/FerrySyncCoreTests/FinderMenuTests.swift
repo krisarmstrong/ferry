@@ -84,6 +84,19 @@ struct FinderMenuTests {
     #expect(entries.first?.title == "Send to Phone\\u{202E}fdp.exe")
   }
 
+  /// The name the Ferry menu shows: the manufacturer when the device reports no model.
+  @Test func aDeviceWithoutAModelGoesByItsManufacturer() {
+    let id = DeviceID(serial: "A")
+    let storage = StorageInfo(
+      id: StorageID(device: id, key: StorageKey.internal), description: "Internal storage",
+      capacity: 1, free: 1)
+    let device = AttachedDevice(
+      info: DeviceInfo(id: id, manufacturer: "NetAlly", model: ""), state: .ready([storage]),
+      method: .usbFileTransfer)
+    let entries = FinderMenu.entries(devices: [device], selection: [report])
+    #expect(entries.first?.title == "Send to NetAlly")
+  }
+
   /// Two devices with one model stay apart by their actions.
   @Test func eachEntryActsOnItsOwnDevice() {
     let first = attached("A", model: "Pixel 8")

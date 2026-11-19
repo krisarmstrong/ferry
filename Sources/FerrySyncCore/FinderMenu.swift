@@ -59,10 +59,10 @@ public enum FinderMenu {
 
   public static var toolbarToolTip: String { text("Send selected files to a device") }
 
-  /// The name a device goes by in the menu and in notices: its model, escaped, since the device
-  /// supplies it.
+  /// The name a device goes by in the menu and in notices: the one the Ferry menu shows,
+  /// escaped, since the device supplies it.
   public static func displayName(of device: AttachedDevice) -> String {
-    DisplayText.escaped(device.info.model)
+    device.displayName
   }
 
   /// A ready device with a storage to write to.

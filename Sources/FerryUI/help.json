@@ -148,8 +148,7 @@
           ],
           "steps": [
             "To turn on this menu, open System Settings, then **General** → **Login Items & Extensions**.",
-            "Under Extensions, click the info button next to **Finder**.",
-            "Turn on Ferry."
+            "Under Extensions, find Ferry's Finder extension and turn it on."
           ]
         },
         {

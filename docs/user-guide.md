@@ -225,8 +225,7 @@ the apps are installed, or why not. The Ferry menu lists a send in progress unde
 To turn on the Finder menu, once:
 
 1. Open System Settings, then **General** → **Login Items & Extensions**.
-2. Under Extensions, click the info button next to **Finder**.
-3. Turn on **Ferry**.
+2. Under Extensions, find Ferry's Finder extension and turn it on.
 
 ### Large files
 
