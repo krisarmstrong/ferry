@@ -102,7 +102,8 @@ public struct WirelessEndpoint: Hashable, Sendable, Codable {
     isIPv4(host) || isIPv6(host) || isHostname(host)
   }
 
-  /// Dotted decimal, four parts, so `10.1` is not an address.
+  /// Dotted decimal, four parts, so `10.1` is not an address, and no leading zeros, which adb
+  /// may read as octal.
   private static func isIPv4(_ text: String) -> Bool {
     NumericAddress.isIPv4(text)
   }

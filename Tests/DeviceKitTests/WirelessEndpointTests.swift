@@ -93,4 +93,11 @@ struct PairingCodeTests {
   func anAddressWithMoreAfterItIsRefused(text: String) {
     #expect(WirelessEndpoint(parsing: text) == nil)
   }
+
+  /// A typed IPv4 address with leading zeros is refused, with or without a port: adb may read a
+  /// part such as `010` as octal (8), so it would reach a different host than the one typed.
+  @Test(arguments: ["192.0.2.01", "010.0.2.1", "192.0.2.010:5555"])
+  func anIPv4AddressWithLeadingZerosIsRefused(text: String) {
+    #expect(WirelessEndpoint(parsing: text) == nil)
+  }
 }
