@@ -15,6 +15,8 @@ private let serial = "0123456789abcdef"
 private actor Gate {
   private var isOpen = true
   private var waiting: [CheckedContinuation<Void, Never>] = []
+  /// How many callers the closed gate is holding.
+  var held: Int { waiting.count }
 
   func close() { isOpen = false }
 
@@ -251,12 +253,10 @@ struct ADBToolsLogcatTests {
     await client.gate.close()
     let run = start(makeTools(fake, limits: limits), client)
     await log.send(["first"])
-    // The first batch is with the held client; these queue up behind it.
-    #expect(try await eventually(timeout: .seconds(5)) { await log.pendingCount == 0 })
-    try await Task.sleep(for: .milliseconds(50))
+    // The first batch is now with the held client; what follows queues up behind it.
+    #expect(try await eventually(timeout: .seconds(5)) { await client.gate.held == 1 })
     await log.send((0..<500).map { "burst \($0)" })
     #expect(try await eventually(timeout: .seconds(5)) { await log.pendingCount == 0 })
-    try await Task.sleep(for: .milliseconds(50))
     await client.gate.open()
     await log.end()
     #expect(try await run.value == .done)

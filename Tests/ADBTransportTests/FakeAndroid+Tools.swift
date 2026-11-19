@@ -104,27 +104,7 @@ extension FakeAndroid {
       return true
     }
     if service.hasPrefix("forward:") {
-      let pieces = service.dropFirst("forward:".count).split(
-        separator: ";", omittingEmptySubsequences: false)
-      guard pieces.count == 2, !pieces[0].isEmpty, !pieces[1].isEmpty, pieces[1].first != "*" else {
-        try await peer.fail("bad forward: \(service.dropFirst("forward:".count))")
-        return true
-      }
-      let (local, remote) = (String(pieces[0]), String(pieces[1]))
-      let taken = state.withLock { state in
-        local.hasPrefix("tcp:")
-          && UInt16(local.dropFirst(4)).map(state.tools.takenPorts.contains) == true
-      }
-      guard !taken else {
-        try await peer.fail("cannot bind listener: Address already in use")
-        return true
-      }
-      state.withLock { state in
-        state.tools.forwards.removeAll { $0.local == local }
-        state.tools.forwards.append(Forward(serial: serial, local: local, remote: remote))
-      }
-      try await peer.okay()
-      try await peer.okay()
+      try await addForward(String(service.dropFirst("forward:".count)), serial: serial, peer)
       return true
     }
     if service.hasPrefix("killforward:") {
@@ -143,6 +123,42 @@ extension FakeAndroid {
       return true
     }
     return false
+  }
+
+  /// `forward:` with `<local>;<remote>` after an optional `norebind:`.
+  private func addForward(_ request: String, serial: String, _ peer: Peer) async throws {
+    var spec = request[...]
+    let noRebind = spec.hasPrefix("norebind:")
+    if noRebind { spec = spec.dropFirst("norebind:".count) }
+    let pieces = spec.split(separator: ";", omittingEmptySubsequences: false)
+    guard pieces.count == 2, !pieces[0].isEmpty, !pieces[1].isEmpty, pieces[1].first != "*" else {
+      try await peer.fail("bad forward: \(spec)")
+      return
+    }
+    let (local, remote) = (String(pieces[0]), String(pieces[1]))
+    let (taken, existing) = state.withLock { state in
+      let port = local.hasPrefix("tcp:") ? UInt16(local.dropFirst(4)) : nil
+      return (
+        port.map(state.tools.takenPorts.contains) == true,
+        state.tools.forwards.contains { $0.local == local }
+      )
+    }
+    if taken {
+      try await peer.fail("cannot bind listener: Address already in use")
+      return
+    }
+    // `install_listener`: an existing listener on the port is repointed at the requested
+    // device and target, whoever owned it, unless the request says `norebind:`.
+    if existing, noRebind {
+      try await peer.fail("cannot rebind existing socket")
+      return
+    }
+    state.withLock { state in
+      state.tools.forwards.removeAll { $0.local == local }
+      state.tools.forwards.append(Forward(serial: serial, local: local, remote: remote))
+    }
+    try await peer.okay()
+    try await peer.okay()
   }
 
   /// The legacy `shell:` service, for a device without `shell_v2`, wrapped as `ADBShell` wraps a

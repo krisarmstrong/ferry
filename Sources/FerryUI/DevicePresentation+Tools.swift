@@ -193,16 +193,23 @@ extension DevicePresentation {
 
   /// A forward as the list shows it: the Mac port, an arrow, the device port.
   static func forwardLine(_ forward: PortForward) -> String {
-    let (local, remote) = (forward.local, forward.remote)
-    return String(
-      localized: LocalizedStringResource(
-        "This Mac port \(local) → device port \(remote)", bundle: .module))
+    String(localized: forwardLineResource(forward))
+  }
+
+  /// Ports are interpolated as text: as numbers they would be grouped, `8,080`.
+  static func forwardLineResource(_ forward: PortForward) -> LocalizedStringResource {
+    let (local, remote) = (String(forward.local), String(forward.remote))
+    return LocalizedStringResource(
+      "This Mac port \(local) → device port \(remote)", bundle: .module)
   }
 
   static func removeForwardLabel(_ forward: PortForward) -> String {
-    let local = forward.local
-    return String(
-      localized: LocalizedStringResource("Remove the forward from port \(local)", bundle: .module))
+    String(localized: removeForwardResource(forward))
+  }
+
+  static func removeForwardResource(_ forward: PortForward) -> LocalizedStringResource {
+    let local = String(forward.local)
+    return LocalizedStringResource("Remove the forward from port \(local)", bundle: .module)
   }
 
   /// What the device said about itself, a row each; a part it could not say has no row. Every

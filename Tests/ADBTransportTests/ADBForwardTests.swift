@@ -73,6 +73,33 @@ struct ADBForwardTests {
     }
   }
 
+  /// Plain `forward:` on a port adb already forwards points that forward at this device, whoever
+  /// made it; Ferry asks with `norebind:` so it is refused instead.
+  @Test func aPortAnotherDeviceForwardsIsNeverTakenOver() async throws {
+    let device = FakeAndroid()
+    let theirs = FakeAndroid.Forward(serial: "other", local: "tcp:8080", remote: "tcp:9999")
+    device.setTools { $0.forwards = [theirs] }
+    await #expect(throws: ADBError.failed("cannot rebind existing socket")) {
+      try await withHost(device) { host in
+        try await host.addForward(serial: Self.serial, PortForward(local: 8080, remote: 80))
+      }
+    }
+    #expect(device.state.withLock { $0.tools.forwards } == [theirs])
+  }
+
+  @Test func aPortThisDeviceAlreadyForwardsIsRefusedToo() async throws {
+    let device = FakeAndroid()
+    device.setTools {
+      $0.forwards = [.init(serial: Self.serial, local: "tcp:8080", remote: "tcp:80")]
+    }
+    await #expect(throws: ADBError.failed("cannot rebind existing socket")) {
+      try await withHost(device) { host in
+        try await host.addForward(serial: Self.serial, PortForward(local: 8080, remote: 81))
+      }
+    }
+    #expect(device.state.withLock { $0.tools.forwards.map(\.remote) } == ["tcp:80"])
+  }
+
   @Test func aForwardIsRemovedByItsLocalPort() async throws {
     let device = FakeAndroid()
     device.setTools {

@@ -13,9 +13,11 @@ extension ADBHost {
     Self.parseForwards(try await query("host-serial:\(serial):list-forward"), serial: serial)
   }
 
+  /// `norebind:` makes adb refuse a Mac port it already forwards. Without it adb silently points
+  /// the existing forward at this device, even one another device or tool made.
   public func addForward(serial: String, _ forward: PortForward) async throws(ADBError) {
     try await forwardRequest(
-      "host-serial:\(serial):forward:tcp:\(forward.local);tcp:\(forward.remote)")
+      "host-serial:\(serial):forward:norebind:tcp:\(forward.local);tcp:\(forward.remote)")
   }
 
   public func removeForward(serial: String, local: UInt16) async throws(ADBError) {

@@ -685,7 +685,7 @@
     "Remove Ferry…" : {
 
     },
-    "Remove the forward from port %lld" : {
+    "Remove the forward from port %@" : {
 
     },
     "Removes a ready device from Finder and releases it; it then shows **Ejected**. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names." : {
@@ -859,7 +859,7 @@
     "The sidebar says \"Ferry\"" : {
       "extractionState" : "manual"
     },
-    "This Mac port %lld → device port %lld" : {
+    "This Mac port %@ → device port %@" : {
 
     },
     "This needs USB debugging. Turn it on, then try again." : {
