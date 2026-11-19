@@ -150,6 +150,20 @@ struct AgentCancelTests {
     }
   }
 
+  /// A network connect tries each address with adb's own 30 s limit, in turn: it has no deadline.
+  /// Every request with one moves no file contents, so none of them can be cancelled.
+  @Test func networkConnectsHaveNoDeadline() throws {
+    let id = DeviceID(serial: "S1")
+    let address = try #require(WirelessEndpoint(parsing: "192.0.2.31", defaultPort: 5555))
+    let connects: [AgentRequest] = [
+      .connectAddress(address), .connectWireless(id), .enableWireless(id),
+      .confirmWireless(UnconfirmedAddress(address: address, id: id, name: "LinkRunner")),
+    ]
+    #expect(connects.allSatisfy { $0.mayTakeLong })
+    #expect(!AgentRequest.forgetWireless(id).mayTakeLong)
+    #expect(!AgentRequest.list(domain: "d", folder: .root).isCancellable)
+  }
+
   /// A transfer, which reports its progress, has no deadline however long it runs.
   @Test func aTransferIsNotTimedOut() async throws {
     let harness = CancelHarness()

@@ -44,8 +44,9 @@ extension AgentSending {
 /// A cancelled call throws `.cancelled` at once and tells the agent, which stops a transfer at
 /// its next block (see `RequestCancellation`); anything else it finishes, and its reply is
 /// dropped. A metadata call (see `AgentRequest.mayTakeLong`) that has no reply within
-/// `replyDeadline` throws `.agentNotResponding` and is cancelled the same way: a wedged device
-/// must not hold FileProvider's request until its own watchdog.
+/// `replyDeadline` throws `.agentNotResponding`, so a wedged device does not hold FileProvider's
+/// request until its own watchdog. The agent keeps running it (it moves no file contents, so
+/// nothing can stop it) and its reply is dropped.
 public actor AgentClient: AgentSending {
   /// How long a metadata call may wait for its reply.
   public static let replyDeadline = Duration.seconds(120)
@@ -141,7 +142,6 @@ public actor AgentClient: AgentSending {
       throw .cancelled
     case .failure(is ReplyOverdue):
       Self.log.error("the agent did not answer a request in time")
-      Self.cancel(id, on: connection)
       throw .agentNotResponding
     case .failure(let error):
       // An interrupted connection stays usable: launchd relaunches the agent on the next
