@@ -34,6 +34,11 @@ public final class DeviceList: Sendable {
     state.withLock { $0.devices }
   }
 
+  /// How many requests the list has made, for tests: `fresh` decides under the lock.
+  var requestsMade: UInt64 {
+    state.withLock { $0.request }
+  }
+
   /// Asks the agent and stores its answer, unless a later request has answered first. An agent
   /// that cannot be reached has no devices.
   public func refresh() async {
