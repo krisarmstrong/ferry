@@ -16,6 +16,8 @@ import os
     case running
     /// The request failed, so the device list is not known.
     case unreachable
+    /// The request failed and Ferry was updated while it ran: the new agent refuses this copy.
+    case replaced
   }
 
   /// Where macOS turns on File Provider extensions.
@@ -29,7 +31,7 @@ import os
   public private(set) var devices: [AttachedDevice] = []
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
   public private(set) var provider = ProviderState.enabled
-  public private(set) var agent = AgentState.checking
+  public internal(set) var agent = AgentState.checking
   /// What macOS said about the helper the last time the agent did not answer.
   public private(set) var helper = HelperStatus.allowed
   /// Transfers the agent is running, as of the last status.
@@ -129,7 +131,7 @@ import os
       }
     } catch {
       Self.log.error("status request failed: \(String(describing: error), privacy: .private)")
-      agent = .unreachable
+      agent = services.appWasReplaced() ? .replaced : .unreachable
       helper = await services.helperStatus()
     }
   }
@@ -258,39 +260,6 @@ import os
     let reported = await services.opensAtLogin()
     // A later request shows its own value until it is applied in turn.
     if request == loginItemRequests { opensAtLogin = reported }
-  }
-
-  /// Removes Ferry's locations from Finder, unregisters the agent and the login item, and
-  /// quits. Stops if the locations or the agent remain, so the user can try again rather than
-  /// being left with locations no agent serves. Once the agent is gone a retry could only fail,
-  /// so a login item that will not unregister is logged and Ferry quits anyway. Changes the
-  /// locations had not sent to a device are shown in Finder, since the menu goes away.
-  public func removeFerry() async {
-    let preserved: [URL]
-    do {
-      guard case .removed(let saved) = try await client.send(.removeAllDomains, file: nil) else {
-        throw TransportError.io("agent kept its locations")
-      }
-      try await services.unregisterAgent()
-      preserved = saved.filter(Self.holdsSomething)
-    } catch {
-      Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .private)")
-      actionError = String(
-        localized: LocalizedStringResource(
-          "Could not remove Ferry. Make sure Ferry is running, then try again.", bundle: .module))
-      return
-    }
-    if !preserved.isEmpty {
-      services.reveal(preserved)
-    }
-    if await services.opensAtLogin() {
-      do {
-        try await services.setOpensAtLogin(false)
-      } catch {
-        Self.log.error("removing the login item failed: \(error, privacy: .public)")
-      }
-    }
-    services.quit()
   }
 
   func perform(_ request: AgentRequest) async {

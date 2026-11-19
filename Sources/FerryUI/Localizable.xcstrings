@@ -1015,6 +1015,12 @@
           }
         }
       }
+    },
+    "Ferry was updated. Quit and reopen Ferry." : {
+
+    },
+    "Relaunch" : {
+
     }
   },
   "version" : "1.0"

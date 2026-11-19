@@ -29,6 +29,11 @@ public protocol SystemServicing {
   /// Shows the items in Finder.
   func reveal(_ urls: [URL])
   func quit()
+  /// Whether Ferry's executable on disk is no longer the one this process launched from: the
+  /// app was updated while it ran.
+  func appWasReplaced() -> Bool
+  /// Opens Ferry again from its bundle and quits this copy.
+  func relaunch()
   /// Puts `text` on the pasteboard.
   func copy(_ text: String)
   /// Asks the user for an `.apk`; `nil` if they cancel.
@@ -55,6 +60,10 @@ public final class SystemServices: SystemServicing {
 
   /// Where `SMAppService.agent(plistName:)` finds the agent, in `Contents/Library/LaunchAgents`.
   private nonisolated static let agentPlist = "io.github.krisarmstrong.ferry.agent.plist"
+
+  /// The executable this process launched from, and which file it was then.
+  private let executable = Bundle.main.executableURL
+  private let launchedFrom = Bundle.main.executableURL.flatMap(ExecutableIdentity.init(of:))
 
   public init() {}
 
@@ -113,6 +122,28 @@ public final class SystemServices: SystemServicing {
 
   public func quit() {
     NSApplication.shared.terminate(nil)
+  }
+
+  public func appWasReplaced() -> Bool {
+    guard let executable, let launchedFrom else { return false }
+    return ExecutableIdentity(of: executable) != launchedFrom
+  }
+
+  /// Opens a new instance from the bundle, which runs the updated code, then quits this one.
+  /// If the new one cannot open, this one stays, so the menu is not lost.
+  public func relaunch() {
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.createsNewApplicationInstance = true
+    let bundle = Bundle.main.bundleURL
+    NSWorkspace.shared.openApplication(at: bundle, configuration: configuration) { _, error in
+      Task { @MainActor in
+        if let error {
+          Self.log.error("relaunching failed: \(error, privacy: .public)")
+        } else {
+          NSApplication.shared.terminate(nil)
+        }
+      }
+    }
   }
 
   public func copy(_ text: String) {

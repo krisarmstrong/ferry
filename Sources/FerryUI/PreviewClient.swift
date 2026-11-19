@@ -64,6 +64,8 @@ private final class PreviewServices: SystemServicing {
   func open(_ url: URL) {}
   func reveal(_ urls: [URL]) {}
   func quit() {}
+  func appWasReplaced() -> Bool { false }
+  func relaunch() {}
   func copy(_ text: String) {}
   func chooseAPK() async -> URL? { nil }
   func captureFolders() -> [URL] { [] }

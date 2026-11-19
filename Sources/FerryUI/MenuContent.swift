@@ -29,6 +29,9 @@ public struct MenuContent: View {
       if model.agent == .unreachable {
         HelperRow(status: model.helper) { model.openLoginItems() }
       }
+      if model.agent == .replaced {
+        ReplacedRow { model.relaunch() }
+      }
       if model.showsTurnOnRow {
         TurnOnRow { model.turnOnInFinder() }
       }
@@ -96,7 +99,8 @@ public struct MenuContent: View {
           .font(.callout)
           .foregroundStyle(.secondary)
       }
-      if let error = model.actionError {
+      // Once the agent refuses this copy every action fails the same way: the row says why.
+      if let error = model.actionError, model.agent != .replaced {
         Text(verbatim: error)
           .font(.callout)
           .foregroundStyle(.red)
@@ -205,6 +209,26 @@ private struct HelperRow: View {
         Button(action: openSettings) {
           Text("Open System Settings", bundle: .module)
         }
+      }
+    }
+  }
+}
+
+/// Ferry was updated while it ran, and the new agent refuses this copy: reopening runs the new
+/// one.
+private struct ReplacedRow: View {
+  let relaunch: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label {
+        Text("Ferry was updated. Quit and reopen Ferry.", bundle: .module)
+      } icon: {
+        Image(systemName: "arrow.clockwise.circle")
+          .foregroundStyle(.yellow)
+      }
+      Button(action: relaunch) {
+        Text("Relaunch", bundle: .module)
       }
     }
   }

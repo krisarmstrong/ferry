@@ -308,6 +308,8 @@ final class FakeServices: SystemServicing {
   var loginItem = true
   var failLoginItem = false
   var helper = HelperStatus.allowed
+  /// Whether the app's executable was replaced since launch.
+  var replaced = false
 
   init(log: CallLog) {
     self.log = log
@@ -347,6 +349,9 @@ final class FakeServices: SystemServicing {
   func quit() {
     log.record("quit")
   }
+
+  func appWasReplaced() -> Bool { replaced }
+  func relaunch() { log.record("relaunch") }
 
   func copy(_ text: String) {
     log.record("copy \(text)")

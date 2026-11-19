@@ -52,6 +52,13 @@ public struct SettingsView: View {
           Text(verbatim: error)
             .foregroundStyle(.red)
         }
+        if model.agent == .replaced {
+          Button {
+            model.relaunch()
+          } label: {
+            Text("Relaunch", bundle: .module)
+          }
+        }
       }
     }
     .formStyle(.grouped)
