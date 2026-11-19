@@ -127,7 +127,7 @@
     "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device." : {
       "extractionState" : "manual"
     },
-    "A device whose screen is off sends a black screenshot, and a recording of a screen that does not change has a single frame." : {
+    "Ferry turns the device's screen on before a screenshot or a recording, so a screen that was off is not captured black. A recording of a screen that does not change has a single frame." : {
       "extractionState" : "manual"
     },
     "A file changed on both sides" : {

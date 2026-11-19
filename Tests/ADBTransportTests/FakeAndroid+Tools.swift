@@ -31,6 +31,15 @@ extension FakeAndroid {
     var logcatEnds = false
     /// What `dumpsys battery` prints; `nil` is a device with no battery service.
     var battery: String?
+    /// Whether `dumpsys power` reports the display on.
+    var displayOn = true
+    /// After `input keyevent KEYCODE_WAKEUP`, the display comes on once `dumpsys power` has been
+    /// read this many times; `nil` never.
+    var displayOnAfterPolls: Int?
+    /// Whether `input` refuses the key.
+    var wakeRefused = false
+    /// `dumpsys power` reads since the last wake key.
+    var powerPolls = 0
     /// The adb server's forwards, for every device it has, as `list-forward` lists them.
     var forwards: [Forward] = []
     /// Local ports the server cannot bind.
@@ -248,8 +257,26 @@ extension FakeAndroid {
     return state.tools.pmResult
   }
 
-  /// `dumpsys battery`, or what a device without the service says.
-  static func dumpsys(_ operands: [String], in state: State) -> ShellResult {
+  /// `input keyevent KEYCODE_WAKEUP`: wakes the display after `displayOnAfterPolls` reads.
+  static func input(_ operands: [String], in state: inout State) -> ShellResult {
+    guard operands == ["keyevent", "KEYCODE_WAKEUP"], !state.tools.wakeRefused else {
+      return ShellResult(status: 1, stderr: "Error: Unknown command\n")
+    }
+    state.tools.powerPolls = 0
+    return ShellResult()
+  }
+
+  /// `dumpsys power`, `dumpsys battery`, or what a device without the service says.
+  static func dumpsys(_ operands: [String], in state: inout State) -> ShellResult {
+    if operands == ["power"] {
+      state.tools.powerPolls += 1
+      if let after = state.tools.displayOnAfterPolls, state.tools.powerPolls >= after {
+        state.tools.displayOn = true
+      }
+      let display = state.tools.displayOn ? "ON" : "OFF"
+      return ShellResult(
+        stdout: "Power Manager State:\n  mDirty=0x0\nDisplay Power: state=\(display)\n")
+    }
     guard operands == ["battery"], let battery = state.tools.battery else {
       return ShellResult(status: 20, stderr: "Can't find service: \(operands.first ?? "")\n")
     }

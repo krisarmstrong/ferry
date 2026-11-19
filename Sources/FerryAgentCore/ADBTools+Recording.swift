@@ -35,6 +35,7 @@ extension ADBTools {
       return .failed(.notOverADB)
     }
     recordings[id]?.route = route
+    _ = await device.wakeScreen(route: route)
     await journal.note(recording.path, on: id)
     let control: any ScreenRecordingControl
     do throws(ADBError) {

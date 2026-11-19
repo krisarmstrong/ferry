@@ -16,6 +16,9 @@ public protocol ADBToolDevice: Sendable {
   func recordScreen(route: ADBRoute, to path: String) async throws(ADBError)
     -> any ScreenRecordingControl
   func removeTemporary(_ path: String, route: ADBRoute) async -> Bool
+  /// Turns the display on, waiting a short while for it; whether it came on. Never throws: a
+  /// capture goes ahead either way.
+  func wakeScreen(route: ADBRoute) async -> Bool
   func logcat(route: ADBRoute) async throws(ADBError) -> any LogcatSource
   func deviceInfo(route: ADBRoute) async throws(ADBError) -> AndroidDeviceInfo
   func forwards(route: ADBRoute) async throws(ADBError) -> [PortForward]
@@ -240,6 +243,8 @@ public actor ADBTools {
   public func screenshot(_ id: DeviceID, into file: Int32) async throws(TransportError) -> Outcome {
     try FileTransfer.requireRegular(file)
     guard let route = await target(id) else { return .failed(.notOverADB) }
+    // A unit whose display is off captures black.
+    _ = await device.wakeScreen(route: route)
     let image: Data
     do throws(ADBError) {
       image = try await device.screenshot(route: route)

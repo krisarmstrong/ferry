@@ -16,6 +16,10 @@ actor FakeToolDevice: ADBToolDevice {
   }
 
   private(set) var installs: [Install] = []
+  /// Wakes, screenshots and recordings started, in order, as `<what> <serial>`.
+  private(set) var order: [String] = []
+  /// Whether the display came on when woken.
+  var wakes = true
   private(set) var screenshots: [String] = []
   private(set) var recordingsStarted: [(serial: String, path: String)] = []
   /// Every `removeTemporary`, in order.
@@ -59,6 +63,7 @@ actor FakeToolDevice: ADBToolDevice {
   func screenshot(route: ADBRoute) async throws(ADBError) -> Data {
     if let failure { throw failure }
     screenshots.append(route.serial)
+    order.append("screenshot \(route.serial)")
     return image
   }
 
@@ -68,7 +73,13 @@ actor FakeToolDevice: ADBToolDevice {
     await onCreate?(path)
     if let failure { throw failure }
     recordingsStarted.append((route.serial, path))
+    order.append("record \(route.serial)")
     return recording
+  }
+
+  func wakeScreen(route: ADBRoute) async -> Bool {
+    order.append("wake \(route.serial)")
+    return wakes
   }
 
   func removeTemporary(_ path: String, route: ADBRoute) async -> Bool {

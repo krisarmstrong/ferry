@@ -86,6 +86,17 @@ struct ADBToolsTests {
     #expect(try agentCopies().isEmpty)
   }
 
+  /// A unit whose display is off captures black, so the screen is woken first; one that stays
+  /// dark is captured anyway.
+  @Test(arguments: [true, false])
+  func theScreenIsWokenBeforeTheScreenshot(wakes: Bool) async throws {
+    let fake = FakeToolDevice()
+    await fake.set { $0.wakes = wakes }
+    let (_, handle) = try destination()
+    #expect(try await makeTools(fake).screenshot(device, into: handle.fileDescriptor) == .done)
+    #expect(await fake.order == ["wake \(serial)", "screenshot \(serial)"])
+  }
+
   /// adbd's `exec:` carries stderr with the image: text before the PNG signature is dropped.
   @Test func textBeforeTheImageIsDropped() async throws {
     let fake = FakeToolDevice()

@@ -109,6 +109,16 @@ struct ADBToolsRecordingTests {
     #expect(await fake.recording.interrupts == 0)
   }
 
+  /// The screen is woken before the recording starts, and recorded whether or not it came on.
+  @Test(arguments: [true, false])
+  func theScreenIsWokenBeforeTheRecording(wakes: Bool) async throws {
+    let fake = FakeToolDevice()
+    await fake.set { $0.wakes = wakes }
+    await fake.recording.end()
+    _ = try await makeTools(fake).startRecording(device)
+    #expect(await fake.order == ["wake \(serial)", "record \(serial)"])
+  }
+
   /// One that outlives its limit is stopped by Ferry, and closed if SIGINT does not end it.
   @Test func aRecordingPastItsLimitIsStoppedThenClosed() async throws {
     let fake = FakeToolDevice()
