@@ -69,16 +69,6 @@ actor FakeAgent: AgentSending {
     self.contents = contents
   }
 
-  /// The identifier of the item at `path`.
-  func id(_ path: RemotePath) throws -> ItemID {
-    try #require(paths.first { $0.value == path }?.key)
-  }
-
-  /// The identifier FileProvider has for the item at `path`.
-  func identifier(_ path: RemotePath) throws -> NSFileProviderItemIdentifier {
-    NSFileProviderItemIdentifier(try id(path))
-  }
-
   private func changeReply(_ since: Data?) -> AgentResponse {
     switch since {
     case nil:
@@ -157,7 +147,8 @@ actor FakeAgent: AgentSending {
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
       .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
       .installAPK, .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording,
-      .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward, .deviceInfo, .shellTarget:
+      .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward, .deviceInfo, .shellTarget,
+      .sendFile:
       throw .unsupported("\(request)")
     }
   }
@@ -321,6 +312,16 @@ actor FakeAgent: AgentSending {
 // MARK: Test controls
 
 extension FakeAgent {
+  /// The identifier of the item at `path`.
+  func id(_ path: RemotePath) throws -> ItemID {
+    try #require(paths.first { $0.value == path }?.key)
+  }
+
+  /// The identifier FileProvider has for the item at `path`.
+  func identifier(_ path: RemotePath) throws -> NSFileProviderItemIdentifier {
+    NSFileProviderItemIdentifier(try id(path))
+  }
+
   func set(failure: TransportError?, thrown: TransportError? = nil) {
     self.failure = failure
     self.thrown = thrown

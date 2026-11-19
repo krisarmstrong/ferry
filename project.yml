@@ -68,6 +68,8 @@ targets:
           destination: executables
       - target: FerryProvider
         embed: true
+      - target: FerrySync
+        embed: true
 
   FerryAgent:
     type: tool
@@ -119,6 +121,27 @@ targets:
         product: FerryIPC
       - package: Ferry
         product: DeviceKit
+
+  # The Finder menu: Send to <device> and Install on <device>. Sandboxed; it talks only to the
+  # agent, which admits it in its own role (see ClientRole.finderSync).
+  FerrySync:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Apps/FerrySync
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.krisarmstrong.ferry.sync
+        PRODUCT_NAME: FerrySync
+        INFOPLIST_FILE: Apps/FerrySync/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/FerrySync/FerrySync.entitlements
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: Ferry
+        product: FerrySyncCore
+      - package: Ferry
+        product: FerryIPC
+      - sdk: FinderSync.framework
 
 schemes:
   Ferry:

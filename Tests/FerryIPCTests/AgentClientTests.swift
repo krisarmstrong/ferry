@@ -238,6 +238,22 @@ func theProviderMaySendOnlyItemRequests() async throws {
   }
 }
 
+/// Over a real connection, the Finder Sync extension's other requests are refused before any
+/// handler runs.
+@Test(.timeLimit(.minutes(1)))
+func theFinderExtensionMayNotSendOtherRequests() async throws {
+  let harness = Harness(role: .finderSync)
+  defer { harness.finish() }
+  for request: AgentRequest in [
+    .list(domain: "d", folder: .root), .eject(DeviceID(serial: "A")), .removeAllDomains,
+    .screenshot(DeviceID(serial: "A")), .deviceInfo(DeviceID(serial: "A")),
+  ] {
+    #expect(
+      try await harness.client.send(request, file: nil) == .failure(.io("request not allowed")),
+      "\(request)")
+  }
+}
+
 @Test(.timeLimit(.minutes(1)))
 func theAppMayNotSendItemRequests() async throws {
   let harness = Harness(role: .app)

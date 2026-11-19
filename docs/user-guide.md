@@ -200,6 +200,34 @@ and you then save your version from the Mac, Ferry keeps the device's version an
 beside it as **name (conflict from Mac)**, for example `report (conflict from Mac).txt`. Finder
 then shows the device's version under the original name. Nothing is overwritten.
 
+### Send to a device from Finder
+
+Control-click files anywhere on the Mac and choose **Send to** and the device (for example
+**Send to LinkRunner 10G**). Ferry copies them into the `Download` folder on the device's
+internal storage, and makes that folder if the device has none. Ferry's button in the Finder
+toolbar has the same menu: add it with **View** → **Customize Toolbar**. With no device
+connected, the menu says **No device connected**.
+
+Sending never replaces a file. If `Download` already has one with the same name, Ferry keeps it
+and saves yours beside it as **name (conflict from Mac)**, as for a file changed on both sides.
+
+Only files can be sent this way. A folder shows "Folders can't be sent from this menu. Copy the
+folder into the device's location in Finder, or compress it into a .zip first." A package, such
+as an `.rtfd` document or an app, and a symbolic link or alias are refused with the same
+messages Finder shows when you copy them to the device.
+
+When every selected file is an `.apk` and the device is on USB debugging, the menu also has
+**Install on** the device. It installs each app as **Install App…** in the menu does.
+
+Finder shows no progress for these. A notification says when the files are on the device or
+the apps are installed, or why not. The Ferry menu lists a send in progress under its device.
+
+To turn on the Finder menu, once:
+
+1. Open System Settings, then **General** → **Login Items & Extensions**.
+2. Under Extensions, click the info button next to **Finder**.
+3. Turn on **Ferry**.
+
 ### Large files
 
 Files larger than 4 GB copy normally to internal storage. Many SD cards use a format (FAT32)
@@ -449,5 +477,3 @@ Do step 1 first. It is the step that removes the Finder locations and stops the 
 
 - **Pair and connect over Wi-Fi from Ferry**: today Ferry uses network devices that adb
   already lists.
-- **Send to device** in Finder: send selected files to a connected device from the
-  Control-click menu.

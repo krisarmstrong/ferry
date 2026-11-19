@@ -14,7 +14,8 @@ struct FerryIdentityTests {
       identity.clientRequirement == """
         anchor apple generic and certificate leaf[subject.OU] = "ABCDE12345" and \
         (identifier "io.github.krisarmstrong.ferry" or \
-        identifier "io.github.krisarmstrong.ferry.provider")
+        identifier "io.github.krisarmstrong.ferry.provider" or \
+        identifier "io.github.krisarmstrong.ferry.sync")
         """)
     #expect(
       identity.agentRequirement == """

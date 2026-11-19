@@ -31,12 +31,13 @@ public struct FerryIdentity: Sendable, Equatable {
 
   public var machServiceName: String { "\(teamID).io.github.krisarmstrong.ferry.agent" }
 
-  /// Admits only the Ferry app and its FileProvider extension, signed by this team.
+  /// Admits only the Ferry app and its extensions, signed by this team.
   public var clientRequirement: String {
     """
     anchor apple generic and certificate leaf[subject.OU] = "\(teamID)" and \
     (identifier "io.github.krisarmstrong.ferry" or \
-    identifier "io.github.krisarmstrong.ferry.provider")
+    identifier "io.github.krisarmstrong.ferry.provider" or \
+    identifier "io.github.krisarmstrong.ferry.sync")
     """
   }
 
@@ -58,24 +59,31 @@ public struct FerryIdentity: Sendable, Equatable {
 }
 
 /// Which Ferry process a connection to the agent comes from. Each may send only the requests it
-/// needs: the app manages devices and domains, the FileProvider extension works on items.
+/// needs: the app manages devices and domains, the FileProvider extension works on items, and
+/// the Finder Sync extension lists devices, sends files to them and installs apps.
 public enum ClientRole: Sendable, CaseIterable {
   case app
   case provider
+  case finderSync
 
   var signingIdentifier: String {
     switch self {
     case .app: "io.github.krisarmstrong.ferry"
     case .provider: "io.github.krisarmstrong.ferry.provider"
+    case .finderSync: "io.github.krisarmstrong.ferry.sync"
     }
   }
 
   /// Whether a client in this role may send `request`.
   public func allows(_ request: AgentRequest) -> Bool {
     switch request {
-    case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
+    case .status, .installAPK:
+      self == .app || self == .finderSync
+    case .sendFile:
+      self == .finderSync
+    case .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
       .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
-      .installAPK, .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording,
+      .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording,
       .startLogcat, .stopLogcat, .forwards, .addForward, .removeForward, .deviceInfo, .shellTarget:
       self == .app
     case .item, .list, .fetch, .create, .rename, .move, .replaceContents, .delete, .changes,

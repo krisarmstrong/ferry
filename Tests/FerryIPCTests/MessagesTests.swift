@@ -47,10 +47,12 @@ private func tag(_ request: AgentRequest) -> Int {
   case .removeForward: 33
   case .deviceInfo: 34
   case .shellTarget: 35
+  case .sendFile: 36
   }
 }
 
-private func requests() -> [AgentRequest] {
+/// One of each request, for tests that check every case.
+func requests() -> [AgentRequest] {
   let photo = ItemID.random()
   let camera = ItemID.random()
   var all: [AgentRequest] = [
@@ -83,6 +85,7 @@ private func requests() -> [AgentRequest] {
     .stopRecording(device), .saveRecording(device), .discardRecording(device),
   ]
   all += developerRequests()
+  all.append(.sendFile(device, name: "Report.pdf"))
   return all
 }
 
@@ -260,7 +263,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...35))
+  #expect(Set(requests().map(tag)) == Set(0...36))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }

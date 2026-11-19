@@ -14,6 +14,11 @@ extension DomainController {
     await manager.providerState()
   }
 
+  /// The connected domain of `storage`, if it has one.
+  func connectedDomain(of storage: StorageID) -> String? {
+    domains.first { $0.value.connected && $0.value.storage == storage }?.key
+  }
+
   /// The domain's item table, for a request that does not touch the device. Waits, and fails,
   /// as `route(_:)` does.
   func items(of domain: String) async throws(TransportError) -> ItemTable {

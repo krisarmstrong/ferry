@@ -7,15 +7,15 @@ import Foundation
 enum ConflictCopy {
   /// Uploads `scratch` beside `path` under the first free conflict name.
   static func upload(
-    _ scratch: URL, beside path: RemotePath, _ route: DomainController.Route
+    _ scratch: URL, beside path: RemotePath, _ route: DomainController.Route,
+    progress: @escaping ProgressHandler = AgentService.ignoreProgress
   ) async throws(TransportError) -> RemoteItem {
     let (parent, name) = (path.parent ?? .root, path.name ?? "")
     for attempt in 1...maxAttempts {
       let copy = try parent.appending(self.name(for: name, attempt: attempt))
       do {
         return try await route.writer.write(
-          from: scratch, to: copy, in: route.storage, replacing: false,
-          progress: AgentService.ignoreProgress)
+          from: scratch, to: copy, in: route.storage, replacing: false, progress: progress)
       } catch .alreadyExists where attempt < maxAttempts {
         continue
       }

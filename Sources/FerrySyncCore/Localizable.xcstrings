@@ -1,0 +1,325 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Couldn’t install %lld apps on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t install %1$lld apps on %2$@"
+          }
+        }
+      }
+    },
+    "Couldn’t install “%@” on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t install “%1$@” on %2$@"
+          }
+        }
+      }
+    },
+    "Couldn’t send %lld files to %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t send %1$lld files to %2$@"
+          }
+        }
+      }
+    },
+    "Couldn’t send “%@” to %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t send “%1$@” to %2$@"
+          }
+        }
+      }
+    },
+    "Download already had a file with that name, so it’s there as “%@”." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download already had a file with that name, so it’s there as “%@”."
+          }
+        }
+      }
+    },
+    "Folders can’t be sent from this menu. Copy the folder into the device’s location in Finder, or compress it into a .zip first." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folders can’t be sent from this menu. Copy the folder into the device’s location in Finder, or compress it into a .zip first."
+          }
+        }
+      }
+    },
+    "Install on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install on %@"
+          }
+        }
+      }
+    },
+    "Installed %lld apps on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed %1$lld apps on %2$@"
+          }
+        }
+      }
+    },
+    "Installed %lld of %lld on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed %1$lld of %2$lld on %3$@"
+          }
+        }
+      }
+    },
+    "Installed “%@” on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed “%1$@” on %2$@"
+          }
+        }
+      }
+    },
+    "It’s in Download." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s in Download."
+          }
+        }
+      }
+    },
+    "No device connected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No device connected"
+          }
+        }
+      }
+    },
+    "Only files can be sent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only files can be sent."
+          }
+        }
+      }
+    },
+    "Packages and app bundles can’t be copied to the device. Compress it into a .zip first." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
+          }
+        }
+      }
+    },
+    "Select files to send" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select files to send"
+          }
+        }
+      }
+    },
+    "Send selected files to a device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send selected files to a device"
+          }
+        }
+      }
+    },
+    "Send to %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to %@"
+          }
+        }
+      }
+    },
+    "Sent %lld files to %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sent %1$lld files to %2$@"
+          }
+        }
+      }
+    },
+    "Sent %lld of %lld to %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sent %1$lld of %2$lld to %3$@"
+          }
+        }
+      }
+    },
+    "Sent “%@” to %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sent “%1$@” to %2$@"
+          }
+        }
+      }
+    },
+    "Symbolic links and aliases can’t be copied to the device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Symbolic links and aliases can’t be copied to the device."
+          }
+        }
+      }
+    },
+    "The device can’t store a file with that name." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device can’t store a file with that name."
+          }
+        }
+      }
+    },
+    "The device doesn’t have enough free space." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device doesn’t have enough free space."
+          }
+        }
+      }
+    },
+    "The file can’t be read." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file can’t be read."
+          }
+        }
+      }
+    },
+    "The file is too large for the device’s storage." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file is too large for the device’s storage."
+          }
+        }
+      }
+    },
+    "They’re in Download." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "They’re in Download."
+          }
+        }
+      }
+    },
+    "This Mac doesn’t have enough free space to copy the file." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac doesn’t have enough free space to copy the file."
+          }
+        }
+      }
+    },
+    "“%@” wasn’t installed. %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” wasn’t installed. %2$@"
+          }
+        }
+      }
+    },
+    "“%@” wasn’t sent. %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” wasn’t sent. %2$@"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

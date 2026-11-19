@@ -12,6 +12,7 @@ let package = Package(
     .library(name: "FerryAgentCore", targets: ["FerryAgentCore"]),
     .library(name: "FerryIPC", targets: ["FerryIPC"]),
     .library(name: "FerryProviderCore", targets: ["FerryProviderCore"]),
+    .library(name: "FerrySyncCore", targets: ["FerrySyncCore"]),
     .library(name: "FerryUI", targets: ["FerryUI"]),
     .library(name: "MTPTransport", targets: ["MTPTransport"]),
   ],
@@ -28,6 +29,9 @@ let package = Package(
       name: "FerryAgentCore", dependencies: ["ADBTransport", "DeviceKit", "FerryIPC", "MTPTransport"]),
     .target(name: "FerryIPC", dependencies: ["DeviceKit"]),
     .target(name: "FerryProviderCore", dependencies: ["DeviceKit", "FerryIPC"]),
+    .target(
+      name: "FerrySyncCore", dependencies: ["DeviceKit", "FerryIPC", "FerryUI"],
+      resources: [.process("Localizable.xcstrings")]),
     .target(
       name: "FerryUI", dependencies: ["DeviceKit", "FerryIPC"],
       resources: [.process("Localizable.xcstrings"), .process("help.json")]),
@@ -53,6 +57,9 @@ let package = Package(
     .testTarget(
       name: "FerryProviderCoreTests",
       dependencies: ["FerryProviderCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),
+    .testTarget(
+      name: "FerrySyncCoreTests",
+      dependencies: ["FerrySyncCore", "FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),
     .testTarget(
       name: "FerryUITests",
       dependencies: ["FerryUI", "FerryIPC", "DeviceKit", "DeviceKitTestSupport"]),

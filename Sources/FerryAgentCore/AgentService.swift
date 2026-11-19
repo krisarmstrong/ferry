@@ -24,8 +24,8 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 ///
 /// A request keeps running if its client goes away; its reply is then dropped.
 public actor AgentService: AgentHandling {
-  private let hub: DeviceHub
-  private let domains: DomainController
+  let hub: DeviceHub
+  let domains: DomainController
   let transfers = TransferBoard()
   /// Where the agent keeps its scratch copies of clients' files (see `FileTransfer`).
   let scratchFolder: URL
@@ -104,13 +104,15 @@ public actor AgentService: AgentHandling {
         expired: changes.expired)
     case (.workingSet(let domain, let page), _):
       return try await workingSet(page, in: domain)
+    case (.sendFile(let id, let name), let file?):
+      return .entry(try await send(file, as: name, to: id, progress: progress))
     case (.fetch, nil), (.replaceContents, nil), (.status, _), (.recheck, _), (.recheckADB, _),
       (.refresh, _), (.eject, _), (.removeAllDomains, _), (.connectAddress, _), (.pair, _),
       (.connectWireless, _), (.enableWireless, _), (.forgetWireless, _), (.confirmWireless, _),
       (.ignoreWireless, _), (.installAPK, _), (.screenshot, _), (.startRecording, _),
       (.stopRecording, _), (.saveRecording, _), (.discardRecording, _), (.startLogcat, _),
       (.stopLogcat, _), (.forwards, _), (.addForward, _), (.removeForward, _), (.deviceInfo, _),
-      (.shellTarget, _):
+      (.shellTarget, _), (.sendFile, nil):
       throw .io("bad request")
     }
   }

@@ -240,6 +240,11 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   case deviceInfo(DeviceID)
   /// The `adb` and serial for a shell in Terminal. Answered with `.shellTarget`.
   case shellTarget(DeviceID)
+  /// Copies the readable file sent with the request into `Download/` on the device's internal
+  /// storage as `name`, for Send to <device> in Finder. A name the folder already has is never
+  /// written over: the file goes beside it as a conflict copy. Answered with `.entry`, whose
+  /// name is the one the file got.
+  case sendFile(DeviceID, name: String)
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
   /// device reach Finder.
   case refresh(DeviceID)
