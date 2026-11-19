@@ -6,7 +6,7 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 // MARK: The user's requests
 
 extension DeviceHub {
-  /// The user's Try Again: re-reads a held device's storages, for instance after file transfer
+  /// The user's Check Again: re-reads a held device's storages, for instance after file transfer
   /// was turned on. A device the hub does not hold (busy, failed, not sharing, ejected) is
   /// offered to the transport again and the bus scanned.
   public func recheck(_ id: DeviceID) async {

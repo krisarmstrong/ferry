@@ -330,7 +330,7 @@ it. One device is open at a time; the first ready one is open when the menu open
 | **Not sharing files** | The device is connected but file transfer is off or it is locked. Click **How to Turn On File Transfer** for the steps. |
 | **Ejected** | You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in. |
 | **In use by another app** | Another app has the device. Quit it, then click **Check Again**. See [Troubleshooting](#in-use-by-another-app). |
-| **Can't open** | The device reported an error, shown under its name. Click **Check Again**, or unplug it and plug it back in. |
+| **Can't open** | The device reported an error, shown when you click it. Click **Check Again**, or unplug it and plug it back in. |
 
 Above the devices, the menu can also show:
 

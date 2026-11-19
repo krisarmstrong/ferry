@@ -78,7 +78,7 @@ public actor DeviceHub {
   struct Backoff {
     var delay: Duration
     var waiting: Bool
-    /// The wait this entry is for, so a wait from before a Try Again cannot end a later one.
+    /// The wait this entry is for, so a wait from before a Check Again cannot end a later one.
     let token: UInt64
   }
 
