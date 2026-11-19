@@ -405,10 +405,10 @@ Click **Take Screenshot** to save what the device's screen shows. Click **Record
 record it, for up to three minutes; the menu shows how long it has been recording, and **Stop
 Recording** ends it.
 
-Ferry saves them where macOS saves its own screenshots (the Desktop, unless you chose another
-folder in the Screenshot app), named like macOS's own, such as
-`Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png`, and shows them in Finder. It never
-replaces a file. A recording waits on the device until Ferry has saved it, even if you quit
+Ferry saves them in `Documents/Ferry/<device>/`, screenshots in `Screenshots` and recordings in
+`Screen Recordings`, named like macOS's own, such as
+`Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png`, and shows them in Finder. macOS asks
+whether Ferry may use Documents the first time it saves one. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit
 Ferry meanwhile; Ferry then removes it from the device.
 
 If Ferry can't save a recording, the menu shows **Recording couldn't be saved**:
@@ -416,8 +416,8 @@ If Ferry can't save a recording, the menu shows **Recording couldn't be saved**:
 **Record Screen** returns once it is saved or discarded. An ejected device keeps its recording
 until Ferry serves it again.
 
-A device whose screen is off sends a black screenshot, and a recording of a screen that does not
-change has a single frame.
+Ferry turns the device's screen on before a screenshot or a recording, so a screen that was off
+is not captured black. A recording of a screen that does not change has a single frame.
 
 ### Logcat
 
