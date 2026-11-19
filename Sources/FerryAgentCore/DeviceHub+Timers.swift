@@ -7,7 +7,7 @@ extension DeviceHub {
   func scheduleRescan(after delay: Duration?) {
     rescan?.cancel()
     rescan = delay.map { delay in
-      Task { [weak self, clock] in
+      requestFreeTask { [weak self, clock] in
         do {
           try await clock.sleep(for: delay)
         } catch {
@@ -28,7 +28,7 @@ extension DeviceHub {
     generations += 1
     let token = generations
     backoff[id] = Backoff(delay: delay, waiting: true, token: token)
-    Task { [weak self, clock] in
+    requestFreeTask { [weak self, clock] in
       do {
         try await clock.sleep(for: delay)
       } catch {
@@ -59,7 +59,7 @@ extension DeviceHub {
   func updatePolling() {
     let waiting = !waitingIDs.isEmpty
     if waiting, poller == nil {
-      poller = Task { [weak self, clock] in
+      poller = requestFreeTask { [weak self, clock] in
         while !Task.isCancelled {
           do {
             try await clock.sleep(for: Self.recheckInterval)

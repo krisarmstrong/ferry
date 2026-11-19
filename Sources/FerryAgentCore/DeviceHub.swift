@@ -127,7 +127,7 @@ public actor DeviceHub {
     (events, continuation) = AsyncStream.makeStream(of: HubEvent.self)
     self.transport = transport
     self.clock = clock
-    Task { [weak self] in
+    requestFreeTask { [weak self] in
       await self?.reconcile()
       await self?.markScanned()
       for await _ in arrivals {
@@ -206,7 +206,7 @@ public actor DeviceHub {
   /// Reconciles run one at a time, in the order they were asked for.
   func reconcile() async {
     let previous = lastReconcile
-    let current = Task { [weak self] in
+    let current = requestFreeTask { [weak self] in
       await previous?.value
       await self?.refresh()
     }
@@ -301,7 +301,7 @@ public actor DeviceHub {
   /// does not hold up other devices.
   private func probe(_ id: DeviceID) {
     guard probing.insert(id).inserted else { return }
-    Task { [weak self] in
+    requestFreeTask { [weak self] in
       await self?.recheckHeld(id)
       await self?.probed(id)
     }

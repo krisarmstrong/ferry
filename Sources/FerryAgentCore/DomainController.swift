@@ -204,11 +204,11 @@ public actor DomainController {
   /// and `links` happens inside one of these operations.
   func serially<T: Sendable>(_ work: @escaping @Sendable () async -> T) async -> T {
     let previous = tail
-    let current = Task {
+    let current = requestFreeTask {
       await previous?.value
       return await work()
     }
-    tail = Task { _ = await current.value }
+    tail = requestFreeTask { _ = await current.value }
     defer { if adopted { publishLocations() } }
     return await current.value
   }

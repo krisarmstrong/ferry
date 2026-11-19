@@ -131,7 +131,7 @@ extension DeviceHub {
   func beginSwap(_ id: DeviceID, to target: SwapTarget) {
     guard swapping.insert(id).inserted else { return }
     log.info("device \(id.serial, privacy: .private) moving to \(target.name, privacy: .public)")
-    Task { [weak self] in
+    requestFreeTask { [weak self] in
       await self?.swap(id, to: target)
     }
   }
@@ -148,7 +148,7 @@ extension DeviceHub {
       if let listing {
         store(listing.info, listing.state, .unheld, method: listing.method)
         // The listing is from before the drain, which can be long: what is attached now decides.
-        Task { [weak self] in await self?.reconcile() }
+        requestFreeTask { [weak self] in await self?.reconcile() }
       } else {
         drop(id)
       }
@@ -217,7 +217,7 @@ extension DeviceHub {
     generations += 1
     let token = generations
     swapHolds[id] = Backoff(delay: delay, waiting: true, token: token)
-    Task { [weak self, clock] in
+    requestFreeTask { [weak self, clock] in
       do {
         try await clock.sleep(for: delay)
       } catch {
@@ -270,12 +270,12 @@ extension DeviceHub {
   func drop(_ id: DeviceID) {
     entries[id] = nil
     if let session = kept.removeValue(forKey: id) {
-      Task { await session.close() }
+      requestFreeTask { await session.close() }
     }
     updatePolling()
     log.info("device \(id.serial, privacy: .private) detached")
     continuation.yield(.detached(id))
-    Task { [weak self] in await self?.reconcile() }
+    requestFreeTask { [weak self] in await self?.reconcile() }
   }
 }
 
