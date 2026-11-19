@@ -274,9 +274,14 @@ public actor WirelessADB {
     }
   }
 
-  /// Forgets every remembered device, as Remove Ferry does.
+  /// Forgets every remembered device, and withdraws every address waiting for the user, as
+  /// Remove Ferry does. A device remembered meanwhile (a connect queued behind a forget) is
+  /// forgotten too: it repeats until nothing is left.
   public func forgetAll() async {
-    for id in entries.keys.sorted(by: { $0.serial < $1.serial }) { await forget(id) }
+    repeat {
+      while let id = entries.keys.min(by: { $0.serial < $1.serial }) { await forget(id) }
+      await gate.run { unconfirmedAddresses = [:] }
+    } while !entries.isEmpty
   }
 
   /// Forgets the device and revokes everything under way for it: disconnects adb from its

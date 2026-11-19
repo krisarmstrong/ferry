@@ -43,6 +43,9 @@ actor FakeWirelessADB: WirelessADBControl {
   var nameless: Set<String> = []
   /// Runs while the identity of an adb serial is read: what a scan would see then.
   var whileIdentifying: (@Sendable (String) -> Void)?
+  /// Set by `holdDisconnects()`: each disconnect waits, once recorded, for `releaseDisconnects()`.
+  private var disconnectsHeld = false
+  private var heldDisconnects: [CheckedContinuation<Void, Never>] = []
   private(set) var inFlight = 0
   private(set) var maxInFlight = 0
   private let events: AsyncStream<ADBServerEvent>
@@ -93,7 +96,20 @@ actor FakeWirelessADB: WirelessADBControl {
   func disconnect(_ endpoint: WirelessEndpoint) async throws(ADBError) {
     try requireServer()
     calls.append(.disconnect(endpoint.argument))
+    if disconnectsHeld {
+      await withCheckedContinuation { heldDisconnects.append($0) }
+    }
     listed[endpoint.argument] = nil
+  }
+
+  func holdDisconnects() {
+    disconnectsHeld = true
+  }
+
+  func releaseDisconnects() {
+    disconnectsHeld = false
+    for held in heldDisconnects { held.resume() }
+    heldDisconnects = []
   }
 
   func pair(_ endpoint: WirelessEndpoint, code: PairingCode) async throws(ADBError)
