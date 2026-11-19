@@ -61,11 +61,16 @@ public final class SystemServices: SystemServicing {
   /// Where `SMAppService.agent(plistName:)` finds the agent, in `Contents/Library/LaunchAgents`.
   private nonisolated static let agentPlist = "io.github.krisarmstrong.ferry.agent.plist"
 
-  /// The executable this process launched from, and which file it was then.
-  private let executable = Bundle.main.executableURL
-  private let launchedFrom = Bundle.main.executableURL.flatMap(ExecutableIdentity.init(of:))
+  /// The app's executable and its bundle's seal, and which files they were at launch.
+  private let bundleFiles = [
+    Bundle.main.executableURL,
+    Bundle.main.bundleURL.appending(path: "Contents/_CodeSignature/CodeResources"),
+  ].compactMap { $0 }
+  private let launchedFrom: BundleFingerprint
 
-  public init() {}
+  public init() {
+    launchedFrom = BundleFingerprint(of: bundleFiles)
+  }
 
   public func registerAgent() async {
     await Task.detached(priority: .utility) {
@@ -125,8 +130,7 @@ public final class SystemServices: SystemServicing {
   }
 
   public func appWasReplaced() -> Bool {
-    guard let executable, let launchedFrom else { return false }
-    return ExecutableIdentity(of: executable) != launchedFrom
+    BundleFingerprint(of: bundleFiles) != launchedFrom
   }
 
   /// Opens a new instance from the bundle, which runs the updated code, then quits this one.

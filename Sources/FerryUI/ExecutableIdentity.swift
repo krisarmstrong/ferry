@@ -25,3 +25,14 @@ struct ExecutableIdentity: Equatable {
       && lhs.modified.tv_sec == rhs.modified.tv_sec && lhs.modified.tv_nsec == rhs.modified.tv_nsec
   }
 }
+
+/// Which files are at a bundle's key paths, by `ExecutableIdentity`; a missing file counts too.
+/// The executable alone is not enough: an update that changes only the agent or a resource
+/// leaves it as it was, but changes the bundle's seal (`_CodeSignature/CodeResources`).
+struct BundleFingerprint: Equatable {
+  private let files: [ExecutableIdentity?]
+
+  init(of files: [URL]) {
+    self.files = files.map(ExecutableIdentity.init(of:))
+  }
+}

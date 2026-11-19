@@ -76,4 +76,20 @@ struct ExecutableIdentityTests {
     let folder = try TestScratch.folder("identity")
     #expect(ExecutableIdentity(of: folder.appending(path: "gone")) == nil)
   }
+
+  /// An update that changes only the agent or a resource leaves the app's executable alone but
+  /// changes the bundle's seal, and the new agent refuses the app all the same.
+  @Test func aBundleWhoseSealChangedIsAnother() throws {
+    let folder = try TestScratch.folder("identity")
+    let executable = folder.appending(path: "Ferry")
+    let seal = folder.appending(path: "CodeResources")
+    try Data("app".utf8).write(to: executable)
+    try Data("seal one".utf8).write(to: seal)
+    let launched = BundleFingerprint(of: [executable, seal])
+    #expect(BundleFingerprint(of: [executable, seal]) == launched)
+    let update = folder.appending(path: "CodeResources.new")
+    try Data("seal two".utf8).write(to: update)
+    #expect(rename(update.path, seal.path) == 0)
+    #expect(BundleFingerprint(of: [executable, seal]) != launched)
+  }
 }
