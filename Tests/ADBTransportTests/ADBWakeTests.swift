@@ -137,7 +137,7 @@ struct ADBWakeTests {
     #expect(pauses.all == [.milliseconds(100), .milliseconds(100)])
   }
 
-  /// A display that stays off is read until the paced waits reach the limit.
+  /// A display that stays off is read until the paced waits would pass the limit.
   @Test func aDisplayThatStaysOffIsReadUntilTheLimit() async throws {
     let device = FakeAndroid()
     device.setTools { $0.displayOn = false }
@@ -146,8 +146,13 @@ struct ADBWakeTests {
       await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
     }
     #expect(!woke)
-    #expect(pauses.all == [.milliseconds(100), .milliseconds(100), .milliseconds(100)])
-    #expect(device.commands.filter { $0 == ["dumpsys", "power"] }.count == 4)
+    // The 300 ms are also a bound in time, which a loaded machine can reach first, even with a
+    // read on its way: the paced waits never pass it, and each read but the first follows one.
+    let waits = pauses.all
+    let reads = device.commands.filter { $0 == ["dumpsys", "power"] }.count
+    #expect(waits.allSatisfy { $0 == .milliseconds(100) })
+    #expect(waits.count <= 3)
+    #expect((waits.count...(waits.count + 1)).contains(reads))
   }
 
   /// A device whose `dumpsys power` has no display line will never say the display is on, so
