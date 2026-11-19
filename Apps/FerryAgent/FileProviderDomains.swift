@@ -10,12 +10,11 @@ private let log = Logger(
 struct FileProviderDomains: DomainManaging {
   func add(_ spec: DomainSpec) async throws {
     try await NSFileProviderManager.add(
-      Self.configured(
-        NSFileProviderDomainIdentifier(spec.identifier), displayName: spec.displayName))
+      DomainSettings.configured(spec.identifier, displayName: spec.displayName))
   }
 
-  /// Adds every existing domain again whose settings differ from `configured`, such as one
-  /// added by an earlier Ferry. An add with an existing identifier updates the domain in place,
+  /// Adds every existing domain again whose settings differ from Ferry's (`DomainSettings`),
+  /// such as one added by an earlier Ferry. An add with an existing identifier updates the domain in place,
   /// so its items, enablement and the agent's item table all stay. A domain named by serial is
   /// left alone: `DomainController` replaces it.
   func conformExisting() async {
@@ -26,11 +25,10 @@ struct FileProviderDomains: DomainManaging {
       log.error("listing domains failed: \(error, privacy: .private)")
       return
     }
-    for domain in domains
-    where domain.supportsSyncingTrash && DomainNaming.isIdentifier(domain.identifier.rawValue) {
+    for domain in domains where DomainSettings.needsUpdate(domain) {
       do {
         try await NSFileProviderManager.add(
-          Self.configured(domain.identifier, displayName: domain.displayName))
+          DomainSettings.configured(domain.identifier.rawValue, displayName: domain.displayName))
         log.info("updated settings of \(domain.identifier.rawValue, privacy: .private)")
       } catch {
         log.error(
@@ -38,15 +36,6 @@ struct FileProviderDomains: DomainManaging {
         )
       }
     }
-  }
-
-  private static func configured(
-    _ identifier: NSFileProviderDomainIdentifier, displayName: String
-  ) -> NSFileProviderDomain {
-    let domain = NSFileProviderDomain(identifier: identifier, displayName: displayName)
-    // MTP has no trash: Finder offers Delete Immediately, which deletes on the device.
-    domain.supportsSyncingTrash = false
-    return domain
   }
 
   func disconnect(_ identifier: String) async throws {
