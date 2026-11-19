@@ -104,7 +104,7 @@ extension AppModel {
     do {
       let response = try await client.send(request, file: file, progress: progress)
       switch response {
-      case .done:
+      case .done, .shellTarget:
         actionError = nil
       case .toolFailed(let failure):
         actionError = DevicePresentation.message(for: failure)

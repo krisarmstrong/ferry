@@ -25,6 +25,22 @@ extension FakeAndroid {
     /// What `screenrecord` leaves at its path when it finishes.
     var recordingBytes =
       Data([0, 0, 0, 0x18]) + Data("ftypmp42".utf8) + Data(repeating: 1, count: 2_000)
+    /// What `logcat -v threadtime` sends, chunk by chunk, then whether it ends (the buffer was
+    /// dumped) or stays open following the log until the client closes.
+    var logcat: [Data] = []
+    var logcatEnds = false
+    /// What `dumpsys battery` prints; `nil` is a device with no battery service.
+    var battery: String?
+    /// The adb server's forwards, for every device it has, as `list-forward` lists them.
+    var forwards: [Forward] = []
+    /// Local ports the server cannot bind.
+    var takenPorts: Set<UInt16> = []
+  }
+
+  struct Forward: Equatable {
+    var serial: String
+    var local: String
+    var remote: String
   }
 
   struct Recording {
@@ -48,6 +64,10 @@ extension FakeAndroid {
   func exec(_ command: String, _ peer: Peer) async throws {
     guard let words = Self.words(command) else { throw ScriptError.unexpected(command) }
     state.withLock { $0.commands.append(words) }
+    if words == ["logcat", "-v", "threadtime"] {
+      try await logcat(peer)
+      return
+    }
     guard words == ["screencap", "-p"] else { throw ScriptError.unexpected(command) }
     if state.withLock({ $0.hangingPrograms.contains("screencap") }) {
       _ = try? await peer.stream.read(exactly: 1)
@@ -55,6 +75,74 @@ extension FakeAndroid {
     }
     try await peer.raw(state.withLock { $0.tools.screencap })
     await peer.finish()
+  }
+
+  /// Sends the scripted log, then follows it (nothing more arrives) or ends it.
+  private func logcat(_ peer: Peer) async throws {
+    let (chunks, ends) = state.withLock { ($0.tools.logcat, $0.tools.logcatEnds) }
+    for chunk in chunks { try await peer.raw(chunk) }
+    if ends {
+      await peer.finish()
+    } else {
+      _ = try? await peer.stream.read(exactly: 1)
+    }
+  }
+
+  /// The adb server's forward requests, as `adb.cpp`'s `handle_forward_request` answers them on
+  /// the host (`SendOkay`, then the list, for `list-forward`; two `OKAY`s for a `forward` or
+  /// `killforward` that worked; one `FAIL` frame, with no `OKAY` first, for one that did not).
+  /// False for any other request.
+  func forwardRequest(_ request: String, serial: String, _ peer: Peer) async throws -> Bool {
+    let prefix = "host-serial:\(serial):"
+    guard request.hasPrefix(prefix) else { return false }
+    let service = String(request.dropFirst(prefix.count))
+    if service == "list-forward" {
+      let lines = state.withLock { state in
+        state.tools.forwards.map { "\($0.serial) \($0.local) \($0.remote)\n" }.joined()
+      }
+      try await peer.answer(lines)
+      return true
+    }
+    if service.hasPrefix("forward:") {
+      let pieces = service.dropFirst("forward:".count).split(
+        separator: ";", omittingEmptySubsequences: false)
+      guard pieces.count == 2, !pieces[0].isEmpty, !pieces[1].isEmpty, pieces[1].first != "*" else {
+        try await peer.fail("bad forward: \(service.dropFirst("forward:".count))")
+        return true
+      }
+      let (local, remote) = (String(pieces[0]), String(pieces[1]))
+      let taken = state.withLock { state in
+        local.hasPrefix("tcp:")
+          && UInt16(local.dropFirst(4)).map(state.tools.takenPorts.contains) == true
+      }
+      guard !taken else {
+        try await peer.fail("cannot bind listener: Address already in use")
+        return true
+      }
+      state.withLock { state in
+        state.tools.forwards.removeAll { $0.local == local }
+        state.tools.forwards.append(Forward(serial: serial, local: local, remote: remote))
+      }
+      try await peer.okay()
+      try await peer.okay()
+      return true
+    }
+    if service.hasPrefix("killforward:") {
+      let local = String(service.dropFirst("killforward:".count))
+      let removed = state.withLock { state in
+        let before = state.tools.forwards.count
+        state.tools.forwards.removeAll { $0.local == local && $0.serial == serial }
+        return state.tools.forwards.count != before
+      }
+      guard removed else {
+        try await peer.fail("listener '\(local)' not found")
+        return true
+      }
+      try await peer.okay()
+      try await peer.okay()
+      return true
+    }
+    return false
   }
 
   /// The legacy `shell:` service, for a device without `shell_v2`, wrapped as `ADBShell` wraps a
@@ -141,6 +229,14 @@ extension FakeAndroid {
     }
     state.tools.installed.append(data)
     return state.tools.pmResult
+  }
+
+  /// `dumpsys battery`, or what a device without the service says.
+  static func dumpsys(_ operands: [String], in state: State) -> ShellResult {
+    guard operands == ["battery"], let battery = state.tools.battery else {
+      return ShellResult(status: 20, stderr: "Can't find service: \(operands.first ?? "")\n")
+    }
+    return ShellResult(stdout: battery)
   }
 
   /// `kill -2 PID`: interrupts the recording if it is that process.

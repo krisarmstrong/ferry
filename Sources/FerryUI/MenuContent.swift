@@ -49,7 +49,12 @@ public struct MenuContent: View {
             isRemembered: model.isRemembered(device.id),
             useOverWiFi: { Task { await model.useOverWiFi(device.id) } },
             forget: { Task { await model.forget(device.id) } }),
-          tools: ToolActions(model: model, device: device.id))
+          tools: ToolActions(
+            model: model, device: device.id,
+            open: { window in
+              NSApp.activate()
+              openWindow(id: window.windowID, value: device.id)
+            }))
       }
       ForEach(model.rememberedOffline) { device in
         RememberedRow(

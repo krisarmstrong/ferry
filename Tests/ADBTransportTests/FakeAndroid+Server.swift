@@ -27,6 +27,7 @@ extension FakeAndroid {
       }
       return
     }
+    if !gone, try await forwardRequest(first, serial: serial, peer) { return }
     guard first == "host:transport:\(serial)", !gone else {
       try await peer.fail("device '\(serial)' not found")
       return

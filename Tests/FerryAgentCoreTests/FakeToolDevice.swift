@@ -1,6 +1,7 @@
 import ADBTransport
 import DeviceKit
 import Foundation
+import Synchronization
 
 @testable import FerryAgentCore
 
@@ -25,6 +26,15 @@ actor FakeToolDevice: ADBToolDevice {
   var onCreate: (@Sendable (String) async -> Void)?
   var installResult = APKInstallResult.installed
   var failure: ADBError?
+  /// The log the device streams; each `logcat` call opens the next.
+  var logcats: [FakeLogcat] = []
+  private(set) var logcatsOpened: [String] = []
+  var info = AndroidDeviceInfo(
+    model: "LinkRunner G2", androidVersion: "8.1.0", build: "OPM1", serial: "S", battery: nil,
+    addresses: [], storage: nil)
+  var forwardList: [PortForward] = []
+  /// Every forward request, as `add <local> <remote>` or `remove <local>`, with its serial.
+  private(set) var forwardCalls: [String] = []
   var image = FakeToolDevice.png
   let recording: FakeRecording
 
@@ -62,6 +72,101 @@ actor FakeToolDevice: ADBToolDevice {
   func removeTemporary(_ path: String, serial: String) async -> Bool {
     removals.append(path)
     return removes
+  }
+
+  func logcat(serial: String) async throws(ADBError) -> any LogcatSource {
+    if let failure { throw failure }
+    logcatsOpened.append(serial)
+    guard !logcats.isEmpty else { return FakeLogcat() }
+    return logcats.removeFirst()
+  }
+
+  func deviceInfo(serial: String) async throws(ADBError) -> AndroidDeviceInfo {
+    if let failure { throw failure }
+    return info
+  }
+
+  func forwards(serial: String) async throws(ADBError) -> [PortForward] {
+    if let failure { throw failure }
+    return forwardList
+  }
+
+  func addForward(serial: String, _ forward: PortForward) async throws(ADBError) {
+    if let failure { throw failure }
+    forwardCalls.append("add \(serial) \(forward.local) \(forward.remote)")
+    forwardList.append(forward)
+  }
+
+  func removeForward(serial: String, local: UInt16) async throws(ADBError) {
+    if let failure { throw failure }
+    forwardCalls.append("remove \(serial) \(local)")
+    forwardList.removeAll { $0.local == local }
+  }
+
+  nonisolated func adbPath() -> URL? { adbLocation.value }
+  nonisolated let adbLocation = AdbLocation()
+}
+
+/// Where the fake finds adb, settable from a test without awaiting the device.
+final class AdbLocation: Sendable {
+  private let path = Mutex<URL?>(URL(fileURLWithPath: "/opt/homebrew/bin/adb"))
+  var value: URL? { path.withLock { $0 } }
+  func set(_ url: URL?) { path.withLock { $0 = url } }
+}
+
+/// A device's log as a test scripts it: lines go in with `send`, and end with `end()`, `fail`, or
+/// the agent closing it.
+actor FakeLogcat: LogcatSource {
+  private var pending: [[Data]] = []
+  private var waiter: CheckedContinuation<Void, Never>?
+  private var ended = false
+  private var failure: ADBError?
+  private(set) var closed = false
+  /// Chunks sent that the agent has not yet read.
+  var pendingCount: Int { pending.count }
+
+  func send(_ lines: [String]) {
+    pending.append(lines.map { Data($0.utf8) })
+    wake()
+  }
+
+  func sendRaw(_ lines: [Data]) {
+    pending.append(lines)
+    wake()
+  }
+
+  func end() {
+    ended = true
+    wake()
+  }
+
+  func fail(_ error: ADBError) {
+    failure = error
+    ended = true
+    wake()
+  }
+
+  private func wake() {
+    waiter?.resume()
+    waiter = nil
+  }
+
+  func next() async throws(ADBError) -> [Data]? {
+    while true {
+      if !pending.isEmpty { return pending.removeFirst() }
+      if let failure { throw failure }
+      if ended || closed { return nil }
+      await withCheckedContinuation { waiter = $0 }
+    }
+  }
+
+  nonisolated func close() {
+    Task { await markClosed() }
+  }
+
+  private func markClosed() {
+    closed = true
+    wake()
   }
 }
 

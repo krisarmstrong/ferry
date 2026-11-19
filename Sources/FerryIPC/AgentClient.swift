@@ -10,9 +10,23 @@ public protocol AgentSending: Sendable {
   func send(
     _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
   ) async throws(TransportError) -> AgentResponse
+
+  /// As above, for a request the agent answers with a stream of log lines: each batch goes to
+  /// `logs` while the request runs. A conformer that does not stream ignores `logs`.
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?,
+    logs: LogBatchHandler?
+  ) async throws(TransportError) -> AgentResponse
 }
 
 extension AgentSending {
+  public func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?,
+    logs: LogBatchHandler?
+  ) async throws(TransportError) -> AgentResponse {
+    try await send(request, file: file, progress: progress)
+  }
+
   /// Sends a request whose progress nobody follows.
   public func send(_ request: AgentRequest, file: FileHandle?) async throws(TransportError)
     -> AgentResponse
@@ -43,6 +57,8 @@ public actor AgentClient: AgentSending {
   private var connection: NSXPCConnection?
   /// The progress handler of each request in flight, by the identifier it was sent under.
   private var progressHandlers: [String: TransferProgressHandler] = [:]
+  /// The handlers of requests that take log lines.
+  private let logRouter = LogRouter()
   /// The agent's progress reports, from every connection, in the order they arrived.
   private let progressEvents: AsyncStream<ProgressReceiver.Event>
   private let progressSink: AsyncStream<ProgressReceiver.Event>.Continuation
@@ -67,7 +83,7 @@ public actor AgentClient: AgentSending {
   private init(target: Target) {
     self.target = target
     (progressEvents, progressSink) = AsyncStream.makeStream(of: ProgressReceiver.Event.self)
-    receiver = ProgressReceiver(progressSink)
+    receiver = ProgressReceiver(progressSink, logs: logRouter)
   }
 
   deinit {
@@ -77,9 +93,20 @@ public actor AgentClient: AgentSending {
   public func send(
     _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
   ) async throws(TransportError) -> AgentResponse {
+    try await send(request, file: file, progress: progress, logs: nil)
+  }
+
+  public func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?,
+    logs: LogBatchHandler?
+  ) async throws(TransportError) -> AgentResponse {
     let id = UUID().uuidString
     if let progress { progressHandlers[id] = progress }
-    defer { progressHandlers[id] = nil }
+    if let logs { logRouter.set(id, logs) }
+    defer {
+      progressHandlers[id] = nil
+      logRouter.remove(id)
+    }
     let data: Data
     do {
       data = try JSONEncoder().encode(request)

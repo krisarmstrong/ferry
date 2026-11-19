@@ -21,9 +21,23 @@ public protocol AgentHandling: Sendable {
   func handle(
     _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler
   ) async -> AgentResponse
+
+  /// As above, for a request that streams log lines: `logs` sends each batch to the client and
+  /// says whether it wants more. `nil` when the client gave nothing to receive them.
+  func handle(
+    _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler,
+    logs: LogSink?
+  ) async -> AgentResponse
 }
 
 extension AgentHandling {
+  public func handle(
+    _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler,
+    logs: LogSink?
+  ) async -> AgentResponse {
+    await handle(request, file: file, progress: progress)
+  }
+
   /// Handles a request whose progress nobody follows.
   public func handle(_ request: AgentRequest, file: FileHandle?) async -> AgentResponse {
     await handle(request, file: file, progress: { _, _ in })
@@ -116,12 +130,21 @@ final class AgentService: NSObject, AgentXPC, Sendable {
       return
     }
     let reported = Reported()
+    var logs: LogSink?
+    if let connection {
+      // NSXPCConnection is documented thread-safe; the sink may run on any task.
+      nonisolated(unsafe) let shared = connection
+      logs = { batch in await Self.send(batch, for: id, on: shared) }
+    }
+    let sink = logs
     Task {
-      let response = await handler.handle(decoded, file: file) { completed, total in
-        // A report that cannot be delivered is dropped: it never fails the transfer.
-        reported.mark()
-        client?.progress(id, completed: completed, total: total)
-      }
+      let response = await handler.handle(
+        decoded, file: file,
+        progress: { completed, total in
+          // A report that cannot be delivered is dropped: it never fails the transfer.
+          reported.mark()
+          client?.progress(id, completed: completed, total: total)
+        }, logs: sink)
       if reported.any, let connection {
         await Self.flush(id, on: connection)
       }
@@ -139,6 +162,24 @@ final class AgentService: NSObject, AgentXPC, Sendable {
       }
       client.flush(id) { reply(Data()) }
     }
+  }
+
+  /// Sends a batch and waits until the client has taken it, so the stream goes no faster than the
+  /// client reads. `false` when the client says it wants no more, or its connection failed.
+  private static func send(_ batch: LogBatch, for id: String, on connection: NSXPCConnection)
+    async -> Bool
+  {
+    guard let data = try? JSONEncoder().encode(batch) else { return true }
+    let answer = await awaitReply { reply, failed in
+      guard let client = connection.remoteObjectProxyWithErrorHandler(failed) as? any AgentClientXPC
+      else {
+        failed(CancellationError())
+        return
+      }
+      client.logBatch(id, batch: data) { reply(Data([$0 ? 1 : 0])) }
+    }
+    if case .success(let data) = answer { return data.first == 1 }
+    return false
   }
 
   private static func encode(_ response: AgentResponse) -> Data {

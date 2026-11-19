@@ -33,7 +33,7 @@ public enum ADBServerEvent: Sendable, Equatable {
 public actor ADBHost {
   private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBHost")
 
-  private let port: UInt16
+  let port: UInt16
   private let locator: ADBLocator
   private let launcher: @Sendable (URL) async throws(ADBError) -> Void
   private let backoff: Backoff
@@ -54,6 +54,11 @@ public actor ADBHost {
     self.locator = locator
     self.launcher = launcher
     self.backoff = backoff
+  }
+
+  /// The `adb` program the locator finds, if any.
+  public nonisolated func adbURL() -> URL? {
+    locator.adbURL()
   }
 
   public func version() async throws(ADBError) -> Int {

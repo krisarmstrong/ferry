@@ -221,6 +221,23 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   case saveRecording(DeviceID)
   /// Deletes a finished recording the app will not save, from the device. Answered with `.done`.
   case discardRecording(DeviceID)
+  /// Streams the device's log (`logcat -v threadtime`) to the client on the reverse channel, in
+  /// batches. Answered with `.done` when it was stopped or the device ended it, and with a
+  /// failure when the device was lost. One stream per device: starting another ends the first.
+  case startLogcat(DeviceID)
+  /// Ends the device's log stream. Answered with `.done`.
+  case stopLogcat(DeviceID)
+  /// The device's TCP port forwards. Answered with `.forwards`.
+  case forwards(DeviceID)
+  /// Forwards a port on this Mac to one on the device. Answered with `.done`.
+  case addForward(DeviceID, PortForward)
+  /// Removes the forward from this Mac's `local` port. Answered with `.done`.
+  case removeForward(DeviceID, local: UInt16)
+  /// Reads the device's model, version, battery, addresses and storage. Answered with
+  /// `.deviceInfo`.
+  case deviceInfo(DeviceID)
+  /// The `adb` and serial for a shell in Terminal. Answered with `.shellTarget`.
+  case shellTarget(DeviceID)
   /// Lists again every folder the agent knows on the device's domains, so changes made on the
   /// device reach Finder.
   case refresh(DeviceID)
@@ -272,6 +289,9 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   case removed(preserved: [URL])
   case wireless(WirelessOutcome)
   case toolFailed(ToolFailure)
+  case forwards([PortForward])
+  case deviceInfo(AndroidDeviceInfo)
+  case shellTarget(ShellTarget)
   case done
   case failure(TransportError)
 }

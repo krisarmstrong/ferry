@@ -40,6 +40,13 @@ private func tag(_ request: AgentRequest) -> Int {
   case .stopRecording: 26
   case .saveRecording: 27
   case .discardRecording: 28
+  case .startLogcat: 29
+  case .stopLogcat: 30
+  case .forwards: 31
+  case .addForward: 32
+  case .removeForward: 33
+  case .deviceInfo: 34
+  case .shellTarget: 35
   }
 }
 
@@ -75,6 +82,7 @@ private func requests() -> [AgentRequest] {
     .installAPK(device, name: "Ferry Test.apk"), .screenshot(device), .startRecording(device),
     .stopRecording(device), .saveRecording(device), .discardRecording(device),
   ]
+  all += developerRequests()
   return all
 }
 
@@ -137,6 +145,9 @@ private func tag(_ response: AgentResponse) -> Int {
   case .keptOnDevice: 8
   case .wireless: 9
   case .toolFailed: 10
+  case .forwards: 11
+  case .deviceInfo: 12
+  case .shellTarget: 13
   }
 }
 
@@ -187,7 +198,8 @@ private func toolResponses() -> [AgentResponse] {
   for failure: ToolFailure in [
     .notOverADB, .notAnAPK, .apkTooLarge, .installFailed("INSTALL_FAILED_OLDER_SDK"),
     .alreadyRecording, .notRecording, .noImage, .recordingFailed("no encoder"), .cannotSave,
-    .recordingTooLarge, .recordingStalled, .recordingBusy,
+    .recordingTooLarge, .recordingStalled, .recordingBusy, .invalidPort, .adbNotFound,
+    .forwardFailed("cannot bind listener: Address already in use"),
   ] {
     all.append(.toolFailed(failure))
   }
@@ -202,6 +214,21 @@ private func toolResponses() -> [AgentResponse] {
             device: device, started: Date(timeIntervalSince1970: 1_763_503_800), stopping: false,
             finished: true),
         ])))
+  all += [
+    .forwards([]), .forwards([PortForward(local: 8080, remote: 80)]),
+    .deviceInfo(
+      AndroidDeviceInfo(
+        model: "LinkRunner G2", androidVersion: "8.1.0", build: "OPM1", serial: "R58N12345",
+        battery: .init(level: 87, state: .charging), addresses: ["192.0.2.31"],
+        storage: .init(used: 5, free: 10))),
+    .deviceInfo(
+      AndroidDeviceInfo(
+        model: "", androidVersion: "", build: "", serial: "", battery: nil, addresses: [],
+        storage: nil)),
+  ]
+  if let target = ShellTarget(adb: "/opt/homebrew/bin/adb", serial: "192.0.2.31:5555") {
+    all.append(.shellTarget(target))
+  }
   return all
 }
 
@@ -232,7 +259,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyRequestRoundTripsJSON() throws {
-  #expect(Set(requests().map(tag)) == Set(0...28))
+  #expect(Set(requests().map(tag)) == Set(0...35))
   for request in requests() {
     #expect(try roundTrip(request) == request)
   }
@@ -246,7 +273,7 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyResponseRoundTripsJSON() throws {
-  #expect(Set(try responses().map(tag)) == Set(0...10))
+  #expect(Set(try responses().map(tag)) == Set(0...13))
   for response in try responses() {
     #expect(try roundTrip(response) == response)
   }

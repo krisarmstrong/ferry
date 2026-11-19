@@ -165,9 +165,8 @@ actor FakeAgent: AgentSending {
       return changeReply(since)
     case .workingSet(_, let page):
       return try workingSetPage(page)
-    case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .connectAddress,
-      .pair, .connectWireless, .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless,
-      .installAPK, .screenshot, .startRecording, .stopRecording, .saveRecording, .discardRecording:
+    default:
+      // Everything else is the app's: the extension never sends it.
       throw .unsupported("\(request)")
     }
   }

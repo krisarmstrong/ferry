@@ -50,6 +50,8 @@ struct FerryApp: App {
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
 
+    DeveloperScenes(model: model)
+
     Settings {
       SettingsView(model: model)
     }

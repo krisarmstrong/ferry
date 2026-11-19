@@ -2,6 +2,7 @@ import ADBTransport
 import DeviceKit
 import FerryIPC
 import Foundation
+import Synchronization
 import os
 
 let toolsLog = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ADBTools")
@@ -15,7 +16,24 @@ public protocol ADBToolDevice: Sendable {
   func recordScreen(serial: String, to path: String) async throws(ADBError)
     -> any ScreenRecordingControl
   func removeTemporary(_ path: String, serial: String) async -> Bool
+  func logcat(serial: String) async throws(ADBError) -> any LogcatSource
+  func deviceInfo(serial: String) async throws(ADBError) -> AndroidDeviceInfo
+  func forwards(serial: String) async throws(ADBError) -> [PortForward]
+  func addForward(serial: String, _ forward: PortForward) async throws(ADBError)
+  func removeForward(serial: String, local: UInt16) async throws(ADBError)
+  /// The `adb` program, if it is installed.
+  func adbPath() -> URL?
 }
+
+/// A device's log as lines of bytes (see `ADBLogcat`).
+public protocol LogcatSource: Sendable {
+  /// The next lines; `nil` once the device ended the log; throws when it was lost.
+  func next() async throws(ADBError) -> [Data]?
+  /// Ends the log: a read waiting for more fails or returns `nil`.
+  func close()
+}
+
+extension ADBLogcat: LogcatSource {}
 
 /// A screen recording running on a device (see `ADBScreenRecording`).
 public protocol ScreenRecordingControl: Sendable {
@@ -34,6 +52,11 @@ extension ADBDeviceTools: ADBToolDevice {
     -> any ScreenRecordingControl
   {
     try await startRecording(serial: serial, to: path)
+  }
+
+  public func logcat(serial: String) async throws(ADBError) -> any LogcatSource {
+    let log: ADBLogcat = try await logcat(serial: serial)
+    return log
   }
 }
 
@@ -55,6 +78,23 @@ extension ADBDeviceTools: ADBToolDevice {
 /// then, and the recording waits on the device, listed as finished, until the app collects it
 /// with `.saveRecording`, even after the app was relaunched.
 public actor ADBTools {
+  /// A log stream running for a device, ended by `stop()`.
+  final class LogcatRun: Sendable {
+    let source: any LogcatSource
+    private let stopped = Mutex(false)
+
+    init(source: any LogcatSource) {
+      self.source = source
+    }
+
+    var isStopped: Bool { stopped.withLock { $0 } }
+
+    func stop() {
+      stopped.withLock { $0 = true }
+      source.close()
+    }
+  }
+
   public struct Limits: Sendable {
     /// No APK can be larger: its ZIP offsets are 32-bit.
     public var apkSize: UInt64 = 4 << 30
@@ -68,6 +108,17 @@ public actor ADBTools {
     public var recordingSize: UInt64 = 1 << 30
     /// How long a pull may go without data before it is given up.
     public var pullStall = Duration.seconds(30)
+    /// The log queue between the device and the client keeps this many of the newest lines and
+    /// bytes; older ones are dropped and counted.
+    public var logQueueLines = 20_000
+    public var logQueueBytes = 8 << 20
+    /// A batch sent to the client holds at most this many lines and bytes (a line past the byte
+    /// limit still goes alone), so no message is large.
+    public var logBatchLines = 500
+    public var logBatchBytes = 256 << 10
+    /// The least time between two batches, so a busy log is sent in a few large batches rather
+    /// than many small ones.
+    public var logInterval = Duration.milliseconds(100)
 
     public init() {}
   }
@@ -105,6 +156,7 @@ public actor ADBTools {
   let now: @Sendable () -> Date
   let limits: Limits
   var recordings: [DeviceID: Recording] = [:]
+  var logcats: [DeviceID: LogcatRun] = [:]
 
   public init(
     device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> String?,

@@ -164,4 +164,20 @@ struct ToolPresentationTests {
       DevicePresentation.installingLine(AppInstall(name: "a.apk", percent: 100))
         == "Installing “a.apk”…")
   }
+
+  @Test func developerToolFailuresReadInPlainWords() {
+    #expect(
+      DevicePresentation.message(for: .invalidPort)
+        == "Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device.")
+    #expect(
+      DevicePresentation.message(for: .adbNotFound)
+        == "Ferry can't find adb. Install it, then try again.")
+    #expect(
+      DevicePresentation.message(
+        for: .forwardFailed("cannot bind listener: Address already in use"))
+        == "adb couldn't forward the port: cannot bind listener: Address already in use")
+    #expect(
+      DevicePresentation.message(for: .forwardFailed("a\u{1B}[2Jb"))
+        == "adb couldn't forward the port: a\\u{1B}[2Jb")
+  }
 }

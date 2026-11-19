@@ -37,6 +37,7 @@ extension FakeAndroid {
     let allowed: [String: Set<Character>] = [
       "mv": ["f", "i", "v", "n"], "rm": ["f", "i", "R", "r"], "mkdir": ["v", "p"],
       "df": ["H", "P", "k", "h", "a"], "getprop": [], "ip": ["4"], "pm": ["r"], "kill": ["2"],
+      "dumpsys": [],
     ]
     guard let flags = allowed[program] else {
       return ShellResult(status: 127, stderr: "/system/bin/sh: \(program): not found\n")
@@ -75,6 +76,7 @@ extension FakeAndroid {
         in: &state)
     case "pm": pm(operands, in: &state)
     case "kill": kill(operands, in: &state)
+    case "dumpsys": dumpsys(operands, in: state)
     case "mkdir": mkdir(operands, in: &state)
     case "getprop": ShellResult(stdout: (state.properties[operands.first ?? ""] ?? "") + "\n")
     case "ip" where options == ["4"] && operands == ["addr"]: ShellResult(stdout: state.addresses)

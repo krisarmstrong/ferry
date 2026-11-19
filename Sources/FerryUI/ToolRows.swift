@@ -16,8 +16,13 @@ struct ToolActions {
   let stopRecording: () -> Void
   let chooseFolder: () -> Void
   let discard: () -> Void
+  let openLogcat: () -> Void
+  let openShell: () -> Void
+  let openForwards: () -> Void
+  let openInfo: () -> Void
 
-  init(model: AppModel, device: DeviceID) {
+  /// `open` shows one of the developer windows for the device.
+  init(model: AppModel, device: DeviceID, open: @escaping (DeveloperWindow) -> Void) {
     install = model.installs[device]
     recording = model.recording(on: device)
     unsaved = model.recordingUnsaved(on: device)
@@ -28,6 +33,10 @@ struct ToolActions {
     stopRecording = { Task { await model.stopRecording(on: device) } }
     chooseFolder = { Task { await model.chooseRecordingDestination(on: device) } }
     discard = { Task { await model.discardRecording(on: device) } }
+    openLogcat = { open(.logcat) }
+    openShell = { Task { await model.openShell(on: device) } }
+    openForwards = { open(.portForwarding) }
+    openInfo = { open(.deviceInfo) }
   }
 
   func install(_ url: URL) { installDropped(url) }
@@ -103,5 +112,23 @@ struct ToolRow: View {
       }
     }
     .controlSize(.small)
+    Menu {
+      Button(action: actions.openLogcat) {
+        Text("Logcat…", bundle: .module)
+      }
+      Button(action: actions.openShell) {
+        Text("Open Shell", bundle: .module)
+      }
+      Button(action: actions.openForwards) {
+        Text("Port Forwarding…", bundle: .module)
+      }
+      Button(action: actions.openInfo) {
+        Text("Device Info…", bundle: .module)
+      }
+    } label: {
+      Text("Developer Tools", bundle: .module)
+    }
+    .controlSize(.small)
+    .fixedSize()
   }
 }

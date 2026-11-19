@@ -5,8 +5,10 @@ extension AgentService {
   /// Answers the tool requests; `nil` for any other. Without adb they fail as the device not
   /// being served over ADB, which the menu already explains.
   func performToolRequest(
-    _ request: AgentRequest, file: Int32?, progress: @escaping TransferProgressHandler
+    _ request: AgentRequest, file: Int32?, progress: @escaping TransferProgressHandler,
+    logs: LogSink?
   ) async throws(TransportError) -> AgentResponse? {
+    if let response = try await performDeveloperRequest(request, logs: logs) { return response }
     let outcome: ADBTools.Outcome
     switch (request, file) {
     case (.installAPK(let id, let name), let file?):
@@ -38,5 +40,48 @@ extension AgentService {
       return nil
     }
     return outcome.response
+  }
+}
+
+extension AgentService {
+  /// Logcat, port forwards, device info and the shell's target; `nil` for any other request.
+  func performDeveloperRequest(_ request: AgentRequest, logs: LogSink?)
+    async throws(TransportError) -> AgentResponse?
+  {
+    switch request {
+    case .startLogcat(let id):
+      // The lines go to the client that asked: with no way to send them there is no stream.
+      guard let logs else { throw .io("bad request") }
+      guard let tools else { return .toolFailed(.notOverADB) }
+      return try await tools.streamLogcat(id, to: logs).response
+    case .stopLogcat(let id):
+      return await tools?.stopLogcat(id).response ?? .done
+    case .forwards(let id):
+      guard let tools else { return .toolFailed(.notOverADB) }
+      switch try await tools.forwards(id) {
+      case .success(let list): return .forwards(list)
+      case .failure(let failure): return .toolFailed(failure)
+      }
+    case .addForward(let id, let forward):
+      guard let tools else { return .toolFailed(.notOverADB) }
+      return try await tools.addForward(id, forward).response
+    case .removeForward(let id, let local):
+      guard let tools else { return .toolFailed(.notOverADB) }
+      return try await tools.removeForward(id, local: local).response
+    case .deviceInfo(let id):
+      guard let tools else { return .toolFailed(.notOverADB) }
+      switch try await tools.deviceInfo(id) {
+      case .success(let info): return .deviceInfo(info)
+      case .failure(let failure): return .toolFailed(failure)
+      }
+    case .shellTarget(let id):
+      guard let tools else { return .toolFailed(.notOverADB) }
+      switch try await tools.shellTarget(id) {
+      case .success(let target): return .shellTarget(target)
+      case .failure(let failure): return .toolFailed(failure)
+      }
+    default:
+      return nil
+    }
   }
 }

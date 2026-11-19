@@ -300,8 +300,8 @@ Settings:
 ## Tools over USB debugging
 
 A device Ferry reaches over ADB (**USB · ADB** or **Wi-Fi · ADB** in the menu) shows
-**Install App…**, **Screenshot** and **Record Screen** under its name. A device on file
-transfer shows **More tools with USB debugging…** instead.
+**Install App…**, **Screenshot** and **Record Screen** under its name, and a **Developer
+Tools** menu. A device on file transfer shows **More tools with USB debugging…** instead.
 
 ### Install an app
 
@@ -333,6 +333,37 @@ until Ferry serves it again.
 
 A device whose screen is off sends a black screenshot, and a recording of a screen that does not
 change has a single frame.
+
+### Logcat
+
+Choose **Developer Tools**, then **Logcat…**, to watch the device's log in a window of its own.
+Ferry keeps the newest 50,000 lines. **Level** shows lines at that level and above, and
+**Filter** shows the lines that contain your text, whatever its case. **Pause** freezes the
+window while lines keep arriving, and **Resume** catches up. **Clear** empties it.
+
+**Save…** writes the lines that match the filters to a plain text file where you choose. The log
+stops when you close the window or the device goes away.
+
+### Open a shell
+
+Choose **Developer Tools**, then **Open Shell**, to open Terminal with a shell on the device
+(`adb shell`). Ferry needs adb for this, and says so if it can't find it. Nothing on the device
+changes unless you type a command that changes it.
+
+### Forward a port
+
+Choose **Developer Tools**, then **Port Forwarding…**, to send connections to a port on this Mac
+to a port on the device. Type the port on this Mac (1024 or higher) and the port on the device,
+then click **Add**. **Remove** ends a forward.
+
+If the port on this Mac is already in use, the window shows adb's message. Ferry lists only the
+TCP forwards adb holds for this device.
+
+### Device info
+
+Choose **Developer Tools**, then **Device Info…**, to see the model, Android version, build,
+serial number, battery, IP addresses and storage the device reports. Ferry only reads them.
+**Copy** puts them on the clipboard.
 
 ## Troubleshooting
 

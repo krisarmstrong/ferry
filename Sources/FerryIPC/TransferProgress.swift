@@ -17,6 +17,33 @@ public typealias TransferProgressHandler = @Sendable (_ completed: UInt64, _ tot
   /// Answered once every report sent before it has been received. The agent sends it before
   /// replying to a request that reported progress, so its reports never trail the reply.
   func flush(_ request: String, reply: @escaping @Sendable () -> Void)
+  /// A batch of log lines (a JSON `LogBatch`) for the request `request`. The client answers once
+  /// it has taken the batch, which is when the agent sends the next one: `true` to go on, `false`
+  /// when the client has nothing waiting for lines (its request ended), which ends the stream.
+  func logBatch(_ request: String, batch: Data, reply: @escaping @Sendable (Bool) -> Void)
+}
+
+/// The handlers of the requests in flight that take log lines, by request identifier.
+final class LogRouter: Sendable {
+  private let handlers = Mutex<[String: LogBatchHandler]>([:])
+
+  func set(_ request: String, _ handler: @escaping LogBatchHandler) {
+    handlers.withLock { $0[request] = handler }
+  }
+
+  func remove(_ request: String) {
+    handlers.withLock { $0[request] = nil }
+  }
+
+  /// Hands the batch to the request's handler and returns once it has taken it. `false` if no
+  /// request waits for lines; a batch that does not decode is dropped.
+  func deliver(_ request: String, _ data: Data) async -> Bool {
+    guard let handler = handlers.withLock({ $0[request] }) else { return false }
+    if let batch = try? JSONDecoder().decode(LogBatch.self, from: data) {
+      await handler(batch)
+    }
+    return true
+  }
 }
 
 /// A transfer the agent is running, for the menu.
@@ -68,9 +95,11 @@ final class ProgressReceiver: NSObject, AgentClientXPC {
 
   private let events: AsyncStream<Event>.Continuation
   private let count = Atomic<UInt64>(0)
+  private let logs: LogRouter
 
-  init(_ events: AsyncStream<Event>.Continuation) {
+  init(_ events: AsyncStream<Event>.Continuation, logs: LogRouter) {
     self.events = events
+    self.logs = logs
   }
 
   /// The number of the last report received.
@@ -85,6 +114,11 @@ final class ProgressReceiver: NSObject, AgentClientXPC {
   /// XPC delivers a connection's messages in order, so the reports before this one are in.
   func flush(_ request: String, reply: @escaping @Sendable () -> Void) {
     reply()
+  }
+
+  func logBatch(_ request: String, batch: Data, reply: @escaping @Sendable (Bool) -> Void) {
+    let logs = logs
+    Task { reply(await logs.deliver(request, batch)) }
   }
 }
 

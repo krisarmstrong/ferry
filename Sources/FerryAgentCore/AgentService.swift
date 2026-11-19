@@ -49,9 +49,16 @@ public actor AgentService: AgentHandling {
   public func handle(
     _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler
   ) async -> AgentResponse {
+    await handle(request, file: file, progress: progress, logs: nil)
+  }
+
+  public func handle(
+    _ request: AgentRequest, file: FileHandle?, progress: @escaping TransferProgressHandler,
+    logs: LogSink?
+  ) async -> AgentResponse {
     do throws(TransportError) {
       guard Self.takesFile(request) == (file != nil) else { throw .io("bad request") }
-      return try await perform(request, file: file?.fileDescriptor, progress: progress)
+      return try await perform(request, file: file?.fileDescriptor, progress: progress, logs: logs)
     } catch {
       log.log(
         level: error.logType,
@@ -62,12 +69,12 @@ public actor AgentService: AgentHandling {
 
   /// `file` is present exactly when `takesFile(request)`.
   private func perform(
-    _ request: AgentRequest, file: Int32?, progress: @escaping TransferProgressHandler
+    _ request: AgentRequest, file: Int32?, progress: @escaping TransferProgressHandler,
+    logs: LogSink?
   ) async throws(TransportError) -> AgentResponse {
     if let response = try await performAppRequest(request) { return response }
-    if let response = try await performToolRequest(request, file: file, progress: progress) {
-      return response
-    }
+    let tool = try await performToolRequest(request, file: file, progress: progress, logs: logs)
+    if let tool { return tool }
     switch (request, file) {
     case (.item(let domain, let id), _):
       return .entry(try await item(id, in: domain))
@@ -101,8 +108,9 @@ public actor AgentService: AgentHandling {
       (.refresh, _), (.eject, _), (.removeAllDomains, _), (.connectAddress, _), (.pair, _),
       (.connectWireless, _), (.enableWireless, _), (.forgetWireless, _), (.confirmWireless, _),
       (.ignoreWireless, _), (.installAPK, _), (.screenshot, _), (.startRecording, _),
-      (.stopRecording, _), (.saveRecording, _),
-      (.discardRecording, _):
+      (.stopRecording, _), (.saveRecording, _), (.discardRecording, _), (.startLogcat, _),
+      (.stopLogcat, _), (.forwards, _), (.addForward, _), (.removeForward, _), (.deviceInfo, _),
+      (.shellTarget, _):
       throw .io("bad request")
     }
   }

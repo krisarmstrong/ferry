@@ -21,7 +21,7 @@ public struct ActiveRecording: Codable, Sendable, Equatable {
 
 /// Why a tool (APK install, screenshot, screen recording) did not do what was asked, for the
 /// user. A lost device is `.failure(.deviceDisconnected)` instead, as for files.
-public enum ToolFailure: Codable, Sendable, Equatable {
+public enum ToolFailure: Error, Codable, Sendable, Equatable {
   /// The device is not served over ADB (USB debugging is off, or it is not ready).
   case notOverADB
   /// The file is not an Android app: no ZIP with an `AndroidManifest.xml`.
@@ -46,4 +46,76 @@ public enum ToolFailure: Codable, Sendable, Equatable {
   case recordingBusy
   /// The app could not create the file where macOS saves screenshots, nor on the Desktop.
   case cannotSave
+  /// A port forward needs a port on the Mac from 1024 to 65535 and one on the device from 1 to
+  /// 65535.
+  case invalidPort
+  /// adb refused a forward (the port is taken, say): adb's own words.
+  case forwardFailed(String)
+  /// Ferry could not find the `adb` program, which a shell in Terminal runs.
+  case adbNotFound
+}
+
+/// Lines of a device's log the agent sends in one go, on the reverse channel (see
+/// `AgentClientXPC.logBatch`). Lines are text: bytes that are not UTF-8 arrive as replacement
+/// characters, and a line is at most a few KB.
+public struct LogBatch: Codable, Sendable, Equatable {
+  public let lines: [String]
+  /// Lines the agent dropped before these because the app was not taking them fast enough.
+  public let skipped: Int
+
+  public init(lines: [String], skipped: Int) {
+    self.lines = lines
+    self.skipped = skipped
+  }
+}
+
+/// How the agent sends a batch of log lines to the client that asked for them. Answers whether
+/// the client wants more: `false` once it has gone away or stopped listening, which ends the
+/// stream.
+public typealias LogSink = @Sendable (LogBatch) async -> Bool
+
+/// How a client takes a batch of log lines. It returns once the batch is in, which paces the
+/// agent: it sends the next batch only after this one is taken.
+public typealias LogBatchHandler = @Sendable (LogBatch) async -> Void
+
+/// What Open Shell needs to run `adb -s <serial> shell` in Terminal: the `adb` the agent found
+/// and the serial of the route it serves the device by.
+///
+/// Both end up in a command line, so each is checked: the path must be absolute and free of
+/// control characters, and the serial limited to the characters adb itself gives serials
+/// (letters, digits, `.`, `_`, `-` and `:`), not starting with `-`, which adb would read as an
+/// option. A reply that fails the check does not decode.
+public struct ShellTarget: Codable, Sendable, Equatable {
+  public let adb: String
+  public let serial: String
+
+  public init?(adb: String, serial: String) {
+    guard Self.isValid(adb: adb), Self.isValid(serial: serial) else { return nil }
+    self.adb = adb
+    self.serial = serial
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let adb = try container.decode(String.self, forKey: .adb)
+    let serial = try container.decode(String.self, forKey: .serial)
+    guard let target = ShellTarget(adb: adb, serial: serial) else {
+      throw DecodingError.dataCorrupted(
+        .init(codingPath: decoder.codingPath, debugDescription: "invalid shell target"))
+    }
+    self = target
+  }
+
+  static func isValid(adb path: String) -> Bool {
+    path.hasPrefix("/") && path.utf8.count <= 1024
+      && path.unicodeScalars.allSatisfy { $0.value >= 0x20 && $0.value != 0x7F }
+  }
+
+  static func isValid(serial: String) -> Bool {
+    (1...128).contains(serial.utf8.count) && serial.first != "-"
+      && serial.unicodeScalars.allSatisfy {
+        ("a"..."z").contains($0) || ("A"..."Z").contains($0) || ("0"..."9").contains($0)
+          || ".-_:".unicodeScalars.contains($0)
+      }
+  }
 }

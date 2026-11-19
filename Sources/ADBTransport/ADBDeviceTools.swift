@@ -188,6 +188,34 @@ public struct ADBDeviceTools: Sendable {
     }
   }
 
+  // MARK: Forwards and the program
+
+  public func forwards(serial: String) async throws(ADBError) -> [PortForward] {
+    let host = host
+    return try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
+      try await host.forwards(serial: serial)
+    }
+  }
+
+  public func addForward(serial: String, _ forward: PortForward) async throws(ADBError) {
+    let host = host
+    try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
+      try await host.addForward(serial: serial, forward)
+    }
+  }
+
+  public func removeForward(serial: String, local: UInt16) async throws(ADBError) {
+    let host = host
+    try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
+      try await host.removeForward(serial: serial, local: local)
+    }
+  }
+
+  /// The `adb` the locator finds, which a shell in Terminal runs.
+  public func adbPath() -> URL? {
+    host.adbURL()
+  }
+
   // MARK: Plumbing
 
   /// `rm -f -- path`, run to the end even when the caller was cancelled, bounded in time. True

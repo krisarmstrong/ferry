@@ -38,6 +38,10 @@ public protocol SystemServicing {
   func captureFolders() -> [URL]
   /// Asks the user where to save a file, suggesting `suggestedName`; `nil` if they cancel.
   func chooseDestination(suggestedName: String) async -> URL?
+  /// Asks the user where to save a log (plain text); `nil` if they cancel.
+  func chooseLogDestination(suggestedName: String) async -> URL?
+  /// Opens the `.command` file in Terminal, which runs it. False if Terminal could not.
+  func openInTerminal(_ script: URL) async -> Bool
 }
 
 /// `SMAppService`, `NSWorkspace` and `NSApplication`.
@@ -134,6 +138,29 @@ public final class SystemServices: SystemServicing {
     panel.allowedContentTypes = [.mpeg4Movie]
     NSApp.activate()
     return panel.runModal() == .OK ? panel.url : nil
+  }
+
+  public func chooseLogDestination(suggestedName: String) async -> URL? {
+    let panel = NSSavePanel()
+    panel.nameFieldStringValue = suggestedName
+    panel.allowedContentTypes = [.plainText]
+    NSApp.activate()
+    return panel.runModal() == .OK ? panel.url : nil
+  }
+
+  public func openInTerminal(_ script: URL) async -> Bool {
+    guard
+      let terminal = NSWorkspace.shared.urlForApplication(
+        withBundleIdentifier: "com.apple.Terminal")
+    else { return false }
+    do {
+      _ = try await NSWorkspace.shared.open(
+        [script], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration())
+      return true
+    } catch {
+      Self.log.error("opening Terminal failed: \(error, privacy: .public)")
+      return false
+    }
   }
 
   public func captureFolders() -> [URL] {

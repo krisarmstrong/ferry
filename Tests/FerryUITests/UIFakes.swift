@@ -28,6 +28,16 @@ final class FakeClient: AgentSending {
   private let toolBytes = Mutex(Data())
   /// Progress the agent reports on a tool request before it answers.
   private let toolProgress = Mutex<[(UInt64, UInt64)]>([])
+  /// The log stream: the client's handler for lines, how the stream ends if it ends by itself,
+  /// and the request waiting for a stop.
+  private let logHandler = Mutex<LogBatchHandler?>(nil)
+  private let streamEnd = Mutex<AgentResponse?>(nil)
+  private let streamWaiter = Mutex<CheckedContinuation<AgentResponse, Never>?>(nil)
+  /// What the developer tools answer.
+  let forwardList = Mutex<[PortForward]>([])
+  let infoReply = Mutex<AgentResponse>(.toolFailed(.notOverADB))
+  let shellReply = Mutex<AgentResponse>(.toolFailed(.adbNotFound))
+  let forwardReply = Mutex<AgentResponse>(.done)
 
   init(log: CallLog) {
     self.log = log
@@ -75,6 +85,39 @@ final class FakeClient: AgentSending {
     for (done, total) in toolProgress.withLock({ $0 }) { progress?(done, total) }
     if let file { try? file.write(contentsOf: toolBytes.withLock { $0 }) }
     return toolResult.withLock { $0 }
+  }
+
+  /// Sends lines to the log window, as the agent's batches do.
+  func push(_ batch: LogBatch) async {
+    let handler = logHandler.withLock { $0 }
+    await handler?(batch)
+  }
+
+  /// The log stream ends by itself with `response`, as when the device ends it or is lost.
+  func endStream(with response: AgentResponse) {
+    if let waiter = streamWaiter.withLock({ state -> CheckedContinuation<AgentResponse, Never>? in
+      defer { state = nil }
+      return state
+    }) {
+      waiter.resume(returning: response)
+    } else {
+      streamEnd.withLock { $0 = response }
+    }
+  }
+
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?,
+    logs: LogBatchHandler?
+  ) async throws(TransportError) -> AgentResponse {
+    guard case .startLogcat(let id) = request else {
+      return try await send(request, file: file, progress: progress)
+    }
+    logHandler.withLock { $0 = logs }
+    log.record("startLogcat \(id.serial)")
+    if let ended = streamEnd.withLock({ $0 }) { return ended }
+    return await withCheckedContinuation { continuation in
+      streamWaiter.withLock { $0 = continuation }
+    }
   }
 
   /// What the agent answers to the next wireless request.
@@ -168,6 +211,35 @@ final class FakeClient: AgentSending {
       log.record("discardRecording \(id.serial)")
       clearRecordings()
       return .done
+    default:
+      return developerReply(request)
+    }
+  }
+
+  private func developerReply(_ request: AgentRequest) -> AgentResponse {
+    switch request {
+    case .stopLogcat(let id):
+      log.record("stopLogcat \(id.serial)")
+      endStream(with: .done)
+      return .done
+    case .forwards(let id):
+      log.record("forwards \(id.serial)")
+      return .forwards(forwardList.withLock { $0 })
+    case .addForward(let id, let forward):
+      log.record("addForward \(id.serial) \(forward.local) \(forward.remote)")
+      let reply = forwardReply.withLock { $0 }
+      if reply == .done { forwardList.withLock { $0.append(forward) } }
+      return reply
+    case .removeForward(let id, let local):
+      log.record("removeForward \(id.serial) \(local)")
+      forwardList.withLock { $0.removeAll { $0.local == local } }
+      return forwardReply.withLock { $0 }
+    case .deviceInfo(let id):
+      log.record("deviceInfo \(id.serial)")
+      return infoReply.withLock { $0 }
+    case .shellTarget(let id):
+      log.record("shellTarget \(id.serial)")
+      return shellReply.withLock { $0 }
     default:
       return .failure(.unsupported("\(request)"))
     }
@@ -276,6 +348,23 @@ final class FakeServices: SystemServicing {
   func chooseAPK() async -> URL? {
     log.record("chooseAPK")
     return pickedAPK
+  }
+
+  /// What the save panel for a log returns: `nil` is Cancel.
+  var logDestination: URL?
+  /// The scripts handed to Terminal, and whether it opens them.
+  var terminalScripts: [URL] = []
+  var terminalOpens = true
+
+  func chooseLogDestination(suggestedName: String) async -> URL? {
+    log.record("chooseLogDestination \(suggestedName)")
+    return logDestination
+  }
+
+  func openInTerminal(_ script: URL) async -> Bool {
+    log.record("openInTerminal \(script.lastPathComponent)")
+    terminalScripts.append(script)
+    return terminalOpens
   }
 }
 

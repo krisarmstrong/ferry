@@ -267,7 +267,7 @@
       "title": "Tools over USB debugging",
       "symbol": "wrench.and.screwdriver",
       "paragraphs": [
-        "A device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) shows Install App…, Screenshot and Record Screen under its name. A device on file transfer shows More tools with USB debugging… instead."
+        "A device Ferry reaches over ADB (USB · ADB or Wi-Fi · ADB in the menu) shows Install App…, Screenshot and Record Screen under its name, and a Developer Tools menu. A device on file transfer shows More tools with USB debugging… instead."
       ],
       "groups": [
         {
@@ -284,6 +284,32 @@
             "Ferry saves them where macOS saves its own screenshots (the Desktop, unless you chose another folder in the Screenshot app), named like macOS's own, such as Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png, and shows them in Finder. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device.",
             "If Ferry can't save a recording, the menu shows Recording couldn't be saved: Choose Folder… saves it where you pick, and Discard deletes it from the device. Record Screen returns once it is saved or discarded. An ejected device keeps its recording until Ferry serves it again.",
             "A device whose screen is off sends a black screenshot, and a recording of a screen that does not change has a single frame."
+          ]
+        },
+        {
+          "title": "Logcat",
+          "paragraphs": [
+            "Choose Developer Tools, then Logcat…, to watch the device's log in a window of its own. Ferry keeps the newest 50,000 lines. Level shows lines at that level and above, and Filter shows the lines that contain your text, whatever its case. Pause freezes the window while lines keep arriving, and Resume catches up. Clear empties it.",
+            "Save… writes the lines that match the filters to a plain text file where you choose. The log stops when you close the window or the device goes away."
+          ]
+        },
+        {
+          "title": "Open a shell",
+          "paragraphs": [
+            "Choose Developer Tools, then Open Shell, to open Terminal with a shell on the device (adb shell). Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it."
+          ]
+        },
+        {
+          "title": "Forward a port",
+          "paragraphs": [
+            "Choose Developer Tools, then Port Forwarding…, to send connections to a port on this Mac to a port on the device. Type the port on this Mac (1024 or higher) and the port on the device, then click Add. Remove ends a forward.",
+            "If the port on this Mac is already in use, the window shows adb's message. Ferry lists only the TCP forwards adb holds for this device."
+          ]
+        },
+        {
+          "title": "Device info",
+          "paragraphs": [
+            "Choose Developer Tools, then Device Info…, to see the model, Android version, build, serial number, battery, IP addresses and storage the device reports. Ferry only reads them. Copy puts them on the clipboard."
           ]
         }
       ]

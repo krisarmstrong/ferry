@@ -84,7 +84,8 @@ extension AgentService {
     case .status, .recheck, .recheckADB, .refresh, .eject, .removeAllDomains, .item, .list, .rename,
       .move, .delete, .changes, .workingSet, .connectAddress, .pair, .connectWireless,
       .enableWireless, .forgetWireless, .confirmWireless, .ignoreWireless, .startRecording,
-      .stopRecording, .discardRecording:
+      .stopRecording, .discardRecording, .startLogcat, .stopLogcat, .forwards, .addForward,
+      .removeForward, .deviceInfo, .shellTarget:
       false
     }
   }

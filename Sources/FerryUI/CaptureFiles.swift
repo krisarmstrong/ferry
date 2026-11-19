@@ -14,11 +14,13 @@ enum CaptureFiles {
   enum Kind {
     case screenshot
     case recording
+    case logcat
 
     var prefix: String {
       switch self {
       case .screenshot: "Screenshot"
       case .recording: "Screen Recording"
+      case .logcat: "Logcat"
       }
     }
 
@@ -26,6 +28,7 @@ enum CaptureFiles {
       switch self {
       case .screenshot: "png"
       case .recording: "mp4"
+      case .logcat: "txt"
       }
     }
   }
