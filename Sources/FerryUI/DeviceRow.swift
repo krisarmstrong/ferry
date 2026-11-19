@@ -138,16 +138,23 @@ private struct DeviceDetails: View {
     if recording == .unsaved {
       MenuRow(
         title: Text("Choose Folder…", bundle: .module), symbol: "folder",
-        indent: MenuMetrics.actionIndent, action: tools.chooseFolder)
+        indent: MenuMetrics.actionIndent, action: tools.chooseFolder
+      )
+      .deviceAction(LocalizedStringResource("Choose Folder…", bundle: .module), on: tools.name)
       MenuRow(
         title: Text("Discard", bundle: .module), symbol: "trash",
-        indent: MenuMetrics.actionIndent, action: tools.discard)
+        indent: MenuMetrics.actionIndent, action: tools.discard
+      )
+      .deviceAction(LocalizedStringResource("Discard", bundle: .module), on: tools.name)
     }
     if hint == .moreTools {
       MenuRow(
         title: Text("More Tools with USB Debugging…", bundle: .module),
         symbol: "wrench.and.screwdriver", indent: MenuMetrics.actionIndent,
-        action: showUSBDebugging)
+        action: showUSBDebugging
+      )
+      .deviceAction(
+        LocalizedStringResource("More Tools with USB Debugging…", bundle: .module), on: tools.name)
     }
   }
 
