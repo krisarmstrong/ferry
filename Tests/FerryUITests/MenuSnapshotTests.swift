@@ -65,6 +65,11 @@ struct MenuSnapshotTests {
     // Launching reads the login item, which the fake has on: Open at Login shows its checkmark.
     await model.launch()
     #expect(model.opensAtLogin)
+    // A form open when the menu opens stays open, so it is opened before the menu draws.
+    if shown == .pairForm {
+      model.toggleNetworkForm(.code)
+      model.networkForm?.address = "192.0.2.31:37123"
+    }
     let appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
     let view = NSHostingView(
       rootView: MenuContent(model: model)
@@ -81,16 +86,10 @@ struct MenuSnapshotTests {
     while model.shownDetails(of: Self.usb.id) != .loaded(Self.details) {
       await Self.change(of: model) { _ = $0.details }
     }
-    switch shown {
-    case .forwards:
+    if shown == .forwards {
       await model.toggleForwards(of: Self.usb.id)
       #expect(model.openForwards(of: Self.usb.id)?.forwards.count == 1)
-    case .pairForm:
-      model.toggleNetworkForm(.code)
-      model.networkForm?.address = "192.0.2.31:37123"
     }
-    // Lets the main actor turn over, so the view takes in what changed, without waiting.
-    for _ in 0..<5 { await Task.yield() }
     view.frame = CGRect(origin: .zero, size: view.fittingSize)
     view.layoutSubtreeIfNeeded()
     let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
@@ -140,6 +139,8 @@ struct MenuSnapshotTests {
   @Test func theMenuDrawsWithPairWithCodeOpen() async throws {
     let bitmap = try await drawnMenu(.light, showing: .pairForm)
     #expect(bitmap.size.width == 320)
+    // Everything from the header to Quit Ferry, with the form's two fields and hint.
+    #expect(bitmap.size.height > 700)
     #expect(drawnPixels(bitmap) > 1_000)
     guard let folder = ProcessInfo.processInfo.environment["FERRY_MENU_SNAPSHOTS"] else { return }
     let png = try #require(bitmap.representation(using: .png, properties: [:]))

@@ -36,14 +36,20 @@ struct AppModelNetworkFormTests {
     #expect(log.all.isEmpty)
   }
 
-  /// A form opened starts clean: the last network message belonged to something else.
-  @Test func openingAFormClearsTheLastMessage() async {
+  /// The form shows only its own answers: what Use over Wi-Fi says stays in the status row, a
+  /// form open or not.
+  @Test func messagesFromElsewhereStayInTheStatusRow() async {
     client.setWireless(.wireless(.needsNetwork))
     let model = model()
     await model.useOverWiFi(DeviceID(serial: "A1"))
-    #expect(model.wirelessMessage != nil)
+    let message = model.wirelessMessage
+    #expect(message != nil)
     model.toggleNetworkForm(.address)
-    #expect(model.wirelessMessage == nil)
+    #expect(model.wirelessMessage == message)
+    #expect(model.networkForm?.message == nil)
+    await model.useOverWiFi(DeviceID(serial: "A1"))
+    #expect(model.wirelessMessage == message)
+    #expect(model.networkForm?.message == nil)
   }
 
   @Test(arguments: [
@@ -61,8 +67,7 @@ struct AppModelNetworkFormTests {
     #expect(model.networkForm?.canSend == sendable)
   }
 
-  /// A failure keeps the form, what was typed and the reason; the status row leaves the reason
-  /// to the form while it is open.
+  /// A failure keeps the form, what was typed and the reason, which is the form's alone.
   @Test func aFailureKeepsTheFormWithItsReason() async {
     client.setWireless(.wireless(.failed(.otherDevice)))
     let model = model()
@@ -71,10 +76,12 @@ struct AppModelNetworkFormTests {
     await model.submitNetworkForm()
     #expect(model.networkForm?.address == "192.0.2.99")
     #expect(model.networkForm?.isSending == false)
-    #expect(model.wirelessMessage == "That address belongs to another device.")
-    #expect(model.wirelessStatusMessage == nil)
-    model.toggleNetworkForm(.address)
+    #expect(model.networkForm?.message == "That address belongs to another device.")
     #expect(model.wirelessMessage == nil)
+    // Typing again, or sending again, starts without the old reason.
+    model.toggleNetworkForm(.address)
+    model.toggleNetworkForm(.address)
+    #expect(model.networkForm?.message == nil)
   }
 
   /// Waiting for Allow closes the form; the menu's status row then says what to do.
@@ -86,7 +93,7 @@ struct AppModelNetworkFormTests {
     model.networkForm?.address = "192.0.2.31"
     await model.submitNetworkForm()
     #expect(model.networkForm == nil)
-    #expect(model.wirelessStatusMessage == "Tap Allow on the device to finish connecting.")
+    #expect(model.wirelessMessage == "Tap Allow on the device to finish connecting.")
   }
 
   /// Collapsing the form while it sends cancels the request, and its answer is never shown.

@@ -21,6 +21,9 @@ struct NetworkForm: Equatable {
   var code = ""
   /// Sent, and waiting for the agent.
   var isSending = false
+  /// Why the last send failed, shown under the fields. It can carry adb's words, so it is shown
+  /// verbatim.
+  var message: String?
 
   /// What the fields send, once they hold an address (and a code); the agent checks them again.
   var request: AgentRequest? {
@@ -48,11 +51,6 @@ struct WirelessReply: Sendable {
 /// Reaching devices over the network: the Connect by Address and Pair with Code forms, Use over
 /// Wi-Fi on a device on USB debugging, and remembered devices.
 extension AppModel {
-  /// The network message the menu's status row shows: while a form is open, the form shows it.
-  var wirelessStatusMessage: String? {
-    networkForm == nil ? wirelessMessage : nil
-  }
-
   /// Opens a form, closing the other, or closes it if it is open. From then on the menu offers
   /// adb if it is missing.
   public func toggleNetworkForm(_ kind: WirelessForm) {
@@ -69,22 +67,28 @@ extension AppModel {
     networkSend?.cancel()
     networkSend = nil
     networkForm = nil
-    wirelessMessage = nil
   }
 
-  /// Sends the open form. Done, it closes and the menu says what follows (waiting for Allow on
-  /// the device); otherwise it stays, with the reason under its fields.
+  /// Sends the open form. Done, it closes and the menu's status row says what follows (waiting
+  /// for Allow on the device); otherwise it stays, with the reason under its fields. The form
+  /// shows only its own answers: Use over Wi-Fi and the rest speak in the status row.
   func submitNetworkForm() async {
     guard let form = networkForm, form.canSend, let request = form.request else { return }
     networkForm?.isSending = true
+    networkForm?.message = nil
     let send = Task { await wirelessReply(request) }
     networkSend = send
     let reply = await send.value
     // Collapsed or replaced meanwhile: the answer is not this form's.
     if networkSend == send {
       networkSend = nil
-      wirelessMessage = reply.message
-      if reply.done { networkForm = nil } else { networkForm?.isSending = false }
+      if reply.done {
+        networkForm = nil
+        wirelessMessage = reply.message
+      } else {
+        networkForm?.isSending = false
+        networkForm?.message = reply.message
+      }
     }
     await refresh()
   }

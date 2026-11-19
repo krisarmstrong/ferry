@@ -112,7 +112,7 @@ struct AppModelWirelessTests {
     client.setWireless(.wireless(outcome))
     let model = model(client)
     #expect(await send(model, .address, address: "192.0.2.99") == false)
-    #expect(model.wirelessMessage == message)
+    #expect(model.networkForm?.message == message)
   }
 
   @Test func useOverWiFiAndForgetAndConnectAgainReachTheAgent() async {

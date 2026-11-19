@@ -53,8 +53,9 @@ import os
   private(set) var connectedAddresses: [DeviceID: WirelessEndpoint] = [:]
   /// New addresses for known devices, waiting for the user to say Use It or Ignore.
   public private(set) var unconfirmed: [UnconfirmedAddress] = []
-  /// What the last network request said, for the open form or the menu; `nil` once it
-  /// connected. It can carry adb's words, so it is shown verbatim.
+  /// What the last network request said, for the menu's status row; `nil` once it connected. A
+  /// form's failure stays in the form (`NetworkForm.message`). It can carry adb's words, so it
+  /// is shown verbatim.
   public internal(set) var wirelessMessage: String?
   /// The network form open under the network rows, with what was typed in it.
   var networkForm: NetworkForm?

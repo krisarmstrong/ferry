@@ -109,7 +109,7 @@ public struct MenuContent: View {
       StatusRow(
         symbol: "hand.raised", title: Text(verbatim: DevicePresentation.waitingLine(for: address)))
     }
-    if let message = model.wirelessStatusMessage {
+    if let message = model.wirelessMessage {
       StatusRow(symbol: "wifi.exclamationmark", title: Text(verbatim: message))
     }
     if let message = model.toolMessage {
