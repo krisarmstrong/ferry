@@ -5,17 +5,20 @@ import Foundation
 /// keyboard. A value, so the window's behaviour is tested without drawing it.
 struct HelpNavigator: Equatable {
   let content: HelpContent
-  var query = ""
+  var query = "" {
+    didSet { shownCategories = content.categories(matching: query) }
+  }
   private(set) var selection: String
+  /// The categories and topics the search shows, worked out once per query.
+  private(set) var shownCategories: [HelpCategory]
   /// The message a Help link opened, which the detail scrolls to and marks.
   private(set) var highlighted: String?
 
   init(content: HelpContent, selection: String) {
     self.content = content
     self.selection = selection
+    shownCategories = content.categories
   }
-
-  var shownCategories: [HelpCategory] { content.categories(matching: query) }
 
   var shownTopics: [HelpTopic] { shownCategories.flatMap(\.topics) }
 

@@ -12,6 +12,27 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 struct HelpContent: Decodable, Sendable, Equatable {
   let version: Int
   let categories: [HelpCategory]
+  /// Each topic's words as search reads them, by topic id: built once, with the help.
+  let searchIndex: [String: HelpSearchIndex]
+
+  private enum CodingKeys: String, CodingKey {
+    case version, categories
+  }
+
+  init(version: Int, categories: [HelpCategory]) {
+    self.version = version
+    self.categories = categories
+    searchIndex = Dictionary(
+      categories.flatMap(\.topics).map { ($0.id, HelpSearchIndex($0)) },
+      uniquingKeysWith: { first, _ in first })
+  }
+
+  init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      version: try container.decode(Int.self, forKey: .version),
+      categories: try container.decode([HelpCategory].self, forKey: .categories))
+  }
 
   /// The help that ships in the bundle, or `nil` if it is missing or does not decode. The tests
   /// check it, so that is a build defect, logged as a fault; the Help window then says help is
@@ -39,12 +60,10 @@ struct HelpContent: Decodable, Sendable, Equatable {
   /// ignoring case, diacritics and Markdown; a category with none is left out. Every category
   /// for an empty query.
   func categories(matching query: String) -> [HelpCategory] {
-    let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    let query = HelpSearchIndex.folded(query.trimmingCharacters(in: .whitespacesAndNewlines))
     guard !query.isEmpty else { return categories }
     return categories.compactMap { category in
-      let topics = category.topics.filter { topic in
-        topic.strings.contains { HelpText.plain($0).localizedStandardContains(query) }
-      }
+      let topics = category.topics.filter { searchIndex[$0.id]?.contains(query) == true }
       return topics.isEmpty ? nil : HelpCategory(title: category.title, topics: topics)
     }
   }
@@ -52,6 +71,29 @@ struct HelpContent: Decodable, Sendable, Equatable {
   /// The topic that explains the message whose catalog key is `key`.
   func topic(forMessage key: String) -> HelpTopic? {
     topics.first { topic in topic.messages.contains { $0.message == key } }
+  }
+}
+
+/// A topic's words as the reader sees them, without Markdown, folded for search.
+struct HelpSearchIndex: Sendable, Equatable {
+  let title: String
+  /// Every string the topic shows, its title among them.
+  let text: [String]
+
+  init(_ topic: HelpTopic) {
+    title = Self.folded(HelpText.plain(topic.title))
+    text = topic.strings.map { Self.folded(HelpText.plain($0)) }
+  }
+
+  /// `string` ignoring case, diacritics and width, as search compares it.
+  static func folded(_ string: String) -> String {
+    string.folding(
+      options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+  }
+
+  /// Whether the topic mentions `query`, already folded.
+  func contains(_ query: String) -> Bool {
+    text.contains { $0.contains(query) }
   }
 }
 

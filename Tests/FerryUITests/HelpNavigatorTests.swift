@@ -189,3 +189,32 @@ struct HelpRequestTests {
     #expect(model.takeHelpRequest() == nil)
   }
 }
+
+/// Search reads a plain-text index built once with the help, not each string's Markdown on every
+/// keystroke.
+struct HelpSearchIndexTests {
+  private static let help = HelpContent.bundled ?? HelpContent(version: 0, categories: [])
+
+  @Test func theIndexHoldsEveryTopicFoldedOnce() throws {
+    #expect(Self.help.searchIndex.count == Self.help.topics.count)
+    let topic = try #require(Self.help.topics.first { $0.id == "menu" })
+    let entry = try #require(Self.help.searchIndex["menu"])
+    #expect(entry.title == HelpSearchIndex.folded(HelpText.plain(topic.title)))
+    // Markdown is gone and case and diacritics are folded: "**Refresh**" reads "refresh".
+    #expect(entry.text.contains { $0.contains("refresh") })
+    #expect(!entry.text.contains { $0.contains("**") })
+  }
+
+  @Test func foldingIgnoresCaseDiacriticsAndWidth() {
+    #expect(HelpSearchIndex.folded("Chécking ＡＢ") == "checking ab")
+  }
+
+  /// The navigator works out what the search shows once per query, not per read.
+  @Test func theShownTopicsFollowTheQuery() {
+    var navigator = HelpNavigator(content: Self.help, selection: "menu")
+    navigator.query = "telemetry"
+    #expect(navigator.shownTopics.map(\.id) == ["privacy"])
+    navigator.query = ""
+    #expect(navigator.shownTopics.count == Self.help.topics.count)
+  }
+}
