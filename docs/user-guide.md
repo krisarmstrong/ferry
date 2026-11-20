@@ -268,7 +268,7 @@ A file the device changed since Finder last showed it is not deleted. Finder put
 
 #### Folders named like apps
 
-A folder on the device named like an app or a document package, such as Tool.app or Notes.rtfd, shows in Finder as an app or a document, because macOS goes by the name. It is read-only on the Mac, with everything in it: edit it on the device, or copy it to the Mac. Something put inside one stays on the Mac, and Finder shows an error for it. Saving one from a Mac app can leave a copy beside it, such as Notes 2.rtfd, which Finder marks with an error, with the edit only on the Mac: copy it to the Mac to keep it. A folder can't be renamed to such a name. To remove one, delete it on the device, or delete the folder that holds it; Finder may put that folder back once, so delete it again.
+A folder on the device named like an app or a document package, such as Tool.app or Notes.rtfd, shows in Finder as an app or a document, because macOS goes by the name. Android's own app folders count too: Android/data/com.example.app reads as an app. It is read-only on the Mac, with everything in it: edit it on the device, or copy it to the Mac. Something put inside one stays on the Mac, and Finder shows an error for it. Saving one from a Mac app can leave a copy beside it, such as Notes 2.rtfd, which Finder marks with an error, with the edit only on the Mac: copy it to the Mac to keep it. A folder can't be renamed to such a name. To remove one, delete it on the device, or delete the folder that holds it; Finder may put that folder back once, so delete it again.
 
 ### When a file changed on both sides
 
@@ -280,10 +280,12 @@ Ferry never replaces a file the device changed without you seeing it.
 
 How quickly Finder shows a change made on the device depends on how Ferry reaches it.
 
-- **USB debugging or Wi-Fi**: Changes show up in Finder on their own.
+Ferry watches the 32 folders Finder showed most recently on each device. A change in a folder you have not opened shows up when you open it. While a copy to or from the device runs, Ferry checks for changes again once it ends.
+
+- **USB debugging or Wi-Fi**: Changes show up in Finder within a few seconds, and within about 30 seconds at most.
 - **File transfer**: New and deleted files show up within about 30 seconds. A file changed in place or renamed on the device needs **Refresh**.
 
-**Refresh** in the Ferry menu shows every change at once.
+**Refresh** in the Ferry menu (⌘R while the menu is open) shows every change at once.
 
 ### Send files from Finder
 
@@ -323,7 +325,7 @@ Click a device to see what you can do with it, and click it again to close it. O
 
 #### Menu items
 
-- **Refresh**: Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds.
+- **Refresh**: Press ⌘R while the menu is open. Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds.
 - **Open at Login**: Starts Ferry when you log in. A checkmark shows it is on. **Needs approval in System Settings** means macOS is waiting for you to allow it there.
 - **Help**: Opens this window. Press ⌘? while the menu is open. Here, ⌘F goes to the search field, Return opens the best match, and ⌘[ and ⌘] step through the topics. A **?** beside a problem in the menu opens its entry here.
 - **Quit Ferry**: Closes the menu. The helper keeps running, so devices stay in Finder.
