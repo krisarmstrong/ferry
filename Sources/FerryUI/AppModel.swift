@@ -240,12 +240,24 @@ import os
     services.open(Self.loginItemsSettings)
   }
 
-  /// Registers the agent, reads its status, then whether Ferry opens at login. The system calls
+  /// Starts the agent, reads its status, then whether Ferry opens at login. The system calls
   /// run off the main actor (see `SystemServices`), so the app opens without waiting on them.
   public func launch() async {
-    await services.registerAgent()
+    await startAgent()
     await refresh()
     loginItem = await services.loginItemStatus()
+  }
+
+  /// Registers the agent, or restarts it when the agent in the bundle is not the one last
+  /// started: after an update the old agent keeps running until it stops, and would serve the
+  /// new app and extensions its old code. Without the agent's identity it only registers.
+  private func startAgent() async {
+    guard let build = services.agentBuild(), build != services.startedAgentBuild() else {
+      await services.registerAgent()
+      return
+    }
+    await services.restartAgent()
+    services.recordStartedAgent(build)
   }
 
   /// The Open at Login row: shows `enabled` at once, then applies it after any change still

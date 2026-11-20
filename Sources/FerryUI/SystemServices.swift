@@ -27,6 +27,14 @@ public enum LoginItemStatus: Sendable, Equatable {
 public protocol SystemServicing {
   /// Registers the agent, which launchd then starts on demand. Registering again is harmless.
   func registerAgent() async
+  /// The agent executable in the bundle, by its code directory hash; `nil` if unreadable.
+  func agentBuild() -> String?
+  /// The agent `recordStartedAgent` last recorded.
+  func startedAgentBuild() -> String?
+  func recordStartedAgent(_ build: String)
+  /// Stops the running agent and registers the one in the bundle, then has macOS read the
+  /// bundle again, so the extensions it holds are the bundle's too.
+  func restartAgent() async
   /// What macOS says about the helper now.
   func helperStatus() async -> HelperStatus
   /// Whether Ferry opens at login.
@@ -93,6 +101,51 @@ public final class SystemServices: SystemServicing {
         Self.log.error("registering the agent failed: \(error, privacy: .public)")
       }
       Self.log.info("agent status: \(Self.describe(agent.status), privacy: .public)")
+    }.value
+  }
+
+  /// Where `recordStartedAgent` keeps the agent last started.
+  private nonisolated static let startedAgentKey = "StartedAgentBuild"
+
+  public func agentBuild() -> String? {
+    let agent = Bundle.main.bundleURL.appending(path: "Contents/MacOS/FerryAgent")
+    var code: SecStaticCode?
+    var information: CFDictionary?
+    guard SecStaticCodeCreateWithPath(agent as CFURL, [], &code) == errSecSuccess, let code,
+      SecCodeCopySigningInformation(code, [], &information) == errSecSuccess,
+      let hash = (information as? [String: Any])?[kSecCodeInfoUnique as String] as? Data
+    else { return nil }
+    return hash.map { String(format: "%02x", $0) }.joined()
+  }
+
+  public func startedAgentBuild() -> String? {
+    UserDefaults.standard.string(forKey: Self.startedAgentKey)
+  }
+
+  public func recordStartedAgent(_ build: String) {
+    UserDefaults.standard.set(build, forKey: Self.startedAgentKey)
+  }
+
+  public func restartAgent() async {
+    let bundle = Bundle.main.bundleURL
+    await Task.detached(priority: .utility) {
+      let agent = SMAppService.agent(plistName: Self.agentPlist)
+      // Waits until launchd has stopped the old agent. Not registered (a first launch) is fine.
+      do {
+        try await agent.unregister()
+      } catch {
+        Self.log.info("unregistering the agent to restart it: \(error, privacy: .public)")
+      }
+      do {
+        try agent.register()
+      } catch {
+        Self.log.error("registering the agent failed: \(error, privacy: .public)")
+      }
+      Self.log.info("agent restarted, status: \(Self.describe(agent.status), privacy: .public)")
+      let registered = LSRegisterURL(bundle as CFURL, true)
+      if registered != noErr {
+        Self.log.error("registering the bundle with Launch Services failed: \(registered)")
+      }
     }.value
   }
 
