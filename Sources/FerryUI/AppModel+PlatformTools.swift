@@ -22,10 +22,13 @@ enum PlatformToolsFetch: Equatable {
 
 struct PlatformToolsState {
   var fetch = PlatformToolsFetch.idle
-  /// This release pins a newer adb under a license the user has not accepted yet.
+  /// The bundled license text is not one the user accepted, and Ferry has fetched adb before.
   var licenseChanged = false
   /// The fetch running, the user's or a quiet update, one at most.
   var task: Task<Void, Never>?
+  /// Whether the running fetch shows its progress and outcome: a quiet update becomes the
+  /// user's when they ask for adb while it runs.
+  var shown = false
 }
 
 /// Get Android Platform Tools…: Ferry downloads Google's adb once the user has accepted Google's
@@ -98,10 +101,14 @@ extension AppModel {
   }
 
   /// A quiet update shows nothing, and on failure leaves the adb Ferry has for the next launch to
-  /// replace.
+  /// replace. The user asking while one runs takes it over rather than starting another.
   private func fetchPlatformTools(shown: Bool) {
+    if shown {
+      platformTools.shown = true
+      platformTools.fetch = .fetching
+    }
     guard platformTools.task == nil else { return }
-    if shown { platformTools.fetch = .fetching }
+    platformTools.shown = shown
     platformTools.task = Task {
       defer { platformTools.task = nil }
       do throws(PlatformToolsError) {
@@ -113,7 +120,7 @@ extension AppModel {
       } catch {
         Self.log.error(
           "fetching the platform tools: \(String(describing: error), privacy: .public)")
-        platformTools.fetch = shown ? .failed(error) : .idle
+        platformTools.fetch = platformTools.shown ? .failed(error) : .idle
       }
     }
   }

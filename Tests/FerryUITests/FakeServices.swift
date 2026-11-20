@@ -172,8 +172,8 @@ final class FakeServices: SystemServicing {
   var fetchedVersion: String?
   /// How the next fetches end, in order; once it is empty they succeed.
   var fetchOutcomes: [PlatformToolsError] = []
-  /// Set: a fetch waits until it is cancelled, and each one held is announced on
-  /// `fetchesHeld`.
+  /// Set: a fetch waits until it is cancelled or `releaseFetch()` lets it go on, and each one
+  /// held is announced on `fetchesHeld`.
   var holdsFetch = false
   private var heldFetch: CheckedContinuation<Void, Never>?
   let (fetchesHeld, fetchHeld) = AsyncStream<Void>.makeStream()
@@ -186,6 +186,13 @@ final class FakeServices: SystemServicing {
   }
 
   func fetchedPlatformToolsVersion() -> String? { fetchedVersion }
+
+  /// Lets the held fetch go on to its outcome.
+  func releaseFetch() {
+    holdsFetch = false
+    heldFetch?.resume()
+    heldFetch = nil
+  }
 
   func fetchPlatformTools(accepted: LicenseAcceptance?) async throws(PlatformToolsError) {
     log.record("fetchPlatformTools \(accepted?.version ?? "none")")
@@ -202,7 +209,7 @@ final class FakeServices: SystemServicing {
           self.heldFetch = nil
         }
       }
-      throw .cancelled
+      if Task.isCancelled { throw .cancelled }
     }
     if !fetchOutcomes.isEmpty { throw fetchOutcomes.removeFirst() }
     fetchedVersion = PlatformToolsRelease.pinned.version

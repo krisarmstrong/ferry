@@ -133,6 +133,31 @@ struct AppModelPlatformToolsTests {
     #expect(model.platformToolsRow == .failed(.offline))
   }
 
+  /// Accept while a quiet update runs: the user's request takes it over, and sees its progress
+  /// and how it ends.
+  @Test(arguments: [nil, PlatformToolsError.offline])
+  func acceptDuringAQuietUpdateTakesItOver(failure: PlatformToolsError?) async {
+    let client = FakeClient(log: log)
+    client.setStatus([device("A1", model: "Pixel 8", .ready([]))], adb: .notInstalled)
+    let services = FakeServices(log: log)
+    services.fetchedVersion = "36.0.0"
+    services.acceptance = Self.accepted
+    services.holdsFetch = true
+    services.fetchOutcomes = failure.map { [$0] } ?? []
+    let model = model(client, services)
+    await model.launch()
+    var held = services.fetchesHeld.makeAsyncIterator()
+    await held.next()
+    #expect(model.platformToolsRow == .offer)
+    model.acceptLicense()
+    #expect(model.platformToolsRow == .fetching)
+    services.releaseFetch()
+    await model.platformToolsSettled()
+    #expect(log.all.filter { $0.hasPrefix("fetchPlatformTools") }.count == 1)
+    #expect(model.platformToolsRow == failure.map { .failed($0) } ?? .offer)
+    #expect(log.all.contains("recheckADB") == (failure == nil))
+  }
+
   @Test func cancelStopsTheDownload() async {
     let (client, services) = missingAdb()
     services.holdsFetch = true
