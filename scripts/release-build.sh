@@ -46,10 +46,11 @@ case "$sign" in
 esac
 
 xcodegen generate --quiet
-# CLibMTP finds libmtp through pkg-config: the pinned build, not Homebrew's.
+# CLibMTP finds libmtp through pkg-config: the pinned build, not Homebrew's. Clean first: an
+# incremental build can keep an earlier copy of the agent in Contents/MacOS.
 PKG_CONFIG_PATH="$deps/lib/pkgconfig" xcodebuild -project Ferry.xcodeproj -scheme Ferry \
   -configuration Release -destination 'platform=macOS,arch=arm64' -derivedDataPath "$derived" \
-  -quiet "${signing[@]}" ${extra[@]+"${extra[@]}"} build
+  -quiet "${signing[@]}" ${extra[@]+"${extra[@]}"} clean build
 
 # Inside out: the libraries the agent loads, Sparkle's helpers (Sparkle's documented order),
 # then the app, whose seal covers them all.

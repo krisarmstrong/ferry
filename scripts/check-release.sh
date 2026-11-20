@@ -1,9 +1,11 @@
 #!/bin/bash
-# Checks what only a release build must have (`make check-app CONFIG=Release`): libmtp and
-# libusb inside the bundle and nothing loaded from Homebrew; and, for a build signed by the team,
-# the real Sparkle key, the HTTPS feed, and the hardened runtime, a Developer ID signature and a
-# secure timestamp on every executable. An ad hoc build (scripts/update-dry-run.sh) has a test
-# key and a local feed, and no Developer ID signature.
+# Checks what only a release build must have (`make check-app CONFIG=Release`):
+# - libmtp and libusb inside the bundle, their LGPL texts and source offer, nothing from Homebrew;
+# - no executable allowing a debugger to attach (get-task-allow), which notarization refuses;
+# - for a build signed by the team: the real Sparkle key, the HTTPS feed, and on every
+#   executable the hardened runtime, a Developer ID signature and a secure timestamp.
+# An ad hoc build (CI, scripts/update-dry-run.sh) has a test key or none, a local feed or the
+# real one, and no Developer ID signature.
 #
 # Usage: scripts/check-release.sh <Ferry.app> <team|adhoc>
 set -euo pipefail
@@ -18,13 +20,26 @@ fail() {
 for lib in libmtp.9.dylib libusb-1.0.0.dylib; do
   [ -f "$app/Contents/Frameworks/$lib" ] || fail "no $lib in $app/Contents/Frameworks"
 done
+licenses="$app/Contents/Resources/Licenses"
+for text in "$licenses"/libusb-*-COPYING.txt "$licenses"/libmtp-*-COPYING.txt \
+  "$licenses/README.txt"; do
+  [ -s "$text" ] || fail "no $text"
+done
+echo "release build carries libmtp and libusb, their licences and where their source is"
+
+executables=()
 while IFS= read -r -d '' file; do
-  file -b "$file" | grep -q 'Mach-O' || continue
+  file -b "$file" | grep -q 'Mach-O' && executables+=("$file")
+done < <(find "$app" -type f -print0)
+for file in "${executables[@]}"; do
   if otool -L "$file" | tail -n +2 | grep -E '/opt/homebrew/|/usr/local/' >&2; then
     fail "$file links a library outside the bundle and the system"
   fi
-done < <(find "$app" -type f -print0)
-echo "release build carries libmtp and libusb and links nothing from Homebrew"
+  if codesign -d --entitlements - --xml "$file" 2> /dev/null | grep -q 'get-task-allow'; then
+    fail "$file is signed with com.apple.security.get-task-allow"
+  fi
+done
+echo "no executable (${#executables[@]}) links Homebrew or allows a debugger to attach"
 
 [ "$sign" = adhoc ] && exit 0
 
@@ -40,14 +55,13 @@ feed="https://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xm
   || fail "SUFeedURL is not $feed"
 echo "release build carries the Sparkle key and its HTTPS feed"
 
-for code in "$app" "$app/Contents/MacOS/FerryAgent" "$app/Contents/PlugIns/FerryProvider.appex" \
-  "$app/Contents/PlugIns/FerrySync.appex"; do
-  details="$(codesign -dv --verbose=2 "$code" 2>&1)"
+for file in "${executables[@]}"; do
+  details="$(codesign -dv --verbose=2 "$file" 2>&1)"
   grep -q '^CodeDirectory.*flags=.*runtime' <<< "$details" \
-    || fail "$code is not signed with the hardened runtime"
+    || fail "$file is not signed with the hardened runtime"
   grep -q '^Authority=Developer ID Application:' <<< "$details" \
-    || fail "$code is not signed with a Developer ID Application certificate"
-  grep -q '^Timestamp=' <<< "$details" || fail "$code has no secure timestamp"
+    || fail "$file is not signed with a Developer ID Application certificate"
+  grep -q '^Timestamp=' <<< "$details" || fail "$file has no secure timestamp"
 done
 codesign --verify --deep --strict "$app" || fail "$app does not verify"
-echo "release build is signed with Developer ID, the hardened runtime and timestamps"
+echo "every executable is signed with Developer ID, the hardened runtime and a timestamp"
