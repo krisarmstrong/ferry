@@ -100,7 +100,9 @@ struct FileProviderDomains: DomainManaging {
   func providerState() async -> ProviderState {
     do {
       return ProviderState(
-        domainsEnabled: try await NSFileProviderManager.domains().map(\.userEnabled))
+        domains: try await NSFileProviderManager.domains().map {
+          (enabled: $0.userEnabled, hidden: $0.isHidden)
+        })
     } catch {
       log.error("listing domains failed: \(error, privacy: .private)")
       return .noDomains

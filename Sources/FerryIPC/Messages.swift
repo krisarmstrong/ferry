@@ -116,11 +116,14 @@ public enum ProviderState: String, Codable, Sendable {
   case enabled
   /// Every domain is off: the user has a step to take.
   case disabled
-  /// No domain exists yet, because no device has been ready, so there is nothing to turn on.
+  /// No domain is in Finder: none exists yet, or every one is hidden because its device is
+  /// away, so there is nothing to turn on.
   case noDomains
 
-  /// The state of domains whose `userEnabled` flags are `enabled`.
-  public init(domainsEnabled enabled: [Bool]) {
+  /// The state of domains with these `userEnabled` and `isHidden` flags. A hidden domain is not
+  /// in Finder, so whether it is turned on asks nothing of the user: it is left out.
+  public init(domains: [(enabled: Bool, hidden: Bool)]) {
+    let enabled = domains.filter { !$0.hidden }.map(\.enabled)
     if enabled.isEmpty {
       self = .noDomains
     } else {

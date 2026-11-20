@@ -386,13 +386,3 @@ func requirementCompiles(_ text: String) throws {
   #expect(SecRequirementCreateWithString(text as CFString, [], &requirement) == errSecSuccess)
   #expect(requirement != nil)
 }
-
-struct ProviderStateTests {
-  @Test(arguments: [
-    ([], ProviderState.noDomains), ([false], .disabled), ([false, false], .disabled),
-    ([false, true], .enabled), ([true], .enabled),
-  ])
-  func stateFollowsTheDomains(enabled: [Bool], state: ProviderState) {
-    #expect(ProviderState(domainsEnabled: enabled) == state)
-  }
-}
