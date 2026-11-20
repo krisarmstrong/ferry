@@ -183,9 +183,9 @@ public struct MenuContent: View {
         forget: { Task { await model.forget(device.id) } }),
       tools: ToolActions(
         model: model, device: device.id,
-        open: { window in
+        openLogcat: {
           NSApp.activate()
-          openWindow(id: window.windowID, value: device.id)
+          openWindow(id: LogcatWindow.windowID, value: device.id)
         }))
   }
 

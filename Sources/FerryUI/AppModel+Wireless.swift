@@ -3,7 +3,7 @@ import FerryIPC
 import Foundation
 
 /// The network forms that open in place under the menu's network rows.
-public enum WirelessForm: Hashable, Sendable, CaseIterable {
+public enum WirelessForm: Hashable, Sendable {
   /// Connect by Address: for devices that accept ADB over the network.
   case address
   /// Pair with Code: Android 11+ Wireless debugging.

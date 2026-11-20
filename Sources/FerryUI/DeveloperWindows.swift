@@ -1,19 +1,8 @@
 import DeviceKit
 import SwiftUI
 
-/// The windows the developer tools open, one per device: each is a window group over the
-/// device, so two devices have two windows and opening one again brings it forward.
-public enum DeveloperWindow: Sendable {
-  case logcat
-
-  public var windowID: String {
-    switch self {
-    case .logcat: "logcat"
-    }
-  }
-}
-
-/// The scenes of the developer tools' windows, for the app's `body`.
+/// The scenes of the developer tools' windows, for the app's `body`: Logcat, a window group over
+/// the device, so two devices have two windows and opening one again brings it forward.
 public struct DeveloperScenes: Scene {
   private let model: AppModel
 

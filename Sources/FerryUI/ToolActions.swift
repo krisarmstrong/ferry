@@ -34,8 +34,8 @@ struct ToolActions {
   let copyAddress: (DevicePresentation.DetailLine) -> Void
   let copyAllDetails: (DevicePresentation.DetailLine) -> Void
 
-  /// `open` shows one of the developer windows for the device.
-  init(model: AppModel, device: DeviceID, open: @escaping (DeveloperWindow) -> Void) {
+  /// `openLogcat` shows the device's Logcat window.
+  init(model: AppModel, device: DeviceID, openLogcat: @escaping () -> Void) {
     name = model.windowName(of: device)
     install = model.installs[device]
     recording = model.recording(on: device)
@@ -49,7 +49,7 @@ struct ToolActions {
     stopRecording = { Task { await model.stopRecording(on: device) } }
     chooseFolder = { Task { await model.chooseRecordingDestination(on: device) } }
     discard = { Task { await model.discardRecording(on: device) } }
-    openLogcat = { open(.logcat) }
+    self.openLogcat = openLogcat
     openShell = { Task { await model.openShell(on: device) } }
     forwards = model.openForwards(of: device)
     toggleForwards = { Task { await model.toggleForwards(of: device) } }

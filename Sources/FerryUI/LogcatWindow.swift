@@ -5,7 +5,7 @@ import SwiftUI
 /// follow the end of the log unless it is paused, and a line below with how many are shown. The
 /// stream stops when the window closes.
 public struct LogcatWindow: View {
-  public static let windowID = DeveloperWindow.logcat.windowID
+  public static let windowID = "logcat"
   public static let windowTitle = Text("Logcat", bundle: .module)
 
   @State private var session: LogcatSession

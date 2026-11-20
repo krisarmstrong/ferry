@@ -138,7 +138,7 @@ struct MenuTextFieldTests {
     await model.refresh()
     await model.toggleForwards(of: id)
     let session = try #require(model.openForwards(of: id))
-    let window = hosted(PortForwardRows(tools: ToolActions(model: model, device: id) { _ in }))
+    let window = hosted(PortForwardRows(tools: ToolActions(model: model, device: id) {}))
     defer { window.close() }
     let content = try #require(window.contentView)
     let fields = textFields(in: content)
