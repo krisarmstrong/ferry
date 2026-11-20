@@ -195,7 +195,7 @@ Ferry never searches the network. It connects only to addresses you give it, and
 1. Connect the device to Ethernet or Wi-Fi.
 2. Connect it to the Mac by cable, with USB debugging on.
 3. Click the device in the menu, then **Use over Wi-Fi**.
-4. Unplug the cable. The device stays in Finder over the network.
+4. Unplug the cable. Ferry still reaches the device over the network, so it stays in Finder.
 
 Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again.
 
@@ -239,7 +239,7 @@ Anyone on a network can claim a device's serial number. So when a new address an
 
 Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs.
 
-A device appears in Finder only while it is connected. When you unplug it, or it leaves the network, its location leaves the sidebar, and it comes back with its files when the device connects again.
+A device appears in Finder only while Ferry can reach it. When it is unplugged and not on the network, locked, or not sharing files, its location leaves the sidebar. It comes back with its files when Ferry can reach it again.
 
 A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number.
 

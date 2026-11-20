@@ -367,8 +367,8 @@ must not contain file names. Therefore:
   the agent and never leave it. When a device is unplugged (or otherwise not
   served, including at agent start), its domain is disconnected and hidden from
   Finder (`NSFileProviderDomain.isHidden`, set by adding the domain again under
-  the same identifier), not removed: Finder shows a device only while it is
-  connected, and a replug reconnects and shows the same domain with its files
+  the same identifier), not removed: Finder shows a device only while Ferry can
+  reach it, and a replug reconnects and shows the same domain with its files
   and unsent changes. "Eject" in the menu removes
   it, keeping any changes not yet sent to the device (the system moves them aside
   and the menu says where). Removing a location, by Eject or "Remove Ferry", keeps
