@@ -70,7 +70,7 @@ Full instructions: [User guide](docs/user-guide.md). The same help is in the app
 
 ## Build from source
 
-Requires Xcode 27 (Swift 6.4), [XcodeGen](https://github.com/yonaskolb/XcodeGen),
+Requires Xcode 26.6 or later (Swift 6.3), [XcodeGen](https://github.com/yonaskolb/XcodeGen),
 SwiftLint and Homebrew's libmtp.
 
 ```sh
