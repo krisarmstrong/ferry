@@ -107,6 +107,7 @@ with a note.
 | Menu polling stops when the menu closes | pass |
 | No "Move to Trash" (Ferry has no trash); stale pre-fix domain re-added in place | pass |
 | Unplug mid-copy; replug returns the same location | not run (needs the cable pulled by hand) |
+| Unplug: location leaves the sidebar and CloudStorage; replug: it is back and a folder opens | not run (needs the cable pulled by hand) |
 | Eject from the menu: Finder location removed, device released (`ferryctl` can open it) | pass |
 | Agent restart (`launchctl kickstart -k`): device re-admitted, location back and browsable | pass |
 | Remove Ferry (Help → Troubleshooting, confirm): app quits, agent unregistered, all locations gone, device released | pass |
