@@ -509,6 +509,12 @@ macOS did not let Ferry watch for devices being plugged in.
 
 Nothing to do: devices still appear, a little later. Restart the Mac if it stays.
 
+**Unsent changes were saved to …**
+
+You ejected the device before some changes reached it. macOS kept those files in a folder on the Mac. Deletes and renames that had not reached the device were dropped.
+
+Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again.
+
 ### USB debugging messages
 
 Messages about ADB, adb and allowing this Mac.

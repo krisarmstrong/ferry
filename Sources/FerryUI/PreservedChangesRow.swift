@@ -9,11 +9,16 @@ struct PreservedChangesRow: View {
 
   var body: some View {
     ForEach(locations, id: \.self) { location in
-      StatusRow(
-        symbol: "doc.on.doc",
-        title: Text("Unsent changes were saved to \(Self.shown(location))", bundle: .module))
+      let line = Self.line(location)
+      StatusRow(symbol: "doc.on.doc", title: Text(verbatim: line.text), help: line.help)
     }
     StatusAction(title: Text("Reveal in Finder", bundle: .module), action: reveal)
+  }
+
+  /// What the row says, with its entry in Help.
+  static func line(_ location: URL) -> MenuNotice {
+    MenuNotice(
+      LocalizedStringResource("Unsent changes were saved to \(shown(location))", bundle: .module))
   }
 
   /// The path with the home folder as `~`. The folder can be named after a device, which

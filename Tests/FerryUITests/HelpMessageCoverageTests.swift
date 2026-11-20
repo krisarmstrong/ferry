@@ -38,6 +38,7 @@ struct HelpMessageCoverageTests {
     ("trouble-device", "Error: %@"),
     ("trouble-device", "Cancelled."),
     ("trouble-device", "Ferry can't watch USB for devices, so it looks for them every 30 seconds."),
+    ("trouble-device", "Unsent changes were saved to %@"),
     ("trouble-adb", "Waiting for Allow"),
     ("trouble-adb", "Allow USB debugging on the device"),
     ("trouble-adb", "Install adb for more tools…"),
@@ -252,6 +253,18 @@ struct HelpMessageCoverageTests {
     #expect(others.isDisjoint(with: covered))
     let missing = keys.subtracting(covered).subtracting(others)
     #expect(missing.isEmpty, "\(module) messages without Help: \(missing.sorted())")
+  }
+
+  /// Every FerryUI key is Help's own words, a message in the table, or a label listed in
+  /// `FerryUILabels`: a new problem line cannot reach the menu without someone deciding.
+  @Test func everyFerryUIStringIsHelpAMessageOrALabel() throws {
+    let keys = try Self.catalogKeys("FerryUI")
+    let help = Set(Self.help.categories.map(\.title) + Self.help.topics.flatMap(\.strings))
+    let messages = Set(Self.table.map(\.message))
+    let unclassified = keys.subtracting(help).subtracting(messages).subtracting(FerryUILabels.keys)
+    #expect(unclassified.isEmpty, "FerryUI strings to classify: \(unclassified.sorted())")
+    #expect(FerryUILabels.keys.isSubset(of: keys), "\(FerryUILabels.keys.subtracting(keys))")
+    #expect(FerryUILabels.keys.isDisjoint(with: messages.union(help)))
   }
 
   /// Help shows each message in its exact words, with "…" for a value shown with it.

@@ -2139,6 +2139,15 @@
     },
     "A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number." : {
       "extractionState" : "manual"
+    },
+    "Unsent changes were saved to …" : {
+      "extractionState" : "manual"
+    },
+    "You ejected the device before some changes reached it. macOS kept those files in a folder on the Mac. Deletes and renames that had not reached the device were dropped." : {
+      "extractionState" : "manual"
+    },
+    "Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again." : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.0"

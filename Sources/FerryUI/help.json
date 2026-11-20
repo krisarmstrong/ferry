@@ -646,6 +646,11 @@
               "message": "Ferry can't watch USB for devices, so it looks for them every 30 seconds.",
               "cause": "macOS did not let Ferry watch for devices being plugged in.",
               "fix": "Nothing to do: devices still appear, a little later. Restart the Mac if it stays."
+            },
+            {
+              "message": "Unsent changes were saved to %@",
+              "cause": "You ejected the device before some changes reached it. macOS kept those files in a folder on the Mac. Deletes and renames that had not reached the device were dropped.",
+              "fix": "Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again."
             }
           ]
         },

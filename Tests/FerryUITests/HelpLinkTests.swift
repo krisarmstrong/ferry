@@ -78,6 +78,9 @@ struct HelpLinkTests {
     }
     Self.expectExplained(DevicePresentation.waitingLine(for: "192.0.2.31:5555"), "waiting")
     Self.expectExplained(DevicePresentation.terminalFailure, "terminal")
+    let saved = PreservedChangesRow.line(URL(filePath: "/tmp/Unsent"))
+    #expect(saved.text == "Unsent changes were saved to /tmp/Unsent")
+    Self.expectExplained(saved, "unsent changes")
   }
 
   /// The model's own failures, shown in the menu's error row.
