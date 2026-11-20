@@ -55,8 +55,12 @@ jobs:
           installed="$(brew list --versions libmtp | awk '{print $2}')"
           [ "$installed" = "$LIBMTP_VERSION" ] \
             || { echo "::error::libmtp is $installed, CI expects $LIBMTP_VERSION"; exit 1; }
-      # One test at a time: several suites bound real waits (a fake device's 3 s answer limit,
-      # a 1 s backlog), and the runner's three cores miss them when 1,400 tests run at once.
+      # One test at a time: some ADB suites bound real waits, and the runner's three cores miss
+      # them when 1,400 tests run at once (run 44737853314): ADBTransportTimeoutTests and
+      # ADBTransportRetryTests (answer limits), ADBWakeTests (the wake limit), ADBWirelessTests
+      # and ADBToolsLogcatTests (a 1 s backlog) against a fake adb server over real sockets, and
+      # WirelessADBFixRound2Tests (500 ms connects). They need an injected clock, as the hub
+      # suites have, before this can go.
       - name: Lint, format check, test
         run: make lint fmt-check test TEST_FLAGS=--no-parallel
       - name: Build the app, ad hoc signed
