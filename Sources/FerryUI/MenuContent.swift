@@ -32,11 +32,8 @@ public struct MenuContent: View {
     }
     .padding(6)
     .frame(width: 320, alignment: .leading)
-    .environment(\.openHelp) { key in
-      model.showHelp(forMessage: key)
-      NSApp.activate()
-      openWindow(id: HelpView.windowID)
-    }
+    // For the Help links beside its problems (see `HelpLinkButton`).
+    .environment(model)
     .task { await model.watchWhileMenuOpen() }
     .onChange(of: model.guideOpenPending, initial: true) { _, _ in
       if model.takeGuideOpenRequest() {

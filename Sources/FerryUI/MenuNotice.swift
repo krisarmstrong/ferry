@@ -19,22 +19,20 @@ public struct MenuNotice: Equatable, Sendable {
   }
 }
 
-extension EnvironmentValues {
-  /// Opens Help on the entry for a message's catalog key. The menu sets it; a view without it
-  /// shows no Help link.
-  @Entry var openHelp: (@MainActor (String) -> Void)?
-}
-
 /// The Help link beside a problem in the menu: a question mark that opens the problem's entry in
-/// Help. Nothing when the message has no entry or the menu gives no way to open Help.
+/// Help. Nothing when the message has no entry, or outside the menu, which puts its model in the
+/// environment.
 struct HelpLinkButton: View {
-  @Environment(\.openHelp) private var openHelp
+  @Environment(AppModel.self) private var model: AppModel?
+  @Environment(\.openWindow) private var openWindow
   let key: String?
 
   var body: some View {
-    if let key, let openHelp {
+    if let key, let model {
       Button {
-        openHelp(key)
+        model.showHelp(forMessage: key)
+        NSApp.activate()
+        openWindow(id: HelpView.windowID)
       } label: {
         Image(systemName: "questionmark.circle")
           .foregroundStyle(.secondary)
