@@ -40,19 +40,20 @@ struct AppModelDetailsTests {
 
   private var reads: Int { log.all.filter { $0 == "deviceInfo \(id.serial)" }.count }
 
-  /// The menu's first status expanded the device, and its read has started.
+  /// The user expanded the device after the first status, and its read has started.
   private func expanded(_ client: FakeClient) async -> AppModel {
     let model = model(client)
     await model.refresh()
+    model.toggleExpansion(.device(id))
     #expect(model.isExpanded(.device(id)))
-    model.loadExpandedDetailsIfDue()
     return model
   }
 
   @Test func expandingADeviceReadsItsDetails() async {
     let model = model(client())
     await model.refresh()
-    model.toggleExpansion(.device(id))
+    // Nothing is expanded, so nothing is read, until the user opens the device.
+    #expect(!model.isExpanded(.device(id)))
     await model.detailsSettled()
     #expect(reads == 0)
     model.toggleExpansion(.device(id))
@@ -79,13 +80,16 @@ struct AppModelDetailsTests {
     #expect(reads == 2)
   }
 
-  /// While the menu is open, the expanded device is read on its first status and every 10 s
+  /// While the menu is open, the device the user expanded is read at once and every 10 s
   /// after, on the menu's 2 s cadence: at 0, 10 and 20 s of 22.
   @Test func anOpenMenuRefreshesTheExpandedDevice() async {
     let holder = ModelHolder()
     let ticks = Mutex(0)
     let clock = clock
+    let id = id
     let model = model(client()) { _ in
+      // The user opens the device after the first status, before any time passes.
+      if ticks.withLock({ $0 }) == 0 { await holder.model?.toggleExpansion(.device(id)) }
       clock.advance(.seconds(2))
       await holder.model?.detailsSettled()
       let tick = ticks.withLock { tick in
@@ -142,28 +146,19 @@ struct AppModelDetailsTests {
     #expect(model.shownDetails(of: id) == .loaded(Self.info))
   }
 
-  /// The menu closing while the status request runs starts no read.
-  @Test func noReadStartsOnceTheMenuCloses() async {
-    let client = HeldInfoClient(client())
-    let model = AppModel(
-      client: client, services: FakeServices(log: log), sleep: { _ in }, now: clock.now)
-    let watch = Task { await model.watchWhileMenuOpen() }
-    client.onStatus.withLock { $0 = { watch.cancel() } }
-    await watch.value
-    #expect(model.isExpanded(.device(id)))
-    #expect(model.detailReads.isEmpty)
-    #expect(model.shownDetails(of: id) == DetailsShown.hidden)
-  }
-
-  /// Closing the menu cancels a read still running, and the next open reads again at once.
+  /// Closing the menu cancels a read still running, and the row's next read starts at once.
   @Test func closingTheMenuCancelsARunningRead() async {
     let client = HeldInfoClient(client())
+    let holder = ModelHolder()
+    let id = id
     let model = AppModel(
       client: client, services: FakeServices(log: log),
       sleep: { _ in
+        await holder.model?.toggleExpansion(.device(id))
         await client.arrival()
         throw CancellationError()
       }, now: clock.now)
+    holder.model = model
     await model.watchWhileMenuOpen()
     let read = model.detailReads[id]
     #expect(read?.task.isCancelled == true)
@@ -188,7 +183,7 @@ struct AppModelDetailsTests {
     let model = AppModel(
       client: client, services: FakeServices(log: log), sleep: { _ in }, now: clock.now)
     await model.refresh()
-    model.loadExpandedDetailsIfDue()
+    model.toggleExpansion(.device(id))
     await client.arrival()
 
     let status = fake.statusReply
@@ -222,8 +217,9 @@ struct AppModelDetailsTests {
 
   /// No view reads the running reads, so starting one redraws nothing on their account.
   @Test func theRunningReadsAreNotObserved() async {
-    let model = model(client())
-    await model.refresh()
+    let model = await expanded(client())
+    await model.detailsSettled()
+    clock.advance(.seconds(10))
     let changed = Mutex(false)
     withObservationTracking {
       _ = model.detailReads

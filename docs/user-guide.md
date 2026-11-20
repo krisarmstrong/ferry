@@ -312,7 +312,7 @@ Control-click a file you opened and choose **Remove Download**. The file stays o
 
 The menu has a header with **Refresh**, then any problem that needs you, then your devices, then **Connect by Address…** and **Pair with Code…**, then **Open at Login**, **Help** and **Quit Ferry**.
 
-Click a device to see what you can do with it, and click it again to close it. One device is open at a time; the first ready one is open when the menu opens.
+Every device starts closed each time the menu opens. Click a device to see its details and what you can do with it, and click it again to close it. One device is open at a time, and it stays open while the menu is.
 
 - **Ready**: The device is sharing files and is in Finder. Under its name the menu shows how Ferry reaches it and the free space, such as USB · 21 GB free, or its address over Wi-Fi.
 - **Not sharing files**: File transfer is off or the device is locked. Choose **Transfer files** on the device, then **Refresh**.

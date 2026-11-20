@@ -5,8 +5,8 @@ import Testing
 
 @testable import FerryUI
 
-/// One row of the menu is expanded at a time; the first ready device starts expanded each time
-/// the menu opens.
+/// One row of the menu is expanded at a time, and only the user expands one: every row is
+/// collapsed each time the menu opens.
 @MainActor
 struct MenuExpansionTests {
   let log = CallLog()
@@ -30,28 +30,29 @@ struct MenuExpansionTests {
     return model
   }
 
-  @Test func theFirstReadyDeviceStartsExpanded() async {
+  @Test func everyRowStartsCollapsed() async {
     let client = FakeClient(log: log)
-    client.setStatus([Self.waiting, Self.first, Self.second])
-    let model = await openMenu(client)
-    #expect(model.expansion.expanded == .device(Self.first.id))
-  }
-
-  @Test func nothingIsExpandedWithoutAReadyDevice() async {
-    let client = FakeClient(log: log)
-    client.setStatus([Self.waiting], remembered: [Self.remembered])
+    client.setStatus([Self.waiting, Self.first, Self.second], remembered: [Self.remembered])
     let model = await openMenu(client)
     #expect(model.expansion.expanded == nil)
-    // The rows were there to expand: a ready device now is.
-    client.setStatus([Self.waiting, Self.first], remembered: [Self.remembered])
+  }
+
+  /// A device that becomes ready, or is plugged in, while the menu is open stays collapsed.
+  @Test func aDeviceThatBecomesReadyWhileOpenStaysCollapsed() async {
+    let client = FakeClient(log: log)
+    client.setStatus([Self.waiting])
+    let model = await openMenu(client)
+    let nowReady = device("A", model: "Pixel 8", .ready([]), method: .usbADB)
+    client.setStatus([nowReady, Self.first])
     await model.refresh()
-    #expect(model.expansion.expanded == .device(Self.first.id))
+    #expect(model.expansion.expanded == nil)
   }
 
   @Test func expandingARowCollapsesTheOther() async {
     let client = FakeClient(log: log)
     client.setStatus([Self.first, Self.second])
     let model = await openMenu(client)
+    model.toggleExpansion(.device(Self.first.id))
     model.toggleExpansion(.device(Self.second.id))
     #expect(model.expansion.expanded == .device(Self.second.id))
     #expect(!model.isExpanded(.device(Self.first.id)))
@@ -61,95 +62,19 @@ struct MenuExpansionTests {
     let client = FakeClient(log: log)
     client.setStatus([Self.first])
     let model = await openMenu(client)
+    model.toggleExpansion(.device(Self.first.id))
     #expect(model.expansion.expanded == .device(Self.first.id))
     model.toggleExpansion(.device(Self.first.id))
     #expect(model.expansion.expanded == nil)
   }
 
-  /// The menu refreshes every 2 s while open: a row the user collapsed stays collapsed.
-  @Test func aRefreshDoesNotExpandWhatTheUserCollapsed() async {
+  /// The menu refreshes every 2 s while open: the row the user opened stays open, whichever
+  /// devices become ready.
+  @Test func aRefreshKeepsTheOpenRowOpen() async {
     let client = FakeClient(log: log)
-    client.setStatus([Self.first])
+    client.setStatus([Self.waiting, Self.first])
     let model = await openMenu(client)
-    #expect(model.expansion.expanded == .device(Self.first.id))
     model.toggleExpansion(.device(Self.first.id))
-    #expect(model.expansion.expanded == nil)
-    await model.refresh()
-    #expect(model.expansion.expanded == nil)
-  }
-
-  @Test func aDeviceThatGoesAwayIsNoLongerExpanded() async {
-    let client = FakeClient(log: log)
-    client.setStatus([Self.first, Self.second])
-    let model = await openMenu(client)
-    model.toggleExpansion(.device(Self.second.id))
-    #expect(model.expansion.expanded == .device(Self.second.id))
-    client.setStatus([Self.first])
-    await model.refresh()
-    #expect(model.expansion.expanded == nil)
-  }
-
-  /// A device plugged in while the menu is open, before the user chose a row, is expanded.
-  @Test func aDeviceThatBecomesReadyWhileOpenIsExpanded() async {
-    let client = FakeClient(log: log)
-    client.setStatus([Self.waiting])
-    let model = await openMenu(client)
-    client.setStatus([Self.waiting, Self.first])
-    await model.refresh()
-    #expect(model.expansion.expanded == .device(Self.first.id))
-  }
-
-  @Test func reopeningTheMenuExpandsTheFirstReadyDeviceAgain() async {
-    let client = FakeClient(log: log)
-    client.setStatus([Self.first, Self.second])
-    let model = await openMenu(client)
-    model.toggleExpansion(.device(Self.second.id))
-    await model.watchWhileMenuOpen()
-    #expect(model.expansion.expanded == .device(Self.first.id))
-  }
-
-  /// Nothing refreshes while the menu is closed: on opening, the default follows the status the
-  /// open reads, not the list from the last open.
-  @Test func theDefaultFollowsTheStatusReadOnOpening() async {
-    let client = FakeClient(log: log)
-    client.setStatus([Self.waiting, Self.first])
-    let model = await openMenu(client)
-    #expect(model.expansion.expanded == .device(Self.first.id))
-    let nowReady = device("A", model: "Pixel 8", .ready([]), method: .usbADB)
-    client.setStatus([nowReady, Self.first])
-    await model.watchWhileMenuOpen()
-    #expect(model.expansion.expanded == .device(nowReady.id))
-  }
-
-  /// Opening the menu expands nothing until its first status arrives, so the default never
-  /// comes from the list the menu saw when it last closed.
-  @Test func nothingIsExpandedBeforeTheFirstStatus() async {
-    let client = FakeClient(log: log)
-    client.setStatus([Self.first])
-    let model = await openMenu(client)
-    #expect(model.expansion.expanded == .device(Self.first.id))
-    model.resetExpansion()
-    #expect(model.expansion.expanded == nil)
-  }
-
-  /// Ejecting the open device keeps its row open, so Mount is where the user is looking.
-  @Test func ejectingTheOpenDeviceKeepsItOpen() async {
-    let client = FakeClient(log: log)
-    client.setStatus([Self.first, Self.second])
-    let model = await openMenu(client)
-    #expect(model.expansion.expanded == .device(Self.first.id))
-    let ejected = device("B", model: "Galaxy S24", .ejected, method: .usbADB)
-    client.setStatus([ejected, Self.second])
-    await model.refresh()
-    #expect(model.expansion.expanded == .device(Self.first.id))
-  }
-
-  /// A device listed earlier that becomes ready does not take the expansion from the open row.
-  @Test func aDeviceListedEarlierBecomingReadyDoesNotMoveIt() async {
-    let client = FakeClient(log: log)
-    client.setStatus([Self.waiting, Self.first])
-    let model = await openMenu(client)
-    #expect(model.expansion.expanded == .device(Self.first.id))
     let nowReady = device("A", model: "Pixel 8", .ready([]), method: .usbADB)
     client.setStatus([nowReady, Self.first])
     await model.refresh()
@@ -161,10 +86,31 @@ struct MenuExpansionTests {
     let client = FakeClient(log: log)
     client.setStatus([Self.first, Self.second])
     let model = await openMenu(client)
-    #expect(model.expansion.expanded == .device(Self.first.id))
-    client.setStatus([Self.second])
+    model.toggleExpansion(.device(Self.second.id))
+    client.setStatus([Self.first])
     await model.refresh()
     #expect(model.expansion.expanded == nil)
+  }
+
+  @Test func reopeningTheMenuCollapsesEveryRow() async {
+    let client = FakeClient(log: log)
+    client.setStatus([Self.first, Self.second])
+    let model = await openMenu(client)
+    model.toggleExpansion(.device(Self.second.id))
+    await model.watchWhileMenuOpen()
+    #expect(model.expansion.expanded == nil)
+  }
+
+  /// Ejecting the open device keeps its row open, so Mount is where the user is looking.
+  @Test func ejectingTheOpenDeviceKeepsItOpen() async {
+    let client = FakeClient(log: log)
+    client.setStatus([Self.first, Self.second])
+    let model = await openMenu(client)
+    model.toggleExpansion(.device(Self.first.id))
+    let ejected = device("B", model: "Galaxy S24", .ejected, method: .usbADB)
+    client.setStatus([ejected, Self.second])
+    await model.refresh()
+    #expect(model.expansion.expanded == .device(Self.first.id))
   }
 
   /// A remembered device and an offer that names a known device are rows of their own, apart

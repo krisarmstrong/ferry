@@ -29,11 +29,11 @@ struct AppModelDetailCopyTests {
     AppModel(client: client, services: FakeServices(log: log), sleep: sleep)
   }
 
-  /// The menu's first status expanded the device, and its read has started.
+  /// The user expanded the device after the first status, and its read has started.
   private func expanded(_ client: FakeClient) async -> AppModel {
     let model = model(client)
     await model.refresh()
-    model.loadExpandedDetailsIfDue()
+    model.toggleExpansion(.device(id))
     return model
   }
 
@@ -88,7 +88,7 @@ struct AppModelDetailCopyTests {
     defer { sleeps.wakeAll() }
     let model = model(client(), sleep: sleeps.sleep)
     await model.refresh()
-    model.loadExpandedDetailsIfDue()
+    model.toggleExpansion(.device(id))
     await model.detailsSettled()
     async let copied: Void = model.click(line, modifiers: [.option], on: id)
     try #require(await sleeps.waitForSleeper())
@@ -127,7 +127,7 @@ struct AppModelDetailCopyTests {
     defer { sleeps.wakeAll() }
     let model = model(client(), sleep: sleeps.sleep)
     await model.refresh()
-    model.loadExpandedDetailsIfDue()
+    model.toggleExpansion(.device(id))
     await model.detailsSettled()
     async let all: Void = model.click(Self.line, modifiers: [.option], on: id)
     try #require(await sleeps.waitForSleeper())

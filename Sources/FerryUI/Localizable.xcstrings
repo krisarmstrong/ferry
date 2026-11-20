@@ -885,9 +885,6 @@
     "Collapsed" : {
 
     },
-    "Click a device to see what you can do with it, and click it again to close it. One device is open at a time; the first ready one is open when the menu opens." : {
-      "extractionState" : "manual"
-    },
     "When every selected file is an .apk and Ferry reaches the device over ADB (with USB debugging on, or over Wi-Fi), the menu also has **Install on** the device, which installs the apps as Install App… does." : {
       "extractionState" : "manual"
     },
@@ -2147,6 +2144,9 @@
       "extractionState" : "manual"
     },
     "Press ⌘R while the menu is open. Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds." : {
+      "extractionState" : "manual"
+    },
+    "Every device starts closed each time the menu opens. Click a device to see its details and what you can do with it, and click it again to close it. One device is open at a time, and it stays open while the menu is." : {
       "extractionState" : "manual"
     }
   },
