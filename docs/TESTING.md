@@ -25,7 +25,7 @@ one Android 8 or 9 device.
 
 | Device | Android | Integration suites | Large file (>4 GB) | Manual checklist | Date |
 | ------ | ------- | ------------------ | ------------------ | ---------------- | ---- |
-| NetAlly LinkRunner-100G (Android-based; no MoveObject) | AOSP MTP | pass (4/4; locked case not run) | pass | partial — see note | 2026-11-17 |
+| LinkRunner-100G (Android-based; no MoveObject) | AOSP MTP | pass (4/4; locked case not run) | pass | partial — see note | 2026-11-17 |
 | Owner's phone | — | not yet run | not yet run | not yet run | — |
 | Android 8 or 9 device | 8 / 9 | not yet run | not yet run | not yet run | — |
 

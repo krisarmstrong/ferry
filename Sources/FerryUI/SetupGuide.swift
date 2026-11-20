@@ -94,7 +94,7 @@ struct NumberedSteps: View {
   }
 }
 
-#Preview("NetAlly") {
+#Preview("Tester") {
   let model = AppModel.preview([])
   model.showGuide(for: PreviewClient.notSharing)
   return SetupGuide(model: model)

@@ -20,9 +20,9 @@ struct Target {
   let storage: StorageID
 }
 
-/// How to turn on file transfer; NetAlly steps from the AllyWare 3.x user guides.
+/// How to turn on file transfer; the testers' steps follow the AllyWare 3.x user guides.
 private let enableFileTransfer =
-  "NetAlly LinkRunner 10G/100G, EtherScope nXG: connect the left USB-C port, then "
+  "LinkRunner 10G/100G, EtherScope nXG: connect the left USB-C port, then "
   + "Settings > Connected devices > USB > Transfer files. Other Android: unlock it, tap the "
   + "USB notification, choose File transfer."
 

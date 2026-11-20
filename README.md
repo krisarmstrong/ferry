@@ -7,7 +7,7 @@
 <p align="center">Android devices in Finder, over USB and Wi-Fi.</p>
 
 Ferry is a small menu-bar app that shows Android devices as locations in Finder. It was built
-for field engineers who carry NetAlly network testers (LinkRunner 10G, EtherScope nXG,
+for field engineers who carry network testers (LinkRunner 10G, EtherScope nXG,
 LinkRunner 100G) and need to move test results, captures and files between the tester and a
 Mac. It works with other Android phones too. macOS has no built-in way to browse an Android
 device over USB; Ferry adds one that uses Finder itself, so you browse, open, copy, rename and
@@ -27,7 +27,7 @@ forwarding. It is free and open source (MIT), and it sends nothing to any server
 
 - macOS 26 or later, Apple silicon
 - A USB cable that carries data
-- An Android device with file transfer (MTP): NetAlly LinkRunner 10G, EtherScope nXG,
+- An Android device with file transfer (MTP): LinkRunner 10G, EtherScope nXG,
   LinkRunner 100G, or an Android 8+ phone
 - Optional, for USB debugging, Wi-Fi and the tools: `adb`, from Google's Android platform tools
   (`brew install --cask android-platform-tools`). Ferry never installs or bundles it.
