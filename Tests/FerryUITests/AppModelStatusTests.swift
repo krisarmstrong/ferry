@@ -136,8 +136,9 @@ struct AppModelLoginItemStatusTests {
     let model = model(services)
     await model.launch()
     services.holdsLoginItemChange = true
+    var held = services.loginItemChangesHeld.makeAsyncIterator()
     model.requestOpensAtLogin(false)
-    while services.heldLoginItemChange == nil { await Task.yield() }
+    await held.next()
     await model.readLoginItem()
     #expect(!model.opensAtLogin)
     services.releaseLoginItemChange()

@@ -111,8 +111,8 @@ struct AppModelTests {
         if count > 5 { throw CancellationError() }
       })
     await model.watchWhileMenuOpen()
-    // Opening the menu reads the login item once, then the status every 2 s.
-    #expect(log.all == ["readLoginItem"] + Array(repeating: "status", count: 6))
+    // The status every 2 s, and the login item once, after the first status.
+    #expect(log.all == ["status", "readLoginItem"] + Array(repeating: "status", count: 5))
     #expect(model.isGuidePresented)
   }
 

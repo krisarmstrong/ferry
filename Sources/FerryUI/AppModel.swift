@@ -192,13 +192,18 @@ import os
   public func watchWhileMenuOpen() async {
     // How long the menu has been open since the agent first answered.
     var answeredFor: Duration?
+    var loginItemRead = false
     resetExpansion()
-    await readLoginItem()
     while !Task.isCancelled {
       await refresh()
       // The menu may have closed while the status was read.
       guard !Task.isCancelled else { break }
       loadExpandedDetailsIfDue()
+      // Once per opening, after the first status, so the devices never wait on macOS.
+      if !loginItemRead {
+        loginItemRead = true
+        await readLoginItem()
+      }
       if agent == .running, answeredFor == nil { answeredFor = .zero }
       if let answeredFor { considerEmptyGuide(openFor: answeredFor) }
       do {

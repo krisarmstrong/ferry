@@ -9,9 +9,11 @@ final class FakeServices: SystemServicing {
   let log: CallLog
   var loginItem = LoginItemStatus.enabled
   var failLoginItem = false
-  /// Set: a login item change waits until `releaseLoginItemChange()`.
+  /// Set: a login item change waits until `releaseLoginItemChange()`, and each one held is
+  /// announced on `loginItemChangesHeld`.
   var holdsLoginItemChange = false
-  private(set) var heldLoginItemChange: CheckedContinuation<Void, Never>?
+  private var heldLoginItemChange: CheckedContinuation<Void, Never>?
+  let (loginItemChangesHeld, loginItemChangeHeld) = AsyncStream<Void>.makeStream()
   var helper = HelperStatus.allowed
   /// Whether the app's executable was replaced since launch.
   var replaced = false
@@ -36,7 +38,10 @@ final class FakeServices: SystemServicing {
   func setOpensAtLogin(_ enabled: Bool) async throws {
     log.record("opensAtLogin \(enabled)")
     if holdsLoginItemChange {
-      await withCheckedContinuation { heldLoginItemChange = $0 }
+      await withCheckedContinuation { continuation in
+        heldLoginItemChange = continuation
+        loginItemChangeHeld.yield()
+      }
     }
     if failLoginItem { throw CocoaError(.featureUnsupported) }
     loginItem = enabled ? .enabled : .disabled
