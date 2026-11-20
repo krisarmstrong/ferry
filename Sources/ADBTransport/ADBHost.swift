@@ -168,6 +168,8 @@ public actor ADBHost {
   /// Starts a server only when none answers. A server already running is used as it is,
   /// whichever adb started it: another adb's `start-server` against it could restart it.
   public func startServer() async throws(ADBError) {
+    // Any failure counts as no server; one that appears between this probe and the launch is
+    // left to `adb start-server`, a no-op against a server of its own version.
     if (try? await version()) != nil { return }
     guard let adb = locator.adbURL() else { throw .adbNotInstalled }
     try await launcher(adb)
