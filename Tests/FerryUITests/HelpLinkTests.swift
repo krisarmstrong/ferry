@@ -67,6 +67,9 @@ struct HelpLinkTests {
     let saved = PreservedChangesRow.line(URL(filePath: "/tmp/Unsent"))
     #expect(saved.text == "Unsent changes were saved to /tmp/Unsent")
     Self.expectExplained(saved, "unsent changes")
+    let waiting = WaitingChangesRow.line("Phone – SD card")
+    #expect(waiting.text == "Phone – SD card: changes wait to be sent. Reconnect it to finish.")
+    Self.expectExplained(waiting, "changes waiting")
   }
 
   /// The model's own failures, shown in the menu's error row.

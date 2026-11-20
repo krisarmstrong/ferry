@@ -521,6 +521,12 @@ You ejected the device before some changes reached it. macOS kept those files in
 
 Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again.
 
+**…: changes wait to be sent. Reconnect it to finish.**
+
+The device went away, or Ferry can no longer reach it, before some changes reached it. Its location left Finder, so the files that wait are not shown there. They stay on the Mac. An SD card has a location for each way Ferry reaches the device, so changes made on the card over a cable wait for the cable, even while the card shows over the network.
+
+Reconnect the device the same way as before, by cable or over the network. Its location comes back to Finder and the changes are sent; the line goes once they are.
+
 ### USB debugging messages
 
 Messages about ADB, adb and allowing this Mac.

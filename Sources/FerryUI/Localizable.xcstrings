@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@: changes wait to be sent. Reconnect it to finish." : {
+
+    },
     "A device appears in Finder only while Ferry can reach it. When it is unplugged and not on the network, locked, or not sharing files, its location leaves the sidebar. It comes back with its files when Ferry can reach it again." : {
       "extractionState" : "manual"
     },
@@ -30,6 +33,9 @@
     },
     "File transfer" : {
 
+    },
+    "Reconnect the device the same way as before, by cable or over the network. Its location comes back to Finder and the changes are sent; the line goes once they are." : {
+      "extractionState" : "manual"
     },
     "Removes Ferry's locations from Finder, stops Ferry's helper and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state." : {
       "extractionState" : "manual"
@@ -113,6 +119,9 @@
       "extractionState" : "manual"
     },
     "Ferry then connects to the address the device offers for connections, which is not the one it paired on." : {
+      "extractionState" : "manual"
+    },
+    "The device went away, or Ferry can no longer reach it, before some changes reached it. Its location left Finder, so the files that wait are not shown there. They stay on the Mac. An SD card has a location for each way Ferry reaches the device, so changes made on the card over a cable wait for the cable, even while the card shows over the network." : {
       "extractionState" : "manual"
     },
     "Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again." : {
@@ -2231,6 +2240,9 @@
       "extractionState" : "manual"
     },
     "Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices." : {
+      "extractionState" : "manual"
+    },
+    "…: changes wait to be sent. Reconnect it to finish." : {
       "extractionState" : "manual"
     }
   },

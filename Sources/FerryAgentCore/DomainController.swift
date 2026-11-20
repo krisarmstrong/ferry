@@ -16,6 +16,9 @@ public protocol DomainManaging: Sendable {
   func setHidden(_ identifier: String, hidden: Bool) async throws
   /// The identifiers of the Ferry domains the system hides from Finder now.
   func hiddenDomains() async throws -> Set<String>
+  /// Whether the domain's pending set holds changes not yet sent to its device. Answers in
+  /// bounded time, `false` when the system cannot say.
+  func hasUnsentChanges(_ identifier: String) async -> Bool
   /// Removes the domain, keeping changes not yet sent to the device, and returns where they were
   /// saved, if there were any.
   func remove(_ identifier: String) async throws -> URL?

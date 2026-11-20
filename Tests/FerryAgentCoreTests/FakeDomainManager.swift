@@ -76,6 +76,7 @@ actor FakeDomainManager: DomainManaging {
   func add(_ spec: DomainSpec) async throws {
     registered.insert(spec.identifier)
     hidden.remove(spec.identifier)
+    names[spec.identifier] = spec.displayName
     record(.add(spec))
     changed()
   }
@@ -161,6 +162,31 @@ actor FakeDomainManager: DomainManaging {
     let now = state
     for (id, waiter) in stateWaiters where waiter.done(now) {
       releaseStateWaiter(id)
+    }
+  }
+
+  /// The name the system shows for each domain, as the last add gave it or a test set it.
+  private var names: [String: String] = [:]
+
+  func displayName(of identifier: String) async -> String? { names[identifier] }
+
+  func setDisplayName(_ identifier: String, _ name: String) {
+    names[identifier] = name
+  }
+
+  /// Domains whose pending set holds changes not yet sent to the device.
+  private(set) var pending: Set<String> = []
+
+  func hasUnsentChanges(_ identifier: String) async -> Bool {
+    pending.contains(identifier)
+  }
+
+  /// Marks the domain as holding unsent changes, or as having sent them all.
+  func setPending(_ identifier: String, _ isPending: Bool) {
+    if isPending {
+      pending.insert(identifier)
+    } else {
+      pending.remove(identifier)
     }
   }
 

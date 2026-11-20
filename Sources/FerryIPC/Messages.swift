@@ -160,6 +160,9 @@ public struct StatusReport: Codable, Sendable, Equatable {
   /// The address adb serves each network device on now, for the menu; a device on USB, or one
   /// adb reaches by an mDNS name, has none.
   public let connectedAddresses: [DeviceID: WirelessEndpoint]
+  /// The names of hidden Finder locations (their device is away) still holding changes not
+  /// sent to the device, which nothing in Finder shows while the location is hidden.
+  public let waitingToSend: [String]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
@@ -167,7 +170,8 @@ public struct StatusReport: Codable, Sendable, Equatable {
     awaitingUSBDebugging: [DeviceID] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
-    sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:]
+    sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:],
+    waitingToSend: [String] = []
   ) {
     self.devices = devices
     self.provider = provider
@@ -181,6 +185,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.usbWatchFailed = usbWatchFailed
     self.sessions = sessions
     self.connectedAddresses = connectedAddresses
+    self.waitingToSend = waitingToSend
   }
 }
 

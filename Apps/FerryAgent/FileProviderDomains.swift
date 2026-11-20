@@ -114,6 +114,21 @@ struct FileProviderDomains: DomainManaging {
     Set(try await NSFileProviderManager.domains().filter(\.isHidden).map(\.identifier.rawValue))
   }
 
+  /// The domain's pending set holds anything (see `PendingProbe`), asked for at most 2 s.
+  func hasUnsentChanges(_ identifier: String) async -> Bool {
+    let manager: NSFileProviderManager
+    do {
+      manager = try await self.manager(identifier)
+    } catch {
+      log.error(
+        "no manager for \(identifier, privacy: .private): \(error, privacy: .private)")
+      return false
+    }
+    let enumerator = manager.enumeratorForPendingItems()
+    defer { enumerator.invalidate() }
+    return await PendingProbe.anyItem(in: enumerator, within: .seconds(2))
+  }
+
   func existing() async throws -> [String] {
     try await NSFileProviderManager.domains().map(\.identifier.rawValue)
   }

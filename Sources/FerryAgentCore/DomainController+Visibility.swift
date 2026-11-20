@@ -89,4 +89,22 @@ extension DomainController {
       domains[identifier]?.connected = false
     }
   }
+
+  /// The names of the locations whose device is away, so they are hidden, that still hold
+  /// changes not sent to the device, in name order. Finder shows pending files only in a shown
+  /// location, so the menu names these instead. A location from before the agent started has
+  /// the name the system shows for it.
+  public func locationsWaitingToSend() async -> [String] {
+    let away = domains.filter { !$0.value.connected }.map { ($0.key, $0.value.spec?.displayName) }
+    var names: [String] = []
+    for (identifier, known) in away {
+      guard await manager.hasUnsentChanges(identifier) else { continue }
+      if let name = known, !name.isEmpty {
+        names.append(name)
+      } else if let name = await manager.displayName(of: identifier) {
+        names.append(name)
+      }
+    }
+    return names.sorted()
+  }
 }

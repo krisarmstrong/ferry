@@ -657,6 +657,11 @@
               "message": "Unsent changes were saved to %@",
               "cause": "You ejected the device before some changes reached it. macOS kept those files in a folder on the Mac. Deletes and renames that had not reached the device were dropped.",
               "fix": "Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again."
+            },
+            {
+              "message": "%@: changes wait to be sent. Reconnect it to finish.",
+              "cause": "The device went away, or Ferry can no longer reach it, before some changes reached it. Its location left Finder, so the files that wait are not shown there. They stay on the Mac. An SD card has a location for each way Ferry reaches the device, so changes made on the card over a cable wait for the cable, even while the card shows over the network.",
+              "fix": "Reconnect the device the same way as before, by cable or over the network. Its location comes back to Finder and the changes are sent; the line goes once they are."
             }
           ]
         },
