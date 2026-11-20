@@ -2,6 +2,7 @@
 # Sets up everything a release needs that only the owner may handle. Run it yourself, in
 # Terminal, from the repository; it asks for each password and prints none of them.
 #
+#   0. Run scripts/repo-settings.sh first: the secrets go into its `release` environment.
 #   1. Export the Developer ID certificate first, in Keychain Access: My Certificates, select
 #      "Developer ID Application: Kris Armstrong (X6JWYP43HG)" (one row, with its key), File >
 #      Export Items…, save as .p12 with a new password. `security export` cannot pick one
@@ -25,17 +26,17 @@ sparkle_account=io.github.krisarmstrong.ferry
 # Developer ID certificate and key, for signing in the release workflow.
 read -r -s -p "Password of $p12: " p12_password
 echo
-base64 < "$p12" | gh secret set DEVELOPER_ID_P12_BASE64 --repo "$repo"
-printf '%s' "$p12_password" | gh secret set DEVELOPER_ID_P12_PASSWORD --repo "$repo"
+base64 < "$p12" | gh secret set DEVELOPER_ID_P12_BASE64 --repo "$repo" --env release
+printf '%s' "$p12_password" | gh secret set DEVELOPER_ID_P12_PASSWORD --repo "$repo" --env release
 unset p12_password
 
 # App Store Connect API key, for notarytool: in GitHub, and in your keychain as the
 # "ferry-notary" profile for notarizing by hand (xcrun notarytool ... --keychain-profile).
 read -r -p "Key ID of $p8 (10 characters): " key_id
 read -r -p "Issuer ID (App Store Connect > Integrations, above the keys): " issuer_id
-printf '%s' "$key_id" | gh secret set NOTARY_KEY_ID --repo "$repo"
-printf '%s' "$issuer_id" | gh secret set NOTARY_ISSUER_ID --repo "$repo"
-gh secret set NOTARY_KEY_P8 --repo "$repo" < "$p8"
+printf '%s' "$key_id" | gh secret set NOTARY_KEY_ID --repo "$repo" --env release
+printf '%s' "$issuer_id" | gh secret set NOTARY_ISSUER_ID --repo "$repo" --env release
+gh secret set NOTARY_KEY_P8 --repo "$repo" --env release < "$p8"
 xcrun notarytool store-credentials ferry-notary --key "$p8" --key-id "$key_id" \
   --issuer "$issuer_id"
 
@@ -50,13 +51,13 @@ echo "$sparkle_sha256  $tools/sparkle.tar.xz" | shasum -a 256 -c --status \
 tar -xJf "$tools/sparkle.tar.xz" -C "$tools"
 "$tools/bin/generate_keys" --account "$sparkle_account" > /dev/null
 "$tools/bin/generate_keys" --account "$sparkle_account" -x "$tools/sparkle-private-key"
-gh secret set SPARKLE_PRIVATE_KEY --repo "$repo" < "$tools/sparkle-private-key"
+gh secret set SPARKLE_PRIVATE_KEY --repo "$repo" --env release < "$tools/sparkle-private-key"
 public_key="$("$tools/bin/generate_keys" --account "$sparkle_account" -p)"
 PUBLIC_KEY="$public_key" perl -pi -e \
   's/^(    FERRY_SPARKLE_PUBLIC_KEY: )FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER$/$1$ENV{PUBLIC_KEY}/' \
   project.yml
 
-gh secret list --repo "$repo"
+gh secret list --repo "$repo" --env release
 echo
 echo "Sparkle public key: $public_key (now in project.yml; commit it on a branch and open a PR)."
 echo "Back up the private key: Keychain Access, login keychain, \"Private key for signing Sparkle updates\""

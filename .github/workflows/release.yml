@@ -5,16 +5,13 @@ name: Release
 # appcast, and publishes the release as the latest, whose appcast every installed Ferry reads
 # from releases/latest/download/appcast.xml. A release made with GITHUB_TOKEN starts no other
 # workflow, so the build runs here, after release-please.
-# workflow_dispatch builds the assets of an existing release again.
+# Signing runs only for the tag release-please just made, on main, in the protected `release`
+# environment that holds the secrets (scripts/repo-settings.sh). To retry a failed build, re-run
+# the failed jobs: the release is still a draft.
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Release tag to build again, such as v0.2.0
-        required: true
 
 permissions:
   contents: read
@@ -26,7 +23,7 @@ concurrency:
 jobs:
   release-please:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -42,16 +39,15 @@ jobs:
 
   build:
     needs: release-please
-    if: >-
-      always() && (github.event_name == 'workflow_dispatch'
-      || needs.release-please.outputs.created == 'true')
+    if: needs.release-please.outputs.created == 'true'
     runs-on: macos-26
+    environment: release
     permissions:
       contents: write
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: "1"
-      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release-please.outputs.tag }}
+      TAG: ${{ needs.release-please.outputs.tag }}
       XCODEGEN_VERSION: 2.46.0
       XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
       SPARKLE_VERSION: 2.10.1
@@ -74,13 +70,27 @@ jobs:
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::missing repository secrets: ${missing[*]} (see scripts/release-secrets.sh)"
+            echo "::error::missing secrets of the release environment: ${missing[*]} (see scripts/release-secrets.sh)"
             exit 1
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 0
           persist-credentials: false
+      # Nothing is signed unless the tag is the draft release-please just made, on main.
+      - name: Check the tag is release-please's, on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          git merge-base --is-ancestor "$commit" origin/main \
+            || { echo "::error::$TAG ($commit) is not on main"; exit 1; }
+          release="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,tagName,author)"
+          jq -e --arg tag "$TAG" \
+            '.isDraft and .tagName == $tag and .author.login == "github-actions[bot]"' \
+            <<< "$release" > /dev/null \
+            || { echo "::error::$TAG is not a draft release by release-please: $release"; exit 1; }
       - name: Install XcodeGen, pkg-config and Sparkle's tools
         run: |
           test -d "$DEVELOPER_DIR" || { echo "::error::$DEVELOPER_DIR is not on this image"; exit 1; }

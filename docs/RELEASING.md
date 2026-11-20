@@ -2,6 +2,20 @@
 
 Releases come from release-please and `.github/workflows/release.yml`; nobody tags by hand.
 
+## Once
+
+1. `scripts/repo-settings.sh`: the `release` environment (deployments from `main` and `v*`
+   tags only), a ruleset that keeps `v*` tags from being moved or deleted, and branch protection
+   requiring the CI `check`.
+2. `scripts/release-secrets.sh <developer-id.p12> <AuthKey_….p8>`: the signing, notarization and
+   Sparkle secrets, in the `release` environment, and the Sparkle public key in `project.yml`
+   (commit it through a PR).
+
+The build job signs only when the tag is the draft release release-please just created, and
+the tag's commit is on `main`.
+
+## Each release
+
 1. Merge conventional commits to `main`. release-please keeps a release PR open with the next
    version (before 1.0: `feat` is minor, `fix` a patch) and the CHANGELOG.
 2. Merge the release PR. release-please tags `vX.Y.Z` and creates the GitHub release as a
