@@ -7,10 +7,10 @@ import Testing
 
 struct HelpContentTests {
   private static let help =
-    HelpContent.bundled ?? HelpContent(version: 0, sections: [])
+    HelpContent.bundled ?? HelpContent(version: 0, categories: [])
 
-  private static func section(_ id: String) throws -> HelpSection {
-    try #require(help.sections.first { $0.id == id })
+  private static func topic(_ id: String) throws -> HelpTopic {
+    try #require(help.topics.first { $0.id == id })
   }
 
   private static func decode(_ json: String) throws -> HelpContent {
@@ -19,46 +19,58 @@ struct HelpContentTests {
 
   @Test func bundledHelpDecodes() {
     #expect(HelpContent.bundled != nil)
-    #expect(Self.help.version == 1)
-    #expect(Self.help.sections.first?.id == "getting-started")
-    #expect(Set(Self.help.sections.map(\.id)).count == Self.help.sections.count)
-    // Each section shows something besides its title.
-    #expect(Self.help.sections.allSatisfy { $0.strings.count > 1 })
+    #expect(Self.help.version == 2)
+    #expect(Self.help.topics.first?.id == "getting-started")
+    #expect(Set(Self.help.topics.map(\.id)).count == Self.help.topics.count)
+    #expect(Self.help.categories.allSatisfy { !$0.topics.isEmpty })
+    // Each topic shows something besides its title.
+    #expect(Self.help.topics.allSatisfy { $0.strings.count > 1 })
     // What is planned belongs in the user guide, not in the app's help.
-    #expect(!Self.help.sections.contains { $0.id == "coming-next" })
+    #expect(!Self.help.topics.contains { $0.id == "coming-next" })
   }
 
-  /// Within a section, group titles, terms and paragraphs are unique, so no two rows are
-  /// mistaken for one another.
-  @Test func entriesAreUniqueWithinTheirSection() {
+  /// Within a topic, group titles, terms, paragraphs and messages are unique, so no two rows
+  /// are mistaken for one another, and a message is explained in one topic only.
+  @Test func entriesAreUniqueWithinTheirTopic() {
     func unique(_ values: [String]) -> Bool { Set(values).count == values.count }
-    for section in Self.help.sections {
-      #expect(unique(section.groups.map(\.title)), "\(section.id)")
-      for body in [section.body] + section.groups.map(\.body) {
-        #expect(unique(body.paragraphs), "\(section.id)")
-        #expect(unique(body.definitions.map(\.term)), "\(section.id)")
+    for topic in Self.help.topics {
+      #expect(unique(topic.groups.map(\.title)), "\(topic.id)")
+      for body in [topic.body] + topic.groups.map(\.body) {
+        #expect(unique(body.paragraphs), "\(topic.id)")
+        #expect(unique(body.definitions.map(\.term)), "\(topic.id)")
       }
     }
-  }
-
-  /// The sidebar and the detail show the same section: the chosen one if search shows it, else
-  /// the first shown, and a chosen id the help no longer has falls back the same way.
-  @Test func shownSectionFollowsSelectionAndSearch() throws {
-    #expect(Self.help.shownSection(selection: "menu", query: "")?.id == "menu")
-    #expect(Self.help.shownSection(selection: "gone", query: "")?.id == "getting-started")
-    let filtered = Self.help.sections(matching: "Image Capture")
-    let first = try #require(filtered.first)
-    #expect(!filtered.contains { $0.id == "menu" })
-    #expect(Self.help.shownSection(selection: "menu", query: "Image Capture")?.id == first.id)
-    #expect(Self.help.shownSection(selection: "menu", query: "zzzz-nothing") == nil)
+    #expect(unique(Self.help.topics.flatMap(\.messages).map(\.message)))
   }
 
   @Test func everySymbolExists() {
-    for section in Self.help.sections {
+    for topic in Self.help.topics {
       #expect(
-        NSImage(systemSymbolName: section.symbol, accessibilityDescription: nil) != nil,
-        "\(section.id): \(section.symbol)")
+        NSImage(systemSymbolName: topic.symbol, accessibilityDescription: nil) != nil,
+        "\(topic.id): \(topic.symbol)")
     }
+  }
+
+  /// A message reads as its key with each value shown as "…".
+  @Test(arguments: [
+    ("The device was disconnected.", "The device was disconnected."),
+    ("adb: %@", "adb: …"),
+    ("Sent %lld of %lld to %@", "Sent … of … to …"),
+    (
+      "The device sent %llu bytes of a file it lists as %llu bytes.",
+      "The device sent … bytes of a file it lists as … bytes."
+    ),
+  ])
+  func aMessageReadsWithItsValuesElided(key: String, wording: String) throws {
+    let json = """
+      {"version": 2, "categories": [{"title": "C", "topics": [
+        {"id": "a", "title": "A", "symbol": "folder",
+         "messages": [{"message": "\(key)", "cause": "C", "fix": "F"}]}
+      ]}]}
+      """
+    let message = try #require(try Self.decode(json).topics.first?.messages.first)
+    #expect(message.wording == wording)
+    #expect(message.strings == [wording, "C", "F"])
   }
 
   /// The help is looked up in the catalog at run time, so a string missing from it would not
@@ -70,7 +82,7 @@ struct HelpContentTests {
     struct Catalog: Decodable { let strings: [String: AnyCodable] }
     struct AnyCodable: Decodable {}
     let keys = try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: catalogURL)).strings
-    for key in Self.help.sections.flatMap(\.strings) {
+    for key in Self.help.categories.map(\.title) + Self.help.topics.flatMap(\.strings) {
       #expect(keys[key] != nil, "not in Localizable.xcstrings: \(key)")
     }
   }
@@ -79,10 +91,10 @@ struct HelpContentTests {
     func keys(_ family: DeviceFamily) -> [String] {
       GuideSteps.steps(for: family).map(\.key)
     }
-    let netAlly = try Self.section("connect-netally")
+    let netAlly = try Self.topic("connect-tester")
     #expect(netAlly.body.steps == keys(.netAllyAndroid8Board))
     #expect(netAlly.body.link?.family == .netAllyAndroid8Board)
-    let android = try Self.section("connect-android")
+    let android = try Self.topic("connect-android")
     #expect(
       android.groups.map(\.body.steps) == [keys(.otherAndroid8to9), keys(.otherAndroid10Plus)])
   }
@@ -91,10 +103,10 @@ struct HelpContentTests {
     func keys(_ family: DeviceFamily) -> [String] {
       GuideSteps.steps(for: family, topic: .usbDebugging).map(\.key)
     }
-    let section = try Self.section("usb-debugging")
+    let section = try Self.topic("usb-debugging")
     let groups = Dictionary(uniqueKeysWithValues: section.groups.map { ($0.title, $0.body) })
     #expect(
-      groups["NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG"]?.steps
+      groups[DeviceFamily.netAllyAndroid8Board.title.key]?.steps
         == keys(.netAllyAndroid8Board))
     #expect(groups["Android 8 or 9"]?.steps == keys(.otherAndroid8to9))
     #expect(groups["Android 10 or newer"]?.steps == keys(.otherAndroid10Plus))
@@ -103,97 +115,75 @@ struct HelpContentTests {
     #expect(section.body.link?.family == nil)
   }
 
+  /// One category of `topics` (JSON objects), as a help.json would hold them.
+  private static func wrapped(_ topics: String) -> String {
+    """
+    {"version": 2, "categories": [{"title": "C", "topics": [\(topics)]}]}
+    """
+  }
+
   @Test func linkTargetsDecode() throws {
-    let json = """
-      {"version": 1, "title": "T", "sections": [
-        {"id": "a", "title": "A", "symbol": "folder", "link": {"title": "L", "target": "guide"}},
-        {"id": "b", "title": "B", "symbol": "folder",
-         "link": {"title": "L", "target": "guide:otherAndroid10Plus"}}
-      ]}
+    let json = Self.wrapped(
       """
-    let sections = try Self.decode(json).sections
-    #expect(sections[0].body.link?.family == nil)
-    #expect(sections[0].body.link?.topic == .fileTransfer)
-    #expect(sections[1].body.link?.family == .otherAndroid10Plus)
-    #expect(sections[1].body.link?.topic == .fileTransfer)
-    #expect(sections[0].groups.isEmpty)
-    #expect(sections[0].body.steps.isEmpty)
+      {"id": "a", "title": "A", "symbol": "folder", "link": {"title": "L", "target": "guide"}},
+      {"id": "b", "title": "B", "symbol": "folder",
+       "link": {"title": "L", "target": "guide:otherAndroid10Plus"}}
+      """)
+    let topics = try Self.decode(json).topics
+    #expect(topics[0].body.link?.family == nil)
+    #expect(topics[0].body.link?.topic == .fileTransfer)
+    #expect(topics[1].body.link?.family == .otherAndroid10Plus)
+    #expect(topics[1].body.link?.topic == .fileTransfer)
+    #expect(topics[0].groups.isEmpty)
+    #expect(topics[0].messages.isEmpty)
+    #expect(topics[0].body.steps.isEmpty)
   }
 
   @Test func debuggingLinkTargetsDecode() throws {
-    let json = """
-      {"version": 1, "title": "T", "sections": [
-        {"id": "a", "title": "A", "symbol": "folder",
-         "link": {"title": "L", "target": "debugging"}},
-        {"id": "b", "title": "B", "symbol": "folder",
-         "link": {"title": "L", "target": "debugging:netAllyAndroid8Board"}}
-      ]}
+    let json = Self.wrapped(
       """
-    let sections = try Self.decode(json).sections
-    #expect(sections[0].body.link?.family == nil)
-    #expect(sections[0].body.link?.topic == .usbDebugging)
-    #expect(sections[1].body.link?.family == .netAllyAndroid8Board)
-    #expect(sections[1].body.link?.topic == .usbDebugging)
+      {"id": "a", "title": "A", "symbol": "folder", "link": {"title": "L", "target": "debugging"}},
+      {"id": "b", "title": "B", "symbol": "folder",
+       "link": {"title": "L", "target": "debugging:netAllyAndroid8Board"}}
+      """)
+    let topics = try Self.decode(json).topics
+    #expect(topics[0].body.link?.family == nil)
+    #expect(topics[0].body.link?.topic == .usbDebugging)
+    #expect(topics[1].body.link?.family == .netAllyAndroid8Board)
+    #expect(topics[1].body.link?.topic == .usbDebugging)
   }
 
   @Test(arguments: ["guide:aircheckG3", "web", "guide:", "debugging:", "debugging:aircheckG3"])
   func unknownLinkTargetIsRejected(target: String) {
-    let json = """
-      {"version": 1, "title": "T", "sections": [
-        {"id": "a", "title": "A", "symbol": "folder", "link": {"title": "L", "target": "\(target)"}}
-      ]}
+    let json = Self.wrapped(
       """
+      {"id": "a", "title": "A", "symbol": "folder", "link": {"title": "L", "target": "\(target)"}}
+      """)
     #expect(throws: DecodingError.self) { try Self.decode(json) }
   }
 
   /// Remove Ferry… lives in Help, under Troubleshooting, and nowhere else.
   @Test func removeFerryIsUnderTroubleshooting() throws {
-    let section = try Self.section("troubleshooting")
-    let group = try #require(section.groups.first { $0.body.action == .removeFerry })
-    #expect(group.title == "Remove Ferry")
-    let others = Self.help.sections.flatMap { [$0.body] + $0.groups.map(\.body) }
+    let troubleshooting = try #require(
+      Self.help.categories.first { $0.title == "Troubleshooting" })
+    let topic = try #require(troubleshooting.topics.first { $0.body.action == .removeFerry })
+    #expect(topic.title == "Remove Ferry")
+    let others = Self.help.topics.flatMap { [$0.body] + $0.groups.map(\.body) }
       .filter { $0.action != nil }
     #expect(others.count == 1)
     // Nothing in Help sends the reader to a Settings window that no longer exists.
     #expect(
-      !Self.help.sections.contains { section in
-        section.strings.contains { $0.contains("Settings…") || $0.contains("Ferry's Settings") }
+      !Self.help.topics.contains { topic in
+        topic.strings.contains { $0.contains("Settings…") || $0.contains("Ferry's Settings") }
       })
   }
 
   @Test func anUnknownActionIsRejected() {
-    let json = """
-      {"version": 1, "title": "T", "sections": [
-        {"id": "a", "title": "A", "symbol": "folder", "action": "reboot"}
-      ]}
+    let json = Self.wrapped(
       """
+      {"id": "a", "title": "A", "symbol": "folder", "action": "reboot"}
+      """)
     #expect(throws: DecodingError.self) { try Self.decode(json) }
-  }
-
-  @Test(arguments: ["", "   "])
-  func emptySearchShowsEverySection(query: String) {
-    #expect(Self.help.sections(matching: query) == Self.help.sections)
-  }
-
-  @Test func searchMatchesTitlesAndText() {
-    #expect(Self.help.sections(matching: "privacy").map(\.id) == ["privacy"])
-    #expect(Self.help.sections(matching: "TELEMETRY").map(\.id) == ["privacy"])
-    #expect(Self.help.sections(matching: "MacDroid").map(\.id) == ["troubleshooting"])
-  }
-
-  /// "Tap **Transfer files**" reads "Tap Transfer files", so a search for that finds it.
-  @Test func searchIgnoresMarkdown() {
-    let ids = Self.help.sections(matching: "tap transfer files").map(\.id)
-    #expect(ids.contains("connect-netally"))
-    #expect(ids.contains("connect-android"))
-  }
-
-  @Test func searchIgnoresDiacritics() {
-    #expect(Self.help.sections(matching: "Chécking").map(\.id) == ["menu"])
-  }
-
-  @Test func searchWithNoMatchIsEmpty() {
-    #expect(Self.help.sections(matching: "zzqx").isEmpty)
   }
 
   /// A missing or broken help.json must not stop Ferry: the Help window says help is not

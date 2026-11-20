@@ -16,9 +16,6 @@
     "Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it." : {
       "extractionState" : "manual"
     },
-    "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details and its tools: Take Screenshot, Record Screen, Send File…, Install App…, Logcat, Port Forwarding and Open in Terminal. A device on file transfer shows More Tools with USB Debugging… instead." : {
-      "extractionState" : "manual"
-    },
     "**Forget This Device** disconnects the device and forgets its addresses. Ferry no longer connects to it by itself." : {
       "extractionState" : "manual"
     },
@@ -34,9 +31,6 @@
     "Removes Ferry's locations from Finder, stops Ferry's helper and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state." : {
       "extractionState" : "manual"
     },
-    "Starts Ferry when you log in. A checkmark shows it is on." : {
-      "extractionState" : "manual"
-    },
     "In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched." : {
       "extractionState" : "manual"
     },
@@ -46,16 +40,7 @@
     "Open at Login" : {
 
     },
-    "Click **Connect by Address…**, type the device's IP address or name in the field that opens in the menu, and click **Connect** or press Return. Ferry uses adb's usual port unless you add another after a colon. If the device asks, tap **Allow** on it: the menu shows that it is waiting until you do." : {
-      "extractionState" : "manual"
-    },
-    "On the device, open **Developer options** → **Wireless debugging** and choose **Pair device with pairing code**. In Ferry's menu, click **Pair with Code…**: the form opens in the menu. Enter the IP address and port and the code the device shows, and click **Pair** or press Return. Press Escape, or click **Pair with Code…** again, to close it." : {
-      "extractionState" : "manual"
-    },
     "If the port on this Mac is already in use, adb's message shows under the ports. Ferry lists only the TCP forwards adb holds for this device." : {
-      "extractionState" : "manual"
-    },
-    "Click Port Forwarding under the device to send connections to a port on this Mac to a port on the device. It opens in place and lists each forward as Mac 8080 → Device 80. Type the port on this Mac (1024 or higher) and the port on the device, then click Add or press Return. The remove button beside a forward ends it." : {
       "extractionState" : "manual"
     },
     "Remove forward %@" : {
@@ -121,9 +106,6 @@
     "Is this address your device?" : {
       "extractionState" : "manual"
     },
-    "Ferry remembers each device it connects this way by its serial number, and connects to it again when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered · not nearby**: click it, then **Connect Again** to try again." : {
-      "extractionState" : "manual"
-    },
     "Remembered devices" : {
       "extractionState" : "manual"
     },
@@ -131,18 +113,6 @@
       "extractionState" : "manual"
     },
     "Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again." : {
-      "extractionState" : "manual"
-    },
-    "With the device on USB debugging and connected by cable, click the device in the menu, then **Use over Wi-Fi**. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the network if it is off, and connects to the first address that answers. Connect the device to Ethernet or Wi-Fi first." : {
-      "extractionState" : "manual"
-    },
-    "Use over Wi-Fi suits a device already on USB debugging, such as a NetAlly tester or a phone with Android 8 to 10. Pair with Code is for Android 11 and newer. Connect by Address is for a device that already accepts ADB over the network." : {
-      "extractionState" : "manual"
-    },
-    "Ferry can reach a device over ADB on your network as well as by cable. It never searches the network: it connects only to addresses you give it, and to the addresses a device on USB debugging reports for itself. A device that is also on a cable is always served by the cable." : {
-      "extractionState" : "manual"
-    },
-    "Connect over the network" : {
       "extractionState" : "manual"
     },
     "Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again." : {
@@ -170,9 +140,6 @@
     "Control-click files on the Mac and choose **Send to** and the device. Ferry copies them into the Download folder on the device's internal storage. Ferry's button in the Finder toolbar has the same menu once you add it with **View** → **Customize Toolbar**." : {
       "extractionState" : "manual"
     },
-    "Folders, packages and links can't be sent from this menu. Copy a folder into the device's location in Finder instead, and compress a package into a .zip first." : {
-      "extractionState" : "manual"
-    },
     "If Download already has a file with the same name, Ferry keeps it and saves yours beside it as **name (conflict from Mac)**. Sending never replaces a file." : {
       "extractionState" : "manual"
     },
@@ -197,13 +164,7 @@
     "%lld." : {
 
     },
-    "A device on your network is waiting for you to allow this Mac. Tap **Allow** on the device." : {
-      "extractionState" : "manual"
-    },
     "Ferry turns the device's screen on before a screenshot or a recording, so a screen that was off is not captured black. A recording of a screen that does not change has a single frame." : {
-      "extractionState" : "manual"
-    },
-    "A file changed on both sides" : {
       "extractionState" : "manual"
     },
     "A file the device changed since Finder last showed it is not deleted. Finder puts it back with the device's version." : {
@@ -216,9 +177,6 @@
       "extractionState" : "manual"
     },
     "A package, such as an .rtfd document or an app, can't be copied to the device: compress it into a .zip first. Symbolic links and aliases can't be copied to the device either; Finder shows an error for them." : {
-      "extractionState" : "manual"
-    },
-    "A package, such as an .rtfd or Keynote document, an app, a plug-in or a framework, is one item on the Mac but a folder on the device, so Ferry does not copy it. Control-click it, choose **Compress**, and copy the .zip instead." : {
       "extractionState" : "manual"
     },
     "Add" : {
@@ -285,9 +243,6 @@
     "Choose **Refresh** in the Ferry menu." : {
       "extractionState" : "manual"
     },
-    "An open device lists its network ports with their IPv4 addresses, then its Android version and battery. For a model Ferry knows, every port is listed by the name on the unit, with Not connected for one that has no address. Ferry only reads them, when you open the device and every 10 seconds while the menu stays open." : {
-      "extractionState" : "manual"
-    },
     "Click Logcat to watch the device's log in a window of its own. Ferry keeps the newest 50,000 lines. Level shows lines at that level and above, and Filter shows the lines that contain your text, whatever its case. Pause freezes the window while lines keep arriving, and Resume catches up. Clear empties it." : {
       "extractionState" : "manual"
     },
@@ -315,9 +270,6 @@
     "Click Install App… and choose an .apk file, or drag one .apk onto the device in the menu. Ferry checks that the file is an Android app, copies it to the device and installs it, replacing an older version of the same app. The menu shows how far the copy has got, then says when the app is installed." : {
       "extractionState" : "manual"
     },
-    "Click Take Screenshot to save what the device's screen shows. Click Record Screen to record it, for up to three minutes; the menu shows how long it has been recording, and Stop Recording ends it." : {
-      "extractionState" : "manual"
-    },
     "Click the Ferry icon in the menu bar." : {
       "extractionState" : "manual"
     },
@@ -327,17 +279,8 @@
     "Connect" : {
 
     },
-    "Connect a NetAlly unit" : {
-      "extractionState" : "manual"
-    },
     "Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac." : {
 
-    },
-    "Connect another Android phone" : {
-      "extractionState" : "manual"
-    },
-    "Connect by Address" : {
-      "extractionState" : "manual"
     },
     "Connect by Address…" : {
 
@@ -386,14 +329,8 @@
     "Debug" : {
 
     },
-    "Delete" : {
-      "extractionState" : "manual"
-    },
     "Device" : {
 
-    },
-    "Device details" : {
-      "extractionState" : "manual"
     },
     "Discard" : {
 
@@ -443,9 +380,6 @@
     "Ferry knows this device at another address. Confirm the new one in the menu." : {
 
     },
-    "Ferry needs adb, from Google's Android platform tools. If it is missing, the menu shows **Install adb for more tools…** and the command to run: `brew install --cask android-platform-tools`. Click **Check Again** once it is installed." : {
-      "extractionState" : "manual"
-    },
     "Ferry saves them in Documents, in Ferry, then a folder for each device with Screenshots and Screen Recordings in it, named like macOS's own, such as Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png, and shows them in Finder. macOS asks whether Ferry may use Documents the first time it saves one. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device." : {
       "extractionState" : "manual"
     },
@@ -458,14 +392,8 @@
     "Ferry's help could not be loaded. Reinstalling Ferry restores it." : {
 
     },
-    "Ferry's helper is not responding" : {
-      "extractionState" : "manual"
-    },
     "Ferry's helper is not responding. Quit Ferry and open it again." : {
 
-    },
-    "Ferry's locations are all off in System Settings. Click **Open System Settings** and turn on Ferry under File Providers. Shown once a device has been connected." : {
-      "extractionState" : "manual"
     },
     "File transfer is off or the device is locked. Choose **Transfer files** on the device, then **Refresh**." : {
       "extractionState" : "manual"
@@ -525,9 +453,6 @@
       "extractionState" : "manual"
     },
     "If the device refuses the app, the menu says why, for example that a newer version is installed or that the app needs a newer version of Android. Ferry removes its copy of the app from the device either way." : {
-      "extractionState" : "manual"
-    },
-    "If the menu says **Allow Ferry's helper** or **macOS can't find Ferry's helper**, click **Open System Settings** and turn on Ferry under Allow in the Background." : {
       "extractionState" : "manual"
     },
     "Ignore" : {
@@ -616,9 +541,6 @@
     "Mount" : {
 
     },
-    "NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG" : {
-
-    },
     "For an ejected device: puts it back in Finder." : {
       "extractionState" : "manual"
     },
@@ -649,9 +571,6 @@
     "If the device accepts ADB over the network, use **Connect by Address…**." : {
       "extractionState" : "manual"
     },
-    "Only adb lists the device, and USB debugging is not allowed yet. Tap **OK** or **Allow** on the device." : {
-      "extractionState" : "manual"
-    },
     "Open **Settings** → **About phone** and tap **Build number** until developer mode is on." : {
       "extractionState" : "manual"
     },
@@ -659,9 +578,6 @@
       "extractionState" : "manual"
     },
     "Open **Settings** → **System** → **Developer options** and turn on **USB debugging**." : {
-      "extractionState" : "manual"
-    },
-    "Open a shell" : {
       "extractionState" : "manual"
     },
     "Open System Settings" : {
@@ -673,26 +589,14 @@
     "Opens the steps that turn on USB debugging." : {
       "extractionState" : "manual"
     },
-    "Opens this window." : {
-      "extractionState" : "manual"
-    },
     "Other Android phone (Android 10 or newer)" : {
 
     },
     "Other Android phone (Android 8 or 9)" : {
 
     },
-    "Otherwise, quit Ferry from the menu and open it again from Applications." : {
-      "extractionState" : "manual"
-    },
-    "Packages and app bundles can't be copied to the device" : {
-      "extractionState" : "manual"
-    },
     "Pair" : {
 
-    },
-    "Pair with Code" : {
-      "extractionState" : "manual"
     },
     "Pair with Code…" : {
 
@@ -705,9 +609,6 @@
     },
     "Pause" : {
 
-    },
-    "Plug the device back in and turn on file transfer. Finder finishes the copy when the device reconnects. A half-copied file never appears under its real name." : {
-      "extractionState" : "manual"
     },
     "Port Forwarding" : {
 
@@ -778,12 +679,6 @@
     "Saving recording…" : {
 
     },
-    "Screenshots and screen recordings" : {
-      "extractionState" : "manual"
-    },
-    "Send to a device from Finder" : {
-      "extractionState" : "manual"
-    },
     "Serial number" : {
 
     },
@@ -844,15 +739,6 @@
     "The menu" : {
       "extractionState" : "manual"
     },
-    "The sidebar says \"Ferry\"" : {
-      "extractionState" : "manual"
-    },
-    "Over USB debugging or Wi-Fi, changes made on the device show up in Finder on their own. In file transfer mode, new and deleted files show up within about 30 seconds; to see a file that was changed in place or renamed on the device, choose **Refresh** in the Ferry menu." : {
-      "extractionState" : "manual"
-    },
-    "Tools over USB debugging" : {
-      "extractionState" : "manual"
-    },
     "Troubleshooting" : {
       "extractionState" : "manual"
     },
@@ -871,23 +757,14 @@
     "USB debugging" : {
 
     },
-    "USB debugging is on, but this Mac is not allowed yet. On the device, tick **Always allow from this computer** and tap **OK** or **Allow**." : {
-      "extractionState" : "manual"
-    },
     "Under **USB preferences**, choose **File transfer**. Or open **Settings** → **Connected devices** → **USB**." : {
 
-    },
-    "Under each device" : {
-      "extractionState" : "manual"
     },
     "Uninstall" : {
       "extractionState" : "manual"
     },
     "Unknown device" : {
 
-    },
-    "Unlock the device and choose Transfer files on it. You do not need to replug the cable." : {
-      "extractionState" : "manual"
     },
     "Unlock the device." : {
       "extractionState" : "manual"
@@ -896,9 +773,6 @@
 
     },
     "Unlock the phone first. Its storage stays hidden while it is locked." : {
-      "extractionState" : "manual"
-    },
-    "Unplugged during a copy" : {
       "extractionState" : "manual"
     },
     "Unsent changes were saved to %@" : {
@@ -913,9 +787,6 @@
     "Use the IP address the device shows under Pair device with pairing code." : {
 
     },
-    "Using Ferry in Finder" : {
-      "extractionState" : "manual"
-    },
     "Verbose" : {
 
     },
@@ -925,16 +796,10 @@
     "Waiting for you to allow this Mac on %@" : {
 
     },
-    "Waiting for you to allow this Mac on…" : {
-      "extractionState" : "manual"
-    },
     "Warning" : {
 
     },
     "With USB debugging on, Ferry serves the device over ADB, which is faster than file transfer and adds more tools. File transfer keeps working without it." : {
-      "extractionState" : "manual"
-    },
-    "With one device location, macOS labels it with the app's name. This is normal." : {
       "extractionState" : "manual"
     },
     "With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester offers ADB only after this." : {
@@ -948,12 +813,6 @@
     },
     "Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched. You can then move Ferry to the Trash." : {
 
-    },
-    "adb is installed but its server is not answering. Click **Check Again**." : {
-      "extractionState" : "manual"
-    },
-    "adb is not installed. Click **Copy**, run the command in Terminal, then click **Check Again**." : {
-      "extractionState" : "manual"
     },
     "adb isn't running" : {
       "extractionState" : "manual"
@@ -973,9 +832,6 @@
           }
         }
       }
-    },
-    "macOS is not letting Ferry's helper run. Click **Open System Settings** and turn on Ferry under Allow in the Background." : {
-      "extractionState" : "manual"
     },
     "— Lines skipped: %lld. The log came faster than Ferry could show it. —" : {
 
@@ -1047,11 +903,1239 @@
     "Click a device to see what you can do with it, and click it again to close it. One device is open at a time; the first ready one is open when the menu opens." : {
       "extractionState" : "manual"
     },
-    "Sends files you choose into the device's Download folder, as **Send to** does in Finder." : {
-      "extractionState" : "manual"
-    },
     "When every selected file is an .apk and Ferry reaches the device over ADB (with USB debugging on, or over Wi-Fi), the menu also has **Install on** the device, which installs the apps as Install App… does." : {
       "extractionState" : "manual"
+    },
+    "What Ferry does" : {
+      "extractionState" : "manual"
+    },
+    "Over a cable, Ferry uses the device's file transfer mode. With USB debugging on, or over Wi-Fi, it uses ADB, which is faster and adds tools such as screenshots and app installs." : {
+      "extractionState" : "manual"
+    },
+    "macOS asks you to allow Ferry's locations in Finder. Until you do, the menu shows **Turn on Ferry in Finder** once a device has been connected." : {
+      "extractionState" : "manual"
+    },
+    "Connect your first device" : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and connect it to the Mac with a USB cable." : {
+      "extractionState" : "manual"
+    },
+    "On the device, choose **Transfer files**." : {
+      "extractionState" : "manual"
+    },
+    "Look for the device in Finder's sidebar, under Locations." : {
+      "extractionState" : "manual"
+    },
+    "The steps differ a little by model. **How to Connect** shows them for yours." : {
+      "extractionState" : "manual"
+    },
+    "Connecting" : {
+      "extractionState" : "manual"
+    },
+    "Connect a network tester" : {
+      "extractionState" : "manual"
+    },
+    "Connect an Android phone" : {
+      "extractionState" : "manual"
+    },
+    "Turn on USB debugging" : {
+      "extractionState" : "manual"
+    },
+    "LinkRunner 10G, LinkRunner 100G or EtherScope nXG" : {
+
+    },
+    "Install adb" : {
+      "extractionState" : "manual"
+    },
+    "Ferry needs adb, from Google's Android platform tools, for USB debugging and Wi-Fi. File transfer works without it." : {
+      "extractionState" : "manual"
+    },
+    "When adb is missing, the menu shows **Install adb for more tools…** with the command to run." : {
+      "extractionState" : "manual"
+    },
+    "Click **Copy** in that row." : {
+      "extractionState" : "manual"
+    },
+    "Paste the command in Terminal and press Return: `brew install --cask android-platform-tools`." : {
+      "extractionState" : "manual"
+    },
+    "Click **Check Again**." : {
+      "extractionState" : "manual"
+    },
+    "Ferry never installs adb itself." : {
+      "extractionState" : "manual"
+    },
+    "Allow this Mac on the device" : {
+      "extractionState" : "manual"
+    },
+    "The first time a device meets this Mac over ADB, it asks whether to allow USB debugging. Ferry can't use ADB until you allow it." : {
+      "extractionState" : "manual"
+    },
+    "Until then, the device shows **Waiting for Allow** in the menu, with **Allow USB debugging on the device** under it. Over the network, the menu shows **Waiting for you to allow this Mac on** and the address." : {
+      "extractionState" : "manual"
+    },
+    "Tick **Always allow from this computer**, so it does not ask again." : {
+      "extractionState" : "manual"
+    },
+    "Tap **OK** or **Allow**." : {
+      "extractionState" : "manual"
+    },
+    "If the prompt never appears, unplug the cable and plug it back in. On a tester, turn **USB debugging** off and on again." : {
+      "extractionState" : "manual"
+    },
+    "Use a device over Wi-Fi" : {
+      "extractionState" : "manual"
+    },
+    "Use over Wi-Fi suits a device already on USB debugging, such as a network tester or a phone with Android 8 to 10." : {
+      "extractionState" : "manual"
+    },
+    "Ferry never searches the network. It connects only to addresses you give it, and to the addresses a device on USB debugging reports for itself. A device that is also on a cable is always served by the cable." : {
+      "extractionState" : "manual"
+    },
+    "Connect the device to Ethernet or Wi-Fi." : {
+      "extractionState" : "manual"
+    },
+    "Connect it to the Mac by cable, with USB debugging on." : {
+      "extractionState" : "manual"
+    },
+    "Click the device in the menu, then **Use over Wi-Fi**." : {
+      "extractionState" : "manual"
+    },
+    "Unplug the cable. The device stays in Finder over the network." : {
+      "extractionState" : "manual"
+    },
+    "Connect by address" : {
+      "extractionState" : "manual"
+    },
+    "For a device that already accepts ADB over the network." : {
+      "extractionState" : "manual"
+    },
+    "Click **Connect by Address…**. A field opens in the menu." : {
+      "extractionState" : "manual"
+    },
+    "Type the device's IP address or name. Add a port after a colon if it does not use port 5555." : {
+      "extractionState" : "manual"
+    },
+    "Click **Connect** or press Return." : {
+      "extractionState" : "manual"
+    },
+    "If the device asks, tap **Allow** on it." : {
+      "extractionState" : "manual"
+    },
+    "Press Escape, or click **Connect by Address…** again, to close the field." : {
+      "extractionState" : "manual"
+    },
+    "Pair with a code" : {
+      "extractionState" : "manual"
+    },
+    "For phones with Android 11 and newer, which pair over Wi-Fi without a cable." : {
+      "extractionState" : "manual"
+    },
+    "On the device, open **Developer options** → **Wireless debugging** and choose **Pair device with pairing code**." : {
+      "extractionState" : "manual"
+    },
+    "In Ferry's menu, click **Pair with Code…**. A form opens in the menu." : {
+      "extractionState" : "manual"
+    },
+    "Enter the IP address and port, and the code, that the device shows." : {
+      "extractionState" : "manual"
+    },
+    "Click **Pair** or press Return." : {
+      "extractionState" : "manual"
+    },
+    "Ferry remembers each device it connects over the network by its serial number, and connects to it again when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered · not nearby**: click it, then **Connect Again** to try again." : {
+      "extractionState" : "manual"
+    },
+    "Files in Finder" : {
+      "extractionState" : "manual"
+    },
+    "Find your device in Finder" : {
+      "extractionState" : "manual"
+    },
+    "With one device location, macOS labels it with the app's name, so the sidebar says Ferry. This is normal." : {
+      "extractionState" : "manual"
+    },
+    "Copy files" : {
+      "extractionState" : "manual"
+    },
+    "If the device is unplugged during a copy, plug it back in and turn on file transfer. Finder finishes the copy when the device reconnects." : {
+      "extractionState" : "manual"
+    },
+    "Rename and delete" : {
+      "extractionState" : "manual"
+    },
+    "Rename files and make folders on the device as you would on any drive." : {
+      "extractionState" : "manual"
+    },
+    "Folders named like apps" : {
+      "extractionState" : "manual"
+    },
+    "When a file changed on both sides" : {
+      "extractionState" : "manual"
+    },
+    "Ferry never replaces a file the device changed without you seeing it." : {
+      "extractionState" : "manual"
+    },
+    "See changes made on the device" : {
+      "extractionState" : "manual"
+    },
+    "How quickly Finder shows a change made on the device depends on how Ferry reaches it." : {
+      "extractionState" : "manual"
+    },
+    "USB debugging or Wi-Fi" : {
+      "extractionState" : "manual"
+    },
+    "Changes show up in Finder on their own." : {
+      "extractionState" : "manual"
+    },
+    "New and deleted files show up within about 30 seconds. A file changed in place or renamed on the device needs **Refresh**." : {
+      "extractionState" : "manual"
+    },
+    "**Refresh** in the Ferry menu shows every change at once." : {
+      "extractionState" : "manual"
+    },
+    "Send files from Finder" : {
+      "extractionState" : "manual"
+    },
+    "Turn on Send to" : {
+      "extractionState" : "manual"
+    },
+    "Read the menu" : {
+      "extractionState" : "manual"
+    },
+    "The menu has a header with **Refresh**, then any problem that needs you, then your devices, then **Connect by Address…** and **Pair with Code…**, then **Open at Login**, **Help** and **Quit Ferry**." : {
+      "extractionState" : "manual"
+    },
+    "USB debugging is on, but this Mac is not allowed yet. Tap **OK** or **Allow** on the device." : {
+      "extractionState" : "manual"
+    },
+    "A device Ferry connects over the network that it can't reach now." : {
+      "extractionState" : "manual"
+    },
+    "Starts Ferry when you log in. A checkmark shows it is on. **Needs approval in System Settings** means macOS is waiting for you to allow it there." : {
+      "extractionState" : "manual"
+    },
+    "Opens this window. Press ⌘? while the menu is open. A **?** button beside a problem in the menu opens its entry here." : {
+      "extractionState" : "manual"
+    },
+    "Device details and addresses" : {
+      "extractionState" : "manual"
+    },
+    "An open device lists its network ports with their IPv4 addresses, then its Android version and battery, such as Android 8.1.0 · Battery 87%. For a model Ferry knows, every port is listed by the name on the unit, with Not connected for one that has no address. Ferry only reads them, when you open the device and every 10 seconds while the menu stays open." : {
+      "extractionState" : "manual"
+    },
+    "Details need USB debugging or Wi-Fi." : {
+      "extractionState" : "manual"
+    },
+    "A device's tools" : {
+      "extractionState" : "manual"
+    },
+    "Under an open device, its tools sit in groups divided by thin lines. A device on file transfer shows More Tools with USB Debugging… instead of the ADB tools." : {
+      "extractionState" : "manual"
+    },
+    "Take Screenshot, Record Screen" : {
+      "extractionState" : "manual"
+    },
+    "Capture the device's screen." : {
+      "extractionState" : "manual"
+    },
+    "Send File…, Install App…" : {
+      "extractionState" : "manual"
+    },
+    "Copy files into Download, or install an app." : {
+      "extractionState" : "manual"
+    },
+    "Logcat, Port Forwarding, Open in Terminal" : {
+      "extractionState" : "manual"
+    },
+    "Developer tools." : {
+      "extractionState" : "manual"
+    },
+    "Use over Wi-Fi, Forget This Device, Eject" : {
+      "extractionState" : "manual"
+    },
+    "Connection and Finder." : {
+      "extractionState" : "manual"
+    },
+    "Rows that depend on the state" : {
+      "extractionState" : "manual"
+    },
+    "For a device in use by another app, or one that can't open: tries it again." : {
+      "extractionState" : "manual"
+    },
+    "For a device not sharing files: opens the steps for it." : {
+      "extractionState" : "manual"
+    },
+    "Take a screenshot or record the screen" : {
+      "extractionState" : "manual"
+    },
+    "Click **Take Screenshot** to save what the device's screen shows. Click **Record Screen** to record it, for up to three minutes; the menu shows how long it has been recording, and **Stop Recording** ends it." : {
+      "extractionState" : "manual"
+    },
+    "Click **Cancel** to stop while the app is still being copied. Once the device is installing it, the install finishes." : {
+      "extractionState" : "manual"
+    },
+    "Send a file from the menu" : {
+      "extractionState" : "manual"
+    },
+    "Click **Send File…** under a device and choose files. Ferry copies them into the device's Download folder, as **Send to** does in Finder." : {
+      "extractionState" : "manual"
+    },
+    "The menu says when they are there, or why not." : {
+      "extractionState" : "manual"
+    },
+    "Watch the device's log" : {
+      "extractionState" : "manual"
+    },
+    "Port forwarding sends connections to a port on this Mac to a port on the device." : {
+      "extractionState" : "manual"
+    },
+    "Click **Port Forwarding** under the device. It opens in place and lists each forward as Mac 8080 → Device 80." : {
+      "extractionState" : "manual"
+    },
+    "Type the port on this Mac (1024 or higher) and the port on the device." : {
+      "extractionState" : "manual"
+    },
+    "Click **Add** or press Return." : {
+      "extractionState" : "manual"
+    },
+    "The remove button beside a forward ends it." : {
+      "extractionState" : "manual"
+    },
+    "Open a shell in Terminal" : {
+      "extractionState" : "manual"
+    },
+    "Device messages" : {
+      "extractionState" : "manual"
+    },
+    "What the menu says about a connected device, and what to do." : {
+      "extractionState" : "manual"
+    },
+    "No device is connected and sharing files." : {
+      "extractionState" : "manual"
+    },
+    "Connect the device and choose **Transfer files** on it." : {
+      "extractionState" : "manual"
+    },
+    "The device is connected but is not sharing files." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and choose **Transfer files** on it." : {
+      "extractionState" : "manual"
+    },
+    "File transfer is off or the device is locked." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and choose **Transfer files** on it, then choose **Refresh**. You do not need to replug the cable." : {
+      "extractionState" : "manual"
+    },
+    "The device is not sharing files." : {
+      "extractionState" : "manual"
+    },
+    "The device locked or turned off file transfer during the task." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and choose **Transfer files** on it, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Another Mac app has the device open, so Ferry can't reach it." : {
+      "extractionState" : "manual"
+    },
+    "Another Mac app has the device open." : {
+      "extractionState" : "manual"
+    },
+    "Another app is using the device. Quit Image Capture or Android File Transfer." : {
+      "extractionState" : "manual"
+    },
+    "The device reported an error when Ferry opened it." : {
+      "extractionState" : "manual"
+    },
+    "Click **Check Again**, or unplug the device and plug it back in." : {
+      "extractionState" : "manual"
+    },
+    "The device reported an error." : {
+      "extractionState" : "manual"
+    },
+    "The device refused the request without saying why." : {
+      "extractionState" : "manual"
+    },
+    "Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**." : {
+      "extractionState" : "manual"
+    },
+    "The device was disconnected." : {
+      "extractionState" : "manual"
+    },
+    "The device went away during the task: the cable came out, it went to sleep, or it left the network." : {
+      "extractionState" : "manual"
+    },
+    "Reconnect the device and try again." : {
+      "extractionState" : "manual"
+    },
+    "The device reports no storage." : {
+      "extractionState" : "manual"
+    },
+    "The device shares no storage, which happens while it is locked." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and choose **Refresh**." : {
+      "extractionState" : "manual"
+    },
+    "The device does not support this: …." : {
+      "extractionState" : "manual"
+    },
+    "The device can't do what was asked. The rest of the message says what." : {
+      "extractionState" : "manual"
+    },
+    "Do it another way, for example on the device itself." : {
+      "extractionState" : "manual"
+    },
+    "Error: …" : {
+      "extractionState" : "manual"
+    },
+    "Something failed on the device, the Mac or the connection. The rest of the message says what." : {
+      "extractionState" : "manual"
+    },
+    "Cancelled." : {
+      "extractionState" : "manual"
+    },
+    "The task stopped before it finished, usually because you cancelled it." : {
+      "extractionState" : "manual"
+    },
+    "Start it again if you still need it." : {
+      "extractionState" : "manual"
+    },
+    "macOS did not let Ferry watch for devices being plugged in." : {
+      "extractionState" : "manual"
+    },
+    "Nothing to do: devices still appear, a little later. Restart the Mac if it stays." : {
+      "extractionState" : "manual"
+    },
+    "USB debugging messages" : {
+      "extractionState" : "manual"
+    },
+    "Messages about ADB, adb and allowing this Mac." : {
+      "extractionState" : "manual"
+    },
+    "USB debugging is on, but this Mac is not allowed on the device yet." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device, tick **Always allow from this computer** and tap **OK** or **Allow**." : {
+      "extractionState" : "manual"
+    },
+    "The device is asking whether to allow this Mac." : {
+      "extractionState" : "manual"
+    },
+    "adb is not installed, so Ferry can use file transfer only." : {
+      "extractionState" : "manual"
+    },
+    "Click **Copy**, run the command in Terminal, then click **Check Again**." : {
+      "extractionState" : "manual"
+    },
+    "adb is installed but its server is not answering." : {
+      "extractionState" : "manual"
+    },
+    "Click **Check Again**. If that does not help, run `adb start-server` in Terminal." : {
+      "extractionState" : "manual"
+    },
+    "This needs USB debugging. Turn it on, then try again." : {
+      "extractionState" : "manual"
+    },
+    "This tool works only over ADB, and the device is on file transfer." : {
+      "extractionState" : "manual"
+    },
+    "Turn on USB debugging on the device, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry can't find adb. Install it, then try again." : {
+      "extractionState" : "manual"
+    },
+    "This tool runs adb, and Ferry can't find it on this Mac." : {
+      "extractionState" : "manual"
+    },
+    "In Terminal, run `brew install --cask android-platform-tools`, then try again." : {
+      "extractionState" : "manual"
+    },
+    "macOS did not let Ferry open Terminal, or Terminal is missing." : {
+      "extractionState" : "manual"
+    },
+    "Open Terminal once yourself, then try again. If macOS asks whether Ferry may control Terminal, allow it." : {
+      "extractionState" : "manual"
+    },
+    "Wi-Fi and network messages" : {
+      "extractionState" : "manual"
+    },
+    "Messages from Use over Wi-Fi, Connect by Address, Pair with Code and remembered devices." : {
+      "extractionState" : "manual"
+    },
+    "Waiting for you to allow this Mac on …" : {
+      "extractionState" : "manual"
+    },
+    "A device on your network is asking whether to allow this Mac." : {
+      "extractionState" : "manual"
+    },
+    "Tap **Allow** on the device." : {
+      "extractionState" : "manual"
+    },
+    "The device answered and is asking whether to allow this Mac." : {
+      "extractionState" : "manual"
+    },
+    "A new address answered as a device Ferry already knows, and Ferry will not use it until you say so." : {
+      "extractionState" : "manual"
+    },
+    "Click the address in the menu and choose **Use It** if it is your device, or **Ignore**." : {
+      "extractionState" : "manual"
+    },
+    "The device is not on Ethernet or Wi-Fi." : {
+      "extractionState" : "manual"
+    },
+    "Connect the device to Ethernet or Wi-Fi, then click **Use over Wi-Fi** again." : {
+      "extractionState" : "manual"
+    },
+    "Network connections need adb, and it is missing or not answering." : {
+      "extractionState" : "manual"
+    },
+    "Install adb, then click **Check Again**." : {
+      "extractionState" : "manual"
+    },
+    "Use over Wi-Fi starts from a device Ferry serves over USB debugging." : {
+      "extractionState" : "manual"
+    },
+    "Connect the device by cable, allow this Mac on it, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry has never reached this device over the network." : {
+      "extractionState" : "manual"
+    },
+    "Click **Connect by Address…** and type its address." : {
+      "extractionState" : "manual"
+    },
+    "Pairing worked, but the device stopped offering a connection, usually because Wireless debugging turned off." : {
+      "extractionState" : "manual"
+    },
+    "On the device, turn on **Wireless debugging**, then click **Connect Again**." : {
+      "extractionState" : "manual"
+    },
+    "The address answered as a different device from the one you chose." : {
+      "extractionState" : "manual"
+    },
+    "Check the address on the device and try again." : {
+      "extractionState" : "manual"
+    },
+    "The device answered without a serial number, so Ferry could not tell it from others." : {
+      "extractionState" : "manual"
+    },
+    "Connect the device by cable once, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Pairing needs the address from the pairing screen, which has its own port." : {
+      "extractionState" : "manual"
+    },
+    "Copy the IP address and port from **Pair device with pairing code** on the device." : {
+      "extractionState" : "manual"
+    },
+    "The address changed after the menu showed it." : {
+      "extractionState" : "manual"
+    },
+    "Open the menu again and choose from what it shows now." : {
+      "extractionState" : "manual"
+    },
+    "Turning on ADB over Wi-Fi restarts ADB on the device, which would stop a transfer, a screen recording or a log." : {
+      "extractionState" : "manual"
+    },
+    "Let them finish, then try again." : {
+      "extractionState" : "manual"
+    },
+    "adb: …" : {
+      "extractionState" : "manual"
+    },
+    "adb refused the request. The rest of the message is adb's reason." : {
+      "extractionState" : "manual"
+    },
+    "Check the address and that the device is on the network, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry knows the device but can't reach it on the network now." : {
+      "extractionState" : "manual"
+    },
+    "Connect the device to the network, click it in the menu, then **Connect Again**." : {
+      "extractionState" : "manual"
+    },
+    "Messages in Finder" : {
+      "extractionState" : "manual"
+    },
+    "Finder shows these when a copy, rename or delete on the device does not work." : {
+      "extractionState" : "manual"
+    },
+    "Connect the device and choose Transfer files to see its files." : {
+      "extractionState" : "manual"
+    },
+    "Finder shows this in a device's location while the device is not connected or not sharing files." : {
+      "extractionState" : "manual"
+    },
+    "Packages and app bundles can’t be copied to the device. Compress it into a .zip first." : {
+      "extractionState" : "manual"
+    },
+    "A package is one item on the Mac but a folder on the device, so Ferry does not copy it." : {
+      "extractionState" : "manual"
+    },
+    "Control-click it, choose **Compress**, and copy the .zip instead." : {
+      "extractionState" : "manual"
+    },
+    "Symbolic links and aliases can’t be copied to the device." : {
+      "extractionState" : "manual"
+    },
+    "The device has no links or aliases." : {
+      "extractionState" : "manual"
+    },
+    "Copy the original file instead." : {
+      "extractionState" : "manual"
+    },
+    "A folder on the device can’t take a package name, such as .app or .rtfd: macOS would open it as an app or a document." : {
+      "extractionState" : "manual"
+    },
+    "macOS would show a folder with that name as an app or a document." : {
+      "extractionState" : "manual"
+    },
+    "Choose a name without a package extension, such as .app or .rtfd." : {
+      "extractionState" : "manual"
+    },
+    "Folders named like an app or a document package, and what they hold, can’t be changed from this Mac. Change them on the device." : {
+      "extractionState" : "manual"
+    },
+    "macOS shows such a folder as an app or a document, so Ferry keeps it read-only." : {
+      "extractionState" : "manual"
+    },
+    "Change it on the device, or copy it to the Mac." : {
+      "extractionState" : "manual"
+    },
+    "The device does not support …." : {
+      "extractionState" : "manual"
+    },
+    "The device can't do what Finder asked, such as moving a file in one step." : {
+      "extractionState" : "manual"
+    },
+    "Copy the file to its new place, then delete the original." : {
+      "extractionState" : "manual"
+    },
+    "The device saved “…” as “…”." : {
+      "extractionState" : "manual"
+    },
+    "The device changed the name, for example because it cannot store some characters." : {
+      "extractionState" : "manual"
+    },
+    "Use the name the device chose, or rename it with characters the device accepts." : {
+      "extractionState" : "manual"
+    },
+    "The device sent … bytes of a file it lists as … bytes." : {
+      "extractionState" : "manual"
+    },
+    "The file arrived with a different size than the device listed, so the copy is not complete." : {
+      "extractionState" : "manual"
+    },
+    "Choose **Refresh**, then open the file again." : {
+      "extractionState" : "manual"
+    },
+    "The device stored … bytes where … were sent." : {
+      "extractionState" : "manual"
+    },
+    "The device kept a different size than Ferry sent, so the copy is not complete." : {
+      "extractionState" : "manual"
+    },
+    "Check the device has free space, then copy the file again." : {
+      "extractionState" : "manual"
+    },
+    "“…” holds folders nested more than … deep, which Ferry does not delete." : {
+      "extractionState" : "manual"
+    },
+    "Ferry does not delete a folder nested more than 64 levels deep." : {
+      "extractionState" : "manual"
+    },
+    "Delete it on the device." : {
+      "extractionState" : "manual"
+    },
+    "Unexpected response from the Ferry agent." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper answered in a way the Finder extension does not expect, which can happen right after an update." : {
+      "extractionState" : "manual"
+    },
+    "Quit Ferry from the menu and open it again from Applications." : {
+      "extractionState" : "manual"
+    },
+    "Send to and Send File messages" : {
+      "extractionState" : "manual"
+    },
+    "The notification or menu line says which file failed, then why. Look up the reason here too." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t send “…” to …" : {
+      "extractionState" : "manual"
+    },
+    "The file did not reach the device. The next line says why." : {
+      "extractionState" : "manual"
+    },
+    "Fix what the next line says, then send it again." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t send … files to …" : {
+      "extractionState" : "manual"
+    },
+    "None of the files reached the device. The next line says why for one of them." : {
+      "extractionState" : "manual"
+    },
+    "Fix what the next line says, then send them again." : {
+      "extractionState" : "manual"
+    },
+    "Sent … of … to …" : {
+      "extractionState" : "manual"
+    },
+    "Some files reached the device and some did not. The next line names one that did not, and why." : {
+      "extractionState" : "manual"
+    },
+    "Fix what the next line says, then send the rest again." : {
+      "extractionState" : "manual"
+    },
+    "“…” wasn’t sent. …" : {
+      "extractionState" : "manual"
+    },
+    "The file named did not reach the device. The reason follows." : {
+      "extractionState" : "manual"
+    },
+    "Fix the reason, then send it again." : {
+      "extractionState" : "manual"
+    },
+    "Also not sent: …." : {
+      "extractionState" : "manual"
+    },
+    "More files failed besides the one named." : {
+      "extractionState" : "manual"
+    },
+    "Fix the reason given, then send them again." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t install “…” on …" : {
+      "extractionState" : "manual"
+    },
+    "The app did not install. The next line says why." : {
+      "extractionState" : "manual"
+    },
+    "Fix what the next line says, then install it again." : {
+      "extractionState" : "manual"
+    },
+    "Couldn’t install … apps on …" : {
+      "extractionState" : "manual"
+    },
+    "None of the apps installed. The next line says why for one of them." : {
+      "extractionState" : "manual"
+    },
+    "Fix what the next line says, then install them again." : {
+      "extractionState" : "manual"
+    },
+    "Installed … of … on …" : {
+      "extractionState" : "manual"
+    },
+    "Some apps installed and some did not. The next line names one that did not, and why." : {
+      "extractionState" : "manual"
+    },
+    "Fix what the next line says, then install the rest again." : {
+      "extractionState" : "manual"
+    },
+    "“…” wasn’t installed. …" : {
+      "extractionState" : "manual"
+    },
+    "The app named did not install. The reason follows." : {
+      "extractionState" : "manual"
+    },
+    "Fix the reason, then install it again." : {
+      "extractionState" : "manual"
+    },
+    "Also not installed: …." : {
+      "extractionState" : "manual"
+    },
+    "More apps failed besides the one named." : {
+      "extractionState" : "manual"
+    },
+    "Fix the reason given, then install them again." : {
+      "extractionState" : "manual"
+    },
+    "Only files can be sent." : {
+      "extractionState" : "manual"
+    },
+    "You chose something that is not a regular file." : {
+      "extractionState" : "manual"
+    },
+    "Choose files. To copy a folder, drag it into the device's location in Finder." : {
+      "extractionState" : "manual"
+    },
+    "Folders can’t be sent from this menu. Copy the folder into the device’s location in Finder, or compress it into a .zip first." : {
+      "extractionState" : "manual"
+    },
+    "Send to sends files only." : {
+      "extractionState" : "manual"
+    },
+    "Drag the folder into the device's location in Finder, or compress it into a .zip first." : {
+      "extractionState" : "manual"
+    },
+    "The device can’t store a file with that name." : {
+      "extractionState" : "manual"
+    },
+    "The name has characters the device's storage does not allow." : {
+      "extractionState" : "manual"
+    },
+    "Rename the file on the Mac, then send it again." : {
+      "extractionState" : "manual"
+    },
+    "The device doesn’t have enough free space." : {
+      "extractionState" : "manual"
+    },
+    "The device's storage is full." : {
+      "extractionState" : "manual"
+    },
+    "Free up space on the device, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device has a file named Download where its Download folder should be. Rename or remove it on the device, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry sends into Download, and a file on the device has that name." : {
+      "extractionState" : "manual"
+    },
+    "Rename or remove that file on the device, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The file can’t be read." : {
+      "extractionState" : "manual"
+    },
+    "Ferry could not read the file on the Mac, for example because of its permissions." : {
+      "extractionState" : "manual"
+    },
+    "Check that you can open the file, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The file is too large for the device’s storage." : {
+      "extractionState" : "manual"
+    },
+    "The storage cannot hold a file this large. Many SD cards stop at 4 GB." : {
+      "extractionState" : "manual"
+    },
+    "Compress or split the file, or copy it to internal storage." : {
+      "extractionState" : "manual"
+    },
+    "This Mac doesn’t have enough free space to copy the file." : {
+      "extractionState" : "manual"
+    },
+    "Ferry needs room on the Mac for the copy." : {
+      "extractionState" : "manual"
+    },
+    "Free up space on the Mac, then try again." : {
+      "extractionState" : "manual"
+    },
+    "App install messages" : {
+      "extractionState" : "manual"
+    },
+    "Install App…, Install on and dropping an .apk on a device can end with these." : {
+      "extractionState" : "manual"
+    },
+    "That file isn't an Android app (.apk)." : {
+      "extractionState" : "manual"
+    },
+    "The file does not hold an Android app, even if its name ends in .apk." : {
+      "extractionState" : "manual"
+    },
+    "Choose a real .apk file. A split app (.apks or .xapk) can't be installed this way." : {
+      "extractionState" : "manual"
+    },
+    "That app is larger than 4 GB." : {
+      "extractionState" : "manual"
+    },
+    "Ferry installs apps up to 4 GB." : {
+      "extractionState" : "manual"
+    },
+    "Install it another way, such as from an app store on the device." : {
+      "extractionState" : "manual"
+    },
+    "The app is already installed." : {
+      "extractionState" : "manual"
+    },
+    "The device already has this app." : {
+      "extractionState" : "manual"
+    },
+    "Nothing to do. To reinstall it, uninstall it on the device first." : {
+      "extractionState" : "manual"
+    },
+    "A newer version of the app is installed. Uninstall it first." : {
+      "extractionState" : "manual"
+    },
+    "The device has a newer version of this app than the .apk you chose." : {
+      "extractionState" : "manual"
+    },
+    "Uninstall the app on the device, then install again. Or install a newer .apk." : {
+      "extractionState" : "manual"
+    },
+    "The installed app is signed differently. Uninstall it first." : {
+      "extractionState" : "manual"
+    },
+    "The app on the device was signed by someone else, so Android will not replace it." : {
+      "extractionState" : "manual"
+    },
+    "Uninstall the app on the device, then install again. Its data on the device goes with it." : {
+      "extractionState" : "manual"
+    },
+    "The app needs a newer version of Android." : {
+      "extractionState" : "manual"
+    },
+    "The app needs a newer Android than the device runs." : {
+      "extractionState" : "manual"
+    },
+    "Use a version of the app that supports this Android version." : {
+      "extractionState" : "manual"
+    },
+    "The app doesn't support this device's processor." : {
+      "extractionState" : "manual"
+    },
+    "The app is built for a different kind of processor than this device has." : {
+      "extractionState" : "manual"
+    },
+    "Get a version of the app built for this device." : {
+      "extractionState" : "manual"
+    },
+    "The app is a test build, which the device won't install." : {
+      "extractionState" : "manual"
+    },
+    "The app is marked as a test build, which Android installs only with a developer command." : {
+      "extractionState" : "manual"
+    },
+    "Use a release build of the app." : {
+      "extractionState" : "manual"
+    },
+    "Another app on the device already defines one of this app's permissions." : {
+      "extractionState" : "manual"
+    },
+    "An app already on the device defines a permission this app also defines." : {
+      "extractionState" : "manual"
+    },
+    "Uninstall the other app, then install again." : {
+      "extractionState" : "manual"
+    },
+    "Another app on the device already uses this app's content provider." : {
+      "extractionState" : "manual"
+    },
+    "An app already on the device claims the same content provider." : {
+      "extractionState" : "manual"
+    },
+    "The app needs a library the device doesn't have." : {
+      "extractionState" : "manual"
+    },
+    "The app depends on a system library this device lacks." : {
+      "extractionState" : "manual"
+    },
+    "Use a version of the app made for this device." : {
+      "extractionState" : "manual"
+    },
+    "The app couldn't be read by the device. It may be damaged or unsigned." : {
+      "extractionState" : "manual"
+    },
+    "The device could not read the .apk. It may be incomplete, damaged or unsigned." : {
+      "extractionState" : "manual"
+    },
+    "Download or build the .apk again, then install it." : {
+      "extractionState" : "manual"
+    },
+    "The device doesn't allow installing apps over USB." : {
+      "extractionState" : "manual"
+    },
+    "A setting on the device blocks installs over USB." : {
+      "extractionState" : "manual"
+    },
+    "In **Developer options**, turn on **Install via USB** if the device has it, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device's app verification refused the app." : {
+      "extractionState" : "manual"
+    },
+    "The device's app checks blocked the app." : {
+      "extractionState" : "manual"
+    },
+    "Install apps only from sources you trust. The device's security settings may let you allow it." : {
+      "extractionState" : "manual"
+    },
+    "The install was cancelled on the device." : {
+      "extractionState" : "manual"
+    },
+    "Someone tapped Cancel on the device, or the device stopped the install." : {
+      "extractionState" : "manual"
+    },
+    "Install again and accept the prompt on the device." : {
+      "extractionState" : "manual"
+    },
+    "The device doesn't have enough space for the app." : {
+      "extractionState" : "manual"
+    },
+    "The device's internal storage is too full to install the app." : {
+      "extractionState" : "manual"
+    },
+    "Couldn't install the app: …" : {
+      "extractionState" : "manual"
+    },
+    "The device refused the app for a reason Ferry has no plain words for. The rest of the message is the device's own reason." : {
+      "extractionState" : "manual"
+    },
+    "Look up that reason, or check that the app suits this device." : {
+      "extractionState" : "manual"
+    },
+    "Screenshot and recording messages" : {
+      "extractionState" : "manual"
+    },
+    "Take Screenshot and Record Screen can end with these." : {
+      "extractionState" : "manual"
+    },
+    "The device didn't send a screenshot. Unlock it and try again." : {
+      "extractionState" : "manual"
+    },
+    "The device returned no image, which happens while it is locked." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and click **Take Screenshot** again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry can't save to its folder in Documents. Allow Ferry in Privacy & Security." : {
+      "extractionState" : "manual"
+    },
+    "macOS is not letting Ferry write to Documents, where it saves screenshots and recordings." : {
+      "extractionState" : "manual"
+    },
+    "Open System Settings → **Privacy & Security** → **Files & Folders**, and turn on Documents for Ferry." : {
+      "extractionState" : "manual"
+    },
+    "The device is already recording its screen." : {
+      "extractionState" : "manual"
+    },
+    "A recording is already running on the device." : {
+      "extractionState" : "manual"
+    },
+    "Click **Stop Recording** first." : {
+      "extractionState" : "manual"
+    },
+    "The device isn't recording its screen." : {
+      "extractionState" : "manual"
+    },
+    "No recording is running, so there is nothing to stop. It may have reached its three-minute limit." : {
+      "extractionState" : "manual"
+    },
+    "Click **Record Screen** to start a new one." : {
+      "extractionState" : "manual"
+    },
+    "The device didn't record its screen." : {
+      "extractionState" : "manual"
+    },
+    "The device's screen recorder stopped without a recording." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and try again." : {
+      "extractionState" : "manual"
+    },
+    "The device didn't record its screen: …" : {
+      "extractionState" : "manual",
+      "generatesSymbol" : false
+    },
+    "The device's screen recorder failed. The rest of the message is the device's own reason." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and try again. Some screens, such as protected video, can't be recorded." : {
+      "extractionState" : "manual"
+    },
+    "The device sent more than a recording can be, so Ferry deleted it." : {
+      "extractionState" : "manual"
+    },
+    "The file the device sent was larger than a three-minute recording can be, so Ferry did not keep it." : {
+      "extractionState" : "manual"
+    },
+    "Record again." : {
+      "extractionState" : "manual"
+    },
+    "The recording stopped arriving. It's still on the device: choose a folder, or discard it." : {
+      "extractionState" : "manual"
+    },
+    "The recording stopped coming from the device before Ferry saved it." : {
+      "extractionState" : "manual"
+    },
+    "Click **Choose Folder…** to save it, or **Discard** to delete it from the device." : {
+      "extractionState" : "manual"
+    },
+    "The recording is still being finished. Try again in a moment." : {
+      "extractionState" : "manual"
+    },
+    "Ferry is still saving the last recording." : {
+      "extractionState" : "manual"
+    },
+    "Wait until the menu stops showing **Saving recording…**, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry could not save the recording in Documents. It is still on the device." : {
+      "extractionState" : "manual"
+    },
+    "Click **Choose Folder…** to save it where you pick, or **Discard** to delete it." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper couldn't start copying the recording." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper could not make the file to copy the recording into." : {
+      "extractionState" : "manual"
+    },
+    "Check the Mac has free space, then click **Choose Folder…** again." : {
+      "extractionState" : "manual"
+    },
+    "Port forwarding and log messages" : {
+      "extractionState" : "manual"
+    },
+    "Ports below 1024 on a Mac need administrator rights." : {
+      "extractionState" : "manual"
+    },
+    "Type a port from 1024 to 65535." : {
+      "extractionState" : "manual"
+    },
+    "Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device." : {
+      "extractionState" : "manual"
+    },
+    "One of the ports is missing or out of range." : {
+      "extractionState" : "manual"
+    },
+    "Type a Mac port from 1024 to 65535 and a device port from 1 to 65535." : {
+      "extractionState" : "manual"
+    },
+    "adb couldn't forward the port: …" : {
+      "extractionState" : "manual"
+    },
+    "adb refused the forward. The rest of the message is adb's reason. Often the port on this Mac is already in use." : {
+      "extractionState" : "manual"
+    },
+    "Choose another port on this Mac, or quit the app that uses it." : {
+      "extractionState" : "manual"
+    },
+    "That forward is already gone." : {
+      "extractionState" : "manual"
+    },
+    "adb removed the forward already, for example because the device disconnected." : {
+      "extractionState" : "manual"
+    },
+    "Nothing to do. Add it again if you need it." : {
+      "extractionState" : "manual"
+    },
+    "The device stopped sending its log, for example because it restarted." : {
+      "extractionState" : "manual"
+    },
+    "Close the window and click **Logcat** again." : {
+      "extractionState" : "manual"
+    },
+    "— Lines skipped: …. The log came faster than Ferry could show it. —" : {
+      "extractionState" : "manual"
+    },
+    "The log came faster than Ferry could show it, so some lines were left out." : {
+      "extractionState" : "manual"
+    },
+    "Set **Level** or **Filter** to show fewer lines." : {
+      "extractionState" : "manual"
+    },
+    "Couldn't save the log: …" : {
+      "extractionState" : "manual"
+    },
+    "Ferry could not write the file. The rest of the message says why." : {
+      "extractionState" : "manual"
+    },
+    "Choose another folder, or check there is free space, then click **Save…** again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper and settings" : {
+      "extractionState" : "manual"
+    },
+    "Messages about Ferry itself." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's locations are all off in System Settings." : {
+      "extractionState" : "manual"
+    },
+    "Click **Open System Settings** and turn on Ferry under File Providers." : {
+      "extractionState" : "manual"
+    },
+    "macOS is not letting Ferry's helper run." : {
+      "extractionState" : "manual"
+    },
+    "Click **Open System Settings** and turn on Ferry under Allow in the Background." : {
+      "extractionState" : "manual"
+    },
+    "macOS has lost track of Ferry's helper, often after Ferry moved." : {
+      "extractionState" : "manual"
+    },
+    "Click **Open System Settings** and turn on Ferry under Allow in the Background. If it is missing, move Ferry to Applications and open it again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper stopped answering." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper didn't answer in time. Try again in a moment." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper is busy or stuck." : {
+      "extractionState" : "manual"
+    },
+    "Wait a moment and try again. If it keeps happening, quit Ferry and open it again." : {
+      "extractionState" : "manual"
+    },
+    "A newer Ferry replaced this one while it was running." : {
+      "extractionState" : "manual"
+    },
+    "Click **Relaunch**." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper couldn't read the request." : {
+      "extractionState" : "manual"
+    },
+    "The helper got a request it could not read, which can happen right after an update." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper doesn't take this request from here." : {
+      "extractionState" : "manual"
+    },
+    "A part of Ferry asked for something only another part may ask, which points to a mixed or damaged install." : {
+      "extractionState" : "manual"
+    },
+    "Install Ferry again, then open it." : {
+      "extractionState" : "manual"
+    },
+    "macOS did not accept the change." : {
+      "extractionState" : "manual"
+    },
+    "Try again. Or open System Settings → **General** → **Login Items & Extensions** and change it there." : {
+      "extractionState" : "manual"
+    },
+    "macOS is waiting for you to allow Ferry to open at login." : {
+      "extractionState" : "manual"
+    },
+    "Open System Settings → **General** → **Login Items & Extensions** and allow Ferry." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper did not answer, so its locations could not be removed." : {
+      "extractionState" : "manual"
+    },
+    "Quit Ferry, open it again, then click **Remove Ferry…** again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's help is missing from the app." : {
+      "extractionState" : "manual"
+    },
+    "Install Ferry again." : {
+      "extractionState" : "manual"
+    },
+    "About Ferry" : {
+      "extractionState" : "manual"
+    },
+    "Previous Topic" : {
+
+    },
+    "Next Topic" : {
+
     }
   },
   "version" : "1.0"

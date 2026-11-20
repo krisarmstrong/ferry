@@ -121,7 +121,9 @@ import os
   public var isGuidePresented = false
   /// Set with `isGuidePresented`, and cleared by the one view that brings the guide window
   /// forward, so reopening the menu does not pull the guide in front of it again.
-  private(set) var guideOpenPending = false
+  var guideOpenPending = false
+  /// The message whose Help topic the Help window should open, until it takes it.
+  var helpRequest: String?
 
   let client: any AgentSending
   let services: any SystemServicing
@@ -214,26 +216,6 @@ import os
       answeredFor? += Self.pollInterval
     }
     cancelDetailReads()
-  }
-
-  /// Opens the guide with the device's steps, or the model picker if Ferry does not know its
-  /// model or no device is given.
-  public func showGuide(for device: AttachedDevice?) {
-    showGuide(family: device.flatMap { GuideSteps.family(forModel: $0.info.model) })
-  }
-
-  /// Opens the guide with the family's steps, or the model picker for `nil`.
-  public func showGuide(family: DeviceFamily?, topic: GuideTopic = .fileTransfer) {
-    guideFamily = family
-    guideTopic = topic
-    isGuidePresented = true
-    guideOpenPending = true
-  }
-
-  /// Whether the guide window should be brought forward now. True once per `showGuide`.
-  func takeGuideOpenRequest() -> Bool {
-    defer { guideOpenPending = false }
-    return guideOpenPending
   }
 
   /// An ejected device reports `.ejected`, which never opens the guide.

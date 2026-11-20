@@ -1,14 +1,18 @@
 import SwiftUI
 
-/// The Help window: sections from `help.json` in a sidebar, the selected one on the right, and
-/// a search field that narrows the sidebar.
+/// The Help window: short topics under category headings in a sidebar, the selected one on the
+/// right, and a search field that narrows the sidebar. A Help link beside a problem in the menu
+/// opens the topic that explains it (see `AppModel.showHelp(forMessage:)`).
+///
+/// From the keyboard: the arrow keys move through the sidebar, Return in the search field opens
+/// the first match, and ⌘[ and ⌘] go to the previous and next topic from anywhere.
 public struct HelpView: View {
   public static let windowID = "help"
   public static let windowTitle = Text("Ferry Help", bundle: .module)
 
-  /// The section last shown, kept across launches though the window itself is not restored.
-  @AppStorage("help.section") private var selection = "getting-started"
-  @State private var query = ""
+  /// Where the topic last shown is kept across launches; the window itself is not restored.
+  static let selectionKey = "help.topic"
+
   private let model: AppModel
   private let content: HelpContent?
 
@@ -23,7 +27,7 @@ public struct HelpView: View {
 
   public var body: some View {
     if let content {
-      sectionsView(content)
+      HelpBrowser(model: model, content: content)
     } else {
       ContentUnavailableView {
         Label {
@@ -37,68 +41,161 @@ public struct HelpView: View {
       .frame(minWidth: 640, minHeight: 420)
     }
   }
-
-  private func sectionsView(_ content: HelpContent) -> some View {
-    let sections = content.sections(matching: query)
-    let shown = content.shownSection(selection: selection, query: query)
-    return NavigationSplitView {
-      List(sections, selection: shownID(shown)) { section in
-        Label {
-          Text(HelpText.resource(section.title))
-        } icon: {
-          Image(systemName: section.symbol)
-        }
-      }
-      .navigationSplitViewColumnWidth(min: 200, ideal: 220)
-    } detail: {
-      if let shown {
-        HelpSectionDetail(section: shown, model: model)
-      } else {
-        ContentUnavailableView.search(text: query)
-      }
-    }
-    .searchable(text: $query, placement: .toolbar)
-    .frame(minWidth: 640, minHeight: 420)
-    .onAppear {
-      model.helpAppeared()
-      // A section remembered from an earlier help that no longer has it.
-      let known = content.sections.contains { $0.id == selection }
-      if !known, let first = content.sections.first {
-        selection = first.id
-      }
-    }
-  }
-
-  /// The sidebar's selection is the section the detail shows.
-  private func shownID(_ shown: HelpSection?) -> Binding<String?> {
-    Binding(get: { shown?.id }, set: { if let id = $0 { selection = id } })
-  }
 }
 
-/// One section: its title, its own blocks, then each group under a headline.
-struct HelpSectionDetail: View {
-  let section: HelpSection
+/// The sidebar, the detail and the search, driven by a `HelpNavigator`.
+private struct HelpBrowser: View {
   let model: AppModel
+  @State private var navigator: HelpNavigator
+  @FocusState private var sidebarFocused: Bool
+
+  init(model: AppModel, content: HelpContent) {
+    self.model = model
+    let stored = UserDefaults.standard.string(forKey: HelpView.selectionKey) ?? ""
+    _navigator = State(initialValue: HelpNavigator(content: content, selection: stored))
+  }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        Text(HelpText.resource(section.title))
-          .font(.title2)
-          .bold()
-        HelpBodyView(blocks: section.body, model: model)
-        ForEach(Array(section.groups.enumerated()), id: \.offset) { _, group in
-          VStack(alignment: .leading, spacing: 10) {
-            Text(HelpText.resource(group.title))
-              .font(.headline)
-            HelpBodyView(blocks: group.body, model: model)
+    NavigationSplitView {
+      List(selection: selection) {
+        ForEach(navigator.shownCategories, id: \.title) { category in
+          Section {
+            ForEach(category.topics) { topic in
+              Label {
+                Text(HelpText.resource(topic.title))
+              } icon: {
+                Image(systemName: topic.symbol)
+              }
+              .tag(topic.id)
+            }
+          } header: {
+            Text(HelpText.resource(category.title))
           }
         }
       }
-      .padding(24)
-      .frame(maxWidth: 560, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .focused($sidebarFocused)
+      .navigationSplitViewColumnWidth(min: 220, ideal: 250)
+    } detail: {
+      if let shown = navigator.shownTopic {
+        HelpTopicDetail(topic: shown, highlighted: navigator.highlighted, model: model)
+      } else {
+        ContentUnavailableView.search(text: navigator.query)
+      }
     }
+    .searchable(text: $navigator.query, placement: .toolbar)
+    .onSubmit(of: .search) {
+      if navigator.submitSearch() { sidebarFocused = true }
+    }
+    .toolbar {
+      ToolbarItemGroup(placement: .navigation) {
+        Button {
+          navigator.move(by: -1)
+        } label: {
+          Label {
+            Text("Previous Topic", bundle: .module)
+          } icon: {
+            Image(systemName: "chevron.up")
+          }
+        }
+        .keyboardShortcut("[")
+        .help(Text("Previous Topic", bundle: .module))
+        Button {
+          navigator.move(by: 1)
+        } label: {
+          Label {
+            Text("Next Topic", bundle: .module)
+          } icon: {
+            Image(systemName: "chevron.down")
+          }
+        }
+        .keyboardShortcut("]")
+        .help(Text("Next Topic", bundle: .module))
+      }
+    }
+    .frame(minWidth: 680, minHeight: 440)
+    .onAppear { model.helpAppeared() }
+    .onChange(of: model.helpRequest, initial: true) { _, _ in
+      if let key = model.takeHelpRequest() { _ = navigator.open(message: key) }
+    }
+    .onChange(of: navigator.selection) { _, selection in
+      UserDefaults.standard.set(selection, forKey: HelpView.selectionKey)
+    }
+  }
+
+  /// The sidebar's selection is the topic the detail shows.
+  private var selection: Binding<String?> {
+    Binding(get: { navigator.shownTopic?.id }, set: { navigator.select($0) })
+  }
+}
+
+/// One topic: its title, its own blocks, each group under a headline, then the messages it
+/// explains. A message a Help link opened is scrolled to and marked.
+struct HelpTopicDetail: View {
+  let topic: HelpTopic
+  let highlighted: String?
+  let model: AppModel
+
+  var body: some View {
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 16) {
+          Text(HelpText.resource(topic.title))
+            .font(.title2)
+            .bold()
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityHeading(.h1)
+          HelpBodyView(blocks: topic.body, model: model)
+          ForEach(Array(topic.groups.enumerated()), id: \.offset) { _, group in
+            VStack(alignment: .leading, spacing: 10) {
+              Text(HelpText.resource(group.title))
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityHeading(.h2)
+              HelpBodyView(blocks: group.body, model: model)
+            }
+          }
+          ForEach(topic.messages, id: \.message) { message in
+            HelpMessageView(message: message, isHighlighted: message.message == highlighted)
+              .id(message.message)
+          }
+        }
+        .padding(24)
+        .frame(maxWidth: 580, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .onChange(of: highlighted, initial: true) { _, key in
+        guard let key else { return }
+        proxy.scrollTo(key, anchor: .top)
+      }
+    }
+  }
+}
+
+/// A message in its exact words, then why it appears and what to do.
+private struct HelpMessageView: View {
+  let message: HelpMessage
+  let isHighlighted: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(HelpText.resource(message.wording))
+        .fontWeight(.semibold)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityHeading(.h2)
+      Text(HelpText.attributed(message.cause))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      Text(HelpText.attributed(message.fix))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background {
+      RoundedRectangle(cornerRadius: 8)
+        .fill(isHighlighted ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.quinary))
+    }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -193,8 +290,8 @@ private struct RemoveFerryButton: View {
 }
 
 #Preview("Troubleshooting") {
-  if let section = HelpContent.bundled?.sections.first(where: { $0.id == "troubleshooting" }) {
-    HelpSectionDetail(section: section, model: .preview([]))
-      .frame(width: 460, height: 560)
+  if let topic = HelpContent.bundled?.topics.first(where: { $0.id == "trouble-device" }) {
+    HelpTopicDetail(topic: topic, highlighted: "Cancelled.", model: .preview([]))
+      .frame(width: 520, height: 600)
   }
 }

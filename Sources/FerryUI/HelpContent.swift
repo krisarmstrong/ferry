@@ -3,14 +3,15 @@ import os
 
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "Help")
 
-/// Ferry's in-app help, decoded from `help.json` (see `Design/Help/README.md` for the schema).
+/// Ferry's in-app help, decoded from `help.json` (see `Design/Help/README.md` for the schema):
+/// short topics under category headings.
 ///
 /// Every string in the file is a key in `Localizable.xcstrings`, looked up when shown, so the
 /// help translates with the rest of the app. The connection steps use the same keys as
 /// `GuideSteps`.
 struct HelpContent: Decodable, Sendable, Equatable {
   let version: Int
-  let sections: [HelpSection]
+  let categories: [HelpCategory]
 
   /// The help that ships in the bundle, or `nil` if it is missing or does not decode. The tests
   /// check it, so that is a build defect, logged as a fault; the Help window then says help is
@@ -31,35 +32,48 @@ struct HelpContent: Decodable, Sendable, Equatable {
     }
   }
 
-  /// The section the window shows, in the sidebar and the detail alike: the selected one if the
-  /// search shows it, else the first the search shows. `nil` when the search shows none.
-  func shownSection(selection: String, query: String) -> HelpSection? {
-    let shown = sections(matching: query)
-    return shown.first { $0.id == selection } ?? shown.first
+  /// Every topic, in the order the sidebar lists them.
+  var topics: [HelpTopic] { categories.flatMap(\.topics) }
+
+  /// The categories with the topics that mention `query` in their title or any of their text,
+  /// ignoring case, diacritics and Markdown; a category with none is left out. Every category
+  /// for an empty query.
+  func categories(matching query: String) -> [HelpCategory] {
+    let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { return categories }
+    return categories.compactMap { category in
+      let topics = category.topics.filter { topic in
+        topic.strings.contains { HelpText.plain($0).localizedStandardContains(query) }
+      }
+      return topics.isEmpty ? nil : HelpCategory(title: category.title, topics: topics)
+    }
   }
 
-  /// The sections that mention `query` in their title or any of their text, ignoring case,
-  /// diacritics and Markdown. Every section for an empty query.
-  func sections(matching query: String) -> [HelpSection] {
-    let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !query.isEmpty else { return sections }
-    return sections.filter { section in
-      section.strings.contains { HelpText.plain($0).localizedStandardContains(query) }
-    }
+  /// The topic that explains the message whose catalog key is `key`.
+  func topic(forMessage key: String) -> HelpTopic? {
+    topics.first { topic in topic.messages.contains { $0.message == key } }
   }
 }
 
-/// One sidebar entry: a title and symbol, its own blocks, then titled groups of blocks.
-struct HelpSection: Decodable, Sendable, Identifiable, Hashable {
+/// A heading in the sidebar and the topics under it.
+struct HelpCategory: Decodable, Sendable, Hashable {
+  let title: String
+  let topics: [HelpTopic]
+}
+
+/// One sidebar entry: a title and symbol, its own blocks, titled groups of blocks, then the
+/// messages it explains.
+struct HelpTopic: Decodable, Sendable, Identifiable, Hashable {
   let id: String
   let title: String
   /// An SF Symbol name.
   let symbol: String
   let body: HelpBody
   let groups: [HelpGroup]
+  let messages: [HelpMessage]
 
   private enum CodingKeys: String, CodingKey {
-    case id, title, symbol, groups
+    case id, title, symbol, groups, messages
   }
 
   init(from decoder: any Decoder) throws {
@@ -68,12 +82,14 @@ struct HelpSection: Decodable, Sendable, Identifiable, Hashable {
     title = try container.decode(String.self, forKey: .title)
     symbol = try container.decode(String.self, forKey: .symbol)
     groups = try container.decodeIfPresent([HelpGroup].self, forKey: .groups) ?? []
+    messages = try container.decodeIfPresent([HelpMessage].self, forKey: .messages) ?? []
     body = try HelpBody(from: decoder)
   }
 
-  /// Every string the section shows, as catalog keys.
+  /// Every string the topic shows, as catalog keys.
   var strings: [String] {
     [title] + body.strings + groups.flatMap { [$0.title] + $0.body.strings }
+      + messages.flatMap(\.strings)
   }
 }
 
@@ -91,7 +107,25 @@ struct HelpGroup: Decodable, Sendable, Hashable {
   }
 }
 
-/// The blocks a section or group can hold, shown in this order.
+/// A message Ferry shows, in its exact words, with why it appears and what to do.
+struct HelpMessage: Decodable, Sendable, Hashable {
+  /// The message's key in the String Catalog of the module that shows it, as the code writes
+  /// it: the menu's Help links name a message by this key.
+  let message: String
+  let cause: String
+  let fix: String
+
+  /// The message as the reader sees it, each value it is shown with as "…": a key in FerryUI's
+  /// catalog.
+  var wording: String {
+    message.replacing(/%(?:\d+\$)?(?:@|lld|llu|ld|lu|d|u)/, with: "…")
+      .replacing("%%", with: "%")
+  }
+
+  var strings: [String] { [wording, cause, fix] }
+}
+
+/// The blocks a topic or group can hold, shown in this order.
 struct HelpBody: Decodable, Sendable, Hashable {
   let paragraphs: [String]
   let steps: [String]

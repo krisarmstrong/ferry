@@ -45,7 +45,9 @@ struct CatalogUsageTests {
     let catalog = try JSONDecoder().decode(
       Catalog.self,
       from: Data(contentsOf: Self.root.appending(path: "Sources/FerryUI/Localizable.xcstrings")))
-    let help = Set((HelpContent.bundled?.sections ?? []).flatMap(\.strings))
+    let content = HelpContent.bundled
+    let help = Set(
+      (content?.categories.map(\.title) ?? []) + (content?.topics ?? []).flatMap(\.strings))
     #expect(!help.isEmpty)
     let (text, multiLine) = try Self.literals()
     // A key with a format specifier is made by an interpolation, which no literal spells out.
