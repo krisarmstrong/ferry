@@ -89,7 +89,8 @@ problem.
     with the message's key and opens the window. The window takes the request when it appears,
     or at once if it is already open. It clears the search, selects the topic that explains the
     message, scrolls to the entry and tints it. Choosing another topic drops the tint.
-  - **Keyboard.** The arrow keys move through the sidebar. Return in the search field opens the
+  - **Keyboard.** The arrow keys move through the sidebar. ⌘F focuses the search field
+    (`searchFocused`, through `onKeyPress`, since Ferry has no menu bar to carry Find). Return in the search field opens the
     best match and moves focus to the sidebar. ⌘[ and ⌘] (the chevron buttons in the toolbar)
     go to the previous and next topic shown, across categories, and stop at either end.
 - A `link` renders as a bordered button at the end of its block. `"guide"` opens the setup guide

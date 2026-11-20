@@ -1113,9 +1113,6 @@
     "Starts Ferry when you log in. A checkmark shows it is on. **Needs approval in System Settings** means macOS is waiting for you to allow it there." : {
       "extractionState" : "manual"
     },
-    "Opens this window. Press ⌘? while the menu is open. A **?** button beside a problem in the menu opens its entry here." : {
-      "extractionState" : "manual"
-    },
     "Device details and addresses" : {
       "extractionState" : "manual"
     },
@@ -2147,6 +2144,9 @@
       "extractionState" : "manual"
     },
     "Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again." : {
+      "extractionState" : "manual"
+    },
+    "Opens this window. Press ⌘? while the menu is open. Here, ⌘F goes to the search field, Return opens the best match, and ⌘[ and ⌘] step through the topics. A **?** beside a problem in the menu opens its entry here." : {
       "extractionState" : "manual"
     }
   },

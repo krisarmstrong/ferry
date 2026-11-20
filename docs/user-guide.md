@@ -325,7 +325,7 @@ Click a device to see what you can do with it, and click it again to close it. O
 
 - **Refresh**: Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds.
 - **Open at Login**: Starts Ferry when you log in. A checkmark shows it is on. **Needs approval in System Settings** means macOS is waiting for you to allow it there.
-- **Help**: Opens this window. Press ⌘? while the menu is open. A **?** button beside a problem in the menu opens its entry here.
+- **Help**: Opens this window. Press ⌘? while the menu is open. Here, ⌘F goes to the search field, Return opens the best match, and ⌘[ and ⌘] step through the topics. A **?** beside a problem in the menu opens its entry here.
 - **Quit Ferry**: Closes the menu. The helper keeps running, so devices stay in Finder.
 
 ### Device details and addresses

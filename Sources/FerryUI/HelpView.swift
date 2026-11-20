@@ -5,7 +5,8 @@ import SwiftUI
 /// opens the topic that explains it (see `AppModel.showHelp(forMessage:)`).
 ///
 /// From the keyboard: the arrow keys move through the sidebar, Return in the search field opens
-/// the best match (a title match first), and ⌘[ and ⌘] go to the previous and next topic from anywhere.
+/// the best match (a title match first), ⌘F goes to the search field, and ⌘[ and ⌘] go to the
+/// previous and next topic from anywhere.
 public struct HelpView: View {
   public static let windowID = "help"
   public static let windowTitle = Text("Ferry Help", bundle: .module)
@@ -51,6 +52,7 @@ private struct HelpBrowser: View {
   let model: AppModel
   @State private var navigator: HelpNavigator
   @FocusState private var sidebarFocused: Bool
+  @FocusState private var searchFocused: Bool
 
   init(model: AppModel, content: HelpContent, query: String) {
     self.model = model
@@ -69,6 +71,13 @@ private struct HelpBrowser: View {
       HelpDetail(navigator: navigator, model: model)
     }
     .searchable(text: $navigator.query, placement: .toolbar)
+    .searchFocused($searchFocused)
+    // ⌘F, as in any window that searches: Ferry has no menu bar to carry Find.
+    .onKeyPress(keys: ["f"]) { press in
+      guard press.modifiers == .command else { return .ignored }
+      searchFocused = true
+      return .handled
+    }
     .onSubmit(of: .search) {
       if navigator.submitSearch() { sidebarFocused = true }
     }

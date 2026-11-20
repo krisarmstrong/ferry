@@ -400,7 +400,7 @@
                 },
                 {
                   "term": "Help",
-                  "detail": "Opens this window. Press ⌘? while the menu is open. A **?** button beside a problem in the menu opens its entry here."
+                  "detail": "Opens this window. Press ⌘? while the menu is open. Here, ⌘F goes to the search field, Return opens the best match, and ⌘[ and ⌘] step through the topics. A **?** beside a problem in the menu opens its entry here."
                 },
                 {
                   "term": "Quit Ferry",
