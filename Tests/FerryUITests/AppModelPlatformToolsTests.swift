@@ -158,6 +158,24 @@ struct AppModelPlatformToolsTests {
     #expect(log.all.contains("recheckADB") == (failure == nil))
   }
 
+  /// Accept while the finished download's Check Again is still on its way: the fetch it would
+  /// take over is already done, so the line never stays on Downloading.
+  @Test func acceptDuringThePostDownloadRecheckDoesNotStickOnDownloading() async {
+    let (client, services) = missingAdb()
+    let model = model(client, services)
+    await model.refresh()
+    client.recheckGate.hold()
+    model.acceptLicense()
+    var held = client.recheckGate.arrivals.makeAsyncIterator()
+    await held.next()
+    model.acceptLicense()
+    client.setStatus([device("A1", model: "Pixel 8", .ready([]))], adb: .available)
+    client.recheckGate.release()
+    await model.platformToolsSettled()
+    #expect(model.platformToolsRow == nil)
+    #expect(log.all.filter { $0.hasPrefix("fetchPlatformTools") }.count == 1)
+  }
+
   @Test func cancelStopsTheDownload() async {
     let (client, services) = missingAdb()
     services.holdsFetch = true

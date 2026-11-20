@@ -110,7 +110,12 @@ extension AppModel {
     guard platformTools.task == nil else { return }
     platformTools.shown = shown
     platformTools.task = Task {
-      defer { platformTools.task = nil }
+      defer {
+        platformTools.task = nil
+        // A takeover that arrived after the download, during the recheck, has nothing left to
+        // show: the line never outlives its task on Downloading.
+        if platformTools.fetch == .fetching { platformTools.fetch = .idle }
+      }
       do throws(PlatformToolsError) {
         try await services.fetchPlatformTools(accepted: services.platformToolsAcceptance())
         platformTools.fetch = .idle
