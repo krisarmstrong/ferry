@@ -131,7 +131,7 @@ struct ShellLaunchTests {
     let services = FakeServices(log: log)
     let model = model(client, services)
     await model.openShell(on: id)
-    #expect(model.actionError == DevicePresentation.message(for: .adbNotFound))
+    #expect(model.actionError == DevicePresentation.notice(for: .adbNotFound))
     #expect(services.terminalScripts.isEmpty)
   }
 

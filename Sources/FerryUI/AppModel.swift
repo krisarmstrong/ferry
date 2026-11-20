@@ -54,18 +54,16 @@ import os
   /// New addresses for known devices, waiting for the user to say Use It or Ignore.
   public private(set) var unconfirmed: [UnconfirmedAddress] = []
   /// What the last network request said, for the menu's status row; `nil` once it connected. A
-  /// form's failure stays in the form (`NetworkForm.message`). It can carry adb's words, so it
-  /// is shown verbatim.
-  public internal(set) var wirelessMessage: String?
+  /// form's failure stays in the form (`NetworkForm.message`).
+  public internal(set) var wirelessMessage: MenuNotice?
   /// The network form open under the network rows, with what was typed in it.
   var networkForm: NetworkForm?
   /// The open form's request on its way, so collapsing the form can cancel it.
   @ObservationIgnored var networkSend: Task<WirelessReply, Never>?
   /// Set once the user opens a network form this run: a Wi-Fi-only user needs adb too.
   var wantsNetwork = false
-  /// The last failed action, shown until the next one succeeds. It can carry device-supplied
-  /// detail, so it is shown verbatim, never parsed as Markdown.
-  public internal(set) var actionError: String?
+  /// The last failed action, shown until the next one succeeds.
+  public internal(set) var actionError: MenuNotice?
   /// Screen recordings running, as of the last status.
   public private(set) var recordings: [ActiveRecording] = []
   /// Apps being installed from this menu, by device: the file's name and how much has reached
@@ -284,8 +282,8 @@ import os
       actionError = nil
     } catch {
       Self.log.error("open at login: \(error, privacy: .public)")
-      actionError = String(
-        localized: LocalizedStringResource("Could not change Open at Login.", bundle: .module))
+      actionError = MenuNotice(
+        LocalizedStringResource("Could not change Open at Login.", bundle: .module))
     }
     let reported = await services.loginItemStatus()
     loginItemsApplied = request
@@ -304,12 +302,12 @@ import os
         actionError = nil
         preservedChanges = preserved.filter(Self.holdsSomething)
       case .failure(let error):
-        actionError = DevicePresentation.message(for: error)
+        actionError = DevicePresentation.notice(for: error)
       default:
-        actionError = DevicePresentation.message(for: .io("unexpected reply"))
+        actionError = DevicePresentation.notice(for: .io("unexpected reply"))
       }
     } catch {
-      actionError = DevicePresentation.message(for: error)
+      actionError = DevicePresentation.notice(for: error)
     }
     await refresh()
   }

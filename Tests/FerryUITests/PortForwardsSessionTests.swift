@@ -54,7 +54,7 @@ struct PortForwardsSessionTests {
     session.remotePort = remote
     await session.add()
     #expect(!log.all.contains { $0.hasPrefix("addForward") })
-    #expect(session.error == DevicePresentation.message(for: .invalidPort))
+    #expect(session.error == DevicePresentation.notice(for: .invalidPort))
     #expect(session.localPort == local)
   }
 
@@ -77,7 +77,9 @@ struct PortForwardsSessionTests {
     await session.add()
     #expect(
       session.error
-        == "adb couldn't forward the port: cannot bind listener: Address already in use")
+        == MenuNotice(
+          text: "adb couldn't forward the port: cannot bind listener: Address already in use",
+          help: "adb couldn't forward the port: %@"))
     // The fields stay, so the user can change a port and try again.
     #expect(session.localPort == "8080")
   }
@@ -89,8 +91,8 @@ struct PortForwardsSessionTests {
     session.localPort = "8080"
     session.remotePort = "80"
     await session.add()
-    #expect(session.error?.contains("\u{1B}") == false)
-    #expect(session.error?.contains("\\u{1B}") == true)
+    #expect(session.error?.text.contains("\u{1B}") == false)
+    #expect(session.error?.text.contains("\\u{1B}") == true)
   }
 
   @Test func removingSendsTheLocalPortThenShowsTheList() async {
@@ -126,7 +128,7 @@ struct PortForwardsSessionTests {
   @Test func aLostDeviceIsShownAsAnError() async {
     let session = PortForwardsSession(device: id, client: UnreachableClient())
     await session.refresh()
-    #expect(session.error == DevicePresentation.message(for: .deviceDisconnected))
+    #expect(session.error == DevicePresentation.notice(for: .deviceDisconnected))
   }
 }
 

@@ -31,7 +31,7 @@ extension AppModel {
     do {
       handle = try FileHandle(forReadingFrom: url)
     } catch {
-      actionError = DevicePresentation.message(for: .io(error.localizedDescription))
+      actionError = DevicePresentation.notice(for: .io(error.localizedDescription))
       return
     }
     defer { try? handle.close() }
@@ -98,7 +98,7 @@ extension AppModel {
       return nil
     }.value
     guard let (temporary, handle) = opened else {
-      if userInitiated { actionError = DevicePresentation.message(for: .cannotSave) }
+      if userInitiated { actionError = DevicePresentation.notice(for: .cannotSave) }
       return .noFolder
     }
     let response = await sendTool(request, file: handle, userInitiated: userInitiated)
@@ -113,7 +113,7 @@ extension AppModel {
       return .saved
     } catch {
       unlink(temporary.path)
-      if userInitiated { actionError = DevicePresentation.message(for: error) }
+      if userInitiated { actionError = DevicePresentation.notice(for: error) }
       return .noFolder
     }
   }
@@ -158,18 +158,18 @@ extension AppModel {
       case .done, .shellTarget, .failure(.cancelled):
         actionError = nil
       case .toolFailed(let failure):
-        actionError = DevicePresentation.message(for: failure)
+        actionError = DevicePresentation.notice(for: failure)
       case .failure(let error):
-        actionError = DevicePresentation.message(for: error)
+        actionError = DevicePresentation.notice(for: error)
       default:
-        actionError = DevicePresentation.message(for: .io("unexpected reply"))
+        actionError = DevicePresentation.notice(for: .io("unexpected reply"))
       }
       return response
     } catch .cancelled {
       actionError = nil
       return nil
     } catch {
-      actionError = DevicePresentation.message(for: error)
+      actionError = DevicePresentation.notice(for: error)
       return nil
     }
   }
@@ -188,7 +188,7 @@ extension AppModel {
       .send(device), on: urls, deviceName: windowName(of: device))
     let text = [notice.title, notice.body].filter { !$0.isEmpty }.joined(separator: "\n")
     if failed {
-      actionError = text
+      actionError = MenuNotice(text: text, help: notice.help)
     } else {
       actionError = nil
       toolMessage = text

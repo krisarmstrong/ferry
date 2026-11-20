@@ -59,8 +59,8 @@ extension DevicePresentation {
       localized: LocalizedStringResource("Couldn't save the log: \(shown)", bundle: .module))
   }
 
-  static var terminalFailure: String {
-    String(localized: LocalizedStringResource("Ferry couldn't open Terminal.", bundle: .module))
+  static var terminalFailure: MenuNotice {
+    MenuNotice(LocalizedStringResource("Ferry couldn't open Terminal.", bundle: .module))
   }
 
   static func logCountLine(shown: Int, held: Int) -> String {

@@ -112,6 +112,8 @@ struct StatusRow<Detail: View, Actions: View>: View {
   let symbol: String
   var tint: Color?
   let title: Text
+  /// The catalog key of the problem the row reports, whose Help entry its link opens.
+  var help: String?
   @ViewBuilder var detail: Detail
   @ViewBuilder var actions: Actions
 
@@ -130,6 +132,10 @@ struct StatusRow<Detail: View, Actions: View>: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
+        if help != nil {
+          Spacer(minLength: 4)
+          HelpLinkButton(key: help)
+        }
       }
       .padding(.horizontal, MenuMetrics.rowPadding)
       .padding(.vertical, 4)
@@ -139,15 +145,21 @@ struct StatusRow<Detail: View, Actions: View>: View {
 }
 
 extension StatusRow where Detail == EmptyView {
-  init(symbol: String, tint: Color? = nil, title: Text, @ViewBuilder actions: () -> Actions) {
-    self.init(symbol: symbol, tint: tint, title: title, detail: { EmptyView() }, actions: actions)
+  init(
+    symbol: String, tint: Color? = nil, title: Text, help: String? = nil,
+    @ViewBuilder actions: () -> Actions
+  ) {
+    self.init(
+      symbol: symbol, tint: tint, title: title, help: help, detail: { EmptyView() },
+      actions: actions)
   }
 }
 
 extension StatusRow where Detail == EmptyView, Actions == EmptyView {
-  init(symbol: String, tint: Color? = nil, title: Text) {
+  init(symbol: String, tint: Color? = nil, title: Text, help: String? = nil) {
     self.init(
-      symbol: symbol, tint: tint, title: title, detail: { EmptyView() }, actions: { EmptyView() })
+      symbol: symbol, tint: tint, title: title, help: help, detail: { EmptyView() },
+      actions: { EmptyView() })
   }
 }
 

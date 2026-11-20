@@ -48,9 +48,10 @@ struct NetworkFormView: View {
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
         if let message = form.message {
-          Text(verbatim: message)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
+          HelpLinked(key: message.help) {
+            Text(verbatim: message.text)
+              .foregroundStyle(.red)
+          }
         }
         HStack {
           if form.isSending {

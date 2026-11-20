@@ -58,7 +58,8 @@ struct AppModelToolsTests {
     services.folders = [folder]
     let model = model(client, services: services)
     await model.takeScreenshot(on: id)
-    #expect(model.actionError == "The device didn't send a screenshot. Unlock it and try again.")
+    #expect(
+      model.actionError?.text == "The device didn't send a screenshot. Unlock it and try again.")
     #expect(try names(folder.appending(path: "Android/Screenshots")).isEmpty)
     #expect(!log.all.contains { $0.hasPrefix("reveal") })
   }
@@ -114,7 +115,7 @@ struct AppModelToolsTests {
     let services = FakeServices(log: log)
     let model = model(FakeClient(log: log), services: services)
     await model.takeScreenshot(on: id)
-    #expect(model.actionError == DevicePresentation.message(for: .cannotSave))
+    #expect(model.actionError == DevicePresentation.notice(for: .cannotSave))
     #expect(!log.all.contains { $0.hasPrefix("screenshot") })
   }
 
@@ -176,7 +177,8 @@ struct AppModelToolsTests {
     client.setTool(.toolFailed(.installFailed("INSTALL_FAILED_VERSION_DOWNGRADE")))
     let model = model(client)
     await model.installAPK(try apk(), on: id)
-    #expect(model.actionError == "A newer version of the app is installed. Uninstall it first.")
+    #expect(
+      model.actionError?.text == "A newer version of the app is installed. Uninstall it first.")
     #expect(model.toolMessage == nil)
   }
 
