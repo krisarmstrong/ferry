@@ -705,7 +705,7 @@
             {
               "message": "adb isn't running",
               "cause": "adb is installed but its server is not answering.",
-              "fix": "Click **Check Again**. If that does not help, run `adb start-server` in Terminal."
+              "fix": "Click **Check Again**. If that does not help, quit other apps that use adb, such as Android Studio, then click **Check Again**."
             },
             {
               "message": "This needs USB debugging. Turn it on, then try again.",

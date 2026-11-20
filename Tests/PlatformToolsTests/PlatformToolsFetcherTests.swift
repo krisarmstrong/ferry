@@ -5,7 +5,7 @@ import os
 
 @testable import PlatformTools
 
-struct PlatformToolsFetcherTests {
+final class PlatformToolsFetcherTests: Sendable {
   private let home: URL
   private let folder: PlatformToolsFolder
   private let downloads = OSAllocatedUnfairLock(initialState: 0)
@@ -15,6 +15,10 @@ struct PlatformToolsFetcherTests {
       path: "ferry-platform-tools-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
     folder = PlatformToolsFolder(home: home.path)
+  }
+
+  deinit {
+    try? FileManager.default.removeItem(at: home)
   }
 
   private static let license = AndroidSDKLicense(

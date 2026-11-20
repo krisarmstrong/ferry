@@ -1,3 +1,4 @@
+import DeviceKit
 import Foundation
 import PlatformTools
 
@@ -66,6 +67,16 @@ extension AppModel {
   func useExistingADB() async {
     platformTools.fetch = .idle
     await recheckADB()
+  }
+
+  /// Takes what the agent says of adb. adb that turns up another way (the user installed it)
+  /// ends a failed download's line; a failure while adb was there all along (an update under a
+  /// changed license) stays.
+  func noteADBStatus(_ status: ADBStatus?) {
+    if case .failed = platformTools.fetch, status == .available, adbStatus != .available {
+      platformTools.fetch = .idle
+    }
+    adbStatus = status
   }
 
   /// Returns once the fetch running, if any, has ended.

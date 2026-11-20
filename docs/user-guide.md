@@ -569,7 +569,7 @@ Click **Review License…** and accept the new license to update adb.
 
 adb is installed but its server is not answering.
 
-Click **Check Again**. If that does not help, run `adb start-server` in Terminal.
+Click **Check Again**. If that does not help, quit other apps that use adb, such as Android Studio, then click **Check Again**.
 
 **This needs USB debugging. Turn it on, then try again.**
 

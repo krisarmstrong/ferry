@@ -29,6 +29,10 @@ func developerRequests() -> [AgentRequest] {
   ("/opt/homebrew/bin/adb", "0123456789abcdef", true),
   ("/opt/homebrew/bin/adb", "192.0.2.31:5555", true),
   ("/Users/me/Library/Android/sdk/platform-tools/adb", "adb-0A17-AbCd._adb-tls-connect._tcp", true),
+  (
+    "/Users/me/Library/Application Support/Ferry/platform-tools/37.0.3/adb", "0123456789abcdef",
+    true
+  ),
   ("adb", "S", false), ("", "S", false), ("/opt/adb\nrm -rf ~", "S", false),
   ("/opt/adb\u{0}", "S", false), ("/opt/adb", "", false), ("/opt/adb", "-s", false),
   ("/opt/adb", "S; reboot", false), ("/opt/adb", "S T", false), ("/opt/adb", "S'T", false),

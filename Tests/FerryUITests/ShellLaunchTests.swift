@@ -40,6 +40,14 @@ struct ShellLaunchTests {
         .contains("'/opt/homebrew/bin/adb' -s '192.0.2.31:5555' shell\n"))
   }
 
+  /// The adb Ferry fetched lives under Application Support: its space stays inside the quoting.
+  @Test func ferrysFetchedAdbIsOnePath() throws {
+    let adb = "/Users/me/Library/Application Support/Ferry/platform-tools/37.0.3/adb"
+    let script = ShellLaunch.script(
+      for: try target(adb), file: URL(filePath: "/tmp/ferry-shell-X/shell.command"))
+    #expect(script.contains("'\(adb)' -s '0123456789abcdef' shell\n"))
+  }
+
   /// A path with a quote in it cannot end its quoting, in the adb path or the script's own.
   @Test func aQuoteInAPathStaysInsideItsQuoting() throws {
     let script = ShellLaunch.script(

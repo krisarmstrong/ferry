@@ -70,8 +70,9 @@ if $clear; then
 fi
 
 echo
-echo "== In the Ferry menu: the line 'adb isn't on this Mac' shows. Choose Get Android Platform"
-echo "   Tools…, read the license, click Accept, and wait until the line is gone."
+echo "== In the Ferry menu: the line 'adb isn't on this Mac' shows. It shows once a unit is listed;"
+echo "   if none is, open Connect by Address… and it shows. Choose Get Android Platform Tools…, read"
+echo "   the license, click Accept, and wait until the line is gone."
 read -r -p "Press Return when it is gone. " _
 
 echo "== The fetched copy"

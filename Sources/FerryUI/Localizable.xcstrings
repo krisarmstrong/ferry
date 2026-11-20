@@ -1266,9 +1266,6 @@
     "adb is installed but its server is not answering." : {
       "extractionState" : "manual"
     },
-    "Click **Check Again**. If that does not help, run `adb start-server` in Terminal." : {
-      "extractionState" : "manual"
-    },
     "This needs USB debugging. Turn it on, then try again." : {
       "extractionState" : "manual"
     },
@@ -2231,6 +2228,9 @@
       "extractionState" : "manual"
     },
     "This version of Ferry uses a newer adb, and Google has changed the license since you accepted it. Ferry keeps using the adb it has." : {
+      "extractionState" : "manual"
+    },
+    "Click **Check Again**. If that does not help, quit other apps that use adb, such as Android Studio, then click **Check Again**." : {
       "extractionState" : "manual"
     }
   },

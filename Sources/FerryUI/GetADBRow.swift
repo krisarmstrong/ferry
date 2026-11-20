@@ -10,6 +10,10 @@ struct GetADBRow: View {
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
+    row.accessibilityElement(children: .contain)
+  }
+
+  @ViewBuilder private var row: some View {
     let title = MenuStatusText.platformTools(line)
     switch line {
     case .fetching:

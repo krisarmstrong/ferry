@@ -97,6 +97,37 @@ struct AppModelPlatformToolsTests {
     #expect(model.platformToolsRow == .offer)
   }
 
+  /// adb that turns up another way (the user installed it) ends a failed download's line.
+  @Test func aFailureEndsWhenAdbTurnsUp() async {
+    let (client, services) = missingAdb()
+    services.fetchOutcomes = [.offline]
+    let model = model(client, services)
+    await model.refresh()
+    model.acceptLicense()
+    await model.platformToolsSettled()
+    await model.refresh()
+    #expect(model.platformToolsRow == .failed(.offline))
+    client.setStatus([device("A1", model: "Pixel 8", .ready([]))], adb: .available)
+    await model.refresh()
+    #expect(model.platformToolsRow == nil)
+  }
+
+  /// A failed update under a changed license stays shown: adb was there all along.
+  @Test func aFailedUpdateStaysWhileTheOldAdbServes() async {
+    let client = FakeClient(log: log)
+    client.setStatus([], adb: .available)
+    let services = FakeServices(log: log)
+    services.fetchedVersion = "36.0.0"
+    services.acceptance = LicenseAcceptance(version: "2012-11-13", date: .distantPast)
+    services.fetchOutcomes = [.offline]
+    let model = model(client, services)
+    await model.launch()
+    model.acceptLicense()
+    await model.platformToolsSettled()
+    await model.refresh()
+    #expect(model.platformToolsRow == .failed(.offline))
+  }
+
   @Test func cancelStopsTheDownload() async {
     let (client, services) = missingAdb()
     services.holdsFetch = true

@@ -38,7 +38,7 @@ import os
   /// Transfers the agent is running, as of the last status.
   public private(set) var transfers: [ActiveTransfer] = []
   /// Whether adb can be used; `nil` until the agent has looked.
-  public private(set) var adbStatus: ADBStatus?
+  public internal(set) var adbStatus: ADBStatus?
   /// The agent cannot watch USB, so devices come and go in the menu only every 30 s.
   public private(set) var usbWatchFailed = false
   /// The number of each served device's session, as of the last status.
@@ -339,7 +339,7 @@ import os
     helper = .allowed
     provider = report.provider
     transfers = report.transfers
-    adbStatus = report.adbStatus
+    noteADBStatus(report.adbStatus)
     usbWatchFailed = report.usbWatchFailed
     sessions = report.sessions
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)

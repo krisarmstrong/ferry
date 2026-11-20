@@ -33,11 +33,12 @@ public struct PlatformToolsRelease: Sendable, Equatable {
     self.license = license
   }
 
-  /// r37.0.3, from Google's SDK repository (`repository2-3.xml`), which lists it under
-  /// `android-sdk-license`. The license text is that entry's, dated January 16, 2019, and is the
-  /// one published at https://developer.android.com/studio/terms. To move the pin, take the
-  /// archive's version and size from that manifest, and its SHA-256 from a downloaded copy; a
-  /// changed license text gets a new version, and the user accepts it again.
+  /// r37.0.3, as Google's SDK repository lists it in
+  /// https://dl.google.com/android/repository/repository2-3.xml, under `android-sdk-license`. The
+  /// license text is that manifest's `android-sdk-license` entry, dated January 16, 2019: the
+  /// text Google's own SDK tools show for this archive. To move the pin, take the archive's
+  /// version and size from that manifest and its SHA-256 from a downloaded copy; a changed
+  /// license text gets a new version, which the user accepts again.
   public static let pinned = PlatformToolsRelease(
     version: "37.0.3",
     url: URL(string: "https://dl.google.com/android/repository/platform-tools_r37.0.3-darwin.zip")!,
