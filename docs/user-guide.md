@@ -172,7 +172,7 @@ If adb is already on this Mac, from Homebrew or Android Studio, Ferry uses it. I
 2. Read Google's Android SDK License and click **Accept**.
 3. Ferry downloads the platform tools from Google, checks that they are the release it expects and that adb is signed by Google, and keeps only adb and its notices.
 
-Ferry keeps adb in ~/Library/Application Support/Ferry/platform-tools, and records that you accepted the license, and when. When a Ferry update needs a newer adb, Ferry downloads it the same way; if Google has changed the license, Ferry asks you to accept it again first. To use an adb you installed yourself instead, click **Use adb Already on This Mac**.
+Ferry keeps adb in ~/Library/Application Support/Ferry/platform-tools, and records that you accepted the license, and when. When a Ferry update needs a newer adb, Ferry downloads it the same way; if Google has changed the license, Ferry asks you to accept it again first. An adb you installed yourself works too, and Ferry prefers its own copy when both are present.
 
 ### Allow this Mac on the device
 
@@ -539,13 +539,13 @@ Unlock the device, tick **Always allow from this computer** and tap **OK** or **
 
 Ferry found no adb, so it can use file transfer only.
 
-Click **Get Android Platform Tools…** and accept Google's license: Ferry downloads adb once. If adb is already on this Mac, click **Use adb Already on This Mac**.
+Click **Get Android Platform Tools…** and accept Google's license: Ferry downloads adb once. Installing adb any other way also works, for example Homebrew's android-platform-tools, which downloads the same file from Google, and Ferry picks up an installed adb on its own. If both are present, Ferry prefers its own copy and never disturbs a running adb server.
 
 **Couldn't download adb. Ferry needs an internet connection once.**
 
 Ferry could not reach Google's download server, or the server did not send the file.
 
-Connect to the internet and click **Try Again**. Without a connection, install adb another way, then click **Use adb Already on This Mac**.
+Connect to the internet and click **Try Again**. Without a connection, install adb another way, for example with Homebrew: Ferry picks up an installed adb on its own.
 
 **The download didn't pass Ferry's checks, so Ferry deleted it.**
 

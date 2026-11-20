@@ -2146,9 +2146,6 @@
     "Get Android Platform Tools…" : {
 
     },
-    "Use adb Already on This Mac" : {
-
-    },
     "Review License…" : {
 
     },
@@ -2167,7 +2164,7 @@
     "To get adb, Ferry downloads Android SDK Platform-Tools %@ from Google, which licenses it under these terms." : {
 
     },
-    "Click **Get Android Platform Tools…** and accept Google's license: Ferry downloads adb once. If adb is already on this Mac, click **Use adb Already on This Mac**." : {
+    "Click **Get Android Platform Tools…** and accept Google's license: Ferry downloads adb once. Installing adb any other way also works, for example Homebrew's android-platform-tools, which downloads the same file from Google, and Ferry picks up an installed adb on its own. If both are present, Ferry prefers its own copy and never disturbs a running adb server." : {
       "extractionState" : "manual"
     },
     "Click **Get Android Platform Tools…** in that line." : {
@@ -2179,7 +2176,7 @@
     "Click **Try Again**. If it fails again, something on your network may be changing downloads: try another network." : {
       "extractionState" : "manual"
     },
-    "Connect to the internet and click **Try Again**. Without a connection, install adb another way, then click **Use adb Already on This Mac**." : {
+    "Connect to the internet and click **Try Again**. Without a connection, install adb another way, for example with Homebrew: Ferry picks up an installed adb on its own." : {
       "extractionState" : "manual"
     },
     "Ferry can't find adb. Get it from the Ferry menu, then try again." : {
@@ -2194,7 +2191,7 @@
     "Ferry found no adb, so it can use file transfer only." : {
       "extractionState" : "manual"
     },
-    "Ferry keeps adb in ~/Library/Application Support/Ferry/platform-tools, and records that you accepted the license, and when. When a Ferry update needs a newer adb, Ferry downloads it the same way; if Google has changed the license, Ferry asks you to accept it again first. To use an adb you installed yourself instead, click **Use adb Already on This Mac**." : {
+    "Ferry keeps adb in ~/Library/Application Support/Ferry/platform-tools, and records that you accepted the license, and when. When a Ferry update needs a newer adb, Ferry downloads it the same way; if Google has changed the license, Ferry asks you to accept it again first. An adb you installed yourself works too, and Ferry prefers its own copy when both are present." : {
       "extractionState" : "manual"
     },
     "Get adb" : {

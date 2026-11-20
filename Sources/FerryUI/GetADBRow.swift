@@ -28,7 +28,6 @@ struct GetADBRow: View {
       } actions: {
         StatusAction(
           title: Text("Get Android Platform Tools…", bundle: .module), action: showLicense)
-        useExisting
       }
     case .licenseChanged:
       StatusRow(symbol: "doc.text", title: Text(title), help: title.key) {
@@ -42,14 +41,7 @@ struct GetADBRow: View {
         symbol: "exclamationmark.triangle", tint: .yellow, title: Text(title), help: title.key
       ) {
         StatusAction(title: Text("Try Again", bundle: .module)) { model.retryPlatformTools() }
-        useExisting
       }
-    }
-  }
-
-  private var useExisting: some View {
-    StatusAction(title: Text("Use adb Already on This Mac", bundle: .module)) {
-      Task { await model.useExistingADB() }
     }
   }
 

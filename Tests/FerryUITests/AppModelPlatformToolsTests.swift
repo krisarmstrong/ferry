@@ -89,19 +89,6 @@ struct AppModelPlatformToolsTests {
     #expect(model.platformToolsRow == nil)
   }
 
-  /// Use adb Already on This Mac is the agent looking again, and puts the offer back.
-  @Test func usingTheMacsAdbClearsTheFailureAndAsksTheAgent() async {
-    let (client, services) = missingAdb()
-    services.fetchOutcomes = [.offline]
-    let model = model(client, services)
-    await model.refresh()
-    model.acceptLicense()
-    await model.platformToolsSettled()
-    await model.useExistingADB()
-    #expect(log.all.suffix(2) == ["recheckADB", "status"])
-    #expect(model.platformToolsRow == .offer)
-  }
-
   /// adb that turns up another way (the user installed it) ends a failed download's line.
   @Test func aFailureEndsWhenAdbTurnsUp() async {
     let (client, services) = missingAdb()
