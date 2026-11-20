@@ -131,37 +131,42 @@ extension DevicePresentation {
     }
   }
 
-  /// The rows a device's expansion lists under its details, in menu order: the ADB tools, Send
-  /// File…, the network rows, the one its state needs, then Eject.
-  static func actions(
+  /// The rows a device's expansion lists under its details, in groups the menu divides with
+  /// thin lines: capture, sending, the developer tools, then the device itself (Use over Wi-Fi,
+  /// Forget This Device, and Eject or the row its state needs). A group with no rows is left out.
+  static func actionGroups(
     for device: AttachedDevice, isRemembered: Bool, recording: RecordingPhase
-  ) -> [MenuAction] {
-    var actions: [MenuAction] = []
-    if offersTools(device) {
-      actions.append(.takeScreenshot)
+  ) -> [[MenuAction]] {
+    let tools = offersTools(device)
+    var capture: [MenuAction] = []
+    var sending: [MenuAction] = []
+    var developer: [MenuAction] = []
+    var own: [MenuAction] = []
+    if tools {
+      capture.append(.takeScreenshot)
       switch recording {
-      case .none: actions.append(.recordScreen)
-      case .running: actions.append(.stopRecording)
+      case .none: capture.append(.recordScreen)
+      case .running: capture.append(.stopRecording)
       case .saving, .unsaved: break
       }
-      actions += [.logcat, .portForwarding]
+      developer = [.logcat, .portForwarding, .openShell]
     }
     // Sending is a file write through the agent, so any method serves it.
-    if case .ready = device.state { actions.append(.sendFile) }
-    if offersTools(device) { actions += [.installApp, .openShell] }
-    if offersWiFi(device) { actions.append(.useOverWiFi) }
-    if isRemembered { actions.append(.forget) }
+    if case .ready = device.state { sending.append(.sendFile) }
+    if tools { sending.append(.installApp) }
+    if offersWiFi(device) { own.append(.useOverWiFi) }
+    if isRemembered { own.append(.forget) }
     switch device.state {
     case .ready:
-      actions.append(.eject)
+      own.append(.eject)
     case .notSharingFiles:
-      if needsFileTransferSteps(device) { actions.append(.howToTurnOnFileTransfer) }
+      if needsFileTransferSteps(device) { own.append(.howToTurnOnFileTransfer) }
     case .ejected:
-      actions.append(.mount)
+      own.append(.mount)
     case .busy, .failed:
-      actions.append(.checkAgain)
+      own.append(.checkAgain)
     }
-    return actions
+    return [capture, sending, developer, own].filter { !$0.isEmpty }
   }
 
   static let rememberedActions: [MenuAction] = [.connectAgain, .forget]

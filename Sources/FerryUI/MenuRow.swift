@@ -216,10 +216,13 @@ struct ExpandingRowHeader: View {
   }
 }
 
-/// A thin line between the menu's sections.
+/// A thin line between the menu's sections, or, indented, between groups of a device's rows.
 struct MenuSeparator: View {
+  var indent: CGFloat = 0
+
   var body: some View {
     Divider()
+      .padding(.leading, indent)
       .padding(.horizontal, MenuMetrics.rowPadding)
       .padding(.vertical, 4)
       .accessibilityHidden(true)

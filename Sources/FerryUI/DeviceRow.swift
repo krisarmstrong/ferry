@@ -16,8 +16,8 @@ struct DeviceRowActions {
 }
 
 /// One device: its tile, name and summary, and, when expanded, details for its state, what it
-/// says about itself, then its actions as rows. An `.apk` dropped on a device with tools is
-/// installed.
+/// says about itself, then its actions as rows in groups divided by thin lines. An `.apk`
+/// dropped on a device with tools is installed.
 struct DeviceRow: View {
   let device: AttachedDevice
   /// What the menu calls the device.
@@ -46,26 +46,34 @@ struct DeviceRow: View {
         DeviceDetails(
           device: device, transfers: transfers, awaitingUSBDebugging: awaitingUSBDebugging,
           tools: tools, recording: recording, showUSBDebugging: actions.showUSBDebugging)
-        ForEach(
-          DevicePresentation.actions(for: device, isRemembered: isRemembered, recording: recording),
-          id: \.self
-        ) { action in
-          if action == .portForwarding {
-            PortForwardRows(tools: tools)
-          } else {
-            MenuRow(
-              title: Text(action.title), symbol: action.symbol, indent: MenuMetrics.actionIndent,
-              action: perform(action)
-            )
-            .deviceAction(action.title, on: name)
-            // One app at a time: Install App… waits for the one on its way.
-            .disabled(action == .installApp && tools.install != nil)
+        let groups = DevicePresentation.actionGroups(
+          for: device, isRemembered: isRemembered, recording: recording)
+        ForEach(groups.indices, id: \.self) { index in
+          if index > 0 {
+            MenuSeparator(indent: MenuMetrics.actionIndent)
+          }
+          ForEach(groups[index], id: \.self) { action in
+            row(for: action)
           }
         }
       }
     }
     .dropDestination(for: URL.self, isEnabled: DevicePresentation.offersTools(device)) { urls, _ in
       install(urls)
+    }
+  }
+
+  @ViewBuilder private func row(for action: DevicePresentation.MenuAction) -> some View {
+    if action == .portForwarding {
+      PortForwardRows(tools: tools)
+    } else {
+      MenuRow(
+        title: Text(action.title), symbol: action.symbol, indent: MenuMetrics.actionIndent,
+        action: perform(action)
+      )
+      .deviceAction(action.title, on: name)
+      // One app at a time: Install App… waits for the one on its way.
+      .disabled(action == .installApp && tools.install != nil)
     }
   }
 

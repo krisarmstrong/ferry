@@ -91,45 +91,70 @@ struct MenuPresentationTests {
 
   typealias Action = DevicePresentation.MenuAction
 
-  /// The tools; Copy Device Details is part of the details above them, not a tool row.
-  private static let tools: [Action] = [
-    .takeScreenshot, .recordScreen, .logcat, .portForwarding, .sendFile, .installApp, .openShell,
+  /// The tools, in their groups: capture, sending, developer tools.
+  private static let tools: [[Action]] = [
+    [.takeScreenshot, .recordScreen], [.sendFile, .installApp],
+    [.logcat, .portForwarding, .openShell],
   ]
 
-  @Test(
-    arguments: [
-      (ready, ConnectionMethod.usbADB, false, tools + [.useOverWiFi, .eject]),
-      (ready, .usbADB, true, tools + [.useOverWiFi, .forget, .eject]),
-      (ready, .wifiADB, true, tools + [.forget, .eject]),
-      (ready, .wifiADB, false, tools + [.eject]),
-      (ready, .usbFileTransfer, false, [.sendFile, .eject]),
-      (.notSharingFiles, .usbFileTransfer, false, [.howToTurnOnFileTransfer]),
-      (.notSharingFiles, .usbADB, false, [Action]()),
-      (.ejected, .usbFileTransfer, false, [.mount]),
-      (.ejected, .usbADB, true, [.forget, .mount]),
-      (.busy, .usbFileTransfer, false, [.checkAgain]),
-      (.failed(.deviceBusy), .usbFileTransfer, false, [.checkAgain]),
-    ])
-  func eachStateOffersItsActionsInMenuOrder(
-    state: DeviceState, method: ConnectionMethod, remembered: Bool, actions: [Action]
-  ) {
+  /// A state, how the device is attached, whether Ferry remembers it, and its groups.
+  struct GroupCase: Sendable {
+    let state: DeviceState
+    let method: ConnectionMethod
+    let remembered: Bool
+    let groups: [[Action]]
+  }
+
+  private static let groupCases: [GroupCase] = [
+    GroupCase(
+      state: ready, method: .usbADB, remembered: false, groups: tools + [[.useOverWiFi, .eject]]),
+    GroupCase(
+      state: ready, method: .usbADB, remembered: true,
+      groups: tools + [[.useOverWiFi, .forget, .eject]]),
+    GroupCase(
+      state: ready, method: .wifiADB, remembered: true, groups: tools + [[.forget, .eject]]),
+    GroupCase(state: ready, method: .wifiADB, remembered: false, groups: tools + [[.eject]]),
+    GroupCase(
+      state: ready, method: .usbFileTransfer, remembered: false, groups: [[.sendFile], [.eject]]),
+    GroupCase(
+      state: .notSharingFiles, method: .usbFileTransfer, remembered: false,
+      groups: [[.howToTurnOnFileTransfer]]),
+    GroupCase(state: .notSharingFiles, method: .usbADB, remembered: false, groups: []),
+    GroupCase(state: .ejected, method: .usbFileTransfer, remembered: false, groups: [[.mount]]),
+    GroupCase(state: .ejected, method: .usbADB, remembered: true, groups: [[.forget, .mount]]),
+    GroupCase(state: .busy, method: .usbFileTransfer, remembered: false, groups: [[.checkAgain]]),
+    GroupCase(
+      state: .failed(.deviceBusy), method: .usbFileTransfer, remembered: false,
+      groups: [[.checkAgain]]),
+  ]
+
+  /// The rows in groups divided by thin lines: capture, sending, developer tools, then the
+  /// device itself (Use over Wi-Fi, Forget, and Eject or the row its state needs). A group
+  /// with no rows is left out.
+  @Test(arguments: groupCases)
+  func eachStateOffersItsActionsInGroups(_ test: GroupCase) {
     #expect(
-      DevicePresentation.actions(
-        for: Self.attached(state, method), isRemembered: remembered, recording: .none)
-        == actions)
+      DevicePresentation.actionGroups(
+        for: Self.attached(test.state, test.method), isRemembered: test.remembered,
+        recording: .none)
+        == test.groups)
   }
 
   /// Record Screen while nothing records, Stop Recording while it does, and neither while a
-  /// recording is saved or waits for Choose Folder… or Discard.
+  /// recording is saved or waits for Choose Folder… or Discard: Take Screenshot is then alone in
+  /// its group.
   @Test(arguments: [
-    (DevicePresentation.RecordingPhase.none, Action?.some(.recordScreen)),
-    (.running, .stopRecording), (.saving, nil), (.unsaved, nil),
+    (DevicePresentation.RecordingPhase.none, [Action.takeScreenshot, .recordScreen]),
+    (.running, [.takeScreenshot, .stopRecording]), (.saving, [.takeScreenshot]),
+    (.unsaved, [.takeScreenshot]),
   ])
-  func theRecordingRowFollowsTheRecording(phase: DevicePresentation.RecordingPhase, row: Action?) {
-    let actions = DevicePresentation.actions(
+  func theRecordingRowFollowsTheRecording(
+    phase: DevicePresentation.RecordingPhase, capture: [Action]
+  ) {
+    let groups = DevicePresentation.actionGroups(
       for: Self.attached(Self.ready, .usbADB), isRemembered: false, recording: phase)
-    #expect(
-      actions.filter { $0 == .recordScreen || $0 == .stopRecording } == (row.map { [$0] } ?? []))
+    #expect(groups.first == capture)
+    #expect(groups.count == 4)
   }
 
   @Test func rememberedAndOfferRowsOfferTheirPair() {
