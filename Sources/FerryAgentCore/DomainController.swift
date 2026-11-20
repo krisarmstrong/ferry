@@ -82,6 +82,11 @@ public actor DomainController {
   let hub: DeviceHub
   let manager: any DomainManaging
   let itemStore: URL
+  /// Times the retry of a hide or show that failed.
+  let clock: any Clock<Duration>
+  var visibilityRetryTask: Task<Void, Never>?
+  /// The wait before the latest retry of a hide or show; `nil` once one succeeds.
+  var visibilityRetryDelay: Duration?
   var domains: [String: Domain] = [:]
   /// Each ready device's method when last reconciled, to notice a change.
   var lastMethods: [DeviceID: ConnectionMethod] = [:]
@@ -106,11 +111,16 @@ public actor DomainController {
   var requestsAwaitingAdoption: Int { adoptionWaiters.count }
 
   /// `itemStore` is the folder holding the item tables, one file per domain. It must be the
-  /// agent's own: the sandboxed extension can write to the app group's container.
-  public init(hub: DeviceHub, manager: any DomainManaging, itemStore: URL) {
+  /// agent's own: the sandboxed extension can write to the app group's container. `clock` times
+  /// retries; the hub's by default.
+  public init(
+    hub: DeviceHub, manager: any DomainManaging, itemStore: URL,
+    clock: (any Clock<Duration>)? = nil
+  ) {
     self.hub = hub
     self.manager = manager
     self.itemStore = itemStore
+    self.clock = clock ?? hub.clock
   }
 
   /// The agent's item store, in its own Application Support folder.
