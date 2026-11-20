@@ -75,8 +75,6 @@ enum DevicePresentation {
     device.state == .notSharingFiles && device.method != .usbADB
   }
 
-  static let installCommand = "brew install --cask android-platform-tools"
-
   /// Use over Wi-Fi is offered on a device Ferry serves over USB debugging.
   static func offersWiFi(_ device: AttachedDevice) -> Bool {
     if case .ready = device.state { device.method == .usbADB } else { false }
@@ -126,7 +124,7 @@ enum DevicePresentation {
     switch failure {
     case .adbUnavailable:
       LocalizedStringResource(
-        "adb isn't running. Install it, or choose Check Again.", bundle: .module)
+        "adb isn't available. Use the adb line at the top of the menu.", bundle: .module)
     case .notOverUSB:
       LocalizedStringResource(
         "Connect the device with a cable and allow USB debugging first.", bundle: .module)

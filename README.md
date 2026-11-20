@@ -29,8 +29,11 @@ forwarding. It is free and open source (MIT), and it sends nothing to any server
 - A USB cable that carries data
 - An Android device with file transfer (MTP): LinkRunner 10G, EtherScope nXG,
   LinkRunner 100G, or an Android 8+ phone
-- Optional, for USB debugging, Wi-Fi and the tools: `adb`, from Google's Android platform tools
-  (`brew install --cask android-platform-tools`). Ferry never installs or bundles it.
+- Optional, for USB debugging, Wi-Fi and the tools: `adb`, from Google's Android platform tools.
+  Ferry uses one already on the Mac. Without one, the menu offers **Get Android Platform
+  Tools…**: after you accept Google's Android SDK License, Ferry downloads Google's release once
+  from `dl.google.com`, checks its SHA-256 and Google's code signature, and keeps only `adb`.
+  Ferry never bundles Google's binaries.
 
 ## Install
 

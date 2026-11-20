@@ -43,8 +43,12 @@ let package = Package(
       name: "FerryText", dependencies: ["DeviceKit", "FerryIPC"],
       resources: [.process("Localizable.xcstrings")]),
     .target(
-      name: "FerryUI", dependencies: ["DeviceKit", "FerryIPC", "FerrySyncCore", "FerryText"],
-      resources: [.process("Localizable.xcstrings"), .process("help.json")]),
+      name: "FerryUI",
+      dependencies: ["DeviceKit", "FerryIPC", "FerrySyncCore", "FerryText", "PlatformTools"],
+      resources: [
+        .process("Localizable.xcstrings"), .process("help.json"),
+        .copy("android-sdk-license.txt"),
+      ]),
     .executableTarget(
       name: "ferryctl",
       dependencies: [
@@ -76,7 +80,9 @@ let package = Package(
       ]),
     .testTarget(
       name: "FerryUITests",
-      dependencies: ["FerryUI", "FerryIPC", "FerryText", "DeviceKit", "DeviceKitTestSupport"]),
+      dependencies: [
+        "FerryUI", "FerryIPC", "FerryText", "DeviceKit", "DeviceKitTestSupport", "PlatformTools",
+      ]),
   ],
   swiftLanguageModes: [.v6]
 )

@@ -71,16 +71,6 @@
         }
       }
     },
-    "Ferry can't find adb. Install it, then try again." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ferry can't find adb. Install it, then try again."
-          }
-        }
-      }
-    },
     "Ferry can't save to its folder in Documents. Allow Ferry in Privacy & Security." : {
       "localizations" : {
         "en" : {
@@ -407,6 +397,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "adb couldn't forward the port: %@"
+          }
+        }
+      }
+    },
+    "Ferry can't find adb. Get it from the Ferry menu, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry can't find adb. Get it from the Ferry menu, then try again."
           }
         }
       }

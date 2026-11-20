@@ -35,8 +35,9 @@ app:
 		-quiet $(SIGN_FLAGS_$(SIGN)) $(if $(TEAM),FERRY_TEAM_ID=$(TEAM)) build
 	$(MAKE) check-app
 
-# The FerryUI resource bundle inside the app must carry the help and the strings: without them
-# Help says it is not available and the menu shows its string keys.
+# The FerryUI resource bundle inside the app must carry the help, the strings and Google's license:
+# without them Help says it is not available, the menu shows its string keys, and adb cannot be
+# fetched.
 CONFIG ?= Debug
 APP ?= .build/xcode/Build/Products/$(CONFIG)/Ferry.app
 UI_RESOURCES = $(APP)/Contents/Resources/Ferry_FerryUI.bundle/Contents/Resources
@@ -44,7 +45,10 @@ SYNC_RESOURCES = $(APP)/Contents/PlugIns/FerrySync.appex/Contents/Resources
 check-app:
 	@test -f "$(UI_RESOURCES)/help.json" || { echo "error: no help.json in $(UI_RESOURCES)" >&2; exit 1; }
 	@test -d "$(UI_RESOURCES)/en.lproj" || { echo "error: no en.lproj in $(UI_RESOURCES)" >&2; exit 1; }
-	@echo "app bundle carries help.json and en.lproj"
+	@# Google's license, which the user accepts before Ferry downloads adb.
+	@test -f "$(UI_RESOURCES)/android-sdk-license.txt" \
+	  || { echo "error: no android-sdk-license.txt in $(UI_RESOURCES)" >&2; exit 1; }
+	@echo "app bundle carries help.json, en.lproj and the Android SDK License"
 	@# The Finder Sync extension reads its own strings, and the shared ones for failures. It runs
 	@# in every Finder window, so it must not carry the menu's UI.
 	@for bundle in Ferry_FerrySyncCore Ferry_FerryText; do \

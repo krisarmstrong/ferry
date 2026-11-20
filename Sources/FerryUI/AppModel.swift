@@ -62,6 +62,8 @@ import os
   @ObservationIgnored var networkSend: Task<WirelessReply, Never>?
   /// Set once the user opens a network form this run: a Wi-Fi-only user needs adb too.
   var wantsNetwork = false
+  /// Ferry's own copy of adb, from Google's platform tools (see `AppModel+PlatformTools`).
+  var platformTools = PlatformToolsState()
   /// The last failed action, shown until the next one succeeds.
   public internal(set) var actionError: MenuNotice?
   /// Screen recordings running, as of the last status.
@@ -243,12 +245,14 @@ import os
     services.open(Self.loginItemsSettings)
   }
 
-  /// Starts the agent, reads its status, then whether Ferry opens at login. The system calls
-  /// run off the main actor (see `SystemServices`), so the app opens without waiting on them.
+  /// Starts the agent, reads its status, then whether Ferry opens at login, and updates the adb
+  /// Ferry fetched if this release pins a newer one. The system calls run off the main actor (see
+  /// `SystemServices`), so the app opens without waiting on them.
   public func launch() async {
     await startAgent()
     await refresh()
     loginItem = await services.loginItemStatus()
+    considerPlatformToolsUpdate()
   }
 
   /// Registers the agent, or restarts it when the agent in the bundle is not the one last

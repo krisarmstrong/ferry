@@ -1,6 +1,7 @@
 import DeviceKit
 import FerryIPC
 import Foundation
+import PlatformTools
 
 /// A fixed agent for SwiftUI previews.
 struct PreviewClient: AgentSending {
@@ -78,4 +79,8 @@ private final class PreviewServices: SystemServicing {
   func chooseFolder() async -> URL? { nil }
   func chooseLogDestination(suggestedName: String) async -> URL? { nil }
   func openInTerminal(_ script: URL) async -> Bool { false }
+  func platformToolsAcceptance() -> LicenseAcceptance? { nil }
+  func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance) {}
+  func fetchedPlatformToolsVersion() -> String? { nil }
+  func fetchPlatformTools(accepted: LicenseAcceptance?) async throws(PlatformToolsError) {}
 }

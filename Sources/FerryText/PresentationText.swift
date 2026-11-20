@@ -104,7 +104,8 @@ public enum PresentationText {
       LocalizedStringResource(
         "adb couldn't forward the port: \(DisplayText.escaped(detail))", bundle: .module)
     case .adbNotFound:
-      LocalizedStringResource("Ferry can't find adb. Install it, then try again.", bundle: .module)
+      LocalizedStringResource(
+        "Ferry can't find adb. Get it from the Ferry menu, then try again.", bundle: .module)
     case .forwardNotFound:
       LocalizedStringResource("That forward is already gone.", bundle: .module)
     }

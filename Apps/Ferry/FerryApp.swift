@@ -38,6 +38,14 @@ struct FerryApp: App {
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
 
+    // Google's license, shown before Ferry downloads adb.
+    Window(PlatformToolsLicenseView.windowTitle, id: PlatformToolsLicenseView.windowID) {
+      PlatformToolsLicenseView(model: model)
+    }
+    .windowResizability(.contentSize)
+    .defaultLaunchBehavior(.suppressed)
+    .restorationBehavior(.disabled)
+
     // Not restored at launch, like the setup guide; HelpView remembers the last topic itself.
     Window(HelpView.windowTitle, id: HelpView.windowID) {
       HelpView(model: model)
