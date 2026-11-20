@@ -195,7 +195,7 @@ Ferry never searches the network. It connects only to addresses you give it, and
 1. Connect the device to Ethernet or Wi-Fi.
 2. Connect it to the Mac by cable, with USB debugging on.
 3. Click the device in the menu, then **Use over Wi-Fi**.
-4. Unplug the cable. The device stays in Finder over the network.
+4. Unplug the cable. Ferry still reaches the device over the network, so it stays in Finder.
 
 Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again.
 
@@ -238,6 +238,8 @@ Anyone on a network can claim a device's serial number. So when a new address an
 ### Find your device in Finder
 
 Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs.
+
+A device appears in Finder only while Ferry can reach it. When it is unplugged and not on the network, locked, or not sharing files, its location leaves the sidebar. It comes back with its files when Ferry can reach it again.
 
 A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number.
 
@@ -518,6 +520,12 @@ Nothing to do: devices still appear, a little later. Restart the Mac if it stays
 You ejected the device before some changes reached it. macOS kept those files in a folder on the Mac. Deletes and renames that had not reached the device were dropped.
 
 Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again.
+
+**…: changes wait to be sent. Reconnect it to finish.**
+
+The device went away, or Ferry can no longer reach it, before some changes reached it. Its location left Finder, so the files that wait are not shown there. They stay on the Mac. An SD card has a location for each way Ferry reaches the device, so changes made on the card over a cable wait for the cable, even while the card shows over the network.
+
+Reconnect the device the same way as before, by cable or over the network. Its location comes back to Finder and the changes are sent; the line goes once they are.
 
 ### USB debugging messages
 

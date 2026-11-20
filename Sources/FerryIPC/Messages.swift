@@ -116,11 +116,14 @@ public enum ProviderState: String, Codable, Sendable {
   case enabled
   /// Every domain is off: the user has a step to take.
   case disabled
-  /// No domain exists yet, because no device has been ready, so there is nothing to turn on.
+  /// No domain is in Finder: none exists yet, or every one is hidden because its device is
+  /// away, so there is nothing to turn on.
   case noDomains
 
-  /// The state of domains whose `userEnabled` flags are `enabled`.
-  public init(domainsEnabled enabled: [Bool]) {
+  /// The state of domains with these `userEnabled` and `isHidden` flags. A hidden domain is not
+  /// in Finder, so whether it is turned on asks nothing of the user: it is left out.
+  public init(domains: [(enabled: Bool, hidden: Bool)]) {
+    let enabled = domains.filter { !$0.hidden }.map(\.enabled)
     if enabled.isEmpty {
       self = .noDomains
     } else {
@@ -157,6 +160,9 @@ public struct StatusReport: Codable, Sendable, Equatable {
   /// The address adb serves each network device on now, for the menu; a device on USB, or one
   /// adb reaches by an mDNS name, has none.
   public let connectedAddresses: [DeviceID: WirelessEndpoint]
+  /// The names of hidden Finder locations (their device is away) still holding changes not
+  /// sent to the device, which nothing in Finder shows while the location is hidden.
+  public let waitingToSend: [String]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
@@ -164,7 +170,8 @@ public struct StatusReport: Codable, Sendable, Equatable {
     awaitingUSBDebugging: [DeviceID] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
-    sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:]
+    sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:],
+    waitingToSend: [String] = []
   ) {
     self.devices = devices
     self.provider = provider
@@ -178,6 +185,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.usbWatchFailed = usbWatchFailed
     self.sessions = sessions
     self.connectedAddresses = connectedAddresses
+    self.waitingToSend = waitingToSend
   }
 }
 

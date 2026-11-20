@@ -184,7 +184,7 @@
             "Connect the device to Ethernet or Wi-Fi.",
             "Connect it to the Mac by cable, with USB debugging on.",
             "Click the device in the menu, then **Use over Wi-Fi**.",
-            "Unplug the cable. The device stays in Finder over the network."
+            "Unplug the cable. Ferry still reaches the device over the network, so it stays in Finder."
           ],
           "note": "Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again."
         },
@@ -247,6 +247,7 @@
           "symbol": "externaldrive",
           "paragraphs": [
             "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs.",
+            "A device appears in Finder only while Ferry can reach it. When it is unplugged and not on the network, locked, or not sharing files, its location leaves the sidebar. It comes back with its files when Ferry can reach it again.",
             "A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number.",
             "Double-click a file to open it. Ferry copies it to the Mac when you open it.",
             "With one device location, macOS labels it with the app's name, so the sidebar says Ferry. This is normal."
@@ -656,6 +657,11 @@
               "message": "Unsent changes were saved to %@",
               "cause": "You ejected the device before some changes reached it. macOS kept those files in a folder on the Mac. Deletes and renames that had not reached the device were dropped.",
               "fix": "Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again."
+            },
+            {
+              "message": "%@: changes wait to be sent. Reconnect it to finish.",
+              "cause": "The device went away, or Ferry can no longer reach it, before some changes reached it. Its location left Finder, so the files that wait are not shown there. They stay on the Mac. An SD card has a location for each way Ferry reaches the device, so changes made on the card over a cable wait for the cable, even while the card shows over the network.",
+              "fix": "Reconnect the device the same way as before, by cable or over the network. Its location comes back to Finder and the changes are sent; the line goes once they are."
             }
           ]
         },

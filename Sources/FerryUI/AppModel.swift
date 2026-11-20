@@ -87,6 +87,8 @@ import os
   /// Where the system saved changes an eject removed before they reached the device. Shown until
   /// the next action.
   public internal(set) var preservedChanges: [URL] = []
+  /// Hidden locations, their device away, whose changes wait to be sent (see `StatusReport`).
+  private(set) var waitingToSend: [String] = []
   /// Which row of the menu is expanded (see `MenuExpansion`).
   var expansion = MenuExpansion()
   /// What each device said about itself, for its inline details (see `AppModel+Details`).
@@ -221,21 +223,6 @@ import os
     cancelDetailReads()
   }
 
-  /// An ejected device reports `.ejected`, which never opens the guide.
-  public func eject(_ id: DeviceID) async {
-    await perform(.eject(id))
-  }
-
-  /// Mounts an ejected device again.
-  public func mount(_ id: DeviceID) async {
-    await perform(.recheck(id))
-  }
-
-  /// Asks the agent to open a device again, after the app holding it quits.
-  public func recheck(_ id: DeviceID) async {
-    await perform(.recheck(id))
-  }
-
   public func turnOnInFinder() {
     services.open(Self.loginItemsSettings)
   }
@@ -346,6 +333,7 @@ import os
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered
     connectedAddresses = report.connectedAddresses
+    waitingToSend = report.waitingToSend
     unconfirmed = report.unconfirmed
     recordings = report.recordings
     collectFinishedRecordings()
@@ -369,6 +357,21 @@ import os
 }
 
 extension AppModel {
+  /// An ejected device reports `.ejected`, which never opens the guide.
+  public func eject(_ id: DeviceID) async {
+    await perform(.eject(id))
+  }
+
+  /// Mounts an ejected device again.
+  public func mount(_ id: DeviceID) async {
+    await perform(.recheck(id))
+  }
+
+  /// Asks the agent to open a device again, after the app holding it quits.
+  public func recheck(_ id: DeviceID) async {
+    await perform(.recheck(id))
+  }
+
   /// The transfers running on `device`.
   public func transfers(on device: DeviceID) -> [ActiveTransfer] {
     transfers.filter { $0.device == device }

@@ -132,6 +132,7 @@ public struct MenuContent: View {
         model.revealPreservedChanges()
       }
     }
+    WaitingChangesRow(names: model.waitingToSend)
     if model.agent == .running, model.usbWatchFailed {
       StatusRow(
         symbol: "info.circle", title: Text(MenuStatusText.usbWatchFailed),
