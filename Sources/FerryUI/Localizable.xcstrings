@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Copy All Details" : {
+
+    },
+    "Copied All" : {
+
+    },
     "File transfer" : {
 
     },
@@ -42,9 +48,6 @@
     },
     "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details, Copy Device Details, and its tools: Take Screenshot, Record Screen, Logcat, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
       "extractionState" : "manual"
-    },
-    "Copy Device Details" : {
-
     },
     "Android %@" : {
 

@@ -94,8 +94,8 @@ import os
   /// The read running for each device (one at most), so the menu can cancel it and a test can
   /// wait for it. No view reads it.
   @ObservationIgnored var detailReads: [DeviceID: DetailReadTask] = [:]
-  /// The address line just copied, which shows "Copied" for a moment.
-  var copiedAddress: CopiedAddress?
+  /// The detail line just copied from, which shows "Copied" or "Copied All" for a moment.
+  var copiedLine: CopiedLine?
   /// Each device's port forwards, kept while it is listed: the menu redraws its rows on every
   /// status, and the ports typed must outlive them (see `AppModel+Developer`).
   var forwardSessions: [DeviceID: PortForwardsSession] = [:]

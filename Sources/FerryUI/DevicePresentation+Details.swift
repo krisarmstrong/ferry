@@ -1,10 +1,11 @@
+import AppKit
 import DeviceKit
 import FerryText
 import Foundation
 
 /// What a device says about itself, as an expanded device shows it inline (a line per port or
-/// interface with its IPv4 address, then its Android version and battery) and as Copy Device
-/// Details copies it. Every value is the device's, so it is escaped.
+/// interface with its IPv4 address, then its Android version and battery) and as an Option-click
+/// on a line copies it all. Every value is the device's, so it is escaped.
 extension DevicePresentation {
   /// One port or interface: its name on the left, its IPv4 address (or "Not connected") on the
   /// right.
@@ -71,9 +72,26 @@ extension DevicePresentation {
     }
   }
 
-  /// What VoiceOver reads for a line: its label, then its value, or "Copied" just after a copy.
-  static func detailLabel(_ line: DetailLine, copied: Bool) -> String {
-    let (label, value) = (line.label, copied ? String(localized: copiedResource) : line.value)
+  /// What a click on a detail line does.
+  enum DetailClick: Equatable {
+    case copyLine
+    case copyAll
+    case nothing
+  }
+
+  /// With Option held, a click on any line copies every detail; otherwise it copies the line's
+  /// address, and a line with none copies nothing.
+  static func detailClick(on line: DetailLine, modifiers: NSEvent.ModifierFlags) -> DetailClick {
+    if modifiers.contains(.option) { return .copyAll }
+    return line.address == nil ? .nothing : .copyLine
+  }
+
+  /// What VoiceOver reads for a line: its label, then its value, or the word a copy shows in its
+  /// place.
+  static func detailLabel(_ line: DetailLine, copied: CopiedWord?) -> String {
+    let (label, value) = (
+      line.label, copied.map { String(localized: copiedResource($0)) } ?? line.value
+    )
     return String(localized: LocalizedStringResource("\(label), \(value)", bundle: .module))
   }
 
@@ -83,15 +101,23 @@ extension DevicePresentation {
   }
 
   static let copiedResource = LocalizedStringResource("Copied", bundle: .module)
-  static let copyDeviceDetailsResource = LocalizedStringResource(
-    "Copy Device Details", bundle: .module)
+  static let copiedAllResource = LocalizedStringResource("Copied All", bundle: .module)
+  static let copyAllDetailsResource = LocalizedStringResource("Copy All Details", bundle: .module)
+
+  /// "Copied" after a line's address was copied, "Copied All" after every detail was.
+  static func copiedResource(_ word: CopiedWord) -> LocalizedStringResource {
+    switch word {
+    case .line: copiedResource
+    case .all: copiedAllResource
+    }
+  }
   static let loadingDetailsResource = LocalizedStringResource("Loading details…", bundle: .module)
 
   private static var notConnected: String {
     String(localized: LocalizedStringResource("Not connected", bundle: .module))
   }
 
-  /// What Copy Device Details copies: a `Label: value` line per row of `infoRows`.
+  /// What an Option-click on a line copies: a `Label: value` line per row of `infoRows`.
   static func detailsText(_ info: AndroidDeviceInfo) -> String {
     infoRows(info).map { "\($0.label): \($0.value)" }.joined(separator: "\n")
   }

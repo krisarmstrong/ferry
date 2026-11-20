@@ -1,3 +1,4 @@
+import AppKit
 import DeviceKit
 import Foundation
 import Testing
@@ -131,8 +132,8 @@ struct DeviceDetailsPresentationTests {
     #expect(line == "Android 8\\u{202E}")
   }
 
-  /// Copy Device Details puts the Device Info text on the pasteboard: a `Label: value` line per
-  /// row, every address of every port included.
+  /// An Option-click on a detail line puts the Device Info text on the pasteboard: a
+  /// `Label: value` line per row, every address of every port included.
   @Test func theFullTextHasEveryAddress() {
     let text = DevicePresentation.detailsText(
       info([
@@ -159,11 +160,33 @@ struct DeviceDetailsPresentationTests {
   @Test func aLineReadsAsItsLabelAndValue() {
     let line = DevicePresentation.DetailLine(
       id: "wlan0", label: "Wi-Fi Management", address: "192.0.2.159")
-    #expect(
-      DevicePresentation.detailLabel(line, copied: false) == "Wi-Fi Management, 192.0.2.159")
-    #expect(DevicePresentation.detailLabel(line, copied: true) == "Wi-Fi Management, Copied")
+    #expect(DevicePresentation.detailLabel(line, copied: nil) == "Wi-Fi Management, 192.0.2.159")
+    #expect(DevicePresentation.detailLabel(line, copied: .line) == "Wi-Fi Management, Copied")
+    #expect(DevicePresentation.detailLabel(line, copied: .all) == "Wi-Fi Management, Copied All")
+    #expect(String(localized: DevicePresentation.copyAllDetailsResource) == "Copy All Details")
     #expect(
       String(localized: DevicePresentation.copyAddressResource(line))
         == "Copy Wi-Fi Management address")
   }
+
+  /// Option, with or without other keys, copies every detail; otherwise a click copies the
+  /// line's address, and a line with none copies nothing. The flags travel as their raw value,
+  /// which test arguments can carry.
+  @Test(arguments: [
+    (NSEvent.ModifierFlags.option.rawValue, String?.some("192.0.2.159"), Click.copyAll),
+    (NSEvent.ModifierFlags([.option, .shift]).rawValue, "192.0.2.159", .copyAll),
+    (NSEvent.ModifierFlags.option.rawValue, nil, .copyAll),
+    (0, "192.0.2.159", .copyLine),
+    (NSEvent.ModifierFlags.command.rawValue, "192.0.2.159", .copyLine),
+    (0, nil, .nothing),
+  ])
+  func aClickCopiesByItsModifiers(modifiers: UInt, address: String?, click: Click) {
+    let line = DevicePresentation.DetailLine(id: "wlan0", label: "Wi-Fi", address: address)
+    #expect(
+      DevicePresentation.detailClick(
+        on: line, modifiers: NSEvent.ModifierFlags(rawValue: modifiers))
+        == click)
+  }
+
+  typealias Click = DevicePresentation.DetailClick
 }

@@ -5,7 +5,8 @@ import Testing
 
 @testable import FerryUI
 
-/// Everything a device said about itself, a row each, as Copy Device Details copies it.
+/// Everything a device said about itself, a row each, as an Option-click on a detail line
+/// copies it.
 struct InfoRowsTests {
   static let info = AndroidDeviceInfo(
     model: "LinkRunner G2", androidVersion: "8.1.0", build: "OPM1.171019.026",

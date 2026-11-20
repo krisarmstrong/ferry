@@ -18,7 +18,7 @@ public struct PortForward: Codable, Sendable, Hashable {
   }
 }
 
-/// What a device says about itself, for its inline details and Copy Device Details. Every string
+/// What a device says about itself, for its inline details and the copy of them all. Every string
 /// was written by the device, so a screen shows it escaped.
 public struct AndroidDeviceInfo: Codable, Sendable, Equatable {
   public enum BatteryState: String, Codable, Sendable {

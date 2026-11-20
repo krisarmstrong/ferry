@@ -25,11 +25,14 @@ struct ToolActions {
   /// The forwards while Port Forwarding is open; `nil` while it is closed.
   let forwards: PortForwardsSession?
   let toggleForwards: () -> Void
-  /// The device's details as the menu shows them, and the line just copied.
+  /// The device's details as the menu shows them, and what the line just copied from shows.
   let details: DetailsShown
-  let isCopied: (DevicePresentation.DetailLine) -> Bool
+  let copied: (DevicePresentation.DetailLine) -> CopiedWord?
+  /// A click on a detail line, with the modifier keys held as it landed.
+  let click: (DevicePresentation.DetailLine, NSEvent.ModifierFlags) -> Void
+  /// VoiceOver's named actions on a detail line.
   let copyAddress: (DevicePresentation.DetailLine) -> Void
-  let copyDeviceDetails: () -> Void
+  let copyAllDetails: (DevicePresentation.DetailLine) -> Void
 
   /// `open` shows one of the developer windows for the device.
   init(model: AppModel, device: DeviceID, open: @escaping (DeveloperWindow) -> Void) {
@@ -51,9 +54,12 @@ struct ToolActions {
     forwards = model.openForwards(of: device)
     toggleForwards = { Task { await model.toggleForwards(of: device) } }
     details = model.shownDetails(of: device)
-    isCopied = { model.isCopied($0, on: device) }
+    copied = { model.copied($0, on: device) }
+    click = { line, modifiers in
+      Task { await model.click(line, modifiers: modifiers, on: device) }
+    }
     copyAddress = { line in Task { await model.copyAddress(line, on: device) } }
-    copyDeviceDetails = { model.copyDeviceDetails(of: device) }
+    copyAllDetails = { line in Task { await model.copyAllDetails(from: line, on: device) } }
   }
 
   func install(_ url: URL) { installDropped(url) }

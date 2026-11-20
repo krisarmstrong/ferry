@@ -2,8 +2,9 @@ import SwiftUI
 
 /// What an expanded device says about itself, after Control Center's Option-click Wi-Fi details:
 /// a line per port or interface, its name on the left and its IPv4 address on the right, then
-/// its Android version and battery, and Copy Device Details. Clicking an address copies it. While
-/// the first read runs it says so in one line; a failed read shows nothing.
+/// its Android version and battery. Clicking a line copies its address; Option-clicking any line
+/// copies every detail. While the first read runs it says so in one line; a failed read shows
+/// nothing.
 struct DetailLines: View {
   let tools: ToolActions
 
@@ -20,16 +21,7 @@ struct DetailLines: View {
     case .loaded(let info):
       VStack(alignment: .leading, spacing: 0) {
         ForEach(DevicePresentation.detailLines(info)) { line in
-          if line.address == nil {
-            DetailLineContent(line: line, copied: false)
-              .padding(.horizontal, MenuMetrics.rowPadding)
-              .padding(.vertical, 2)
-              .accessibilityElement(children: .ignore)
-              .accessibilityLabel(
-                Text(verbatim: DevicePresentation.detailLabel(line, copied: false)))
-          } else {
-            addressLine(line)
-          }
+          detailLine(line)
         }
         if let system = DevicePresentation.systemLine(info) {
           Text(verbatim: system)
@@ -40,25 +32,32 @@ struct DetailLines: View {
       }
       .font(.callout)
       .padding(.bottom, 2)
-      MenuRow(
-        title: Text(DevicePresentation.copyDeviceDetailsResource), symbol: "doc.on.doc",
-        indent: MenuMetrics.actionIndent, action: tools.copyDeviceDetails
-      )
-      .deviceAction(DevicePresentation.copyDeviceDetailsResource, on: tools.name)
     }
   }
 
-  private func addressLine(_ line: DevicePresentation.DetailLine) -> some View {
-    let copied = tools.isCopied(line)
+  /// The modifier keys are read as the click lands: Option copies every detail.
+  private func detailLine(_ line: DevicePresentation.DetailLine) -> some View {
+    let copied = tools.copied(line)
     return Button {
-      tools.copyAddress(line)
+      tools.click(line, NSEvent.modifierFlags)
     } label: {
       DetailLineContent(line: line, copied: copied)
     }
     .buttonStyle(MenuRowStyle(verticalPadding: 2))
     .accessibilityLabel(Text(verbatim: DevicePresentation.detailLabel(line, copied: copied)))
-    .accessibilityAction(named: Text(DevicePresentation.copyAddressResource(line))) {
-      tools.copyAddress(line)
+    .accessibilityActions {
+      if line.address != nil {
+        Button {
+          tools.copyAddress(line)
+        } label: {
+          Text(DevicePresentation.copyAddressResource(line))
+        }
+      }
+      Button {
+        tools.copyAllDetails(line)
+      } label: {
+        Text(DevicePresentation.copyAllDetailsResource)
+      }
     }
   }
 }
@@ -66,7 +65,7 @@ struct DetailLines: View {
 /// A line's name, then its value on the trailing edge.
 private struct DetailLineContent: View {
   let line: DevicePresentation.DetailLine
-  let copied: Bool
+  let copied: CopiedWord?
 
   var body: some View {
     HStack(spacing: 8) {
@@ -75,8 +74,8 @@ private struct DetailLineContent: View {
         .lineLimit(1)
       Spacer(minLength: 8)
       Group {
-        if copied {
-          Text(DevicePresentation.copiedResource)
+        if let copied {
+          Text(DevicePresentation.copiedResource(copied))
         } else {
           Text(verbatim: line.value)
             .foregroundStyle(line.address == nil ? .secondary : .primary)

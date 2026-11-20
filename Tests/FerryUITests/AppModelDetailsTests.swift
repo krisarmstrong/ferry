@@ -245,49 +245,6 @@ struct AppModelDetailsTests {
     await model.refresh()
     #expect(model.shownDetails(of: id) == DetailsShown.hidden)
   }
-
-  /// A click copies the address and shows "Copied" until the injected clock's 1.5 s have passed.
-  @Test func clickingALineCopiesItsAddress() async {
-    let sleeps = HeldSleeps()
-    let model = model(client(), sleep: sleeps.sleep)
-    await model.refresh()
-    async let copied: Void = model.copyAddress(Self.line, on: id)
-    await sleeps.waitForSleeper()
-    #expect(log.all.contains("copy 192.0.2.159"))
-    // VoiceOver hears it too: the line's new value is not where its focus is.
-    #expect(log.all.contains("announce Copied"))
-    #expect(model.isCopied(Self.line, on: id))
-    #expect(sleeps.durations == [.milliseconds(1500)])
-    sleeps.wakeAll()
-    await copied
-    #expect(!model.isCopied(Self.line, on: id))
-  }
-
-  /// A second click keeps "Copied" for its own 1.5 s: the first click's timer does not end it.
-  @Test func aSecondCopyIsNotClearedByTheFirst() async {
-    let sleeps = HeldSleeps()
-    let model = model(client(), sleep: sleeps.sleep)
-    await model.refresh()
-    async let first: Void = model.copyAddress(Self.line, on: id)
-    await sleeps.waitForSleeper()
-    async let second: Void = model.copyAddress(Self.line, on: id)
-    await sleeps.waitForSleeper(count: 2)
-    sleeps.wakeFirst()
-    await first
-    #expect(model.isCopied(Self.line, on: id))
-    sleeps.wakeAll()
-    await second
-    #expect(!model.isCopied(Self.line, on: id))
-  }
-
-  @Test func copyDeviceDetailsCopiesTheFullText() async {
-    let model = await expanded(client())
-    model.copyDeviceDetails(of: id)
-    #expect(!log.all.contains { $0.hasPrefix("copy ") })
-    await model.detailsSettled()
-    model.copyDeviceDetails(of: id)
-    #expect(log.all.contains("copy \(DevicePresentation.detailsText(Self.info))"))
-  }
 }
 
 /// Lets a sleep closure reach the model it was given to.

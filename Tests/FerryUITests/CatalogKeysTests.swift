@@ -86,7 +86,7 @@ struct CatalogKeysTests {
     }
   }
 
-  /// The inline details: the system line in each of its forms, the copy action and the words
+  /// The inline details: the system line in each of its forms, the copy actions and the words
   /// shown while loading and once copied.
   @Test func theDetailStringsHaveCatalogKeys() throws {
     let keys = try catalogKeys()
@@ -104,9 +104,9 @@ struct CatalogKeysTests {
     #expect(keys.contains(DevicePresentation.copyAddressResource(line).key))
     #expect(keys.contains(DevicePresentation.loadingDetailsResource.key))
     #expect(keys.contains(DevicePresentation.copiedResource.key))
-    #expect(keys.contains(DevicePresentation.copyDeviceDetailsResource.key))
-    #expect(
-      String(localized: DevicePresentation.copyDeviceDetailsResource) == "Copy Device Details")
+    #expect(keys.contains(DevicePresentation.copiedAllResource.key))
+    #expect(keys.contains(DevicePresentation.copyAllDetailsResource.key))
+    #expect(!keys.contains("Copy Device Details"))
     // A label that names its interface, "Wi-Fi (wlan1)".
     #expect(keys.contains("%@ (%@)"))
   }

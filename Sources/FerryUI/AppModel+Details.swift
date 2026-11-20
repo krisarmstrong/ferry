@@ -1,3 +1,4 @@
+import AppKit
 import DeviceKit
 import FerryIPC
 import Foundation
@@ -29,10 +30,18 @@ struct DetailReadTask {
   let task: Task<Void, Never>
 }
 
-/// One click on an address line; its own `click` tells a later click on the same line apart.
-struct CopiedAddress: Equatable {
+/// What a copy shows in place of a line's value: "Copied" for its address, "Copied All" for
+/// every detail.
+enum CopiedWord: Equatable {
+  case line
+  case all
+}
+
+/// One copy from a detail line; its own `click` tells a later click on the same line apart.
+struct CopiedLine: Equatable {
   let device: DeviceID
   let line: String
+  let word: CopiedWord
   let click = UUID()
 }
 
@@ -120,28 +129,53 @@ extension AppModel {
     let listed = Set(devices.map(\.id))
     for (id, read) in detailReads where !listed.contains(id) { read.task.cancel() }
     details = details.filter { listed.contains($0.key) }
-    if let copied = copiedAddress, !listed.contains(copied.device) { copiedAddress = nil }
+    if let copied = copiedLine, !listed.contains(copied.device) { copiedLine = nil }
   }
 
-  /// Copies the line's address and shows "Copied" in its place for 1.5 s on the injected clock.
+  /// A click on a detail line, with the modifier keys held as it landed (see
+  /// `DevicePresentation.detailClick`).
+  func click(
+    _ line: DevicePresentation.DetailLine, modifiers: NSEvent.ModifierFlags, on device: DeviceID
+  ) async {
+    switch DevicePresentation.detailClick(on: line, modifiers: modifiers) {
+    case .copyLine: await copyAddress(line, on: device)
+    case .copyAll: await copyAllDetails(from: line, on: device)
+    case .nothing: break
+    }
+  }
+
+  /// Copies the line's address and shows "Copied" in its place.
   func copyAddress(_ line: DevicePresentation.DetailLine, on device: DeviceID) async {
     guard let address = line.address else { return }
     services.copy(address)
-    services.announce(String(localized: DevicePresentation.copiedResource))
-    let copied = CopiedAddress(device: device, line: line.id)
-    copiedAddress = copied
-    // Cancelled or not, the word goes.
-    try? await sleep(Self.copiedFor)
-    if copiedAddress == copied { copiedAddress = nil }
+    await showCopied(.line, on: line, of: device)
   }
 
-  func isCopied(_ line: DevicePresentation.DetailLine, on device: DeviceID) -> Bool {
-    copiedAddress?.device == device && copiedAddress?.line == line.id
-  }
-
-  /// Copy Device Details: everything the device said about itself, once the details are read.
-  func copyDeviceDetails(of device: DeviceID) {
+  /// Copies everything the device said about itself, once the details are read, and shows
+  /// "Copied All" in place of the line clicked.
+  func copyAllDetails(from line: DevicePresentation.DetailLine, on device: DeviceID) async {
     guard let info = details[device]?.info else { return }
     services.copy(DevicePresentation.detailsText(info))
+    await showCopied(.all, on: line, of: device)
+  }
+
+  func copied(_ line: DevicePresentation.DetailLine, on device: DeviceID) -> CopiedWord? {
+    guard let copied = copiedLine, copied.device == device, copied.line == line.id else {
+      return nil
+    }
+    return copied.word
+  }
+
+  /// Shows the word in place of the line's value for 1.5 s on the injected clock, and has
+  /// VoiceOver say it.
+  private func showCopied(
+    _ word: CopiedWord, on line: DevicePresentation.DetailLine, of device: DeviceID
+  ) async {
+    services.announce(String(localized: DevicePresentation.copiedResource(word)))
+    let copied = CopiedLine(device: device, line: line.id, word: word)
+    copiedLine = copied
+    // Cancelled or not, the word goes.
+    try? await sleep(Self.copiedFor)
+    if copiedLine == copied { copiedLine = nil }
   }
 }
