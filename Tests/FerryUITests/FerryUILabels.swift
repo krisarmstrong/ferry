@@ -121,7 +121,6 @@ enum FerryUILabels {
     "USB debugging",
     "Unknown device",
     "Use It",
-    "Use adb Already on This Mac",
     "Use over Wi-Fi",
     "Verbose",
     "Warning",

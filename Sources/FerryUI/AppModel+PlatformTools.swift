@@ -4,7 +4,7 @@ import PlatformTools
 
 /// What the menu's line about getting adb shows, if anything.
 enum PlatformToolsLine: Equatable {
-  /// No adb anywhere: Get Android Platform Tools…, or Use adb Already on This Mac.
+  /// No adb anywhere: Get Android Platform Tools….
   case offer
   /// This release pins a newer adb under a license the user has not accepted; the adb Ferry
   /// fetched before stays in use meanwhile.
@@ -64,12 +64,6 @@ extension AppModel {
 
   func cancelPlatformTools() {
     platformTools.task?.cancel()
-  }
-
-  /// Use adb Already on This Mac: the agent looks for adb again.
-  func useExistingADB() async {
-    platformTools.fetch = .idle
-    await recheckADB()
   }
 
   /// Takes what the agent says of adb. adb that turns up another way (the user installed it)
