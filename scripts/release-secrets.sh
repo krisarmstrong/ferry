@@ -13,7 +13,18 @@
 # Usage: scripts/release-secrets.sh <developer-id.p12> <AuthKey_XXXXXXXXXX.p8>
 # Then: commit the public key it writes into project.yml, delete the .p12 and keep the .p8 safe.
 set -euo pipefail
+# The exported private key file is readable by you alone.
+umask 077
 cd "$(dirname "$0")/.."
+
+if [ "$#" -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
+  echo "usage: $0 <developer-id.p12> <AuthKey_XXXXXXXXXX.p8>  (both files must exist)" >&2
+  exit 2
+fi
+grep -q '^    FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER$' project.yml || {
+  echo "error: project.yml no longer has the key placeholder; the Sparkle key is already set" >&2
+  exit 1
+}
 
 repo=krisarmstrong/ferry
 p12="$1"
@@ -43,7 +54,7 @@ xcrun notarytool store-credentials ferry-notary --key "$p8" --key-id "$key_id" \
 # Sparkle's EdDSA key: made once with Sparkle's generate_keys, kept in your login keychain, its
 # private half in GitHub, its public half in every Ferry.
 tools="$(mktemp -d)"
-trap 'rm -r "$tools"' EXIT
+trap 'rm -rf "$tools"' EXIT
 curl -fsSL -o "$tools/sparkle.tar.xz" \
   "https://github.com/sparkle-project/Sparkle/releases/download/$sparkle_version/Sparkle-$sparkle_version.tar.xz"
 echo "$sparkle_sha256  $tools/sparkle.tar.xz" | shasum -a 256 -c --status \
@@ -56,6 +67,11 @@ public_key="$("$tools/bin/generate_keys" --account "$sparkle_account" -p)"
 PUBLIC_KEY="$public_key" perl -pi -e \
   's/^(    FERRY_SPARKLE_PUBLIC_KEY: )FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER$/$1$ENV{PUBLIC_KEY}/' \
   project.yml
+grep -qxF "    FERRY_SPARKLE_PUBLIC_KEY: $public_key" project.yml || {
+  echo "error: the public key did not reach project.yml; set FERRY_SPARKLE_PUBLIC_KEY to" >&2
+  echo "$public_key by hand" >&2
+  exit 1
+}
 
 gh secret list --repo "$repo" --env release
 
