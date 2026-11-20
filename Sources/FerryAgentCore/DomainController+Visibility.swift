@@ -69,4 +69,16 @@ extension DomainController {
       await self.showOnlyConnected()
     }
   }
+
+  /// Reconnects a domain just added, which may be one the system had disconnected. If that
+  /// fails it counts as not connected, so the mend that ends the reconcile hides it.
+  func reconnectAdded(_ identifier: String) async {
+    do {
+      try await manager.reconnect(identifier)
+    } catch {
+      log.error(
+        "reconnecting domain \(identifier, privacy: .private) failed: \(error, privacy: .private)")
+      domains[identifier]?.connected = false
+    }
+  }
 }

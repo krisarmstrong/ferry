@@ -41,14 +41,34 @@ actor FakeDomainManager: DomainManaging {
   private var visibilityFailures = 0
   /// How many listings of the hidden domains fail before one succeeds.
   private var hiddenListingFailures = 0
-  private var hiddenWaiters:
-    [Int: (hidden: Set<String>, continuation: CheckedContinuation<Void, Never>)] = [:]
+  /// The registered domains the system holds disconnected. One from before the agent started
+  /// is, as the agent that stopped left it.
+  private(set) var disconnected: Set<String>
+  private var stateWaiters:
+    [Int: (
+      done: @Sendable (FakeDomainManager.State) -> Bool,
+      continuation: CheckedContinuation<Void, Never>
+    )] =
+      [:]
+
+  /// What the system holds, for `waitUntil(_:)`.
+  struct State: Sendable {
+    let registered: Set<String>
+    let hidden: Set<String>
+    let disconnected: Set<String>
+  }
+
+  var state: State { State(registered: registered, hidden: hidden, disconnected: disconnected) }
+
+  /// Shown in Finder but disconnected: greyed out, with every read timing out. Never wanted.
+  var shownButDisconnected: Set<String> { visible.intersection(disconnected) }
 
   init(existing: [String] = [], listingFailures: Int = 0, removalFailures: Int = 0) {
     preexisting = existing
     self.listingFailures = listingFailures
     self.removalFailures = removalFailures
     registered = Set(existing)
+    disconnected = Set(existing)
   }
 
   /// The domain is shown: `DomainManaging.add` adds a shown domain, and an add for an existing
@@ -57,9 +77,18 @@ actor FakeDomainManager: DomainManaging {
     registered.insert(spec.identifier)
     hidden.remove(spec.identifier)
     record(.add(spec))
+    changed()
   }
-  func disconnect(_ identifier: String) async throws { record(.disconnect(identifier)) }
-  func reconnect(_ identifier: String) async throws { record(.reconnect(identifier)) }
+  func disconnect(_ identifier: String) async throws {
+    disconnected.insert(identifier)
+    record(.disconnect(identifier))
+    changed()
+  }
+  func reconnect(_ identifier: String) async throws {
+    disconnected.remove(identifier)
+    record(.reconnect(identifier))
+    changed()
+  }
   func remove(_ identifier: String) async throws -> URL? {
     record(.remove(identifier))
     if removalFailures > 0 {
@@ -68,12 +97,16 @@ actor FakeDomainManager: DomainManaging {
     }
     registered.remove(identifier)
     hidden.remove(identifier)
+    disconnected.remove(identifier)
+    changed()
     return preserved[identifier]
   }
   func removeAll() async throws -> [URL] {
     record(.removeAll)
     registered = []
     hidden = []
+    disconnected = []
+    changed()
     return preserved.keys.sorted().compactMap { preserved[$0] }
   }
   func signal(_ identifier: String) async {
@@ -92,15 +125,18 @@ actor FakeDomainManager: DomainManaging {
     } else {
       hidden.remove(identifier)
     }
-    for (id, waiter) in hiddenWaiters where waiter.hidden == hidden {
-      hiddenWaiters.removeValue(forKey: id)?.continuation.resume()
-    }
+    changed()
   }
 
   /// Returns the hidden domains once they are exactly `expected` or the test is cancelled, as
   /// its time limit does: a hide or show comes from a reconcile no call marks the end of.
   func waitUntilHidden(_ expected: Set<String>) async -> Set<String> {
-    guard hidden != expected, !Task.isCancelled else { return hidden }
+    await waitUntil { $0.hidden == expected }.hidden
+  }
+
+  /// Returns the system's state once `done` holds for it, or once the test is cancelled.
+  func waitUntil(_ done: @escaping @Sendable (State) -> Bool) async -> State {
+    guard !done(state), !Task.isCancelled else { return state }
     nextWaiter += 1
     let id = nextWaiter
     await withTaskCancellationHandler {
@@ -108,17 +144,24 @@ actor FakeDomainManager: DomainManaging {
         if Task.isCancelled {
           continuation.resume()
         } else {
-          hiddenWaiters[id] = (expected, continuation)
+          stateWaiters[id] = (done, continuation)
         }
       }
     } onCancel: {
-      Task { await self.releaseHiddenWaiter(id) }
+      Task { await self.releaseStateWaiter(id) }
     }
-    return hidden
+    return state
   }
 
-  private func releaseHiddenWaiter(_ id: Int) {
-    hiddenWaiters.removeValue(forKey: id)?.continuation.resume()
+  private func releaseStateWaiter(_ id: Int) {
+    stateWaiters.removeValue(forKey: id)?.continuation.resume()
+  }
+
+  private func changed() {
+    let now = state
+    for (id, waiter) in stateWaiters where waiter.done(now) {
+      releaseStateWaiter(id)
+    }
   }
 
   /// The next `count` hide or show requests fail.
@@ -146,6 +189,7 @@ actor FakeDomainManager: DomainManaging {
     } else {
       hidden.remove(identifier)
     }
+    changed()
   }
 
   /// The registered domains Finder shows.

@@ -59,4 +59,20 @@ struct DomainControllerVisibilityTests {
     #expect(await harness.manager.waitUntilHidden([gone]) == [gone])
     #expect(await harness.controller.handledEvents == events)
   }
+
+  /// The system's domains could not be listed at start, so a ready device's domain is added
+  /// again over the one from before, which the agent that stopped left disconnected. The add
+  /// shows it, so it is reconnected too: never shown and disconnected.
+  @Test func aDomainAddedAfterAFailedListingIsReconnected() async throws {
+    let device = await makeDevice("A")
+    let domain = domainID(device)
+    let manager = FakeDomainManager(existing: [domain], listingFailures: 1)
+    let harness = try AgentHarness(devices: [device], manager: manager)
+    defer { harness.finish() }
+
+    let state = await harness.manager.waitUntil { !$0.disconnected.contains(domain) }
+    #expect(!state.disconnected.contains(domain))
+    #expect(await harness.manager.visible.contains(domain))
+    #expect(await harness.manager.shownButDisconnected.isEmpty)
+  }
 }

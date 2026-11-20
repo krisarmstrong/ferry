@@ -32,6 +32,7 @@ struct DomainControllerHiddenTests {
     #expect(calls.contains(.reconnect(domain)))
     #expect(await harness.manager.visible.contains(domain))
     #expect(await harness.manager.hidden.isEmpty)
+    #expect(await harness.manager.shownButDisconnected.isEmpty)
   }
 
   /// At start, every domain from before is hidden until its device is served again; one whose
@@ -48,6 +49,7 @@ struct DomainControllerHiddenTests {
     #expect(
       await harness.manager.visible == [domainID(device), AgentHarness.barrierSpec.identifier])
     #expect(await harness.manager.registered.contains(gone))
+    #expect(await harness.manager.shownButDisconnected.isEmpty)
   }
 
   /// A show that fails is tried again on the next change, so a served device's location never

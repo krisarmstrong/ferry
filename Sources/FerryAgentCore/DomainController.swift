@@ -273,7 +273,11 @@ public actor DomainController {
         log.error(
           "adding domain \(identifier, privacy: .private) failed: \(error, privacy: .private)")
         domains[identifier] = nil
+        return
       }
+      // Unlisted at start, the system may have had this domain from before, left disconnected:
+      // the add shows it, so it is reconnected too. A reconnect of a connected domain is harmless.
+      if !locationsComplete { await reconnectAdded(identifier) }
       return
     }
     if existing.storage == nil {
