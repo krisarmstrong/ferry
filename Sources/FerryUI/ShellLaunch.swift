@@ -1,7 +1,7 @@
 import FerryIPC
 import Foundation
 
-/// Open Shell: what Terminal is given to run `adb -t <transport_id> shell`, or
+/// Open in Terminal: what Terminal is given to run `adb -t <transport_id> shell`, or
 /// `adb -s <serial> shell` where adb names no connection.
 ///
 /// Terminal opens a `.command` file and runs it; the file is written to a private folder (mode

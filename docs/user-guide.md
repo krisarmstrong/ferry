@@ -177,8 +177,8 @@ Ferry remembers each device it connects this way by its serial number, and conne
 when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered
 · not nearby**: click it, then **Connect Again** to try again.
 
-**Forget** disconnects the device and forgets its addresses. Ferry no longer connects to it by
-itself.
+**Forget This Device** disconnects the device and forgets its addresses. Ferry no longer
+connects to it by itself.
 
 ### "Is this address your device?"
 
@@ -384,9 +384,9 @@ and in Help; **Remove Ferry…** is in Help, under Troubleshooting (see [Uninsta
 
 ## Tools over USB debugging
 
-Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details,
-**Copy Device Details**, and its tools: **Take Screenshot**, **Record Screen**, **Logcat**,
-**Port Forwarding**, **Install App…** and **Open Shell**. A device on file transfer shows
+Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details
+and its tools: **Take Screenshot**, **Record Screen**, **Send File…**, **Install App…**,
+**Logcat**, **Port Forwarding** and **Open in Terminal**. A device on file transfer shows
 **More Tools with USB Debugging…** instead.
 
 ### Install an app
@@ -433,9 +433,9 @@ stops when you close the window or the device goes away.
 
 ### Open a shell
 
-Click **Open Shell** to open Terminal with a shell on the device
-(`adb shell`). Ferry needs adb for this, and says so if it can't find it. Nothing on the device
-changes unless you type a command that changes it.
+Click **Open in Terminal** for a shell on the device (`adb shell`) in Terminal. Ferry needs adb
+for this, and says so if it can't find it. Nothing on the device changes unless you type a
+command that changes it.
 
 ### Forward a port
 
@@ -454,9 +454,10 @@ battery. For a model Ferry knows, every port is listed by the name on the unit, 
 connected** for one that has no address. Ferry only reads them, when you open the device and
 every 10 seconds while the menu stays open.
 
-Click an address to copy it; the line shows **Copied** for a moment. **Copy Device Details**,
-just under the details, copies everything the device reports: model, Android version, build, serial number, battery, every
-address on every port including IPv6, and storage.
+Click an address to copy it; the line shows **Copied** for a moment. Option-click any line to
+copy everything the device reports: model, Android version, build, serial number, battery,
+every address on every port including IPv6, and storage. The line shows **Copied All** for a
+moment.
 
 ## Troubleshooting
 

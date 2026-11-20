@@ -2,9 +2,9 @@ import DeviceKit
 import FerryIPC
 import Foundation
 
-/// The developer tools: a log window, Open Shell and port forwarding, for a device Ferry serves
-/// over ADB. The log window and each device's forwards have a session of their own that talks
-/// to the agent.
+/// The developer tools: a log window, Open in Terminal and port forwarding, for a device Ferry
+/// serves over ADB. The log window and each device's forwards have a session of their own that
+/// talks to the agent.
 extension AppModel {
   func logcatSession(for device: DeviceID) -> LogcatSession {
     LogcatSession(
@@ -49,9 +49,9 @@ extension AppModel {
     return DeviceNames.named(info.name, suffix: suffixes[device])
   }
 
-  /// Open Shell: asks the agent for the `adb` it found and the serial of the route it serves the
-  /// device by, writes a script that runs `adb -s <serial> shell` (see `ShellLaunch`), and opens
-  /// it in Terminal.
+  /// Open in Terminal: asks the agent for the `adb` it found and the serial of the route it
+  /// serves the device by, writes a script that runs `adb -s <serial> shell` (see `ShellLaunch`),
+  /// and opens it in Terminal.
   public func openShell(on device: DeviceID) async {
     ShellLaunch.sweep()
     guard let response = await sendTool(.shellTarget(device), file: nil),

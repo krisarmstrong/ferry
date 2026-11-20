@@ -1,6 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Forget This Device" : {
+
+    },
+    "Open in Terminal" : {
+
+    },
+    "Click an address to copy it; the line shows Copied for a moment. Option-click any line to copy everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage. The line shows Copied All for a moment." : {
+      "extractionState" : "manual"
+    },
+    "Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it." : {
+      "extractionState" : "manual"
+    },
+    "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details and its tools: Take Screenshot, Record Screen, Send File…, Install App…, Logcat, Port Forwarding and Open in Terminal. A device on file transfer shows More Tools with USB Debugging… instead." : {
+      "extractionState" : "manual"
+    },
+    "**Forget This Device** disconnects the device and forgets its addresses. Ferry no longer connects to it by itself." : {
+      "extractionState" : "manual"
+    },
     "Copy All Details" : {
 
     },
@@ -42,12 +60,6 @@
     },
     "Mac %@ → Device %@" : {
 
-    },
-    "Click an address to copy it; the line shows Copied for a moment. Copy Device Details, just under the details, copies everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage." : {
-      "extractionState" : "manual"
-    },
-    "Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details, Copy Device Details, and its tools: Take Screenshot, Record Screen, Logcat, Port Forwarding, Install App… and Open Shell. A device on file transfer shows More Tools with USB Debugging… instead." : {
-      "extractionState" : "manual"
     },
     "Android %@" : {
 
@@ -104,9 +116,6 @@
       "extractionState" : "manual"
     },
     "Is this address your device?" : {
-      "extractionState" : "manual"
-    },
-    "**Forget** disconnects the device and forgets its addresses. Ferry no longer connects to it by itself." : {
       "extractionState" : "manual"
     },
     "Ferry remembers each device it connects this way by its serial number, and connects to it again when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered · not nearby**: click it, then **Connect Again** to try again." : {
@@ -277,9 +286,6 @@
       "extractionState" : "manual"
     },
     "Click Logcat to watch the device's log in a window of its own. Ferry keeps the newest 50,000 lines. Level shows lines at that level and above, and Filter shows the lines that contain your text, whatever its case. Pause freezes the window while lines keep arriving, and Resume catches up. Clear empties it." : {
-      "extractionState" : "manual"
-    },
-    "Click Open Shell to open Terminal with a shell on the device (adb shell). Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it." : {
       "extractionState" : "manual"
     },
     "Choose Folder…" : {
@@ -476,9 +482,6 @@
     "For the LinkRunner 10G, EtherScope nXG and LinkRunner 100G." : {
       "extractionState" : "manual"
     },
-    "Forget" : {
-
-    },
     "Forward a port" : {
       "extractionState" : "manual"
     },
@@ -657,9 +660,6 @@
     },
     "Open a shell" : {
       "extractionState" : "manual"
-    },
-    "Open Shell" : {
-
     },
     "Open System Settings" : {
 

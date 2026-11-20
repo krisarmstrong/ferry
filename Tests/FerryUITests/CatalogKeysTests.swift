@@ -57,6 +57,9 @@ struct CatalogKeysTests {
       #expect(keys.contains(action.title.key), "\(action)")
     }
     #expect(keys.contains("Remembered · not nearby"))
+    // The rows' old names are gone with them.
+    #expect(!keys.contains("Open Shell"))
+    #expect(!keys.contains("Forget"))
   }
 
   /// The menu's footer after Settings went: Open at Login, in title case, and its failure.

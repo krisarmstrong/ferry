@@ -80,8 +80,8 @@ public typealias LogSink = @Sendable (LogBatch) async -> Bool
 /// agent: it sends the next batch only after this one is taken.
 public typealias LogBatchHandler = @Sendable (LogBatch) async -> Void
 
-/// What Open Shell needs to run `adb -s <serial> shell` in Terminal: the `adb` the agent found
-/// and the serial of the route it serves the device by.
+/// What Open in Terminal needs to run `adb -s <serial> shell` in Terminal: the `adb` the agent
+/// found and the serial of the route it serves the device by.
 ///
 /// Both end up in a command line, so each is checked: the path must be absolute and free of
 /// control characters, and the serial limited to the characters adb itself gives serials

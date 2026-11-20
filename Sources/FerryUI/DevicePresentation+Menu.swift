@@ -85,7 +85,7 @@ extension DevicePresentation {
   /// A row in a device's expansion.
   enum MenuAction: Hashable, CaseIterable, Sendable {
     case takeScreenshot, recordScreen, stopRecording, logcat, portForwarding, sendFile, installApp
-    case openShell, useOverWiFi, forget, howToTurnOnFileTransfer, mount, checkAgain, eject
+    case openInTerminal, useOverWiFi, forget, howToTurnOnFileTransfer, mount, checkAgain, eject
     case connectAgain, useIt, ignore
 
     var title: LocalizedStringResource {
@@ -97,9 +97,9 @@ extension DevicePresentation {
       case .portForwarding: LocalizedStringResource("Port Forwarding", bundle: .module)
       case .sendFile: LocalizedStringResource("Send File…", bundle: .module)
       case .installApp: LocalizedStringResource("Install App…", bundle: .module)
-      case .openShell: LocalizedStringResource("Open Shell", bundle: .module)
+      case .openInTerminal: LocalizedStringResource("Open in Terminal", bundle: .module)
       case .useOverWiFi: LocalizedStringResource("Use over Wi-Fi", bundle: .module)
-      case .forget: LocalizedStringResource("Forget", bundle: .module)
+      case .forget: LocalizedStringResource("Forget This Device", bundle: .module)
       case .howToTurnOnFileTransfer:
         LocalizedStringResource("How to Turn On File Transfer", bundle: .module)
       case .mount: LocalizedStringResource("Mount", bundle: .module)
@@ -120,7 +120,7 @@ extension DevicePresentation {
       case .portForwarding: "arrow.left.arrow.right"
       case .sendFile: "paperplane"
       case .installApp: "arrow.down.app"
-      case .openShell: "terminal"
+      case .openInTerminal: "terminal"
       case .useOverWiFi, .connectAgain, .useIt: "wifi"
       case .forget, .ignore: "xmark.circle"
       case .howToTurnOnFileTransfer: "questionmark.circle"
@@ -149,7 +149,7 @@ extension DevicePresentation {
       case .running: capture.append(.stopRecording)
       case .saving, .unsaved: break
       }
-      developer = [.logcat, .portForwarding, .openShell]
+      developer = [.logcat, .portForwarding, .openInTerminal]
     }
     // Sending is a file write through the agent, so any method serves it.
     if case .ready = device.state { sending.append(.sendFile) }

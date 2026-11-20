@@ -86,7 +86,7 @@ struct DeviceRow: View {
     case .portForwarding: tools.toggleForwards
     case .sendFile: tools.sendFiles
     case .installApp: tools.chooseAPK
-    case .openShell: tools.openShell
+    case .openInTerminal: tools.openShell
     case .useOverWiFi: actions.useOverWiFi
     case .forget: actions.forget
     case .howToTurnOnFileTransfer: actions.showGuide

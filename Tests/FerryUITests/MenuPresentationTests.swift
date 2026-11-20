@@ -94,7 +94,7 @@ struct MenuPresentationTests {
   /// The tools, in their groups: capture, sending, developer tools.
   private static let tools: [[Action]] = [
     [.takeScreenshot, .recordScreen], [.sendFile, .installApp],
-    [.logcat, .portForwarding, .openShell],
+    [.logcat, .portForwarding, .openInTerminal],
   ]
 
   /// A state, how the device is attached, whether Ferry remembers it, and its groups.
@@ -166,8 +166,9 @@ struct MenuPresentationTests {
     (Action.takeScreenshot, "Take Screenshot"), (.recordScreen, "Record Screen"),
     (.stopRecording, "Stop Recording"), (.logcat, "Logcat"),
     (.portForwarding, "Port Forwarding"), (.sendFile, "Send File…"),
-    (.installApp, "Install App…"), (.openShell, "Open Shell"), (.useOverWiFi, "Use over Wi-Fi"),
-    (.forget, "Forget"), (.howToTurnOnFileTransfer, "How to Turn On File Transfer"),
+    (.installApp, "Install App…"), (.openInTerminal, "Open in Terminal"),
+    (.useOverWiFi, "Use over Wi-Fi"),
+    (.forget, "Forget This Device"), (.howToTurnOnFileTransfer, "How to Turn On File Transfer"),
     (.mount, "Mount"), (.checkAgain, "Check Again"), (.eject, "Eject"),
     (.connectAgain, "Connect Again"), (.useIt, "Use It"), (.ignore, "Ignore"),
   ])

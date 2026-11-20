@@ -6,7 +6,7 @@ import Testing
 
 @testable import FerryUI
 
-/// Open Shell: the script Terminal runs is built only from a checked target, each part
+/// Open in Terminal: the script Terminal runs is built only from a checked target, each part
 /// single-quoted for zsh, in a private folder, and removes itself.
 @MainActor
 struct ShellLaunchTests {
