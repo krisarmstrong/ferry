@@ -358,8 +358,8 @@ extension ADBTransport {
         .map { describe($0).id })
   }
 
-  /// Looks for `adb` again and starts its server, which the user may have just installed. A
-  /// missing `adb` is no error: the next scan reports `.notInstalled`.
+  /// Looks for `adb` again and starts its server: Ferry may have just fetched it, or the user
+  /// installed it. A missing `adb` is no error: the next scan reports `.notInstalled`.
   public func startADBServer() async {
     do throws(ADBError) {
       try await host.startServer()

@@ -22,7 +22,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2")
   ],
   targets: [
-    .target(name: "ADBTransport", dependencies: ["DeviceKit"]),
+    .target(name: "ADBTransport", dependencies: ["DeviceKit", "PlatformTools"]),
     .target(name: "DeviceKit"),
     .target(name: "DeviceKitTestSupport", dependencies: ["DeviceKit"]),
     .target(name: "PlatformTools"),

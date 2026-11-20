@@ -51,7 +51,7 @@ public struct ADBWireless: Sendable {
     self.answerLimit = answerLimit
   }
 
-  /// The real server and the user's `adb`.
+  /// The real server and the `adb` the locator finds.
   public init(locator: ADBLocator = ADBLocator()) {
     self.init(host: ADBHost(locator: locator), run: ADBCommand.runner(locator: locator))
   }

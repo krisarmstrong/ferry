@@ -14,7 +14,7 @@ public struct ADBCommandResult: Sendable, Equatable {
   }
 }
 
-/// Runs the user's `adb` with an argument array. Tests pass a fake.
+/// Runs the located `adb` with an argument array. Tests pass a fake.
 public typealias ADBCommandRunner =
   @Sendable (_ arguments: [String]) async throws(ADBError) -> ADBCommandResult
 
