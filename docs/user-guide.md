@@ -561,9 +561,9 @@ Free some space on the Mac, then click **Try Again**.
 
 **Google changed the Android SDK License**
 
-This version of Ferry uses a newer adb, and Google has changed the license since you accepted it. Ferry keeps using the adb it has.
+Ferry shows a newer text of Google's license than the one you accepted. Ferry keeps using the adb it has until you accept it.
 
-Click **Review License…** and accept the new license to update adb.
+Click **Review License…** and accept it. If this version of Ferry needs a newer adb, Ferry then downloads it.
 
 **adb isn't running**
 

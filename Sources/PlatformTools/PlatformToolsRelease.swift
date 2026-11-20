@@ -1,8 +1,9 @@
 import Foundation
 
 /// The text of Google's Android SDK License that Ferry shows before it downloads the platform
-/// tools: its id in Google's SDK repository, a version Ferry gives the text (the date it bears),
-/// and the SHA-256 of the copy Ferry bundles, so a changed text cannot keep its old version.
+/// tools: where Google publishes it, its version (the date it bears), and the SHA-256 of the copy
+/// Ferry bundles. An acceptance covers one version and checksum, so a changed text is accepted
+/// again.
 public struct AndroidSDKLicense: Sendable, Equatable {
   public let id: String
   public let version: String
@@ -34,19 +35,23 @@ public struct PlatformToolsRelease: Sendable, Equatable {
   }
 
   /// r37.0.3, as Google's SDK repository lists it in
-  /// https://dl.google.com/android/repository/repository2-3.xml, under `android-sdk-license`. The
-  /// license text is that manifest's `android-sdk-license` entry, dated January 16, 2019: the
-  /// text Google's own SDK tools show for this archive. To move the pin, take the archive's
-  /// version and size from that manifest and its SHA-256 from a downloaded copy; a changed
-  /// license text gets a new version, which the user accepts again.
+  /// https://dl.google.com/android/repository/repository2-3.xml. To move the pin, take the
+  /// archive's version and size from that manifest and its SHA-256 from a downloaded copy.
+  ///
+  /// The license is Google's current Android SDK License Agreement, from
+  /// https://developer.android.com/studio/terms, dated April 28, 2026: the text of the page's
+  /// `sdk-terms` block, its headings and date as plain lines, HTML entities decoded, nothing else
+  /// changed (`Sources/FerryUI/android-sdk-license.txt`). The manifest's own
+  /// `android-sdk-license` entry is an older text (January 16, 2019). To move it, transcribe the
+  /// page the same way and set its date and checksum here.
   public static let pinned = PlatformToolsRelease(
     version: "37.0.3",
     url: URL(string: "https://dl.google.com/android/repository/platform-tools_r37.0.3-darwin.zip")!,
     size: 16_597_626,
     sha256: "df21339b9371fef9b19264404338dc686f59a88a1dce634b963da344909001d6",
     license: AndroidSDKLicense(
-      id: "android-sdk-license", version: "2019-01-16",
-      sha256: "1f8729233617b193fd619213792ae16a41b95d2bbbf525dfe66998252ba68b16"))
+      id: "https://developer.android.com/studio/terms", version: "2026-04-28",
+      sha256: "a28708e39abd4bb67c9652344b64b5534bb65df868c062abca9a23c24d37b125"))
 }
 
 /// Why the platform tools could not be fetched. The menu words each one.

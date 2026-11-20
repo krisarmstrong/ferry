@@ -2176,9 +2176,6 @@
     "Click **Get Android Platform Tools…** or **Check Again** at the top of the menu, then try again." : {
       "extractionState" : "manual"
     },
-    "Click **Review License…** and accept the new license to update adb." : {
-      "extractionState" : "manual"
-    },
     "Click **Try Again**. If it fails again, something on your network may be changing downloads: try another network." : {
       "extractionState" : "manual"
     },
@@ -2227,10 +2224,13 @@
     "The file was not the release Ferry expects, could not be read, or its adb was not signed by Google. Ferry never runs an adb it has not checked." : {
       "extractionState" : "manual"
     },
-    "This version of Ferry uses a newer adb, and Google has changed the license since you accepted it. Ferry keeps using the adb it has." : {
+    "Click **Check Again**. If that does not help, quit other apps that use adb, such as Android Studio, then click **Check Again**." : {
       "extractionState" : "manual"
     },
-    "Click **Check Again**. If that does not help, quit other apps that use adb, such as Android Studio, then click **Check Again**." : {
+    "Ferry shows a newer text of Google's license than the one you accepted. Ferry keeps using the adb it has until you accept it." : {
+      "extractionState" : "manual"
+    },
+    "Click **Review License…** and accept it. If this version of Ferry needs a newer adb, Ferry then downloads it." : {
       "extractionState" : "manual"
     }
   },

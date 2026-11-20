@@ -21,10 +21,8 @@ final class PlatformToolsFetcherTests: Sendable {
     try? FileManager.default.removeItem(at: home)
   }
 
-  private static let license = AndroidSDKLicense(
-    id: "android-sdk-license", version: "2019-01-16", sha256: String(repeating: "0", count: 64))
-  private static let accepted = LicenseAcceptance(
-    version: "2019-01-16", date: Date(timeIntervalSince1970: 0))
+  private static let license = PlatformToolsRelease.pinned.license
+  private static let accepted = LicenseAcceptance(of: license, date: Date(timeIntervalSince1970: 0))
 
   /// Google's layout, with more tools than Ferry takes.
   private static func googleLike(adb: String = "the adb binary") -> Data {
@@ -100,7 +98,13 @@ final class PlatformToolsFetcherTests: Sendable {
       try await fetcher.fetch(accepted: nil)
     }
     await #expect(throws: PlatformToolsError.licenseNotAccepted) {
-      try await fetcher.fetch(accepted: LicenseAcceptance(version: "2012-11-13", date: .now))
+      try await fetcher.fetch(
+        accepted: LicenseAcceptance(version: "older", sha256: Self.license.sha256, date: .now))
+    }
+    await #expect(throws: PlatformToolsError.licenseNotAccepted) {
+      try await fetcher.fetch(
+        accepted: LicenseAcceptance(
+          version: Self.license.version, sha256: String(repeating: "0", count: 64), date: .now))
     }
     #expect(downloads.withLock { $0 } == 0)
     #expect(leftovers() == [])

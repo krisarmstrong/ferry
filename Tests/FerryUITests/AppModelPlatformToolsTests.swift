@@ -13,6 +13,11 @@ import Testing
 struct AppModelPlatformToolsTests {
   let log = CallLog()
   private static let pinnedLicense = PlatformToolsRelease.pinned.license.version
+  nonisolated private static let accepted = LicenseAcceptance(
+    of: PlatformToolsRelease.pinned.license, date: .distantPast)
+  /// An acceptance of an older text of the license.
+  nonisolated static let olderAcceptance = LicenseAcceptance(
+    version: "older", sha256: String(repeating: "1", count: 64), date: .distantPast)
 
   private func model(_ client: FakeClient, _ services: FakeServices) -> AppModel {
     AppModel(client: client, services: services)
@@ -118,7 +123,7 @@ struct AppModelPlatformToolsTests {
     client.setStatus([], adb: .available)
     let services = FakeServices(log: log)
     services.fetchedVersion = "36.0.0"
-    services.acceptance = LicenseAcceptance(version: "2012-11-13", date: .distantPast)
+    services.acceptance = Self.olderAcceptance
     services.fetchOutcomes = [.offline]
     let model = model(client, services)
     await model.launch()
@@ -149,7 +154,7 @@ struct AppModelPlatformToolsTests {
     client.setStatus([], adb: .available)
     let services = FakeServices(log: log)
     services.fetchedVersion = "36.0.0"
-    services.acceptance = LicenseAcceptance(version: Self.pinnedLicense, date: .distantPast)
+    services.acceptance = Self.accepted
     let model = model(client, services)
     await model.launch()
     #expect(model.platformToolsRow == nil)
@@ -164,7 +169,7 @@ struct AppModelPlatformToolsTests {
     client.setStatus([], adb: .available)
     let services = FakeServices(log: log)
     services.fetchedVersion = "36.0.0"
-    services.acceptance = LicenseAcceptance(version: "2012-11-13", date: .distantPast)
+    services.acceptance = Self.olderAcceptance
     let model = model(client, services)
     await model.launch()
     await model.platformToolsSettled()
@@ -175,16 +180,46 @@ struct AppModelPlatformToolsTests {
     #expect(model.platformToolsRow == nil)
   }
 
-  @Test(arguments: ["37.0.3", nil])
-  func launchLeavesACurrentOrAbsentCopyAlone(version: String?) async {
+  /// The license Ferry shows changed while the pinned adb did not: whoever accepted the old text
+  /// is asked again, and keeps the adb Ferry fetched meanwhile.
+  @Test(arguments: [
+    AppModelPlatformToolsTests.olderAcceptance,
+    LicenseAcceptance(
+      version: PlatformToolsRelease.pinned.license.version,
+      sha256: String(repeating: "0", count: 64), date: .distantPast),
+  ])
+  func aNewLicenseUnderTheSamePinAsksAgain(acceptance: LicenseAcceptance) async {
     let client = FakeClient(log: log)
     client.setStatus([], adb: .available)
     let services = FakeServices(log: log)
-    services.fetchedVersion = version
-    services.acceptance = LicenseAcceptance(version: "2012-11-13", date: .distantPast)
+    services.fetchedVersion = PlatformToolsRelease.pinned.version
+    services.acceptance = acceptance
     let model = model(client, services)
     await model.launch()
     await model.platformToolsSettled()
+    #expect(model.platformToolsRow == .licenseChanged)
+    #expect(!log.all.contains { $0.hasPrefix("fetchPlatformTools") })
+  }
+
+  @Test func launchLeavesACurrentCopyAlone() async {
+    let client = FakeClient(log: log)
+    client.setStatus([], adb: .available)
+    let services = FakeServices(log: log)
+    services.fetchedVersion = PlatformToolsRelease.pinned.version
+    services.acceptance = Self.accepted
+    let model = model(client, services)
+    await model.launch()
+    await model.platformToolsSettled()
+    #expect(model.platformToolsRow == nil)
+    #expect(!log.all.contains { $0.hasPrefix("fetchPlatformTools") })
+  }
+
+  /// Nothing fetched and nothing accepted: nothing to ask about until adb is needed.
+  @Test func launchWithoutAFetchedCopyAsksNothing() async {
+    let client = FakeClient(log: log)
+    client.setStatus([], adb: .available)
+    let model = model(client, FakeServices(log: log))
+    await model.launch()
     #expect(model.platformToolsRow == nil)
     #expect(!log.all.contains { $0.hasPrefix("fetchPlatformTools") })
   }
@@ -204,11 +239,21 @@ struct AppModelPlatformToolsTests {
     #expect(MenuStatusText.platformTools(.failed(error)).key == message)
   }
 
-  /// The license Ferry shows is the text whose version the user accepts.
+  /// The license Ferry shows is exactly the text the pin names: its checksum, its title, and the
+  /// date it ends with, which is its version.
   @Test func theBundledLicenseIsThePinnedText() throws {
+    let license = PlatformToolsRelease.pinned.license
     let text = try #require(PlatformToolsLicenseView.licenseText)
     let digest = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
-    #expect(digest == PlatformToolsRelease.pinned.license.sha256)
-    #expect(text.hasPrefix("Terms and Conditions\n\nThis is the Android Software Development Kit"))
+    #expect(digest == license.sha256)
+    let lines = text.split(separator: "\n")
+    #expect(lines.first == "This is the Android Software Development Kit License Agreement")
+    let dated = try Date(
+      String(try #require(lines.last)),
+      strategy: Date.FormatStyle()
+        .month(.wide).day(.defaultDigits).year().locale(Locale(identifier: "en_US_POSIX")))
+    let version = dated.formatted(
+      Date.ISO8601FormatStyle(timeZone: TimeZone.current).year().month().day())
+    #expect(version == license.version)
   }
 }

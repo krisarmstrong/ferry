@@ -699,8 +699,8 @@
             },
             {
               "message": "Google changed the Android SDK License",
-              "cause": "This version of Ferry uses a newer adb, and Google has changed the license since you accepted it. Ferry keeps using the adb it has.",
-              "fix": "Click **Review License…** and accept the new license to update adb."
+              "cause": "Ferry shows a newer text of Google's license than the one you accepted. Ferry keeps using the adb it has until you accept it.",
+              "fix": "Click **Review License…** and accept it. If this version of Ferry needs a newer adb, Ferry then downloads it."
             },
             {
               "message": "adb isn't running",

@@ -53,7 +53,8 @@ struct PlatformToolsFolderTests {
         == "https://dl.google.com/android/repository/platform-tools_r37.0.3-darwin.zip")
     #expect(release.size == 16_597_626)
     #expect(release.sha256 == "df21339b9371fef9b19264404338dc686f59a88a1dce634b963da344909001d6")
-    #expect(release.license.id == "android-sdk-license")
-    #expect(release.license.version == "2019-01-16")
+    #expect(release.license.id == "https://developer.android.com/studio/terms")
+    #expect(release.license.version.wholeMatch(of: /\d{4}-\d{2}-\d{2}/) != nil)
+    #expect(release.license.sha256.wholeMatch(of: /[0-9a-f]{64}/) != nil)
   }
 }

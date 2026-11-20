@@ -49,7 +49,7 @@ extension AppModel {
   /// Accept, in the license window: records which text the user accepted and when, then fetches.
   func acceptLicense() {
     services.recordPlatformToolsAcceptance(
-      LicenseAcceptance(version: PlatformToolsRelease.pinned.license.version, date: .now))
+      LicenseAcceptance(of: PlatformToolsRelease.pinned.license, date: .now))
     platformTools.licenseChanged = false
     fetchPlatformTools(shown: true)
   }
@@ -84,18 +84,16 @@ extension AppModel {
     await platformTools.task?.value
   }
 
-  /// At launch. When this release pins a newer version than the one Ferry fetched, it is fetched
-  /// quietly if the user accepted its license; a changed license waits for the user, and the adb
-  /// Ferry has stays in use meanwhile.
+  /// At launch, when Ferry has fetched adb before. A license text the user has not accepted
+  /// (a new text, under this pin or a newer one) waits for the user, and the adb Ferry has stays
+  /// in use meanwhile. Under an accepted license, a newer pinned version is fetched quietly.
   func considerPlatformToolsUpdate() {
     let pinned = PlatformToolsRelease.pinned
-    guard let fetched = services.fetchedPlatformToolsVersion(), fetched != pinned.version else {
-      return
-    }
-    if services.platformToolsAcceptance()?.covers(pinned.license) == true {
-      fetchPlatformTools(shown: false)
-    } else {
+    guard let fetched = services.fetchedPlatformToolsVersion() else { return }
+    if services.platformToolsAcceptance()?.covers(pinned.license) != true {
       platformTools.licenseChanged = true
+    } else if fetched != pinned.version {
+      fetchPlatformTools(shown: false)
     }
   }
 
