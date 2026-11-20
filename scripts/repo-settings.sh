@@ -14,6 +14,10 @@
 #    which release-please tags each release. GitHub cannot narrow that bypass to one workflow:
 #    any workflow with contents: write could create a v* tag, but such a tag never reaches the
 #    secrets (1), and the release job also checks the tag is release-please's draft on main.
+#    The bypass covers every rule, not just creation: any workflow on any branch with
+#    contents: write could also move or delete a v* tag. GitHub cannot narrow it. A moved tag
+#    cannot get a different commit signed, though: the release job requires the tag's commit to
+#    equal the commit release-please released and its draft's target.
 # 3. Branch protection on main: the CI `check` must pass, on an up-to-date branch, and it must
 #    come from GitHub Actions: a status named `check` posted by anything else does not count.
 #
