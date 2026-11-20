@@ -62,61 +62,17 @@ private struct HelpBrowser: View {
 
   var body: some View {
     NavigationSplitView {
-      List(selection: selection) {
-        ForEach(navigator.shownCategories, id: \.title) { category in
-          Section {
-            ForEach(category.topics) { topic in
-              Label {
-                Text(HelpText.resource(topic.title))
-              } icon: {
-                Image(systemName: topic.symbol)
-              }
-              .tag(topic.id)
-            }
-          } header: {
-            Text(HelpText.resource(category.title))
-          }
-        }
-      }
-      .focused($sidebarFocused)
-      .navigationSplitViewColumnWidth(min: 220, ideal: 250)
+      HelpSidebar(navigator: $navigator)
+        .focused($sidebarFocused)
+        .navigationSplitViewColumnWidth(min: 220, ideal: 250)
     } detail: {
-      if let shown = navigator.shownTopic {
-        HelpTopicDetail(topic: shown, highlighted: navigator.highlighted, model: model)
-      } else {
-        ContentUnavailableView.search(text: navigator.query)
-      }
+      HelpDetail(navigator: navigator, model: model)
     }
     .searchable(text: $navigator.query, placement: .toolbar)
     .onSubmit(of: .search) {
       if navigator.submitSearch() { sidebarFocused = true }
     }
-    .toolbar {
-      ToolbarItemGroup(placement: .navigation) {
-        Button {
-          navigator.move(by: -1)
-        } label: {
-          Label {
-            Text("Previous Topic", bundle: .module)
-          } icon: {
-            Image(systemName: "chevron.up")
-          }
-        }
-        .keyboardShortcut("[")
-        .help(Text("Previous Topic", bundle: .module))
-        Button {
-          navigator.move(by: 1)
-        } label: {
-          Label {
-            Text("Next Topic", bundle: .module)
-          } icon: {
-            Image(systemName: "chevron.down")
-          }
-        }
-        .keyboardShortcut("]")
-        .help(Text("Next Topic", bundle: .module))
-      }
-    }
+    .toolbar { stepButtons }
     .frame(minWidth: 680, minHeight: 440)
     .onAppear { model.helpAppeared() }
     .onChange(of: model.helpRequest, initial: true) { _, _ in
@@ -127,9 +83,89 @@ private struct HelpBrowser: View {
     }
   }
 
+  /// Previous Topic and Next Topic, ⌘[ and ⌘].
+  @ToolbarContentBuilder private var stepButtons: some ToolbarContent {
+    ToolbarItemGroup(placement: .navigation) {
+      HelpStepButton(title: "Previous Topic", symbol: "chevron.up", key: "[") {
+        navigator.move(by: -1)
+      }
+      HelpStepButton(title: "Next Topic", symbol: "chevron.down", key: "]") {
+        navigator.move(by: 1)
+      }
+    }
+  }
+}
+
+/// The topics the search shows, under their category headings.
+private struct HelpSidebar: View {
+  @Binding var navigator: HelpNavigator
+
+  var body: some View {
+    List(selection: selection) {
+      ForEach(navigator.shownCategories, id: \.title) { category in
+        Section {
+          ForEach(category.topics) { topic in
+            Label {
+              Text(HelpText.resource(topic.title))
+            } icon: {
+              Image(systemName: topic.symbol)
+            }
+            .tag(topic.id)
+          }
+        } header: {
+          Text(HelpText.resource(category.title))
+        }
+      }
+    }
+  }
+
   /// The sidebar's selection is the topic the detail shows.
   private var selection: Binding<String?> {
     Binding(get: { navigator.shownTopic?.id }, set: { navigator.select($0) })
+  }
+}
+
+/// The topic shown, or that the search found nothing.
+private struct HelpDetail: View {
+  let navigator: HelpNavigator
+  let model: AppModel
+
+  var body: some View {
+    if let shown = navigator.shownTopic {
+      HelpTopicDetail(topic: shown, highlighted: navigator.highlighted, model: model)
+    } else {
+      ContentUnavailableView.search(text: navigator.query)
+    }
+  }
+}
+
+/// A toolbar button that steps through the topics.
+private struct HelpStepButton: View {
+  let title: LocalizedStringResource
+  let symbol: String
+  let key: KeyEquivalent
+  let action: () -> Void
+
+  init(
+    title: String.LocalizationValue, symbol: String, key: KeyEquivalent,
+    action: @escaping () -> Void
+  ) {
+    self.title = LocalizedStringResource(title, bundle: .module)
+    self.symbol = symbol
+    self.key = key
+    self.action = action
+  }
+
+  var body: some View {
+    Button(action: action) {
+      Label {
+        Text(title)
+      } icon: {
+        Image(systemName: symbol)
+      }
+    }
+    .keyboardShortcut(key)
+    .help(Text(title))
   }
 }
 
