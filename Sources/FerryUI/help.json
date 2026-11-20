@@ -246,7 +246,8 @@
           "title": "Find your device in Finder",
           "symbol": "externaldrive",
           "paragraphs": [
-            "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs. An SD card is a second location.",
+            "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs.",
+            "A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number.",
             "Double-click a file to open it. Ferry copies it to the Mac when you open it.",
             "With one device location, macOS labels it with the app's name, so the sidebar says Ferry. This is normal."
           ]

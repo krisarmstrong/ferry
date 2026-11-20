@@ -347,9 +347,6 @@
     "Drag files or folders between the device and the Mac to copy them. A half-copied file never appears under its real name." : {
       "extractionState" : "manual"
     },
-    "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs. An SD card is a second location." : {
-      "extractionState" : "manual"
-    },
     "Eject" : {
 
     },
@@ -2136,6 +2133,12 @@
     },
     "Next Topic" : {
 
+    },
+    "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs." : {
+      "extractionState" : "manual"
+    },
+    "A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number." : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.0"

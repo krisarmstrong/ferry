@@ -20,7 +20,7 @@ forwarding. It is free and open source (MIT), and it sends nothing to any server
 
 | Finder | Menu | Setup guide |
 | ------ | ---- | ----------- |
-| ![A NetAlly unit as a Finder location](docs/screenshots/finder.png) | ![The Ferry menu with one device](docs/screenshots/menu.png) | ![Steps to turn on file transfer](docs/screenshots/guide.png) |
+| ![A network tester as a Finder location](docs/screenshots/finder.png) | ![The Ferry menu with one device](docs/screenshots/menu.png) | ![Steps to turn on file transfer](docs/screenshots/guide.png) |
 -->
 
 ## Requirements
@@ -47,7 +47,7 @@ A signed release DMG and a Homebrew cask are planned.
 
 ## Quick start
 
-**NetAlly LinkRunner 10G, EtherScope nXG, LinkRunner 100G**
+**LinkRunner 10G, EtherScope nXG, LinkRunner 100G**
 
 1. Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac.
 2. On the unit: **Settings** → **Connected devices** → **USB**.
@@ -62,11 +62,11 @@ The device appears in Finder's sidebar under **Locations**. If it does not, see
 **With USB debugging:** turn on USB debugging on the device and allow this Mac when it asks;
 Ferry then serves the device over ADB and shows its tools in the menu. From there, **Use over
 Wi-Fi**, **Pair with Code…** and **Connect by Address…** reach a device over the network. See
-[USB debugging](docs/user-guide.md#usb-debugging-adb) and
-[Connect over the network](docs/user-guide.md#connect-over-the-network).
+[Turn on USB debugging](docs/user-guide.md#turn-on-usb-debugging) and
+[Use a device over Wi-Fi](docs/user-guide.md#use-a-device-over-wi-fi).
 
 Full instructions: [User guide](docs/user-guide.md). The same help is in the app: choose
-**Help** in the Ferry menu.
+**Help** in the Ferry menu, or click the **?** beside a problem in the menu to open its entry.
 
 ## Build from source
 
