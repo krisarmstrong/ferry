@@ -95,8 +95,7 @@ extension DomainController {
     let adopted = identifiers.filter { DomainNaming.isIdentifier($0) && domains[$0] == nil }
       .sorted()
     for identifier in adopted {
-      // Shown until hidden below: whatever the system says, hiding again costs nothing.
-      domains[identifier] = Domain(spec: nil, storage: nil, connected: true, hidden: false)
+      domains[identifier] = Domain(spec: nil, storage: nil, connected: true)
     }
     for identifier in adopted {
       await disconnect(identifier)

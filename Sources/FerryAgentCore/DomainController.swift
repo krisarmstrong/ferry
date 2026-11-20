@@ -14,6 +14,8 @@ public protocol DomainManaging: Sendable {
   /// Hides the domain from Finder, or shows it again. The domain, its files and its unsent
   /// changes stay: only whether Finder lists it changes.
   func setHidden(_ identifier: String, hidden: Bool) async throws
+  /// The identifiers of the Ferry domains the system hides from Finder now.
+  func hiddenDomains() async throws -> Set<String>
   /// Removes the domain, keeping changes not yet sent to the device, and returns where they were
   /// saved, if there were any.
   func remove(_ identifier: String) async throws -> URL?
@@ -75,10 +77,6 @@ public actor DomainController {
     var spec: DomainSpec?
     var storage: StorageID?
     var connected: Bool
-    /// Whether the system hides the domain from Finder, as far as the controller knows. It
-    /// should be hidden exactly while not connected; `showOnlyConnected()` mends a difference
-    /// a failed request left.
-    var hidden: Bool
   }
 
   let hub: DeviceHub
@@ -257,7 +255,7 @@ public actor DomainController {
     let identifier = spec.identifier
     guard var existing = domains[identifier] else {
       guard await isServed(storage.device) else { return }
-      domains[identifier] = Domain(spec: spec, storage: storage, connected: true, hidden: false)
+      domains[identifier] = Domain(spec: spec, storage: storage, connected: true)
       publishLocations()
       do {
         try await manager.add(spec)

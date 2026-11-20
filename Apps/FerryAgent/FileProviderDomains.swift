@@ -53,10 +53,11 @@ struct FileProviderDomains: DomainManaging {
 
   /// An add with the domain's identifier and display name: `NSFileProviderManager.h` says an add
   /// for an existing identifier updates the display name and hidden state and succeeds, so the
-  /// domain is not replaced and its replicated files and unsent changes stay.
+  /// domain is not replaced and its replicated files and unsent changes stay. It is made even when
+  /// the listing already shows the state, which may lag an add just made. A domain the system
+  /// does not list is not added: that would bring back one ejected or removed.
   func setHidden(_ identifier: String, hidden: Bool) async throws {
     let domain = try await domain(identifier)
-    guard domain.isHidden != hidden else { return }
     try await NSFileProviderManager.add(
       DomainSettings.configured(identifier, displayName: domain.displayName, hidden: hidden))
   }
@@ -107,6 +108,10 @@ struct FileProviderDomains: DomainManaging {
       log.error("listing domains failed: \(error, privacy: .private)")
       return .noDomains
     }
+  }
+
+  func hiddenDomains() async throws -> Set<String> {
+    Set(try await NSFileProviderManager.domains().filter(\.isHidden).map(\.identifier.rawValue))
   }
 
   func existing() async throws -> [String] {
