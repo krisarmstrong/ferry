@@ -6,37 +6,12 @@ import Testing
 @testable import FerryUI
 
 /// Every problem the menu words from an error, and every fixed problem line, carries the key of
-/// its Help entry, so its Help link opens the topic that explains it. Each case of each error is
-/// listed: a case added to an enum must be added here.
+/// its Help entry, so its Help link opens the topic that explains it. Every case of every error
+/// is drawn from `HelpLinkCases`, which the compiler keeps exhaustive.
 struct HelpLinkTests {
   private static let help = HelpContent.bundled ?? HelpContent(version: 0, categories: [])
-  private static let path = RemotePath.root
-
-  static let transportErrors: [TransportError] = [
-    .noDeviceConnected, .deviceNotFound(DeviceID(serial: "A")), .noStorage,
-    .storageNotFound("internal"), .deviceBusy, .deviceLocked, .deviceDisconnected,
-    .notFound(path), .unknownItem, .alreadyExists(path), .invalidName("a:b"),
-    .unsupported("move"), .insufficientSpace(needed: 2, free: 1),
-    .fileTooLargeForStorage(size: 5_000_000_000), .sizeMismatch(expected: 2, actual: 1),
-    .downloadSizeMismatch(listed: 2, received: 1),
-    .nameChangedByDevice(requested: "a", actual: "b"), .directoryNotEmpty(path),
-    .changedOnDevice(path), .macDiskFull(needed: 2, free: 1), .folderTooDeep(path),
-    .readOnly(path), .cancelled, .agentNotResponding, .io("broken pipe"),
-  ]
-
-  static let toolFailures: [ToolFailure] = [
-    .notOverADB, .notAnAPK, .apkTooLarge, .installFailed("INSTALL_FAILED_OLDER_SDK"),
-    .installFailed("INSTALL_PARSE_FAILED_NO_CERTIFICATES"), .installFailed("SOMETHING_NEW"),
-    .alreadyRecording, .notRecording, .noImage, .recordingFailed(""),
-    .recordingFailed("encoder died"), .recordingTooLarge, .recordingStalled, .recordingBusy,
-    .cannotSave, .invalidPort, .forwardFailed("Address already in use"), .forwardNotFound,
-    .adbNotFound,
-  ]
-
-  static let wirelessFailures: [WirelessFailure] = [
-    .adbUnavailable, .notOverUSB, .notRemembered, .noConnectService, .otherDevice,
-    .unidentified, .pairingNeedsAddress, .offerChanged, .deviceInUse, .adb("refused"),
-  ]
+  static let transportErrors = HelpLinkCases.Transport.allCases.map(HelpLinkCases.sample)
+  static let toolFailures = HelpLinkCases.Tool.allCases.flatMap(HelpLinkCases.samples)
 
   private static func expectExplained(_ notice: MenuNotice?, _ comment: Comment) {
     let key = notice?.help ?? ""
@@ -57,19 +32,28 @@ struct HelpLinkTests {
     Self.expectExplained(notice, "\(failure)")
   }
 
-  @Test(arguments: wirelessFailures)
-  func eachWirelessFailureLinksToItsEntry(failure: WirelessFailure) {
-    Self.expectExplained(DevicePresentation.notice(for: .failed(failure)), "\(failure)")
+  /// Every outcome but connected says something, with its entry; connected says nothing.
+  @Test(arguments: HelpLinkCases.Outcome.allCases)
+  func eachWirelessOutcomeLinksToItsEntry(kind: HelpLinkCases.Outcome) throws {
+    let address = try #require(WirelessEndpoint(parsing: "192.0.2.31"))
+    let outcome = HelpLinkCases.sample(kind, address: address)
+    #expect(HelpLinkCases.kind(of: outcome) == kind)
+    let notice = DevicePresentation.notice(for: outcome)
+    if kind == .connected {
+      #expect(notice == nil)
+    } else {
+      Self.expectExplained(notice, "\(outcome)")
+    }
   }
 
-  @Test func theOtherWirelessOutcomesLinkToTheirEntries() throws {
-    let address = try #require(WirelessEndpoint(parsing: "192.0.2.31"))
-    for outcome: WirelessOutcome in [
-      .awaitingAllow(address), .needsConfirmation(address), .needsNetwork,
-    ] {
-      Self.expectExplained(DevicePresentation.notice(for: outcome), "\(outcome)")
+  /// Each sample is the case it stands for.
+  @Test func theSamplesAreTheirCases() {
+    for kind in HelpLinkCases.Transport.allCases {
+      #expect(HelpLinkCases.kind(of: HelpLinkCases.sample(kind)) == kind)
     }
-    #expect(DevicePresentation.notice(for: .connected) == nil)
+    for kind in HelpLinkCases.Tool.allCases {
+      #expect(HelpLinkCases.samples(kind).allSatisfy { HelpLinkCases.kind(of: $0) == kind })
+    }
   }
 
   @Test func theFixedProblemLinesLinkToTheirEntries() {
