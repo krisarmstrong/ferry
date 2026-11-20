@@ -15,19 +15,22 @@ public struct HelpView: View {
 
   private let model: AppModel
   private let content: HelpContent?
+  /// A search to open with, for previews and snapshots.
+  private let query: String
 
   public init(model: AppModel) {
     self.init(model: model, content: .bundled)
   }
 
-  init(model: AppModel, content: HelpContent?) {
+  init(model: AppModel, content: HelpContent?, query: String = "") {
     self.model = model
     self.content = content
+    self.query = query
   }
 
   public var body: some View {
     if let content {
-      HelpBrowser(model: model, content: content)
+      HelpBrowser(model: model, content: content, query: query)
     } else {
       ContentUnavailableView {
         Label {
@@ -49,10 +52,12 @@ private struct HelpBrowser: View {
   @State private var navigator: HelpNavigator
   @FocusState private var sidebarFocused: Bool
 
-  init(model: AppModel, content: HelpContent) {
+  init(model: AppModel, content: HelpContent, query: String) {
     self.model = model
     let stored = UserDefaults.standard.string(forKey: HelpView.selectionKey) ?? ""
-    _navigator = State(initialValue: HelpNavigator(content: content, selection: stored))
+    var navigator = HelpNavigator(content: content, selection: stored)
+    navigator.query = query
+    _navigator = State(initialValue: navigator)
   }
 
   var body: some View {
@@ -287,6 +292,10 @@ private struct RemoveFerryButton: View {
 
 #Preview("Help") {
   HelpView(model: .preview([]))
+}
+
+#Preview("Search") {
+  HelpView(model: .preview([]), content: .bundled, query: "recording")
 }
 
 #Preview("Troubleshooting") {
