@@ -1,7 +1,7 @@
 # CI points this at the runner's newest Xcode.
 export DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 
-.PHONY: lint fmt fmt-check test build app check-app guide
+.PHONY: lint fmt fmt-check test build app check-app guide release
 
 lint:
 	swiftlint --strict
@@ -37,7 +37,8 @@ app:
 
 # The FerryUI resource bundle inside the app must carry the help and the strings: without them
 # Help says it is not available and the menu shows its string keys.
-APP ?= .build/xcode/Build/Products/Debug/Ferry.app
+CONFIG ?= Debug
+APP ?= .build/xcode/Build/Products/$(CONFIG)/Ferry.app
 UI_RESOURCES = $(APP)/Contents/Resources/Ferry_FerryUI.bundle/Contents/Resources
 SYNC_RESOURCES = $(APP)/Contents/PlugIns/FerrySync.appex/Contents/Resources
 check-app:
@@ -68,7 +69,7 @@ check-app:
 	@# It may send files to devices and install apps: no injected library may run in it. Xcode
 	@# leaves the hardened runtime out of an ad hoc signature, so then the setting is checked.
 ifeq ($(SIGN),adhoc)
-	@xcodebuild -project Ferry.xcodeproj -target FerrySync -configuration Debug -showBuildSettings \
+	@xcodebuild -project Ferry.xcodeproj -target FerrySync -configuration $(CONFIG) -showBuildSettings \
 	  2>/dev/null | grep -q '^ *ENABLE_HARDENED_RUNTIME = YES$$' \
 	  || { echo "error: the Finder Sync extension is not built with the hardened runtime" >&2; exit 1; }
 	@echo "Finder Sync extension is built with the hardened runtime (not signed: ad hoc)"
@@ -105,3 +106,12 @@ endif
 	@/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionFileProviderAdditionalSyncableExtendedAttributes' \
 	  '$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Info.plist' | grep -q 'com.apple.quarantine' \
 	  || { echo "error: the extension does not declare com.apple.quarantine syncable" >&2; exit 1; }
+ifeq ($(CONFIG),Release)
+	@scripts/check-release.sh '$(APP)' '$(SIGN)'
+endif
+
+# A release build, signed with the Developer ID identity in the keychain, its libmtp and libusb
+# in Contents/Frameworks, in .build/release/Build/Products/Release. Not notarized: the release
+# workflow does that. `SIGN=adhoc` signs to run locally (scripts/update-dry-run.sh).
+release:
+	scripts/release-build.sh $(SIGN)

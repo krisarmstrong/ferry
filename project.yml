@@ -27,7 +27,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     # Off for development: the agent loads Homebrew's libmtp, which library validation would
-    # refuse. Plan 3 bundles libmtp and turns this on.
+    # refuse. A release build bundles libmtp, signed by the team, and turns it on (configs).
     ENABLE_HARDENED_RUNTIME: NO
     MARKETING_VERSION: "0.1.0" # x-release-please-version
     # Sparkle compares CFBundleVersion: it moves with the version on every release.
@@ -38,6 +38,13 @@ settings:
     # prints it). Until it replaces the placeholder the app has no updates, and
     # `make check-app CONFIG=Release` fails.
     FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER
+  # A release is signed with Developer ID for notarization (scripts/release-build.sh).
+  configs:
+    Release:
+      CODE_SIGN_STYLE: Manual
+      CODE_SIGN_IDENTITY: Developer ID Application
+      ENABLE_HARDENED_RUNTIME: YES
+      OTHER_CODE_SIGN_FLAGS: --timestamp
 
 targets:
   Ferry:
@@ -113,6 +120,8 @@ targets:
         # binary.
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
         SKIP_INSTALL: YES
+        # A release build's libmtp and libusb, in Contents/Frameworks beside Contents/MacOS.
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
     dependencies:
       - package: Ferry
         product: FerryAgentCore

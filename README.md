@@ -122,9 +122,9 @@ Ferry is released under the [MIT License](LICENSE).
 Ferry uses [libmtp](https://github.com/libmtp/libmtp) and
 [libusb](https://github.com/libusb/libusb), which are licensed under the GNU Lesser General
 Public License, version 2.1. Ferry links them dynamically. Development builds load the copies
-Homebrew installs; release builds are planned to ship the unmodified libraries in
-`Ferry.app/Contents/Frameworks` with their license texts. Their source code is available from
-the links above.
+Homebrew installs; release builds ship the unmodified libraries, built from their release
+tarballs by `scripts/build-libmtp.sh`, in `Ferry.app/Contents/Frameworks`, with their license
+texts in `Contents/Resources/Licenses`. Their source code is available from the links above.
 
 NetAlly, LinkRunner, EtherScope and AirCheck are trademarks of NetAlly. Ferry is not affiliated
 with or endorsed by NetAlly. Android is a trademark of Google LLC.
