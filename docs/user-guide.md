@@ -131,7 +131,7 @@ With USB debugging on, Ferry serves the device over ADB, which is faster than fi
 
 Menu names vary a little between phone makers. Look for Developer options and the USB debugging switch.
 
-In the app, **How to turn on USB debugging** opens the USB debugging steps.
+In the app, **How to Turn On USB Debugging** opens the USB debugging steps.
 
 #### LinkRunner 10G, LinkRunner 100G or EtherScope nXG
 
@@ -409,7 +409,7 @@ Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry 
 4. Check that Ferry is on under File Providers in Login Items & Extensions.
 5. Choose **Refresh** in the Ferry menu.
 
-In the app, **How to turn on file transfer** opens the setup guide.
+In the app, **How to Turn On File Transfer** opens the setup guide.
 
 #### An app or script from the device does not open at once
 
@@ -427,7 +427,7 @@ Connect the device and choose **Transfer files** on it.
 
 **Choose Transfer files on the device.**
 
-The device is connected but is not sharing files.
+The device is connected but is not sharing files, or no device has shared files yet.
 
 Unlock the device and choose **Transfer files** on it.
 

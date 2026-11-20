@@ -184,8 +184,10 @@ private struct DeviceDetails: View {
       }
     case .notSharingFiles:
       if DevicePresentation.needsFileTransferSteps(device) {
-        Text("Choose Transfer files on the device.", bundle: .module)
-          .foregroundStyle(.secondary)
+        HelpLinked(key: MenuStatusText.chooseTransferFiles.key) {
+          Text(MenuStatusText.chooseTransferFiles)
+            .foregroundStyle(.secondary)
+        }
       }
     case .ejected:
       Text("Not in Finder until you mount it again or plug it back in.", bundle: .module)

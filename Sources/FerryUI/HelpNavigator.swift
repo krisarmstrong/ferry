@@ -13,6 +13,8 @@ struct HelpNavigator: Equatable {
   private(set) var shownCategories: [HelpCategory]
   /// The message a Help link opened, which the detail scrolls to and marks.
   private(set) var highlighted: String?
+  /// How many Help links have opened a message, so the same link clicked again scrolls again.
+  private(set) var linkRequests = 0
 
   init(content: HelpContent, selection: String) {
     self.content = content
@@ -67,6 +69,7 @@ struct HelpNavigator: Equatable {
     query = ""
     selection = topic.id
     highlighted = key
+    linkRequests += 1
     return true
   }
 }

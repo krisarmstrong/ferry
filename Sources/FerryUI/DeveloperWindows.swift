@@ -22,6 +22,7 @@ public struct DeveloperScenes: Scene {
 
   // A window the system restored without its device has nothing to show.
   @ViewBuilder private func logcat(_ device: DeviceID?) -> some View {
-    if let device { LogcatWindow(model: model, device: device) }
+    // The model in the environment gives the window's errors their Help links.
+    if let device { LogcatWindow(model: model, device: device).environment(model) }
   }
 }

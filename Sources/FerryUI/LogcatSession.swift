@@ -12,8 +12,8 @@ import Observation
 @Observable @MainActor final class LogcatSession {
   enum State: Equatable {
     case running
-    /// The stream is over, with why, in words for the user.
-    case ended(String)
+    /// The stream is over, with why, in words for the user and its entry in Help.
+    case ended(MenuNotice)
   }
 
   let device: DeviceID
@@ -26,7 +26,7 @@ import Observation
   /// The lines the window shows, filtered; frozen while paused.
   private(set) var shown: [LogcatEntry] = []
   private(set) var isPaused = false
-  private(set) var saveError: String?
+  private(set) var saveError: MenuNotice?
   var minimumLevel = LogcatEntry.Level.verbose {
     didSet { refresh() }
   }
@@ -69,13 +69,13 @@ import Observation
         logs: { [weak self] batch in await self?.receive(batch) })
     } catch {
       response = nil
-      if !closing, error != .cancelled { state = .ended(DevicePresentation.message(for: error)) }
+      if !closing, error != .cancelled { state = .ended(DevicePresentation.notice(for: error)) }
     }
     guard !closing, let response else { return }
     switch response {
-    case .toolFailed(let failure): state = .ended(DevicePresentation.message(for: failure))
-    case .failure(let error): state = .ended(DevicePresentation.message(for: error))
-    default: state = .ended(DevicePresentation.logEndedLine)
+    case .toolFailed(let failure): state = .ended(DevicePresentation.notice(for: failure))
+    case .failure(let error): state = .ended(DevicePresentation.notice(for: error))
+    default: state = .ended(DevicePresentation.logEnded)
     }
   }
 

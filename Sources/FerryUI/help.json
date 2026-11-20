@@ -138,7 +138,7 @@
             }
           ],
           "link": {
-            "title": "How to turn on USB debugging",
+            "title": "How to Turn On USB Debugging",
             "target": "debugging"
           }
         },
@@ -560,7 +560,7 @@
             }
           ],
           "link": {
-            "title": "How to turn on file transfer",
+            "title": "How to Turn On File Transfer",
             "target": "guide"
           }
         },
@@ -579,7 +579,7 @@
             },
             {
               "message": "Choose Transfer files on the device.",
-              "cause": "The device is connected but is not sharing files.",
+              "cause": "The device is connected but is not sharing files, or no device has shared files yet.",
               "fix": "Unlock the device and choose **Transfer files** on it."
             },
             {

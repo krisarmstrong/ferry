@@ -73,8 +73,10 @@ public struct LogcatWindow: View {
         )
         .foregroundStyle(.secondary)
         if case .ended(let message) = session.state {
-          Text(verbatim: message)
-            .foregroundStyle(.red)
+          HelpLinked(key: message.help) {
+            Text(verbatim: message.text)
+              .foregroundStyle(.red)
+          }
           Button {
             Task { await session.run() }
           } label: {
@@ -82,8 +84,10 @@ public struct LogcatWindow: View {
           }
         }
         if let error = session.saveError {
-          Text(verbatim: error)
-            .foregroundStyle(.red)
+          HelpLinked(key: error.help) {
+            Text(verbatim: error.text)
+              .foregroundStyle(.red)
+          }
         }
         Spacer()
       }

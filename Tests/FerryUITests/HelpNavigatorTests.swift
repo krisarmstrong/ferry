@@ -171,6 +171,15 @@ struct HelpNavigatorTests {
     #expect(navigator == before)
   }
 
+  /// Each Help link is a new request, so the same `?` clicked again scrolls to its entry again.
+  @Test func theSameLinkTwiceIsTwoRequests() {
+    var navigator = Self.navigator()
+    _ = navigator.open(message: "The device was disconnected.")
+    let first = navigator.linkRequests
+    _ = navigator.open(message: "The device was disconnected.")
+    #expect(navigator.linkRequests == first + 1)
+  }
+
   /// Choosing another topic drops the mark.
   @Test func choosingATopicClearsTheMark() {
     var navigator = Self.navigator()

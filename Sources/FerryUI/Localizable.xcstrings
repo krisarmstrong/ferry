@@ -71,9 +71,6 @@
         }
       }
     },
-    "How to turn on file transfer" : {
-      "extractionState" : "manual"
-    },
     "%@, %@" : {
       "localizations" : {
         "en" : {
@@ -430,9 +427,6 @@
     },
     "How to Connect" : {
 
-    },
-    "How to turn on USB debugging" : {
-      "extractionState" : "manual"
     },
     "How to Turn On File Transfer" : {
 
@@ -1210,9 +1204,6 @@
       "extractionState" : "manual"
     },
     "Connect the device and choose **Transfer files** on it." : {
-      "extractionState" : "manual"
-    },
-    "The device is connected but is not sharing files." : {
       "extractionState" : "manual"
     },
     "Unlock the device and choose **Transfer files** on it." : {
@@ -2147,6 +2138,12 @@
       "extractionState" : "manual"
     },
     "Opens this window. Press ⌘? while the menu is open. Here, ⌘F goes to the search field, Return opens the best match, and ⌘[ and ⌘] step through the topics. A **?** beside a problem in the menu opens its entry here." : {
+      "extractionState" : "manual"
+    },
+    "How to Turn On USB Debugging" : {
+      "extractionState" : "manual"
+    },
+    "The device is connected but is not sharing files, or no device has shared files yet." : {
       "extractionState" : "manual"
     }
   },

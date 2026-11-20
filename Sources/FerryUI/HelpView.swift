@@ -141,7 +141,9 @@ private struct HelpDetail: View {
 
   var body: some View {
     if let shown = navigator.shownTopic {
-      HelpTopicDetail(topic: shown, highlighted: navigator.highlighted, model: model)
+      HelpTopicDetail(
+        topic: shown, highlighted: navigator.highlighted, linkRequest: navigator.linkRequests,
+        model: model)
     } else {
       ContentUnavailableView.search(text: navigator.query)
     }
@@ -183,6 +185,8 @@ private struct HelpStepButton: View {
 struct HelpTopicDetail: View {
   let topic: HelpTopic
   let highlighted: String?
+  /// Changes with each Help link, so a second click on the same one scrolls again.
+  var linkRequest = 0
   let model: AppModel
 
   var body: some View {
@@ -213,9 +217,9 @@ struct HelpTopicDetail: View {
         .frame(maxWidth: 580, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .onChange(of: highlighted, initial: true) { _, key in
-        guard let key else { return }
-        proxy.scrollTo(key, anchor: .top)
+      .onChange(of: linkRequest, initial: true) {
+        guard let highlighted else { return }
+        proxy.scrollTo(highlighted, anchor: .top)
       }
     }
   }

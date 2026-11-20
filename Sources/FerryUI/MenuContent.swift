@@ -99,7 +99,7 @@ public struct MenuContent: View {
         symbol: "cable.connector", title: Text(MenuStatusText.noDevice),
         help: MenuStatusText.noDevice.key
       ) {
-        Text("Choose Transfer files on the device.", bundle: .module)
+        Text(MenuStatusText.chooseTransferFiles)
       } actions: {
         StatusAction(title: Text("How to Connect", bundle: .module)) { openGuide(for: nil) }
       }

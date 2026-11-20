@@ -16,6 +16,8 @@ enum MenuStatusText {
   static let installADB = LocalizedStringResource("Install adb for more tools…", bundle: .module)
   static let usbWatchFailed = LocalizedStringResource(
     "Ferry can't watch USB for devices, so it looks for them every 30 seconds.", bundle: .module)
+  static let chooseTransferFiles = LocalizedStringResource(
+    "Choose Transfer files on the device.", bundle: .module)
   static let busy = LocalizedStringResource(
     "Quit Image Capture or Android File Transfer, then try again.", bundle: .module)
   static let allowUSBDebugging = LocalizedStringResource(
@@ -25,6 +27,7 @@ enum MenuStatusText {
 
   static let all = [
     helperNotResponding, allowHelper, helperNotFound, updated, turnOnInFinder, noDevice,
-    adbNotRunning, installADB, usbWatchFailed, busy, allowUSBDebugging, recordingUnsaved,
+    adbNotRunning, installADB, usbWatchFailed, chooseTransferFiles, busy, allowUSBDebugging,
+    recordingUnsaved,
   ]
 }
