@@ -2,8 +2,9 @@
 // Ferry, using only the public key. The release workflow runs it on the appcast it publishes.
 //
 // Usage: xcrun swift scripts/verify-ed-signature.swift <public-key> <signature> <file> [length]
-// The key and the signature are base64. With `length`, only the file's first `length` bytes are
-// signed: the appcast's own signature follows them. Exits 0 when the signature is valid.
+// The key and the signature are base64. With `length`, the file is an appcast: its first
+// `length` bytes are signed and its signature block must begin exactly there, as Sparkle checks.
+// Exits 0 when the signature is valid, 1 when it is not, 2 on unusable arguments.
 import CryptoKit
 import Foundation
 
@@ -23,7 +24,13 @@ else {
   exit(2)
 }
 if values.count == 4 {
-  guard let length = Int(values[3]), length <= message.count else { exit(2) }
+  guard let length = Int(values[3]), (0...message.count).contains(length) else { exit(2) }
+  let block = Data("<!-- sparkle-signatures:\n".utf8)
+  guard let start = message.lastRange(of: block)?.lowerBound, start == length else {
+    FileHandle.standardError.write(
+      Data("error: the signed length does not end where the signature block begins\n".utf8))
+    exit(1)
+  }
   message = message.prefix(length)
 }
 exit(key.isValidSignature(signature, for: message) ? 0 : 1)
