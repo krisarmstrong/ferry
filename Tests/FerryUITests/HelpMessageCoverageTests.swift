@@ -68,7 +68,10 @@ struct HelpMessageCoverageTests {
     ("trouble-network", "That address changed. Check the menu and try again."),
     (
       "trouble-network",
-      "Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again."
+      """
+      Ferry is using this device. Wait for its transfers, screen recording and log to finish, \
+      then try again.
+      """
     ),
     ("trouble-network", "adb: %@"),
     ("trouble-network", "Remembered · not nearby"),
@@ -80,11 +83,17 @@ struct HelpMessageCoverageTests {
     ("trouble-finder", "Symbolic links and aliases can’t be copied to the device."),
     (
       "trouble-finder",
-      "A folder on the device can’t take a package name, such as .app or .rtfd: macOS would open it as an app or a document."
+      """
+      A folder on the device can’t take a package name, such as .app or .rtfd: macOS would \
+      open it as an app or a document.
+      """
     ),
     (
       "trouble-finder",
-      "Folders named like an app or a document package, and what they hold, can’t be changed from this Mac. Change them on the device."
+      """
+      Folders named like an app or a document package, and what they hold, can’t be changed \
+      from this Mac. Change them on the device.
+      """
     ),
     ("trouble-finder", "The device does not support %@."),
     ("trouble-finder", "The device saved “%@” as “%@”."),
@@ -108,13 +117,19 @@ struct HelpMessageCoverageTests {
     ("trouble-send", "Only files can be sent."),
     (
       "trouble-send",
-      "Folders can’t be sent from this menu. Copy the folder into the device’s location in Finder, or compress it into a .zip first."
+      """
+      Folders can’t be sent from this menu. Copy the folder into the device’s location in \
+      Finder, or compress it into a .zip first.
+      """
     ),
     ("trouble-send", "The device can’t store a file with that name."),
     ("trouble-send", "The device doesn’t have enough free space."),
     (
       "trouble-send",
-      "The device has a file named Download where its Download folder should be. Rename or remove it on the device, then try again."
+      """
+      The device has a file named Download where its Download folder should be. Rename or \
+      remove it on the device, then try again.
+      """
     ),
     ("trouble-send", "The file can’t be read."),
     ("trouble-send", "The file is too large for the device’s storage."),
