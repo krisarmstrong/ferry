@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.0](https://github.com/krisarmstrong/ferry/compare/v0.3.0...v0.4.0) (2026-11-20)
+
+
+### Features
+
+* name hidden locations whose changes wait to be sent ([6d2e6d8](https://github.com/krisarmstrong/ferry/commit/6d2e6d8a604fee64dc05ab1b6e00125b448f1826))
+
+
+### Bug Fixes
+
+* don't ask to turn on Ferry for hidden domains only ([758dda1](https://github.com/krisarmstrong/ferry/commit/758dda1b440b822ea1eeb741312153afee6c65a8))
+* hide a device's Finder location while it isn't connected ([196ed59](https://github.com/krisarmstrong/ferry/commit/196ed5967ee7ba2d290600ba3c3ca22d80b352e1))
+* hide a device's Finder location while it isn't connected ([3e884ba](https://github.com/krisarmstrong/ferry/commit/3e884bad40a87375e1384a6ed9597b676d79b676))
+* list the unplug-hides-location check in the manual test plan ([a64d286](https://github.com/krisarmstrong/ferry/commit/a64d2864e7e195cfaf50917f1a60236cab488a33))
+* log the hidden domains at debug level on each reconcile ([aa34443](https://github.com/krisarmstrong/ferry/commit/aa344431eb8c76e9cc83c47fb8b7f52919aa0f37))
+* mend a location's visibility against the system's hidden state ([649d4a6](https://github.com/krisarmstrong/ferry/commit/649d4a6519f5f7cbef57da432efd4e5ae05b4e30))
+* offer one adb action in the menu ([f862a3b](https://github.com/krisarmstrong/ferry/commit/f862a3b1b26b2c31aaef2aea93fe2108a5818979))
+* offer one adb action in the menu ([5c0aec3](https://github.com/krisarmstrong/ferry/commit/5c0aec3d7b05a07039b8b406a1d43d65c59bce8e))
+* reconnect a domain added while the start-up listing failed ([e053478](https://github.com/krisarmstrong/ferry/commit/e05347895dabec9a372772eeee7ae22cdd2893c2))
+* retry a failed hide or show on a timer ([8cc0d85](https://github.com/krisarmstrong/ferry/commit/8cc0d8508f00ea57013ffce8ebf3e86496d7067c))
+* say a device is in Finder only while Ferry can reach it ([443ee30](https://github.com/krisarmstrong/ferry/commit/443ee30217fe6e13bd628ff9f629bedab0f8e840))
+* say in Help that a device shows in Finder only while connected ([3ee605c](https://github.com/krisarmstrong/ferry/commit/3ee605c596a9f98790a0942780c0bce4517bf4ea))
+* show a re-added domain in the fake domain manager, as addDomain does ([b5e1dae](https://github.com/krisarmstrong/ferry/commit/b5e1daeae3f428d879e7811ad390865e43046b87))
+* test hiding for a lock, an SD-card method change and a rename ([d9c9c00](https://github.com/krisarmstrong/ferry/commit/d9c9c004f6779165445c435bc61ca4b7dae7e5dc))
+
 ## [0.3.0](https://github.com/krisarmstrong/ferry/compare/v0.2.1...v0.3.0) (2026-11-20)
 
 
