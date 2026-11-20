@@ -20,6 +20,14 @@ extension DomainController {
       log.error("listing hidden domains failed: \(error, privacy: .private)")
       systemHidden = nil
     }
+    if let systemHidden {
+      // For checking a dev build: `log stream --level debug --predicate 'subsystem ==
+      // "io.github.krisarmstrong.ferry" AND category == "DomainController"'`.
+      let listed = systemHidden.sorted().joined(separator: " ")
+      log.debug(
+        "reconcile: \(systemHidden.count, privacy: .public) hidden domains: \(listed, privacy: .private)"
+      )
+    }
     var failed = systemHidden == nil
     for (identifier, domain) in domains.sorted(by: { $0.key < $1.key })
     where systemHidden.map({ $0.contains(identifier) == domain.connected }) ?? true {
