@@ -59,20 +59,20 @@ for lib in libusb-1.0.0.dylib libmtp.9.dylib; do
   ditto "$deps/lib/$lib" "$frameworks/$lib"
   codesign --force --sign "$identity" "${runtime[@]}" "$frameworks/$lib"
 done
-# LGPL-2.1: their licence texts, and where their unmodified source is.
+# LGPL-2.1: their licence texts, and the exact source they were built from.
 licenses="$app/Contents/Resources/Licenses"
 mkdir -p "$licenses"
-for source in "$deps"/src/libusb-*/ "$deps"/src/libmtp-*/; do
-  [ -d "$source" ] || continue
-  name="$(basename "$source")"
-  ditto "$source/COPYING" "$licenses/$name-COPYING.txt"
-done
 {
-  echo "Ferry links $(sed 's/ libmtp / and libmtp /' "$deps/versions"), unmodified, under the GNU Lesser"
-  echo "General Public License 2.1 (see the COPYING files here). Their source code:"
-  echo "https://github.com/libusb/libusb/releases"
-  echo "https://github.com/libmtp/libmtp/releases"
+  echo "Ferry links these libraries, unmodified, under the GNU Lesser General Public License 2.1"
+  echo "(see the COPYING files here). It builds them from these release tarballs with"
+  echo "scripts/build-libmtp.sh in https://github.com/krisarmstrong/ferry."
 } > "$licenses/README.txt"
+while read -r name version url sha256; do
+  copying="$deps/src/$name-$version/COPYING"
+  [ -f "$copying" ] || { echo "error: no licence text at $copying" >&2; exit 1; }
+  ditto "$copying" "$licenses/$name-$version-COPYING.txt"
+  printf '\n%s %s\n%s\nSHA-256: %s\n' "$name" "$version" "$url" "$sha256" >> "$licenses/README.txt"
+done < "$deps/sources"
 sparkle="$frameworks/Sparkle.framework/Versions/B"
 codesign --force --sign "$identity" "${runtime[@]}" "$sparkle/XPCServices/Installer.xpc"
 codesign --force --sign "$identity" "${runtime[@]}" --preserve-metadata=entitlements \

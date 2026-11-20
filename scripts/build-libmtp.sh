@@ -12,6 +12,8 @@ LIBUSB_SHA256=fea36f34f9156400209595e300840767ab1a385ede1dc7ee893015aea9c6dbaf
 LIBMTP_VERSION=1.1.23
 LIBMTP_SHA256=74a2b6e8cb4a0304e95b995496ea3ac644c29371649b892b856e22f12a0bdeed
 MINIMUM_MACOS=26.0
+LIBUSB_URL="https://github.com/libusb/libusb/releases/download/v$LIBUSB_VERSION/libusb-$LIBUSB_VERSION.tar.bz2"
+LIBMTP_URL="https://github.com/libmtp/libmtp/releases/download/v$LIBMTP_VERSION/libmtp-$LIBMTP_VERSION.tar.gz"
 
 prefix="$(mkdir -p "${1:-.build/deps}" && cd "${1:-.build/deps}" && pwd)"
 sources="$prefix/src"
@@ -28,7 +30,7 @@ fetch() {
   tar -xf "$file" -C "$sources"
 }
 
-if [ -f "$prefix/lib/libmtp.9.dylib" ] \
+if [ -f "$prefix/lib/libmtp.9.dylib" ] && [ -f "$prefix/sources" ] \
   && [ "$(cat "$prefix/versions" 2>/dev/null)" = "libusb $LIBUSB_VERSION libmtp $LIBMTP_VERSION" ]; then
   exit 0
 fi
@@ -38,18 +40,14 @@ export LDFLAGS="-arch arm64 -mmacosx-version-min=$MINIMUM_MACOS"
 export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
 jobs="$(sysctl -n hw.ncpu)"
 
-fetch "libusb-$LIBUSB_VERSION.tar.bz2" \
-  "https://github.com/libusb/libusb/releases/download/v$LIBUSB_VERSION/libusb-$LIBUSB_VERSION.tar.bz2" \
-  "$LIBUSB_SHA256"
+fetch "libusb-$LIBUSB_VERSION.tar.bz2" "$LIBUSB_URL" "$LIBUSB_SHA256"
 (
   cd "$sources/libusb-$LIBUSB_VERSION"
   ./configure --quiet --prefix="$prefix" --disable-static
   make --quiet -j "$jobs" install > /dev/null
 )
 
-fetch "libmtp-$LIBMTP_VERSION.tar.gz" \
-  "https://github.com/libmtp/libmtp/releases/download/v$LIBMTP_VERSION/libmtp-$LIBMTP_VERSION.tar.gz" \
-  "$LIBMTP_SHA256"
+fetch "libmtp-$LIBMTP_VERSION.tar.gz" "$LIBMTP_URL" "$LIBMTP_SHA256"
 (
   cd "$sources/libmtp-$LIBMTP_VERSION"
   # No MTPZ, as in Homebrew's build: it needs libgcrypt, and only old Zune players use it.
@@ -70,4 +68,9 @@ for dylib in "$lib/libusb-1.0.0.dylib" "$lib/libmtp.9.dylib"; do
     exit 1
   fi
 done
+# For the release's LGPL source offer: name, version, tarball and its SHA-256, one per line.
+{
+  echo "libusb $LIBUSB_VERSION $LIBUSB_URL $LIBUSB_SHA256"
+  echo "libmtp $LIBMTP_VERSION $LIBMTP_URL $LIBMTP_SHA256"
+} > "$prefix/sources"
 echo "libusb $LIBUSB_VERSION libmtp $LIBMTP_VERSION" > "$prefix/versions"

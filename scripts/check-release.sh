@@ -25,6 +25,13 @@ for text in "$licenses"/libusb-*-COPYING.txt "$licenses"/libmtp-*-COPYING.txt \
   "$licenses/README.txt"; do
   [ -s "$text" ] || fail "no $text"
 done
+# The source offer names each exact tarball and its SHA-256.
+for library in libusb libmtp; do
+  grep -Eq "^https://github\.com/$library/$library/releases/download/v[0-9.]+/$library-[0-9.]+\.tar\.(bz2|gz)$" \
+    "$licenses/README.txt" || fail "$licenses/README.txt does not name the $library tarball"
+done
+[ "$(grep -cE '^SHA-256: [0-9a-f]{64}$' "$licenses/README.txt")" = 2 ] \
+  || fail "$licenses/README.txt does not give both tarballs' SHA-256"
 echo "release build carries libmtp and libusb, their licences and where their source is"
 
 executables=()
