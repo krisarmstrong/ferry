@@ -9,7 +9,9 @@ import os
 /// removes the versions fetched before. Whatever fails, nothing is left behind but what was
 /// there before.
 public struct PlatformToolsFetcher: Sendable {
-  public typealias Download = @Sendable (URL) async throws(PlatformToolsError) -> URL
+  /// Downloads `url` into a new file in `folder`, giving up past `limit` bytes.
+  public typealias Download =
+    @Sendable (_ url: URL, _ limit: Int, _ folder: URL) async throws(PlatformToolsError) -> URL
   public typealias Verify = @Sendable (URL) throws(PlatformToolsError) -> Void
 
   private static let log = Logger(
@@ -24,7 +26,7 @@ public struct PlatformToolsFetcher: Sendable {
   /// unless its file is signed by Google.
   public init(
     release: PlatformToolsRelease = .pinned, folder: PlatformToolsFolder = .standard,
-    download: @escaping Download = HTTPSDownload.file(from:),
+    download: @escaping Download = HTTPSDownload.file(from:limit:into:),
     verify: @escaping Verify = CodeSignature.checkGoogle
   ) {
     self.release = release
@@ -39,11 +41,12 @@ public struct PlatformToolsFetcher: Sendable {
     guard release.url.scheme?.lowercased() == "https" else { throw .insecureAddress }
     let staging = try makeStaging()
     defer { try? FileManager.default.removeItem(at: staging) }
-    let downloaded = try await download(release.url)
-    defer { try? FileManager.default.removeItem(at: downloaded) }
+    let downloaded = try await download(release.url, release.size, staging)
+    // Read, then gone at once: the staging folder becomes the version folder.
     let archive: Data
     do {
-      archive = try Data(contentsOf: downloaded, options: .alwaysMapped)
+      defer { try? FileManager.default.removeItem(at: downloaded) }
+      archive = try Data(contentsOf: downloaded)
     } catch {
       throw .storage
     }
@@ -116,58 +119,5 @@ public struct PlatformToolsFetcher: Sendable {
 
   private static func hex(_ digest: SHA256.Digest) -> String {
     digest.map { String(format: "%02x", $0) }.joined()
-  }
-}
-
-/// The real download: an ephemeral session, HTTPS only, redirects included.
-public enum HTTPSDownload {
-  public static func file(from url: URL) async throws(PlatformToolsError) -> URL {
-    let session = URLSession(
-      configuration: .ephemeral, delegate: HTTPSOnlyRedirects(), delegateQueue: nil)
-    defer { session.finishTasksAndInvalidate() }
-    let file: URL
-    let response: URLResponse
-    do {
-      (file, response) = try await session.download(from: url)
-    } catch let error as URLError {
-      throw failure(error)
-    } catch {
-      throw .downloadFailed
-    }
-    guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-      http.url?.scheme?.lowercased() == "https"
-    else {
-      try? FileManager.default.removeItem(at: file)
-      throw .downloadFailed
-    }
-    return file
-  }
-
-  /// No connection is `offline`, which the menu words as needing the internet once.
-  static func failure(_ error: URLError) -> PlatformToolsError {
-    switch error.code {
-    case .cancelled:
-      .cancelled
-    case .notConnectedToInternet, .networkConnectionLost, .cannotFindHost, .cannotConnectToHost,
-      .dnsLookupFailed, .timedOut, .internationalRoamingOff, .dataNotAllowed,
-      .callIsActive:
-      .offline
-    case .appTransportSecurityRequiresSecureConnection, .secureConnectionFailed,
-      .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateNotYetValid,
-      .serverCertificateHasUnknownRoot, .clientCertificateRejected:
-      .insecureAddress
-    default:
-      .downloadFailed
-    }
-  }
-}
-
-/// Follows a redirect only to another HTTPS address.
-private final class HTTPSOnlyRedirects: NSObject, URLSessionTaskDelegate, Sendable {
-  func urlSession(
-    _ session: URLSession, task: URLSessionTask,
-    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest
-  ) async -> URLRequest? {
-    request.url?.scheme?.lowercased() == "https" ? request : nil
   }
 }

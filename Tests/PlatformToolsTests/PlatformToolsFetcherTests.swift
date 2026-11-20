@@ -46,17 +46,17 @@ final class PlatformToolsFetcherTests: Sendable {
       license: license)
   }
 
-  /// A fetcher whose download hands over `served` as a new temporary file, as URLSession does.
+  /// A fetcher whose download writes `served` into the folder it is given, as the real one
+  /// does: whatever is left of it shows in `leftovers()`.
   private func fetcher(
     _ release: PlatformToolsRelease, serving served: Data,
     verify: @escaping @Sendable (URL) throws(PlatformToolsError) -> Void = { _ in }
-  ) -> (PlatformToolsFetcher, URL) {
-    let file = FileManager.default.temporaryDirectory.appending(
-      path: "ferry-download-\(UUID().uuidString)")
-    let fetcher = PlatformToolsFetcher(
+  ) -> PlatformToolsFetcher {
+    PlatformToolsFetcher(
       release: release, folder: folder,
-      download: { [downloads] _ throws(PlatformToolsError) in
+      download: { [downloads] _, _, into throws(PlatformToolsError) in
         downloads.withLock { $0 += 1 }
+        let file = into.appending(path: "download.zip")
         do {
           try served.write(to: file)
         } catch {
@@ -64,7 +64,6 @@ final class PlatformToolsFetcherTests: Sendable {
         }
         return file
       }, verify: verify)
-    return (fetcher, file)
   }
 
   /// Everything under the folder, relative to it.
@@ -81,19 +80,18 @@ final class PlatformToolsFetcherTests: Sendable {
 
   @Test func installsOnlyAdbAndItsNotice() async throws {
     let data = Self.googleLike()
-    let (fetcher, download) = fetcher(Self.release(for: data), serving: data)
+    let fetcher = fetcher(Self.release(for: data), serving: data)
     let adb = try await fetcher.fetch(accepted: Self.accepted)
     #expect(adb == folder.root.appending(path: "37.0.3/adb"))
     #expect(try Data(contentsOf: adb) == Data("the adb binary".utf8))
     #expect(leftovers() == ["37.0.3", "37.0.3/NOTICE.txt", "37.0.3/adb"])
     #expect(try mode(adb) == 0o755)
     #expect(try mode(adb.deletingLastPathComponent()) == 0o700)
-    #expect(!FileManager.default.fileExists(atPath: download.path))
   }
 
   @Test func noDownloadWithoutAcceptance() async {
     let data = Self.googleLike()
-    let (fetcher, _) = fetcher(Self.release(for: data), serving: data)
+    let fetcher = fetcher(Self.release(for: data), serving: data)
     await #expect(throws: PlatformToolsError.licenseNotAccepted) {
       try await fetcher.fetch(accepted: nil)
     }
@@ -112,7 +110,7 @@ final class PlatformToolsFetcherTests: Sendable {
 
   @Test func onlyHTTPS() async {
     let data = Self.googleLike()
-    let (fetcher, _) = fetcher(
+    let fetcher = fetcher(
       Self.release(for: data, url: "http://dl.google.com/platform-tools.zip"), serving: data)
     await #expect(throws: PlatformToolsError.insecureAddress) {
       try await fetcher.fetch(accepted: Self.accepted)
@@ -124,21 +122,19 @@ final class PlatformToolsFetcherTests: Sendable {
     let data = Self.googleLike()
     let other = Self.googleLike(adb: "the adb binarY")
     #expect(data.count == other.count)
-    let (fetcher, download) = fetcher(Self.release(for: data), serving: other)
+    let fetcher = fetcher(Self.release(for: data), serving: other)
     await #expect(throws: PlatformToolsError.mismatch) {
       try await fetcher.fetch(accepted: Self.accepted)
     }
-    #expect(!FileManager.default.fileExists(atPath: download.path))
     #expect(leftovers() == [])
   }
 
   @Test func aTruncatedDownloadIsRejectedAndDeleted() async {
     let data = Self.googleLike()
-    let (fetcher, download) = fetcher(Self.release(for: data), serving: data.prefix(100))
+    let fetcher = fetcher(Self.release(for: data), serving: data.prefix(100))
     await #expect(throws: PlatformToolsError.mismatch) {
       try await fetcher.fetch(accepted: Self.accepted)
     }
-    #expect(!FileManager.default.fileExists(atPath: download.path))
     #expect(leftovers() == [])
   }
 
@@ -148,7 +144,7 @@ final class PlatformToolsFetcherTests: Sendable {
     zip.add("platform-tools/adb", "adb", mode: 0o100_755)
     zip.add("platform-tools/../../../.zshrc", "evil")
     let data = zip.data
-    let (fetcher, _) = fetcher(Self.release(for: data), serving: data)
+    let fetcher = fetcher(Self.release(for: data), serving: data)
     await #expect(throws: PlatformToolsError.badArchive) {
       try await fetcher.fetch(accepted: Self.accepted)
     }
@@ -160,7 +156,7 @@ final class PlatformToolsFetcherTests: Sendable {
     var zip = TestZip()
     zip.add("platform-tools/adb", "/bin/sh", mode: 0o120_777)
     let data = zip.data
-    let (fetcher, _) = fetcher(Self.release(for: data), serving: data)
+    let fetcher = fetcher(Self.release(for: data), serving: data)
     await #expect(throws: PlatformToolsError.badArchive) {
       try await fetcher.fetch(accepted: Self.accepted)
     }
@@ -171,7 +167,7 @@ final class PlatformToolsFetcherTests: Sendable {
     var zip = TestZip()
     zip.add("platform-tools/fastboot", "fastboot", mode: 0o100_755)
     let data = zip.data
-    let (fetcher, _) = fetcher(Self.release(for: data), serving: data)
+    let fetcher = fetcher(Self.release(for: data), serving: data)
     await #expect(throws: PlatformToolsError.badArchive) {
       try await fetcher.fetch(accepted: Self.accepted)
     }
@@ -186,7 +182,7 @@ final class PlatformToolsFetcherTests: Sendable {
       checked.withLock { $0.append(file.lastPathComponent) }
       throw .notSigned
     }
-    let (fetcher, _) = fetcher(Self.release(for: data), serving: data, verify: refuse)
+    let fetcher = fetcher(Self.release(for: data), serving: data, verify: refuse)
     await #expect(throws: PlatformToolsError.notSigned) {
       try await fetcher.fetch(accepted: Self.accepted)
     }
@@ -197,7 +193,7 @@ final class PlatformToolsFetcherTests: Sendable {
   @Test func aFailedDownloadLeavesNothing() async {
     let fetcher = PlatformToolsFetcher(
       release: Self.release(for: Data()), folder: folder,
-      download: { _ throws(PlatformToolsError) in throw .offline }, verify: { _ in })
+      download: { _, _, _ throws(PlatformToolsError) in throw .offline }, verify: { _ in })
     await #expect(throws: PlatformToolsError.offline) {
       try await fetcher.fetch(accepted: Self.accepted)
     }
@@ -210,7 +206,7 @@ final class PlatformToolsFetcherTests: Sendable {
     try FileManager.default.createDirectory(at: stale, withIntermediateDirectories: true)
     try Data("half".utf8).write(to: stale.appending(path: "adb"))
     let data = Self.googleLike()
-    let (fetcher, _) = fetcher(Self.release(for: data), serving: data)
+    let fetcher = fetcher(Self.release(for: data), serving: data)
     _ = try await fetcher.fetch(accepted: Self.accepted)
     #expect(leftovers() == ["37.0.3", "37.0.3/NOTICE.txt", "37.0.3/adb"])
   }
@@ -218,30 +214,16 @@ final class PlatformToolsFetcherTests: Sendable {
   /// A new pinned version replaces the old one once it is in place, and not before.
   @Test func replacesAnOlderVersionOnlyOnSuccess() async throws {
     let old = Self.googleLike(adb: "old adb")
-    _ = try await fetcher(Self.release(for: old, version: "36.0.0"), serving: old).0
+    _ = try await fetcher(Self.release(for: old, version: "36.0.0"), serving: old)
       .fetch(accepted: Self.accepted)
     let new = Self.googleLike(adb: "new adb")
     await #expect(throws: PlatformToolsError.mismatch) {
-      try await fetcher(Self.release(for: new, version: "37.0.3"), serving: old).0
+      try await fetcher(Self.release(for: new, version: "37.0.3"), serving: old)
         .fetch(accepted: Self.accepted)
     }
     #expect(leftovers() == ["36.0.0", "36.0.0/NOTICE.txt", "36.0.0/adb"])
-    _ = try await fetcher(Self.release(for: new, version: "37.0.3"), serving: new).0
+    _ = try await fetcher(Self.release(for: new, version: "37.0.3"), serving: new)
       .fetch(accepted: Self.accepted)
     #expect(leftovers() == ["37.0.3", "37.0.3/NOTICE.txt", "37.0.3/adb"])
-  }
-}
-
-struct HTTPSDownloadTests {
-  /// No connection is what the menu words as needing the internet once.
-  @Test(arguments: [
-    (URLError.Code.notConnectedToInternet, PlatformToolsError.offline), (.timedOut, .offline),
-    (.cannotFindHost, .offline), (.networkConnectionLost, .offline), (.cancelled, .cancelled),
-    (.serverCertificateUntrusted, .insecureAddress),
-    (.appTransportSecurityRequiresSecureConnection, .insecureAddress),
-    (.badServerResponse, .downloadFailed),
-  ])
-  func classifiesFailures(code: URLError.Code, expected: PlatformToolsError) {
-    #expect(HTTPSDownload.failure(URLError(code)) == expected)
   }
 }

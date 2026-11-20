@@ -58,7 +58,8 @@ public struct PlatformToolsRelease: Sendable, Equatable {
 public enum PlatformToolsError: Error, Equatable, Sendable {
   /// The user has not accepted this release's license.
   case licenseNotAccepted
-  /// The release's address is not HTTPS, or the download was redirected off it.
+  /// The release's address is not HTTPS, or the download was sent off HTTPS or off the hosts
+  /// Google serves the platform tools from.
   case insecureAddress
   /// The Mac is offline or Google could not be reached.
   case offline
