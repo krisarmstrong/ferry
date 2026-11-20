@@ -49,6 +49,69 @@ struct ZipArchiveTests {
     }
   }
 
+  /// Whatever host made the entry: a link's mode under MS-DOS is still a link.
+  @Test(arguments: [UInt16(0), 3, 19])
+  func rejectsALinkMadeByAnyHost(madeBy: UInt16) {
+    #expect(throws: PlatformToolsError.self) {
+      var zip = TestZip()
+      zip.entries.append(
+        .init(
+          name: "platform-tools/adb", data: Data("/bin/sh".utf8), mode: 0o120_777, madeBy: madeBy))
+      _ = try ZipArchive(zip.data)
+    }
+  }
+
+  /// The local header must say what the central directory says.
+  @Test func rejectsALocalHeaderThatDisagrees() throws {
+    var renamed = TestZip()
+    renamed.entries.append(
+      .init(name: "platform-tools/adb", data: Data("adb".utf8), localName: "../../../evil"))
+    var remethoded = TestZip()
+    remethoded.entries.append(
+      .init(name: "platform-tools/adb", data: Data("adb".utf8), deflate: false, localMethod: 8))
+    for zip in [renamed, remethoded] {
+      let archive = try ZipArchive(zip.data)
+      #expect(throws: PlatformToolsError.badArchive) {
+        _ = try archive.contents(of: "platform-tools/adb")
+      }
+    }
+  }
+
+  @Test func rejectsADuplicateName() {
+    #expect(throws: PlatformToolsError.badArchive) {
+      var zip = TestZip()
+      zip.add("platform-tools/adb", "first", mode: 0o100_755)
+      zip.add("platform-tools/adb", "second", mode: 0o100_755)
+      _ = try ZipArchive(zip.data)
+    }
+  }
+
+  /// Google's names are ASCII; lookalikes of `.`, `/` and control characters are refused.
+  @Test(arguments: [
+    "platform-tools/\u{FF0E}\u{FF0E}/adb", "platform-tools\u{2215}adb", "adb\u{202E}", "C:/adb",
+  ])
+  func rejectsANameThatIsNotPlainASCII(name: String) {
+    #expect(throws: PlatformToolsError.badArchive) {
+      var zip = TestZip()
+      zip.add(name, "x")
+      _ = try ZipArchive(zip.data)
+    }
+  }
+
+  /// An empty stored body cannot stand for a file the directory says has bytes.
+  @Test func rejectsAnEmptyBodyForANonEmptyFile() throws {
+    var zip = TestZip()
+    zip.entries.append(.init(name: "platform-tools/adb", data: Data("adb".utf8)))
+    var data = zip.data
+    // The central directory says 3 bytes, stored: point its compressed size at nothing.
+    let central = try #require(data.firstRange(of: Data([0x50, 0x4b, 0x01, 0x02])))
+    data[central.lowerBound + 20] = 0
+    let archive = try ZipArchive(data)
+    #expect(throws: PlatformToolsError.badArchive) {
+      _ = try archive.contents(of: "platform-tools/adb")
+    }
+  }
+
   @Test func rejectsAnEncryptedEntry() {
     #expect(throws: PlatformToolsError.self) {
       var zip = TestZip()

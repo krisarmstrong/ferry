@@ -16,6 +16,11 @@ struct TestZip {
     /// Written in place of the real checksum when set.
     var crc: UInt32?
     var encrypted = false
+    /// The host that made the entry, in the central directory: 3 is Unix, 0 MS-DOS.
+    var madeBy: UInt16 = 3
+    /// Written in the local header in place of the central directory's name or method.
+    var localName: String?
+    var localMethod: UInt16?
   }
 
   var entries: [Entry] = []
@@ -34,19 +39,20 @@ struct TestZip {
       let body = entry.deflate ? Self.deflated(entry.data) : entry.data
       let crc = entry.crc ?? ZipArchive.crc32(entry.data)
       let name = Data(entry.name.utf8)
+      let localName = Data((entry.localName ?? entry.name).utf8)
       let flags: UInt16 = 0x0008 | 0x0800 | (entry.encrypted ? 0x0001 : 0)
       let method: UInt16 = entry.deflate ? 8 : 0
       archive.le32(0x0403_4b50)
       archive.le16(20)
       archive.le16(flags)
-      archive.le16(method)
+      archive.le16(entry.localMethod ?? method)
       archive.le32(0)  // time and date
       archive.le32(0)  // checksum and sizes follow the data
       archive.le32(0)
       archive.le32(0)
-      archive.le16(UInt16(name.count))
+      archive.le16(UInt16(localName.count))
       archive.le16(0)
-      archive.append(name)
+      archive.append(localName)
       archive.append(body)
       archive.le32(0x0807_4b50)
       archive.le32(crc)
@@ -54,7 +60,7 @@ struct TestZip {
       archive.le32(UInt32(entry.data.count))
 
       central.le32(0x0201_4b50)
-      central.le16(0x0300 | 21)  // made by Unix
+      central.le16(entry.madeBy << 8 | 21)
       central.le16(20)
       central.le16(flags)
       central.le16(method)
@@ -88,11 +94,9 @@ struct TestZip {
   static func deflated(_ data: Data) -> Data {
     let capacity = data.count + 1024
     var output = [UInt8](repeating: 0, count: capacity)
-    let written = data.withUnsafeBytes { source in
-      compression_encode_buffer(
-        &output, capacity, source.bindMemory(to: UInt8.self).baseAddress!, data.count, nil,
-        COMPRESSION_ZLIB)
-    }
+    let source = [UInt8](data)
+    let written = compression_encode_buffer(
+      &output, capacity, source, source.count, nil, COMPRESSION_ZLIB)
     return Data(output[..<written])
   }
 }
