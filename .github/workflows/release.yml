@@ -164,17 +164,28 @@ jobs:
         env:
           DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
           DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        # security import takes a .p12 password only as an argument, where any process on the
+        # runner could read it. So the secret password reaches only openssl, through the
+        # environment, which re-wraps the identity under a throwaway password made here. The
+        # files live in a 0700 folder, removed when the step ends.
         run: |
           umask 077
+          work="$(mktemp -d "$RUNNER_TEMP/developer-id.XXXXXX")"
+          trap 'rm -rf "$work"' EXIT
           keychain="$RUNNER_TEMP/release.keychain-db"
           password="$(uuidgen)"
           security create-keychain -p "$password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$password" "$keychain"
-          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
-          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" \
-            -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
-          rm -f "$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$work/developer-id.p12"
+          /usr/bin/openssl pkcs12 -in "$work/developer-id.p12" -passin env:DEVELOPER_ID_P12_PASSWORD \
+            -nodes -out "$work/identity.pem" 2> /dev/null \
+            || { echo "::error::DEVELOPER_ID_P12_PASSWORD does not open DEVELOPER_ID_P12_BASE64"; exit 1; }
+          TRANSPORT="$(uuidgen)"
+          export TRANSPORT
+          /usr/bin/openssl pkcs12 -export -in "$work/identity.pem" -out "$work/import.p12" \
+            -passout env:TRANSPORT -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+          security import "$work/import.p12" -k "$keychain" -P "$TRANSPORT" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" > /dev/null
           security list-keychains -d user -s "$keychain" login.keychain
       - name: Build and sign
@@ -277,4 +288,4 @@ jobs:
         if: always()
         run: |
           security delete-keychain "$RUNNER_TEMP/release.keychain-db" || true
-          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/notary.p8"
+          rm -rf "$RUNNER_TEMP"/developer-id.* "$RUNNER_TEMP/notary.p8"
