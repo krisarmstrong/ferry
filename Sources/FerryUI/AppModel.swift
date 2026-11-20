@@ -104,11 +104,16 @@ import os
   /// Why Remove Ferry… failed, shown under it in Help; the menu's error row is for its own
   /// actions.
   public internal(set) var removalError: String?
-  /// Read from the system once launched (see `launch()`); `false` until then.
-  public private(set) var opensAtLogin = false
-  /// The login item change being applied, and how many have been requested.
+  /// Read from the system once launched (see `launch()`) and each time the menu opens; off
+  /// until then.
+  public private(set) var loginItem = LoginItemStatus.disabled
+  /// The login item change being applied, how many have been requested, and how many applied.
   private var loginItemChange: Task<Void, Never>?
   private var loginItemRequests = 0
+  private var loginItemsApplied = 0
+
+  /// The Open at Login checkmark: on, or registered and waiting for approval.
+  public var opensAtLogin: Bool { loginItem != .disabled }
 
   /// The steps the guide shows; `nil` shows the model picker.
   public var guideFamily: DeviceFamily?
@@ -188,6 +193,7 @@ import os
     // How long the menu has been open since the agent first answered.
     var answeredFor: Duration?
     resetExpansion()
+    await readLoginItem()
     while !Task.isCancelled {
       await refresh()
       // The menu may have closed while the status was read.
@@ -254,14 +260,14 @@ import os
   public func launch() async {
     await services.registerAgent()
     await refresh()
-    opensAtLogin = await services.opensAtLogin()
+    loginItem = await services.loginItemStatus()
   }
 
   /// The Open at Login row: shows `enabled` at once, then applies it after any change still
   /// being applied, so quick toggles reach macOS in order and the switch never snaps back
   /// meanwhile. Once the last change is applied, it shows what macOS reports.
   public func requestOpensAtLogin(_ enabled: Bool) {
-    opensAtLogin = enabled
+    loginItem = enabled ? .enabled : .disabled
     loginItemRequests += 1
     let request = loginItemRequests
     let previous = loginItemChange
@@ -269,6 +275,15 @@ import os
       await previous?.value
       await applyOpensAtLogin(enabled, request: request)
     }
+  }
+
+  /// Reads what macOS has now, as the menu opens: the user may have changed it in System
+  /// Settings. While a change is being applied the switch keeps the value chosen.
+  func readLoginItem() async {
+    let request = loginItemRequests
+    guard loginItemsApplied == request else { return }
+    let read = await services.loginItemStatus()
+    if loginItemRequests == request, loginItemsApplied == request { loginItem = read }
   }
 
   /// Returns once every requested login item change is applied.
@@ -285,9 +300,10 @@ import os
       actionError = String(
         localized: LocalizedStringResource("Could not change Open at Login.", bundle: .module))
     }
-    let reported = await services.opensAtLogin()
+    let reported = await services.loginItemStatus()
+    loginItemsApplied = request
     // A later request shows its own value until it is applied in turn.
-    if request == loginItemRequests { opensAtLogin = reported }
+    if request == loginItemRequests { loginItem = reported }
   }
 
   func perform(_ request: AgentRequest) async {

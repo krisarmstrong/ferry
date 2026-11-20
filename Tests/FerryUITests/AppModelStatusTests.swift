@@ -89,6 +89,78 @@ struct AppModelLoginItemTests {
   }
 }
 
+/// What macOS says about the login item is read again each time the menu opens, since the user
+/// can change it in System Settings; one waiting for approval shows checked, with a line saying
+/// so.
+@MainActor
+struct AppModelLoginItemStatusTests {
+  let log = CallLog()
+
+  /// A menu that closes as soon as it has read the status once.
+  private func openMenuOnce(_ model: AppModel) async {
+    await model.watchWhileMenuOpen()
+  }
+
+  private func model(_ services: FakeServices) -> AppModel {
+    AppModel(
+      client: FakeClient(log: log), services: services,
+      sleep: { _ in throw CancellationError() })
+  }
+
+  @Test func aLoginItemWaitingForApprovalShowsAsOn() async {
+    let services = FakeServices(log: log)
+    services.loginItem = .needsApproval
+    let model = model(services)
+    await model.launch()
+    #expect(model.loginItem == .needsApproval)
+    #expect(model.opensAtLogin)
+  }
+
+  @Test func openingTheMenuReadsTheLoginItemAgain() async {
+    let services = FakeServices(log: log)
+    let model = model(services)
+    await model.launch()
+    #expect(model.opensAtLogin)
+    // Turned off in System Settings while Ferry ran.
+    services.loginItem = .disabled
+    await openMenuOnce(model)
+    #expect(!model.opensAtLogin)
+    services.loginItem = .needsApproval
+    await openMenuOnce(model)
+    #expect(model.loginItem == .needsApproval)
+  }
+
+  /// A read while the user's change is on its way does not undo the switch.
+  @Test func aReadDuringAChangeKeepsTheChosenValue() async {
+    let services = FakeServices(log: log)
+    let model = model(services)
+    await model.launch()
+    services.holdsLoginItemChange = true
+    model.requestOpensAtLogin(false)
+    while services.heldLoginItemChange == nil { await Task.yield() }
+    await model.readLoginItem()
+    #expect(!model.opensAtLogin)
+    services.releaseLoginItemChange()
+    await model.loginItemSettled()
+    #expect(model.loginItem == .disabled)
+  }
+
+  @Test func removeFerryUnregistersALoginItemWaitingForApproval() async {
+    let services = FakeServices(log: log)
+    services.loginItem = .needsApproval
+    let model = model(services)
+    await model.removeFerry()
+    #expect(log.all.contains("opensAtLogin false"))
+  }
+
+  @Test func theFooterSaysWhenApprovalIsNeeded() throws {
+    let detail = try #require(MenuFooter.loginItemDetail(.needsApproval))
+    #expect(String(localized: detail) == "Needs approval in System Settings")
+    #expect(MenuFooter.loginItemDetail(.enabled) == nil)
+    #expect(MenuFooter.loginItemDetail(.disabled) == nil)
+  }
+}
+
 /// The agent says it cannot watch USB: the menu says devices are looked for every 30 s.
 @MainActor
 struct AppModelUSBWatchTests {

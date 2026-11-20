@@ -13,6 +13,14 @@ public enum HelperStatus: Sendable, Equatable {
   case notFound
 }
 
+/// Whether Ferry opens at login, as macOS has it.
+public enum LoginItemStatus: Sendable, Equatable {
+  case disabled
+  case enabled
+  /// Registered, but waiting for the user to allow it in Login Items & Extensions.
+  case needsApproval
+}
+
 /// The system calls `AppModel` makes outside the agent, behind a protocol so tests can check
 /// their order with a fake.
 @MainActor
@@ -22,7 +30,7 @@ public protocol SystemServicing {
   /// What macOS says about the helper now.
   func helperStatus() async -> HelperStatus
   /// Whether Ferry opens at login.
-  func opensAtLogin() async -> Bool
+  func loginItemStatus() async -> LoginItemStatus
   func setOpensAtLogin(_ enabled: Bool) async throws
   func unregisterAgent() async throws
   func open(_ url: URL)
@@ -99,9 +107,13 @@ public final class SystemServices: SystemServicing {
     }.value
   }
 
-  public func opensAtLogin() async -> Bool {
+  public func loginItemStatus() async -> LoginItemStatus {
     await Task.detached(priority: .utility) {
-      SMAppService.mainApp.status == .enabled
+      switch SMAppService.mainApp.status {
+      case .enabled: .enabled
+      case .requiresApproval: .needsApproval
+      default: .disabled
+      }
     }.value
   }
 

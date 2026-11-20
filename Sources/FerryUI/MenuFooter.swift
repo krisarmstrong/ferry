@@ -6,6 +6,12 @@ import SwiftUI
 struct MenuFooter: View {
   static let openAtLoginResource = LocalizedStringResource("Open at Login", bundle: .module)
 
+  /// The line under Open at Login while macOS waits for the user to allow it.
+  static func loginItemDetail(_ status: LoginItemStatus) -> LocalizedStringResource? {
+    status == .needsApproval
+      ? LocalizedStringResource("Needs approval in System Settings", bundle: .module) : nil
+  }
+
   @Environment(\.openWindow) private var openWindow
   let model: AppModel
 
@@ -15,7 +21,15 @@ struct MenuFooter: View {
         isOn: Binding(
           get: { model.opensAtLogin }, set: { model.requestOpensAtLogin($0) })
       ) {
-        Text(Self.openAtLoginResource)
+        // In the label, so VoiceOver reads it with the switch.
+        VStack(alignment: .leading, spacing: 1) {
+          Text(Self.openAtLoginResource)
+          if let detail = Self.loginItemDetail(model.loginItem) {
+            Text(detail)
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
+        }
       }
       .toggleStyle(MenuToggleStyle())
       MenuRow(title: Text("Help", bundle: .module), shortcut: "⌘?") {

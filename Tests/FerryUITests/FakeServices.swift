@@ -7,8 +7,11 @@ import Foundation
 @MainActor
 final class FakeServices: SystemServicing {
   let log: CallLog
-  var loginItem = true
+  var loginItem = LoginItemStatus.enabled
   var failLoginItem = false
+  /// Set: a login item change waits until `releaseLoginItemChange()`.
+  var holdsLoginItemChange = false
+  private(set) var heldLoginItemChange: CheckedContinuation<Void, Never>?
   var helper = HelperStatus.allowed
   /// Whether the app's executable was replaced since launch.
   var replaced = false
@@ -25,15 +28,23 @@ final class FakeServices: SystemServicing {
     helper
   }
 
-  func opensAtLogin() async -> Bool {
+  func loginItemStatus() async -> LoginItemStatus {
     log.record("readLoginItem")
     return loginItem
   }
 
   func setOpensAtLogin(_ enabled: Bool) async throws {
     log.record("opensAtLogin \(enabled)")
+    if holdsLoginItemChange {
+      await withCheckedContinuation { heldLoginItemChange = $0 }
+    }
     if failLoginItem { throw CocoaError(.featureUnsupported) }
-    loginItem = enabled
+    loginItem = enabled ? .enabled : .disabled
+  }
+
+  func releaseLoginItemChange() {
+    heldLoginItemChange?.resume()
+    heldLoginItemChange = nil
   }
 
   func unregisterAgent() async throws {

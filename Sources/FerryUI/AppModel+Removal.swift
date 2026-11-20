@@ -45,7 +45,7 @@ extension AppModel {
     if !preserved.isEmpty {
       services.reveal(preserved)
     }
-    if await services.opensAtLogin() {
+    if await services.loginItemStatus() != .disabled {
       do {
         try await services.setOpensAtLogin(false)
       } catch {
