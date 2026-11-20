@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 
 @testable import PlatformTools
@@ -35,5 +36,12 @@ struct CodeSignatureTests {
     #expect(
       CodeSignature.googleRequirement.contains("certificate leaf[subject.OU] = \"EQHXZ8M8AV\""))
     #expect(CodeSignature.googleRequirement.contains("identifier \"adb\""))
+  }
+}
+
+extension CodeSignatureTests {
+  /// The per-use check stays offline: it never asks Apple about revocation.
+  @Test func theCheckNeverUsesTheNetwork() {
+    #expect(CodeSignature.flags.contains(.noNetworkAccess))
   }
 }

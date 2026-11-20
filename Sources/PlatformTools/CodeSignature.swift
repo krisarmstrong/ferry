@@ -20,6 +20,21 @@ public enum CodeSignature {
     try check(file, requirement: googleRequirement)
   }
 
+  /// Every architecture, strictly, nested code included, and never over the network: the check
+  /// runs offline, as often as the agent looks for adb, and never asks Apple about revocation.
+  static let flags = SecCSFlags(
+    rawValue: SecCSFlags.RawValue(
+      kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode)
+  ).union(.noNetworkAccess)
+
+  /// `checkGoogle`, remembered for a file until it changes on disk.
+  static let googleSigned = VerifiedFiles(check: checkGoogle)
+
+  /// Whether `file` is Google's, checking it again only if it changed since it last passed.
+  public static func isGoogleSigned(_ file: URL) -> Bool {
+    (try? googleSigned.check(file)) != nil
+  }
+
   /// What `codesign --verify --strict -R=<requirement>` checks, without running a process.
   static func check(_ file: URL, requirement text: String) throws(PlatformToolsError) {
     var code: SecStaticCode?
@@ -28,9 +43,6 @@ public enum CodeSignature {
       SecRequirementCreateWithString(text as CFString, [], &requirement) == errSecSuccess,
       let requirement
     else { throw .notSigned }
-    let flags = SecCSFlags(
-      rawValue: SecCSFlags.RawValue(
-        kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode))
     guard SecStaticCodeCheckValidity(code, flags, requirement) == errSecSuccess else {
       throw .notSigned
     }

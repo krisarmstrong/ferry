@@ -4,10 +4,10 @@ import PlatformTools
 /// Finds the `adb` that starts the server and pairs and connects. A server already answering is
 /// used as it is, whichever adb started it, and never needs one; Ferry never stops a server.
 ///
-/// In order: the `adb` Ferry fetched from Google (see `PlatformToolsFetcher`), checked again
-/// against Google's signature before every use, then one already on this Mac, in the places
-/// Homebrew, Android Studio and `ANDROID_HOME` put it. The agent runs without the user's shell, so
-/// there is no `PATH` to search.
+/// In order: the `adb` Ferry fetched from Google (see `PlatformToolsFetcher`), checked against
+/// Google's signature again whenever the file changed since it last passed, then one already on
+/// this Mac, in the places Homebrew, Android Studio and `ANDROID_HOME` put it. The agent runs
+/// without the user's shell, so there is no `PATH` to search.
 public struct ADBLocator: Sendable {
   private let environment: [String: String]
   private let home: String
@@ -20,7 +20,7 @@ public struct ADBLocator: Sendable {
       environment: ProcessInfo.processInfo.environment,
       home: NSHomeDirectory(),
       isExecutable: { FileManager.default.isExecutableFile(atPath: $0) },
-      isGoogleSigned: { (try? CodeSignature.checkGoogle($0)) != nil })
+      isGoogleSigned: CodeSignature.isGoogleSigned)
   }
 
   /// `fetched` defaults to the newest usable version in Ferry's folder under `home`.
