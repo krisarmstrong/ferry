@@ -454,7 +454,7 @@ battery. For a model Ferry knows, every port is listed by the name on the unit, 
 connected** for one that has no address. Ferry only reads them, when you open the device and
 every 10 seconds while the menu stays open.
 
-Click an address to copy it; the line shows **Copied** for a moment. Option-click any line to
+Click an address to copy it; the line shows **Copied** for a moment. Option-click an address to
 copy everything the device reports: model, Android version, build, serial number, battery,
 every address on every port including IPv6, and storage. The line shows **Copied All** for a
 moment.

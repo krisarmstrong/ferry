@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Click an address to copy it; the line shows Copied for a moment. Option-click an address to copy everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage. The line shows Copied All for a moment." : {
+      "extractionState" : "manual"
+    },
     "Needs approval in System Settings" : {
 
     },
@@ -9,9 +12,6 @@
     },
     "Open in Terminal" : {
 
-    },
-    "Click an address to copy it; the line shows Copied for a moment. Option-click any line to copy everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage. The line shows Copied All for a moment." : {
-      "extractionState" : "manual"
     },
     "Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it." : {
       "extractionState" : "manual"
