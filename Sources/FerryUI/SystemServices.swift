@@ -33,8 +33,9 @@ public protocol SystemServicing {
   func startedAgentBuild() -> String?
   func recordStartedAgent(_ build: String)
   /// Stops the running agent and registers the one in the bundle, then has macOS read the
-  /// bundle again, so the extensions it holds are the bundle's too.
-  func restartAgent() async
+  /// bundle again, so the extensions it holds are the bundle's too. False if the new agent could
+  /// not be registered.
+  func restartAgent() async -> Bool
   /// What macOS says about the helper now.
   func helperStatus() async -> HelperStatus
   /// Whether Ferry opens at login.
@@ -126,9 +127,9 @@ public final class SystemServices: SystemServicing {
     UserDefaults.standard.set(build, forKey: Self.startedAgentKey)
   }
 
-  public func restartAgent() async {
+  public func restartAgent() async -> Bool {
     let bundle = Bundle.main.bundleURL
-    await Task.detached(priority: .utility) {
+    return await Task.detached(priority: .utility) {
       let agent = SMAppService.agent(plistName: Self.agentPlist)
       // Waits until launchd has stopped the old agent. Not registered (a first launch) is fine.
       do {
@@ -136,16 +137,20 @@ public final class SystemServices: SystemServicing {
       } catch {
         Self.log.info("unregistering the agent to restart it: \(error, privacy: .public)")
       }
+      let registered: Bool
       do {
         try agent.register()
+        registered = true
       } catch {
         Self.log.error("registering the agent failed: \(error, privacy: .public)")
+        registered = false
       }
       Self.log.info("agent restarted, status: \(Self.describe(agent.status), privacy: .public)")
-      let registered = LSRegisterURL(bundle as CFURL, true)
-      if registered != noErr {
-        Self.log.error("registering the bundle with Launch Services failed: \(registered)")
+      let launchServices = LSRegisterURL(bundle as CFURL, true)
+      if launchServices != noErr {
+        Self.log.error("registering the bundle with Launch Services failed: \(launchServices)")
       }
+      return registered
     }.value
   }
 

@@ -253,14 +253,16 @@ import os
 
   /// Registers the agent, or restarts it when the agent in the bundle is not the one last
   /// started: after an update the old agent keeps running until it stops, and would serve the
-  /// new app and extensions its old code. Without the agent's identity it only registers.
+  /// new app and extensions its old code. Without the agent's identity it only registers. A
+  /// restart that failed to register is not recorded, so the next launch tries again.
   private func startAgent() async {
     guard let build = services.agentBuild(), build != services.startedAgentBuild() else {
       await services.registerAgent()
       return
     }
-    await services.restartAgent()
-    services.recordStartedAgent(build)
+    if await services.restartAgent() {
+      services.recordStartedAgent(build)
+    }
   }
 
   /// The Open at Login row: shows `enabled` at once, then applies it after any change still

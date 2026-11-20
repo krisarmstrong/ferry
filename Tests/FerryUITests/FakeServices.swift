@@ -38,8 +38,12 @@ final class FakeServices: SystemServicing {
     startedAgent = build
   }
 
-  func restartAgent() async {
+  /// Whether a restart registers the new agent.
+  var restartSucceeds = true
+
+  func restartAgent() async -> Bool {
     log.record("restartAgent")
+    return restartSucceeds
   }
 
   func helperStatus() async -> HelperStatus {

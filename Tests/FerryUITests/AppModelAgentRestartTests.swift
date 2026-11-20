@@ -41,6 +41,27 @@ struct AppModelAgentRestartTests {
       log.all == ["restartAgent", "recordStartedAgent agent-1", "status", "readLoginItem"])
   }
 
+  /// A restart that could not register the new agent records nothing, so the next launch tries
+  /// again; meanwhile the menu shows the helper as unreachable, as for any agent that is down.
+  @Test func aFailedRestartIsRetriedAtTheNextLaunch() async {
+    let services = FakeServices(log: log)
+    services.agentOnDisk = "agent-2"
+    services.startedAgent = "agent-1"
+    services.restartSucceeds = false
+    let model = AppModel(client: UnreachableClient(), services: services)
+    await model.launch()
+    #expect(log.all == ["restartAgent", "readLoginItem"])
+    #expect(services.startedAgent == "agent-1")
+    #expect(model.agent == .unreachable)
+
+    services.restartSucceeds = true
+    await AppModel(client: FakeClient(log: log), services: services).launch()
+    #expect(
+      log.all.suffix(4) == [
+        "restartAgent", "recordStartedAgent agent-2", "status", "readLoginItem",
+      ])
+  }
+
   /// Without the agent's identity there is nothing to compare: registering is harmless, and a
   /// restart on every launch would cut off every transfer at each one.
   @Test func unreadableAgentIsOnlyRegistered() async {
