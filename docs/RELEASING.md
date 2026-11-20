@@ -4,9 +4,10 @@ Releases come from release-please and `.github/workflows/release.yml`; nobody ta
 
 ## Once
 
-1. `scripts/repo-settings.sh`: the `release` environment (deployments from `main` and `v*`
-   tags only), a ruleset that keeps `v*` tags from being moved or deleted, and branch protection
-   requiring the CI `check`.
+1. `scripts/repo-settings.sh`: the `release` environment (deployments from `main` only, no
+   required reviewers, so releases stay automatic), a ruleset that lets only GitHub Actions
+   create `v*` tags and nobody move or delete them, and branch protection requiring the CI
+   `check`.
 2. `scripts/release-secrets.sh <developer-id.p12> <AuthKey_….p8>`: the signing, notarization and
    Sparkle secrets, in the `release` environment, and the Sparkle public key in `project.yml`
    (commit it through a PR).

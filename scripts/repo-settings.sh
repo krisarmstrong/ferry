@@ -2,42 +2,63 @@
 # The repository settings releases rely on. Run it yourself (it changes settings of
 # krisarmstrong/ferry with your gh login); running it again sets the same values.
 #
-# 1. A `release` environment that only main and v* tags may deploy from. The release secrets
-#    live there (scripts/release-secrets.sh), so no other branch or workflow can read them.
-# 2. A ruleset on v* tags: once release-please has made one, nobody can move or delete it.
+# 1. A `release` environment that only the main branch may deploy from. The release secrets
+#    live there (scripts/release-secrets.sh). The release job runs from the push to main that
+#    created the release, so its ref is main; no tag and no other branch can reach the secrets.
+#    There are no required reviewers: releases are fully automatic, by the owner's choice. The
+#    cost is that whatever lands on main is signed and shipped without a human approving the
+#    release run, so main's protection (3) is the gate.
+# 2. A ruleset on v* tags: nobody creates, moves or deletes one except GitHub Actions, through
+#    which release-please tags each release. GitHub cannot narrow that bypass to one workflow:
+#    any workflow with contents: write could create a v* tag, but such a tag never reaches the
+#    secrets (1), and the release job also checks the tag is release-please's draft on main.
 # 3. Branch protection on main: the CI `check` must pass, on an up-to-date branch.
 #
 # Usage: scripts/repo-settings.sh
 set -euo pipefail
 
 repo=krisarmstrong/ferry
+# The GitHub Actions app, whose GITHUB_TOKEN release-please uses.
+actions_app_id=15368
 
 gh api -X PUT "repos/$repo/environments/release" --input - > /dev/null << 'JSON'
 {"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}
 JSON
-existing="$(gh api "repos/$repo/environments/release/deployment-branch-policies" \
-  --jq '.branch_policies[] | "\(.type) \(.name)"')"
-for policy in "branch main" "tag v*"; do
-  grep -qxF "$policy" <<< "$existing" && continue
+policies="$(gh api "repos/$repo/environments/release/deployment-branch-policies" \
+  --jq '.branch_policies[] | "\(.id) \(.type) \(.name)"')"
+main_allowed=no
+while read -r id type name; do
+  [ -n "$id" ] || continue
+  if [ "$type" = branch ] && [ "$name" = main ]; then
+    main_allowed=yes
+  else
+    gh api -X DELETE "repos/$repo/environments/release/deployment-branch-policies/$id"
+    echo "removed the release environment's $type policy $name"
+  fi
+done <<< "$policies"
+if [ "$main_allowed" = no ]; then
   gh api -X POST "repos/$repo/environments/release/deployment-branch-policies" \
-    -f type="${policy%% *}" -f name="${policy#* }" > /dev/null
-done
-echo "release environment: deployments from main and v* tags only"
+    -f type=branch -f name=main > /dev/null
+fi
+echo "release environment: deployments from main only, no required reviewers"
 
-ruleset='{
-  "name": "Release tags",
-  "target": "tag",
-  "enforcement": "active",
-  "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
-  "rules": [{"type": "deletion"}, {"type": "update"}, {"type": "non_fast_forward"}]
-}'
+ruleset="{
+  \"name\": \"Release tags\",
+  \"target\": \"tag\",
+  \"enforcement\": \"active\",
+  \"conditions\": {\"ref_name\": {\"include\": [\"refs/tags/v*\"], \"exclude\": []}},
+  \"rules\": [{\"type\": \"creation\"}, {\"type\": \"update\"}, {\"type\": \"deletion\"},
+    {\"type\": \"non_fast_forward\"}],
+  \"bypass_actors\": [{\"actor_id\": $actions_app_id, \"actor_type\": \"Integration\",
+    \"bypass_mode\": \"always\"}]
+}"
 id="$(gh api "repos/$repo/rulesets" --jq '.[] | select(.name == "Release tags") | .id')"
 if [ -n "$id" ]; then
   gh api -X PUT "repos/$repo/rulesets/$id" --input - <<< "$ruleset" > /dev/null
 else
   gh api -X POST "repos/$repo/rulesets" --input - <<< "$ruleset" > /dev/null
 fi
-echo "v* tags: no deletion, no update"
+echo "v* tags: created only by GitHub Actions; never updated or deleted"
 
 gh api -X PUT "repos/$repo/branches/main/protection" --input - > /dev/null << 'JSON'
 {"required_status_checks": {"strict": true, "contexts": ["check"]},
