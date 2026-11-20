@@ -70,7 +70,7 @@ fi
 echo "v* tags: created only by GitHub Actions; never updated or deleted"
 
 gh api -X PUT "repos/$repo/branches/main/protection" --input - > /dev/null << JSON
-{"required_status_checks": {"strict": true,
+{"required_status_checks": {"strict": true, "contexts": [],
    "checks": [{"context": "check", "app_id": $actions_app_id}]},
  "enforce_admins": false, "required_pull_request_reviews": null, "restrictions": null}
 JSON
