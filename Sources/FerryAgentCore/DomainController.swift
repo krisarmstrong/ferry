@@ -11,6 +11,9 @@ public protocol DomainManaging: Sendable {
   func add(_ spec: DomainSpec) async throws
   func disconnect(_ identifier: String) async throws
   func reconnect(_ identifier: String) async throws
+  /// Hides the domain from Finder, or shows it again. The domain, its files and its unsent
+  /// changes stay: only whether Finder lists it changes.
+  func setHidden(_ identifier: String, hidden: Bool) async throws
   /// Removes the domain, keeping changes not yet sent to the device, and returns where they were
   /// saved, if there were any.
   func remove(_ identifier: String) async throws -> URL?
@@ -38,11 +41,12 @@ extension DomainManaging {
 /// change how it reaches the device (MTP or ADB) between requests without touching the domain.
 ///
 /// A domain is added the first time its storage is ready. When the device leaves (unplugged,
-/// locked, not sharing files, failed) its domains are disconnected, never removed, so a replug
-/// reconnects the same domain. Only `eject` and `removeAll` remove domains.
+/// locked, not sharing files, failed) its domains are disconnected and hidden from Finder, never
+/// removed, so a replug reconnects and shows the same domain. Finder shows a device only while
+/// it can be reached. Only `eject` and `removeAll` remove domains.
 ///
 /// At start, every domain the system already has (from before an agent restart) is disconnected
-/// until its device is ready again. After `removeAll` the controller adds nothing more, so Remove
+/// and hidden until its device is ready again. After `removeAll` the controller adds nothing more, so Remove
 /// Ferry leaves no domain behind however long the agent takes to stop.
 ///
 /// Each domain has one `ItemTable`, loaded from the store when first used. It outlives a
@@ -71,6 +75,10 @@ public actor DomainController {
     var spec: DomainSpec?
     var storage: StorageID?
     var connected: Bool
+    /// Whether the system hides the domain from Finder, as far as the controller knows. It
+    /// should be hidden exactly while not connected; `showOnlyConnected()` mends a difference
+    /// a failed request left.
+    var hidden: Bool
   }
 
   let hub: DeviceHub
@@ -242,13 +250,14 @@ public actor DomainController {
     for device in moved {
       await resync(device)
     }
+    await showOnlyConnected()
   }
 
   private func connect(_ spec: DomainSpec, _ storage: StorageID) async {
     let identifier = spec.identifier
     guard var existing = domains[identifier] else {
       guard await isServed(storage.device) else { return }
-      domains[identifier] = Domain(spec: spec, storage: storage, connected: true)
+      domains[identifier] = Domain(spec: spec, storage: storage, connected: true, hidden: false)
       publishLocations()
       do {
         try await manager.add(spec)
@@ -277,6 +286,7 @@ public actor DomainController {
         domains[identifier]?.connected = false
         return
       }
+      await setHidden(identifier, false)
       // The device may have changed while it was away, so the folders Finder knows are listed
       // again first. FileProvider asks for changes only when signalled. An anchor from before the
       // disconnect may be stale (a new agent process expires every old anchor), so it asks now
@@ -312,6 +322,8 @@ public actor DomainController {
       log.error(
         "disconnecting domain \(identifier, privacy: .private) failed: \(error, privacy: .private)")
     }
+    // Hidden even if the disconnect failed, as for a domain the system already had disconnected.
+    await setHidden(identifier, true)
   }
 
 }
