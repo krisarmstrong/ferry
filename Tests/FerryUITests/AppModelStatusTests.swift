@@ -148,6 +148,25 @@ struct AppModelLoginItemStatusTests {
     #expect(model.loginItem == .disabled)
   }
 
+  /// A change the user makes while the read is on its way wins: the read's older answer is
+  /// dropped.
+  @Test(.timeLimit(.minutes(1))) func aChangeDuringTheReadDropsItsAnswer() async throws {
+    let services = FakeServices(log: log)
+    let model = model(services)
+    await model.launch()
+    #expect(model.loginItem == .enabled)
+    services.holdsNextLoginItemRead = true
+    defer { services.releaseLoginItemRead() }
+    var held = services.loginItemReadsHeld.makeAsyncIterator()
+    let read = Task { await model.readLoginItem() }
+    try #require(await held.next() != nil)
+    model.requestOpensAtLogin(false)
+    await model.loginItemSettled()
+    services.releaseLoginItemRead()
+    await read.value
+    #expect(model.loginItem == .disabled)
+  }
+
   @Test func removeFerryUnregistersALoginItemWaitingForApproval() async {
     let services = FakeServices(log: log)
     services.loginItem = .needsApproval
