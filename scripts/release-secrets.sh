@@ -17,16 +17,61 @@ set -euo pipefail
 umask 077
 cd "$(dirname "$0")/.."
 
+repo=krisarmstrong/ferry
+names=(DEVELOPER_ID_P12_BASE64 DEVELOPER_ID_P12_PASSWORD NOTARY_KEY_ID NOTARY_ISSUER_ID
+  NOTARY_KEY_P8 SPARKLE_PRIVATE_KEY)
+
+# Only the release environment may hold the release secrets: a repository secret of the same
+# name would reach every workflow on every branch. Removes any, then makes sure none is left.
+# Runs first on every run, and alone with --cleanup-only.
+remove_repository_copies() {
+  local name repository_secrets
+  for name in "${names[@]}"; do
+    gh secret delete "$name" --repo "$repo" 2> /dev/null || true
+  done
+  repository_secrets="$(gh secret list --repo "$repo" --json name --jq '.[].name')"
+  for name in "${names[@]}"; do
+    if grep -qxF "$name" <<< "$repository_secrets"; then
+      echo "error: $name is still a repository secret; delete it in the repository's settings" >&2
+      exit 1
+    fi
+  done
+  echo "No release secret is stored at repository level. If one ever was, rotate that key or"
+  echo "certificate: any workflow on any branch could have read it."
+}
+
+if [ "${1:-}" = --cleanup-only ] && [ "$#" -eq 1 ]; then
+  remove_repository_copies
+  exit 0
+fi
 if [ "$#" -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
   echo "usage: $0 <developer-id.p12> <AuthKey_XXXXXXXXXX.p8>  (both files must exist)" >&2
+  echo "       $0 --cleanup-only   (only remove repository-level copies of the secrets)" >&2
   exit 2
 fi
+
+# The secrets go only into a release environment that main alone may deploy from
+# (scripts/repo-settings.sh). A release run on main before that script ran would have created
+# the environment with no policy, open to every branch.
+environment="$(gh api "repos/$repo/environments/release" \
+  --jq '"\(.deployment_branch_policy.protected_branches) \(.deployment_branch_policy.custom_branch_policies)"' \
+  2> /dev/null)" || environment=""
+policies="$(gh api "repos/$repo/environments/release/deployment-branch-policies" \
+  --jq '[.branch_policies[] | "\(.type) \(.name)"] | join(",")' 2> /dev/null)" || policies=""
+if [ "$environment" != "false true" ] || [ "$policies" != "branch main" ]; then
+  echo "error: the release environment must exist and admit only the main branch" >&2
+  echo "(found: ${environment:-no environment}; policies: ${policies:-none})." >&2
+  echo "Run scripts/repo-settings.sh first." >&2
+  exit 1
+fi
+
+remove_repository_copies
+
 grep -q '^      FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER$' project.yml || {
   echo "error: project.yml no longer has the key placeholder; the Sparkle key is already set" >&2
   exit 1
 }
 
-repo=krisarmstrong/ferry
 p12="$1"
 p8="$2"
 sparkle_version=2.10.1
@@ -75,22 +120,6 @@ grep -qxF "      FERRY_SPARKLE_PUBLIC_KEY: $public_key" project.yml || {
 
 gh secret list --repo "$repo" --env release
 
-# Only the release environment may hold them: a repository secret of the same name would reach
-# every workflow and branch. Remove any, then make sure none is left.
-names=(DEVELOPER_ID_P12_BASE64 DEVELOPER_ID_P12_PASSWORD NOTARY_KEY_ID NOTARY_ISSUER_ID
-  NOTARY_KEY_P8 SPARKLE_PRIVATE_KEY)
-for name in "${names[@]}"; do
-  gh secret delete "$name" --repo "$repo" 2> /dev/null || true
-done
-repository_secrets="$(gh secret list --repo "$repo" --json name --jq '.[].name')"
-for name in "${names[@]}"; do
-  if grep -qxF "$name" <<< "$repository_secrets"; then
-    echo "error: $name is still a repository secret; delete it in the repository's settings" >&2
-    exit 1
-  fi
-done
-echo "No release secret is stored at repository level. If one ever was, rotate that key or"
-echo "certificate: any workflow on any branch could have read it."
 echo
 echo "Sparkle public key: $public_key (now in project.yml; commit it on a branch and open a PR)."
 echo "Back up the private key: Keychain Access, login keychain, \"Private key for signing Sparkle updates\""
