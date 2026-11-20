@@ -68,7 +68,7 @@ fi
 echo "v* tags: never updated or deleted (creation is open: see the note above)"
 
 gh api -X PUT "repos/$repo/branches/main/protection" --input - > /dev/null << JSON
-{"required_status_checks": {"strict": true, "contexts": [],
+{"required_status_checks": {"strict": true,
    "checks": [{"context": "check", "app_id": $actions_app_id}]},
  "enforce_admins": false, "required_pull_request_reviews": null, "restrictions": null}
 JSON
