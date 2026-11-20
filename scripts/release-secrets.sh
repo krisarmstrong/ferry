@@ -21,7 +21,7 @@ if [ "$#" -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
   echo "usage: $0 <developer-id.p12> <AuthKey_XXXXXXXXXX.p8>  (both files must exist)" >&2
   exit 2
 fi
-grep -q '^    FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER$' project.yml || {
+grep -q '^      FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER$' project.yml || {
   echo "error: project.yml no longer has the key placeholder; the Sparkle key is already set" >&2
   exit 1
 }
@@ -65,9 +65,9 @@ tar -xJf "$tools/sparkle.tar.xz" -C "$tools"
 gh secret set SPARKLE_PRIVATE_KEY --repo "$repo" --env release < "$tools/sparkle-private-key"
 public_key="$("$tools/bin/generate_keys" --account "$sparkle_account" -p)"
 PUBLIC_KEY="$public_key" perl -pi -e \
-  's/^(    FERRY_SPARKLE_PUBLIC_KEY: )FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER$/$1$ENV{PUBLIC_KEY}/' \
+  's/^(      FERRY_SPARKLE_PUBLIC_KEY: )FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER$/$1$ENV{PUBLIC_KEY}/' \
   project.yml
-grep -qxF "    FERRY_SPARKLE_PUBLIC_KEY: $public_key" project.yml || {
+grep -qxF "      FERRY_SPARKLE_PUBLIC_KEY: $public_key" project.yml || {
   echo "error: the public key did not reach project.yml; set FERRY_SPARKLE_PUBLIC_KEY to" >&2
   echo "$public_key by hand" >&2
   exit 1

@@ -79,6 +79,21 @@ struct UpdateFeedTests {
     #expect(project.contains("\n    FERRY_FEED_URL: \(Self.feed)\n"))
   }
 
+  /// Only a Release build carries the key, so a Debug build never starts Sparkle and never
+  /// replaces itself with a release.
+  @Test func onlyTheReleaseConfigurationHasTheKey() throws {
+    let lines = try String(
+      contentsOf: Self.root.appending(path: "project.yml"), encoding: .utf8
+    ).split(separator: "\n", omittingEmptySubsequences: false)
+    let keys = lines.indices.filter { lines[$0].contains("FERRY_SPARKLE_PUBLIC_KEY:") }
+    #expect(keys.count == 1)
+    let key = try #require(keys.first)
+    #expect(lines[key].hasPrefix("      FERRY_SPARKLE_PUBLIC_KEY: "))
+    let release = try #require(lines.firstIndex(of: "    Release:"))
+    #expect(release > 0 && lines[release - 1] == "  configs:")
+    #expect(release < key && lines[release..<key].allSatisfy { $0.hasPrefix("    ") })
+  }
+
   /// Sparkle comes from SwiftPM at the commit of its 2.10.1 tag, not the tag, which could be
   /// moved: that commit's Package.swift fixes the framework's checksum. Only the app links it.
   @Test func sparkleIsPinnedByRevision() throws {

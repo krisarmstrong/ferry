@@ -37,10 +37,6 @@ settings:
     CURRENT_PROJECT_VERSION: "0.1.0" # x-release-please-version
     # Where Sparkle reads the releases: the appcast attached to the latest GitHub release.
     FERRY_FEED_URL: https://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xml
-    # The public half of the Sparkle EdDSA key that signs releases (scripts/release-secrets.sh
-    # prints it). Until it replaces the placeholder the app has no updates, and
-    # `make check-app CONFIG=Release` fails.
-    FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER
   # A release is signed with Developer ID for notarization (scripts/release-build.sh).
   configs:
     Release:
@@ -50,6 +46,11 @@ settings:
       OTHER_CODE_SIGN_FLAGS: --timestamp
       # No get-task-allow: notarization refuses it, and it would let a debugger attach.
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+      # The public half of the Sparkle EdDSA key that signs releases (scripts/release-secrets.sh
+      # writes it here). Release only: a Debug build has no key, so Sparkle never starts in it.
+      # Until it replaces the placeholder no build has updates, and a team release build fails
+      # `make check-app CONFIG=Release`.
+      FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER
 
 targets:
   Ferry:
