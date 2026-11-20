@@ -105,6 +105,9 @@ import os
   /// Read from the system once launched (see `launch()`) and each time the menu opens; off
   /// until then.
   public private(set) var loginItem = LoginItemStatus.disabled
+  /// Set by the app when the build can update itself; the menu shows Check for Updates… only
+  /// then.
+  public var updater: (any UpdateChecking)?
   /// The login item change being applied, how many have been requested, and how many applied.
   private var loginItemChange: Task<Void, Never>?
   private var loginItemRequests = 0

@@ -34,16 +34,19 @@ forwarding. It is free and open source (MIT), and it sends nothing to any server
 
 ## Install
 
-There is no published release yet; build Ferry from source (below).
-
-1. Run `make app`, then move `Ferry.app` from `.build/xcode/Build/Products/Debug` to
-   **Applications** and open it.
+1. Download `Ferry-<version>.dmg` (or the `.zip`) from the
+   [latest release](https://github.com/krisarmstrong/ferry/releases/latest), drag **Ferry** to
+   **Applications** and open it. Releases are signed with a Developer ID and notarized by Apple.
+   To build Ferry yourself instead, see [Build from source](#build-from-source).
 2. In **System Settings → General → Login Items & Extensions**, turn on **Ferry** under
    **File Providers**. The Ferry menu has a button that opens the right page.
 3. For **Send to** in Finder's Control-click menu, turn on Ferry's Finder extension on the same
    page, under **Extensions**.
 
-A signed release DMG and a Homebrew cask are planned.
+Ferry updates itself. It checks GitHub once a day, downloads a new release in the background
+and installs it when Ferry quits; **Check for Updates…** in the menu checks now. Every update
+must carry Ferry's EdDSA release signature and the same Developer ID as the installed copy. See
+[Updates](docs/user-guide.md#updates).
 
 ## Quick start
 

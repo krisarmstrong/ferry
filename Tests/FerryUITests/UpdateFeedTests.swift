@@ -1,0 +1,79 @@
+import Foundation
+import Testing
+
+@testable import FerryUI
+
+/// Ferry starts its updater only with a feed and a usable public key: a build still carrying the
+/// placeholder key has no updates, rather than an updater that fails at every launch.
+@MainActor
+struct UpdateFeedTests {
+  private static let root = URL(filePath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+  private static let key = Data(repeating: 7, count: 32).base64EncodedString()
+  private static let feed =
+    "https://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xml"
+
+  @Test func aFeedAndAKeyMakeAnUpdateFeed() throws {
+    let found = try #require(UpdateFeed(info: ["SUFeedURL": Self.feed, "SUPublicEDKey": Self.key]))
+    #expect(found.url.absoluteString == Self.feed)
+  }
+
+  @Test(arguments: [
+    "FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER", "", Data(repeating: 7, count: 31).base64EncodedString(),
+    "$(FERRY_SPARKLE_PUBLIC_KEY)",
+  ])
+  func anUnusableKeyMeansNoUpdates(key: String) {
+    #expect(UpdateFeed(info: ["SUFeedURL": Self.feed, "SUPublicEDKey": key]) == nil)
+  }
+
+  @Test func aMissingFeedOrKeyMeansNoUpdates() {
+    #expect(UpdateFeed(info: ["SUPublicEDKey": Self.key]) == nil)
+    #expect(UpdateFeed(info: ["SUFeedURL": Self.feed]) == nil)
+    #expect(UpdateFeed(info: ["SUFeedURL": "not a url", "SUPublicEDKey": Self.key]) == nil)
+  }
+
+  @Test func checkForUpdatesAsksTheUpdater() {
+    let log = CallLog()
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    let updater = FakeUpdater(log: log)
+    model.updater = updater
+    model.checkForUpdates()
+    #expect(log.all == ["checkForUpdates"])
+  }
+
+  /// The settings Sparkle reads: the stable feed of the latest GitHub release, over HTTPS; a
+  /// daily check; downloads in the background, installed when Ferry quits; a signed feed.
+  @Test func theAppAsksSparkleForDailySilentSignedUpdates() throws {
+    let data = try Data(contentsOf: Self.root.appending(path: "Apps/Ferry/Info.plist"))
+    let info = try #require(
+      try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+    #expect(info["SUFeedURL"] as? String == "$(FERRY_FEED_URL)")
+    #expect(info["SUPublicEDKey"] as? String == "$(FERRY_SPARKLE_PUBLIC_KEY)")
+    #expect(info["SUEnableAutomaticChecks"] as? Bool == true)
+    #expect(info["SUAutomaticallyUpdate"] as? Bool == true)
+    #expect(info["SUScheduledCheckInterval"] as? Int == 86_400)
+    #expect(info["SURequireSignedFeed"] as? Bool == true)
+    #expect(info["SUVerifyUpdateBeforeExtraction"] as? Bool == true)
+    #expect(info["SUEnableSystemProfiling"] as? Bool == false)
+    let project = try String(
+      contentsOf: Self.root.appending(path: "project.yml"), encoding: .utf8)
+    #expect(project.contains("\n    FERRY_FEED_URL: \(Self.feed)\n"))
+  }
+
+  /// Sparkle comes from SwiftPM at one exact version, and only the app links it.
+  @Test func sparkleIsPinnedExactly() throws {
+    let project = try String(
+      contentsOf: Self.root.appending(path: "project.yml"), encoding: .utf8)
+    #expect(
+      project.contains(
+        "  Sparkle:\n    url: https://github.com/sparkle-project/Sparkle\n    exactVersion: 2.10.1\n"
+      ))
+  }
+}
+
+@MainActor
+final class FakeUpdater: UpdateChecking {
+  let log: CallLog
+  init(log: CallLog) { self.log = log }
+  func checkForUpdates() { log.record("checkForUpdates") }
+}

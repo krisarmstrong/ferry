@@ -9,6 +9,10 @@ options:
 packages:
   Ferry:
     path: .
+  # Updates. Only the app links it.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
 
 settings:
   base:
@@ -28,6 +32,12 @@ settings:
     MARKETING_VERSION: "0.1.0" # x-release-please-version
     # Sparkle compares CFBundleVersion: it moves with the version on every release.
     CURRENT_PROJECT_VERSION: "0.1.0" # x-release-please-version
+    # Where Sparkle reads the releases: the appcast attached to the latest GitHub release.
+    FERRY_FEED_URL: https://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xml
+    # The public half of the Sparkle EdDSA key that signs releases (scripts/release-secrets.sh
+    # prints it). Until it replaces the placeholder the app has no updates, and
+    # `make check-app CONFIG=Release` fails.
+    FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER
 
 targets:
   Ferry:
@@ -73,6 +83,7 @@ targets:
         product: FerryUI
       - package: Ferry
         product: FerryIPC
+      - package: Sparkle
       - target: FerryAgent
         embed: true
         codeSign: false

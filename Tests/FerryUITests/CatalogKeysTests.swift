@@ -68,6 +68,8 @@ struct CatalogKeysTests {
     #expect(keys.contains(MenuFooter.openAtLoginResource.key))
     #expect(String(localized: MenuFooter.openAtLoginResource) == "Open at Login")
     #expect(!keys.contains("Open at login"))
+    #expect(keys.contains(MenuFooter.checkForUpdatesResource.key))
+    #expect(String(localized: MenuFooter.checkForUpdatesResource) == "Check for Updates…")
     #expect(!keys.contains("Settings…"))
   }
 

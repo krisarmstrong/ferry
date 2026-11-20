@@ -1,10 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// The rows at the foot of the menu: Open at Login, Help and Quit Ferry. Ferry has no Settings
-/// window; Remove Ferry… is in Help, under Troubleshooting.
+/// The rows at the foot of the menu: Open at Login, Check for Updates… (in a build that can
+/// update itself), Help and Quit Ferry. Ferry has no Settings window; Remove Ferry… is in Help,
+/// under Troubleshooting.
 struct MenuFooter: View {
   static let openAtLoginResource = LocalizedStringResource("Open at Login", bundle: .module)
+  static let checkForUpdatesResource = LocalizedStringResource(
+    "Check for Updates…", bundle: .module)
 
   /// The line under Open at Login while macOS waits for the user to allow it.
   static func loginItemDetail(_ status: LoginItemStatus) -> LocalizedStringResource? {
@@ -32,6 +35,11 @@ struct MenuFooter: View {
         }
       }
       .toggleStyle(MenuToggleStyle())
+      if model.updater != nil {
+        MenuRow(title: Text(Self.checkForUpdatesResource)) {
+          model.checkForUpdates()
+        }
+      }
       MenuRow(title: Text("Help", bundle: .module), shortcut: "⌘?") {
         NSApp.activate()
         openWindow(id: HelpView.windowID)

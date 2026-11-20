@@ -15,6 +15,7 @@ struct FerryApp: App {
       preconditionFailure("FerryTeamID is missing from Ferry's Info.plist")
     }
     let model = AppModel(client: AgentClient(identity: identity), services: SystemServices())
+    model.updater = SparkleUpdates()
     _model = State(initialValue: model)
     // Registers the agent and reads the status once, so the log shows the devices before the
     // menu first opens. The system calls run off the main thread.
