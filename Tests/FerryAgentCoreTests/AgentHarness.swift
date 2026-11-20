@@ -51,10 +51,11 @@ actor FakeDomainManager: DomainManaging {
     registered = Set(existing)
   }
 
-  /// A new domain is shown; adding an existing one again leaves it shown or hidden, as the
-  /// system does for an add that only renames.
+  /// The domain is shown: `DomainManaging.add` adds a shown domain, and an add for an existing
+  /// identifier sets its hidden state too (`NSFileProviderManager.h`, `addDomain:`).
   func add(_ spec: DomainSpec) async throws {
     registered.insert(spec.identifier)
+    hidden.remove(spec.identifier)
     record(.add(spec))
   }
   func disconnect(_ identifier: String) async throws { record(.disconnect(identifier)) }
