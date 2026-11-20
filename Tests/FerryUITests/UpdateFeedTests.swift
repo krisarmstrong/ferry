@@ -32,6 +32,25 @@ struct UpdateFeedTests {
     #expect(UpdateFeed(info: ["SUFeedURL": "not a url", "SUPublicEDKey": Self.key]) == nil)
   }
 
+  /// Only HTTPS reaches the network. Plain HTTP is allowed to this Mac alone, where
+  /// scripts/update-dry-run.sh serves its test feed; the release check requires the HTTPS feed.
+  @Test(arguments: [
+    "http://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xml",
+    "http://192.168.1.10:8765/appcast.xml", "http://127.0.0.1.example.com/appcast.xml",
+    "ftp://example.com/appcast.xml", "file:///tmp/appcast.xml",
+  ])
+  func aFeedThatIsNotHTTPSMeansNoUpdates(feed: String) {
+    #expect(UpdateFeed(info: ["SUFeedURL": feed, "SUPublicEDKey": Self.key]) == nil)
+  }
+
+  @Test(arguments: [
+    "http://127.0.0.1:8765/appcast.xml", "http://[::1]:8765/appcast.xml",
+    "http://localhost:8765/appcast.xml",
+  ])
+  func aLoopbackFeedIsAllowed(feed: String) {
+    #expect(UpdateFeed(info: ["SUFeedURL": feed, "SUPublicEDKey": Self.key]) != nil)
+  }
+
   @Test func checkForUpdatesAsksTheUpdater() {
     let log = CallLog()
     let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
