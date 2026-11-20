@@ -97,10 +97,11 @@ struct DomainControllerHiddenTests {
     #expect(await harness.manager.waitUntilHidden([domain]) == [domain])
   }
 
-  /// A request on a domain whose device is away fails at once with `.deviceDisconnected`, which
-  /// the extension shows with the domain's "Connect the device" reason, without asking the
-  /// device or waiting for it. The suite's time limit is the bound on "at once".
-  @Test func aRequestOnAHiddenDomainFailsAtOnce() async throws {
+  /// A request the extension sends on a hidden domain's behalf (FileProvider may still ask
+  /// before the hide lands) fails with `.deviceDisconnected`, which the extension shows with the
+  /// domain's "Connect the device" reason, within a short bound and without waiting for the
+  /// device. Finder's own reads of a disconnected domain never reach the agent at all.
+  @Test func aRouteOnAHiddenDomainFailsWithinABound() async throws {
     let device = await makeDevice("A")
     let harness = try AgentHarness(devices: [device])
     defer { harness.finish() }
@@ -109,9 +110,13 @@ struct DomainControllerHiddenTests {
     harness.tick()
     _ = await harness.barrier(after: 2)
 
-    #expect(
-      await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
-        == .failure(.deviceDisconnected))
+    var response: AgentResponse?
+    let elapsed = await ContinuousClock().measure {
+      response = await harness.service.handle(
+        .list(domain: domainID(device), folder: .root), file: nil)
+    }
+    #expect(response == .failure(.deviceDisconnected))
+    #expect(elapsed < .seconds(2))
   }
 
   /// An ejected device leaves Finder (its domain is removed, keeping unsent changes) and Mount
