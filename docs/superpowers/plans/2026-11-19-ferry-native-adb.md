@@ -1,5 +1,7 @@
 # Ferry Native ADB Engine Implementation Plan
 
+> **Shelved 2026-11-20 (owner).** Ferry bundles adb inside Ferry.app instead (plan 2026-11-18 Task 22). This plan stays as the route back if a real need for an adb-free engine appears.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ferry speaks ADB to Android devices itself, over USB, plain TCP and (Android 11+) TLS, so every ADB feature works with no `adb` installed and no adb server running, while a server the user started keeps working beside it.
