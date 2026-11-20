@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.3.0](https://github.com/krisarmstrong/ferry/compare/v0.2.1...v0.3.0) (2026-11-20)
+
+
+### Features
+
+* **adb:** fetch Google's adb on first use ([d9365bc](https://github.com/krisarmstrong/ferry/commit/d9365bc2007644db3a6006ce6482097194d3606f))
+* **adb:** fetch Google's platform tools, pinned and verified ([902566a](https://github.com/krisarmstrong/ferry/commit/902566a07febd333d2f6dcf8802c6c179025f9d3))
+* **adb:** find Ferry's fetched adb before the Mac's own ([b0d2423](https://github.com/krisarmstrong/ferry/commit/b0d24236950b282a99972fab881515b2c2acd72d))
+* **menu:** Get Android Platform Tools replaces the brew install line ([2396f95](https://github.com/krisarmstrong/ferry/commit/2396f956786644510086820c56bbb6128406fc33))
+
+
+### Bug Fixes
+
+* **adb:** a stalled adb download gives up after five minutes ([1113e38](https://github.com/krisarmstrong/ferry/commit/1113e38e7c01daf6d7f4ffd2550554a7f4ed28cf))
+* **adb:** bound the download and keep it on Google's hosts ([c3b5567](https://github.com/krisarmstrong/ferry/commit/c3b5567af0648d862d0c96e689077fd47693b8d3))
+* **adb:** check adb's signature offline, once per file change ([b40fff8](https://github.com/krisarmstrong/ferry/commit/b40fff829912874ab44a3458d6727bbe80732a70))
+* **adb:** keep Ferry's platform-tools folder private and the user's own ([846ed4a](https://github.com/krisarmstrong/ferry/commit/846ed4a577caa91adf4b908e43998caebad4bee8))
+* **adb:** never start a server while one answers ([9fd9ac1](https://github.com/krisarmstrong/ferry/commit/9fd9ac144a67caad12701eef28f2cfe9d15f9c8f))
+* **adb:** show Google's current SDK license; ask again for a new text ([805b973](https://github.com/krisarmstrong/ferry/commit/805b973a1d3e838cb4f30915d7619e8ad634c7bb))
+* **adb:** zip reader checks local headers, duplicates and names ([3541522](https://github.com/krisarmstrong/ferry/commit/3541522be22abb13ee9c96ec43962fd4d31acf46))
+* Check Again during a scan, the flaky hub test, release-PR check ([c111cfa](https://github.com/krisarmstrong/ferry/commit/c111cfac3fe35b5938cf8bc729193a032ba08483))
+* **menu:** a failed adb download clears once adb turns up ([38eefde](https://github.com/krisarmstrong/ferry/commit/38eefdecd4ac26e521250f150136650ee477759e))
+* **menu:** Accept during a quiet adb update takes it over ([f9504fe](https://github.com/krisarmstrong/ferry/commit/f9504fe3b6bd908812de9f6db20b2cbc09883394))
+* **menu:** the adb line never stays on Downloading after its fetch ([5d6eb54](https://github.com/krisarmstrong/ferry/commit/5d6eb54872edc6a74b681787f529aafa97fd10da))
+* **mtp:** let Check Again take its turn after a scan under way ([4cb734a](https://github.com/krisarmstrong/ferry/commit/4cb734a08125aef1411d77d58d10abf5e71539c1))
+
 ## [0.2.1](https://github.com/krisarmstrong/ferry/compare/v0.2.0...v0.2.1) (2026-11-20)
 
 

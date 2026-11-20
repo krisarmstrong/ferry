@@ -32,9 +32,9 @@ settings:
     # Off for development: the agent loads Homebrew's libmtp, which library validation would
     # refuse. A release build bundles libmtp, signed by the team, and turns it on (configs).
     ENABLE_HARDENED_RUNTIME: NO
-    MARKETING_VERSION: "0.2.1" # x-release-please-version
+    MARKETING_VERSION: "0.3.0" # x-release-please-version
     # Sparkle compares CFBundleVersion: it moves with the version on every release.
-    CURRENT_PROJECT_VERSION: "0.2.1" # x-release-please-version
+    CURRENT_PROJECT_VERSION: "0.3.0" # x-release-please-version
     # Where Sparkle reads the releases: the appcast attached to the latest GitHub release.
     FERRY_FEED_URL: https://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xml
   # A release is signed with Developer ID for notarization (scripts/release-build.sh).
