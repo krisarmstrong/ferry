@@ -60,14 +60,20 @@ struct UpdateFeedTests {
     #expect(project.contains("\n    FERRY_FEED_URL: \(Self.feed)\n"))
   }
 
-  /// Sparkle comes from SwiftPM at one exact version, and only the app links it.
-  @Test func sparkleIsPinnedExactly() throws {
+  /// Sparkle comes from SwiftPM at the commit of its 2.10.1 tag, not the tag, which could be
+  /// moved: that commit's Package.swift fixes the framework's checksum. Only the app links it.
+  @Test func sparkleIsPinnedByRevision() throws {
     let project = try String(
       contentsOf: Self.root.appending(path: "project.yml"), encoding: .utf8)
     #expect(
       project.contains(
-        "  Sparkle:\n    url: https://github.com/sparkle-project/Sparkle\n    exactVersion: 2.10.1\n"
-      ))
+        """
+          Sparkle:
+            url: https://github.com/sparkle-project/Sparkle
+            # 2.10.1
+            revision: ab7d71291238df6e0492143b120c9b696a35f603
+
+        """))
   }
 }
 

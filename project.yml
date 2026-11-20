@@ -9,10 +9,13 @@ options:
 packages:
   Ferry:
     path: .
-  # Updates. Only the app links it.
+  # Updates. Only the app links it. Pinned to the commit of the 2.10.1 tag, not the tag, which
+  # could be moved: that commit's Package.swift fixes the checksum SwiftPM checks the framework
+  # against. Xcode records the pin in Package.resolved too; this line, not that file, decides.
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
-    exactVersion: 2.10.1
+    # 2.10.1
+    revision: ab7d71291238df6e0492143b120c9b696a35f603
 
 settings:
   base:
