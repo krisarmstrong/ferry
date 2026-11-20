@@ -25,8 +25,9 @@ settings:
     # Off for development: the agent loads Homebrew's libmtp, which library validation would
     # refuse. Plan 3 bundles libmtp and turns this on.
     ENABLE_HARDENED_RUNTIME: NO
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0" # x-release-please-version
+    # Sparkle compares CFBundleVersion: it moves with the version on every release.
+    CURRENT_PROJECT_VERSION: "0.1.0" # x-release-please-version
 
 targets:
   Ferry:
