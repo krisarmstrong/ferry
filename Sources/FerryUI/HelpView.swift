@@ -60,6 +60,7 @@ public struct HelpView: View {
     .searchable(text: $query, placement: .toolbar)
     .frame(minWidth: 640, minHeight: 420)
     .onAppear {
+      model.helpAppeared()
       // A section remembered from an earlier help that no longer has it.
       let known = content.sections.contains { $0.id == selection }
       if !known, let first = content.sections.first {

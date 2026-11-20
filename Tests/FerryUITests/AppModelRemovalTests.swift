@@ -70,6 +70,17 @@ extension AppModelTests {
     #expect(model.removalError == removal)
   }
 
+  /// Opening Help again starts Remove Ferry… afresh: an old failure is not shown under it.
+  @Test func helpAppearingClearsAnOldRemovalError() async {
+    let client = FakeClient(log: log)
+    client.failRemoveAll()
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.removeFerry()
+    #expect(model.removalError != nil)
+    model.helpAppeared()
+    #expect(model.removalError == nil)
+  }
+
   @Test func ejectShowsWhereUnsentChangesWereSaved() async throws {
     let saved = try Self.savedFolder(holdingFile: true)
     defer { try? FileManager.default.removeItem(at: saved) }
