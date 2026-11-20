@@ -76,11 +76,13 @@ problem.
   headings.
 - `HelpNavigator` holds the window's state and behaviour, so the tests drive it without drawing:
   - **Search.** `.searchable(placement: .toolbar)` narrows the sidebar to topics whose title or
-    any string, messages included, contains the query. It ignores case, diacritics and Markdown.
-    A category with no match is hidden. With no match at all, the detail shows
+    any string, messages included, contains the query. It ignores case, diacritics, width and
+    Markdown, and reads a plain-text index built once when the help loads. A category with no
+    match is hidden; the sidebar keeps its order. With no match at all, the detail shows
     `ContentUnavailableView.search`.
   - **Selection.** The sidebar and the detail always show the same topic: the chosen one if the
-    search shows it, else the first shown. The topic is kept in `UserDefaults` (`help.topic`).
+    search shows it, else the best match: the first topic whose title matches, else the first
+    shown. The topic is kept in `UserDefaults` (`help.topic`).
     The window opens on it, or on the first topic if it is unknown. The window itself is not
     restored at launch.
   - **Deep links.** A **?** beside a problem in the menu calls `AppModel.showHelp(forMessage:)`
@@ -88,7 +90,7 @@ problem.
     or at once if it is already open. It clears the search, selects the topic that explains the
     message, scrolls to the entry and tints it. Choosing another topic drops the tint.
   - **Keyboard.** The arrow keys move through the sidebar. Return in the search field opens the
-    first match and moves focus to the sidebar. ⌘[ and ⌘] (the chevron buttons in the toolbar)
+    best match and moves focus to the sidebar. ⌘[ and ⌘] (the chevron buttons in the toolbar)
     go to the previous and next topic shown, across categories, and stop at either end.
 - A `link` renders as a bordered button at the end of its block. `"guide"` opens the setup guide
   window with the model picker, and `"guide:<case>"` opens it on that `DeviceFamily`.

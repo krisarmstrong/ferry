@@ -23,10 +23,18 @@ struct HelpNavigator: Equatable {
   var shownTopics: [HelpTopic] { shownCategories.flatMap(\.topics) }
 
   /// The topic the sidebar selects and the detail shows: the chosen one if the search shows
-  /// it, else the first shown. `nil` when the search shows none.
+  /// it, else the best match. `nil` when the search shows none.
   var shownTopic: HelpTopic? {
+    shownTopics.first { $0.id == selection } ?? bestMatch
+  }
+
+  /// The first shown topic whose title matches the search, else the first shown.
+  private var bestMatch: HelpTopic? {
     let shown = shownTopics
-    return shown.first { $0.id == selection } ?? shown.first
+    let query = HelpSearchIndex.folded(query.trimmingCharacters(in: .whitespacesAndNewlines))
+    guard !query.isEmpty else { return shown.first }
+    return shown.first { content.searchIndex[$0.id]?.title.contains(query) == true }
+      ?? shown.first
   }
 
   /// The sidebar chose a topic. It clears its selection while a search is typed, which keeps
@@ -44,10 +52,10 @@ struct HelpNavigator: Equatable {
     select(shown[min(max(index + offset, 0), shown.count - 1)].id)
   }
 
-  /// Return in the search field: opens the first match. False when nothing matches.
+  /// Return in the search field: opens the best match. False when nothing matches.
   mutating func submitSearch() -> Bool {
-    guard let first = shownTopics.first else { return false }
-    select(first.id)
+    guard let best = bestMatch else { return false }
+    select(best.id)
     return true
   }
 

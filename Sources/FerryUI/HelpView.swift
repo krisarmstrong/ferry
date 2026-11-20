@@ -5,7 +5,7 @@ import SwiftUI
 /// opens the topic that explains it (see `AppModel.showHelp(forMessage:)`).
 ///
 /// From the keyboard: the arrow keys move through the sidebar, Return in the search field opens
-/// the first match, and ⌘[ and ⌘] go to the previous and next topic from anywhere.
+/// the best match (a title match first), and ⌘[ and ⌘] go to the previous and next topic from anywhere.
 public struct HelpView: View {
   public static let windowID = "help"
   public static let windowTitle = Text("Ferry Help", bundle: .module)

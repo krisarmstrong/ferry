@@ -67,8 +67,8 @@ struct HelpNavigatorTests {
     #expect(Self.navigator(at: "gone").shownTopic?.id == "getting-started")
   }
 
-  /// Return in the search field opens the first match, so the reader can go on with the
-  /// arrow keys from there.
+  /// Return in the search field opens the first match when no title matches, so the reader
+  /// can go on with the arrow keys from there.
   @Test func returnInTheSearchOpensTheFirstMatch() {
     var navigator = Self.navigator(at: "menu")
     navigator.query = "logcat"
@@ -80,6 +80,18 @@ struct HelpNavigatorTests {
     let foundNone = navigator.submitSearch()
     #expect(!foundNone)
     #expect(navigator.selection == first)
+  }
+
+  /// A topic whose title matches comes before one that only mentions the words, for Return and
+  /// for what the detail shows; the sidebar keeps its order.
+  @Test func aTitleMatchIsOpenedFirst() {
+    var navigator = Self.navigator(at: "privacy")
+    navigator.query = "screenshot"
+    #expect(navigator.shownTopics.first?.id == "getting-started")
+    #expect(navigator.shownTopic?.id == "screenshots")
+    let found = navigator.submitSearch()
+    #expect(found)
+    #expect(navigator.selection == "screenshots")
   }
 
   // MARK: Keyboard
@@ -111,17 +123,17 @@ struct HelpNavigatorTests {
   }
 
   /// With a search, the keys move among the matches only. From a selection the search hides,
-  /// they start at the first match.
-  @Test func movingFollowsTheSearch() {
+  /// they start at the topic shown.
+  @Test func movingFollowsTheSearch() throws {
     var navigator = Self.navigator(at: "menu")
     navigator.query = "recording"
     let shown = navigator.shownTopics.map(\.id)
-    #expect(shown.count > 2)
     #expect(!shown.contains("menu"))
-    navigator.move(by: 1)
-    #expect(navigator.selection == shown[1])
-    navigator.move(by: 1)
-    #expect(navigator.selection == shown[2])
+    let start = try #require(shown.firstIndex(of: navigator.shownTopic?.id ?? ""))
+    navigator.move(by: -1)
+    #expect(navigator.selection == shown[start - 1])
+    navigator.move(by: -1)
+    #expect(navigator.selection == shown[start - 2])
   }
 
   // MARK: Deep links
