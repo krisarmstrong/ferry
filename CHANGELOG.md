@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/krisarmstrong/ferry/compare/v0.2.0...v0.2.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **build:** add Apple's Developer ID intermediates on the release runner ([b4a9f14](https://github.com/krisarmstrong/ferry/commit/b4a9f14247cd445fb851c7c96cf065a4c98ddc90))
+* **build:** add Apple's Developer ID intermediates on the release runner ([e1ec005](https://github.com/krisarmstrong/ferry/commit/e1ec00556f05b9e9ba2f28b701d6978900a12c19))
+
 ## [0.2.0](https://github.com/krisarmstrong/ferry/compare/v0.1.0...v0.2.0) (2026-11-20)
 
 
