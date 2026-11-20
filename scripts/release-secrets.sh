@@ -58,6 +58,23 @@ PUBLIC_KEY="$public_key" perl -pi -e \
   project.yml
 
 gh secret list --repo "$repo" --env release
+
+# Only the release environment may hold them: a repository secret of the same name would reach
+# every workflow and branch. Remove any, then make sure none is left.
+names=(DEVELOPER_ID_P12_BASE64 DEVELOPER_ID_P12_PASSWORD NOTARY_KEY_ID NOTARY_ISSUER_ID
+  NOTARY_KEY_P8 SPARKLE_PRIVATE_KEY)
+for name in "${names[@]}"; do
+  gh secret delete "$name" --repo "$repo" 2> /dev/null || true
+done
+repository_secrets="$(gh secret list --repo "$repo" --json name --jq '.[].name')"
+for name in "${names[@]}"; do
+  if grep -qxF "$name" <<< "$repository_secrets"; then
+    echo "error: $name is still a repository secret; delete it in the repository's settings" >&2
+    exit 1
+  fi
+done
+echo "No release secret is stored at repository level. If one ever was, rotate that key or"
+echo "certificate: any workflow on any branch could have read it."
 echo
 echo "Sparkle public key: $public_key (now in project.yml; commit it on a branch and open a PR)."
 echo "Back up the private key: Keychain Access, login keychain, \"Private key for signing Sparkle updates\""
