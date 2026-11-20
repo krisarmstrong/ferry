@@ -110,12 +110,12 @@ struct ADBWirelessTests {
   @Test func pairingReportsTheGuidAdbPrints() async throws {
     let server = try await Self.server(listing: "")
     defer { server.stop() }
-    let endpoint = WirelessEndpoint(parsing: "198.51.100.169:37123")!
+    let endpoint = WirelessEndpoint(parsing: "192.0.2.170:37123")!
     let runner = FakeADBRunner(
-      output: "Successfully paired to 198.51.100.169:37123 [guid=adb-fedcba9876543210-AbCdEf]\n")
+      output: "Successfully paired to 192.0.2.170:37123 [guid=adb-fedcba9876543210-AbCdEf]\n")
     let outcome = try await Self.wireless(server, runner).pair(endpoint, code: Self.code)
     #expect(outcome == .paired(guid: "adb-fedcba9876543210-AbCdEf"))
-    #expect(await runner.invocations == [["pair", "198.51.100.169:37123", "482913"]])
+    #expect(await runner.invocations == [["pair", "192.0.2.170:37123", "482913"]])
   }
 
   @Test func aWrongCodeFails() async throws {
@@ -146,8 +146,8 @@ struct ADBWirelessTests {
 
   @Test func mdnsServicesAreReadFromTheHostQuery() async throws {
     let lines = [
-      "adb-fedcba9876543210-AbCdEf\t_adb-tls-connect._tcp\t198.51.100.169:41235",
-      "adb-fedcba9876543210-AbCdEf\t_adb-tls-pairing._tcp.\t198.51.100.169:37123",
+      "adb-fedcba9876543210-AbCdEf\t_adb-tls-connect._tcp\t192.0.2.170:41235",
+      "adb-fedcba9876543210-AbCdEf\t_adb-tls-pairing._tcp.\t192.0.2.170:37123",
       "evil\t_adb-tls-connect._tcp\t-s:5555",
       "junk line",
     ]
@@ -163,10 +163,10 @@ struct ADBWirelessTests {
       services == [
         ADBMDNSService(
           name: "adb-fedcba9876543210-AbCdEf", type: "_adb-tls-connect._tcp",
-          endpoint: WirelessEndpoint(parsing: "198.51.100.169:41235")!),
+          endpoint: WirelessEndpoint(parsing: "192.0.2.170:41235")!),
         ADBMDNSService(
           name: "adb-fedcba9876543210-AbCdEf", type: "_adb-tls-pairing._tcp",
-          endpoint: WirelessEndpoint(parsing: "198.51.100.169:37123")!),
+          endpoint: WirelessEndpoint(parsing: "192.0.2.170:37123")!),
       ])
   }
 
@@ -183,7 +183,7 @@ struct ADBWirelessTests {
         inet 192.0.2.31/24 brd 192.0.2.255 scope global eth0
            valid_lft forever preferred_lft forever
     5: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 3000
-        inet 198.51.100.169/24 brd 198.51.100.255 scope global wlan0
+        inet 192.0.2.170/24 brd 192.0.2.255 scope global wlan0
            valid_lft forever preferred_lft forever
     7: eno0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
         inet 192.0.2.166/24 brd 192.0.2.255 scope global noprefixroute dynamic eno0
@@ -197,7 +197,7 @@ struct ADBWirelessTests {
   @Test func onlyEthernetAndWiFiAddressesCount() {
     #expect(
       ADBWireless.networkAddresses(fromIPAddr: Self.etherScopeAddresses) == [
-        "192.0.2.31", "198.51.100.169", "192.0.2.166", "192.168.7.2",
+        "192.0.2.31", "192.0.2.170", "192.0.2.166", "192.168.7.2",
       ])
   }
 

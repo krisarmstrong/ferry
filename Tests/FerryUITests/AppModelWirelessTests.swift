@@ -74,14 +74,14 @@ struct AppModelWirelessTests {
     func canSend(_ address: String, _ code: String) -> Bool {
       NetworkForm(kind: .code, address: address, code: code).canSend
     }
-    #expect(canSend("198.51.100.169:37123", "482913"))
-    #expect(!canSend("198.51.100.169", "482913"))
-    #expect(!canSend("198.51.100.169:37123", "48291"))
+    #expect(canSend("192.0.2.170:37123", "482913"))
+    #expect(!canSend("192.0.2.170", "482913"))
+    #expect(!canSend("192.0.2.170:37123", "48291"))
     #expect(!canSend("pixel.lan:37123", "482913"))
     let client = FakeClient(log: log)
     let model = model(client)
-    #expect(await send(model, .code, address: "198.51.100.169:37123", code: "482913") == true)
-    #expect(log.all.first == "pair 198.51.100.169:37123 482913")
+    #expect(await send(model, .code, address: "192.0.2.170:37123", code: "482913") == true)
+    #expect(log.all.first == "pair 192.0.2.170:37123 482913")
   }
 
   /// Waiting for Allow is a step for the user, not a failure: the form closes and the menu shows

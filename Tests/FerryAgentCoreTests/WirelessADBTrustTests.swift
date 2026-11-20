@@ -104,7 +104,7 @@ struct WirelessADBTrustTests {
     defer { try? FileManager.default.removeItem(at: file) }
     let stored = """
       {"devices":{"fedcba9876543210":{"name":"EtherScope nXG","addresses":[\
-      {"address":"198.51.100.169:41001","learnt":"paired"},\
+      {"address":"192.0.2.170:41001","learnt":"paired"},\
       {"address":"192.0.2.31:5555","learnt":"user"},\
       {"address":"192.0.2.166:5555","learnt":"usb"}]}}}
       """
@@ -121,7 +121,7 @@ struct WirelessADBTrustTests {
     let calls = await adb.calls
     #expect(calls.contains(.connect("192.0.2.31:5555")))
     #expect(calls.contains(.connect("192.0.2.166:5555")))
-    #expect(!calls.contains(.connect("198.51.100.169:41001")))
+    #expect(!calls.contains(.connect("192.0.2.170:41001")))
   }
 
   /// Forgetting revokes everything under way: a connection waiting for Allow at one of its

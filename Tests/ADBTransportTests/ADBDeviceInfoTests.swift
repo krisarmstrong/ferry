@@ -73,7 +73,7 @@ struct ADBDeviceInfoTests {
     1: lo    inet6 ::1/128 scope host \    valid_lft forever preferred_lft forever
     2: dummy0    inet 10.11.12.13/30 brd 10.11.12.15 scope global dummy0\    valid_lft forever preferred_lft forever
     3: eth0    inet 192.0.2.31/24 brd 192.0.2.255 scope global eth0\    valid_lft forever preferred_lft forever
-    5: wlan0    inet 198.51.100.169/24 brd 198.51.100.255 scope global wlan0\    valid_lft forever preferred_lft forever
+    5: wlan0    inet 192.0.2.170/24 brd 192.0.2.255 scope global wlan0\    valid_lft forever preferred_lft forever
     5: wlan0    inet6 fe80::21a:2bff:fe3c:4d5e/64 scope link \    valid_lft forever preferred_lft forever
     5: wlan0    inet6 2001:db8::5/64 scope global dynamic \    valid_lft 86000sec preferred_lft 14000sec
     8: rmnet_data0    inet 100.64.1.2/30 scope global rmnet_data0\    valid_lft forever preferred_lft forever
@@ -88,7 +88,7 @@ struct ADBDeviceInfoTests {
   static let expectedAddresses: [AndroidDeviceInfo.Address] = [
     .init(interface: "dummy0", address: "10.11.12.13"),
     .init(interface: "eth0", address: "192.0.2.31"),
-    .init(interface: "wlan0", address: "198.51.100.169"),
+    .init(interface: "wlan0", address: "192.0.2.170"),
     .init(interface: "wlan0", address: "2001:db8::5"),
     .init(interface: "rmnet_data0", address: "100.64.1.2"),
     .init(interface: "ccmni1", address: "100.64.9.9"),

@@ -139,21 +139,21 @@ struct WirelessADBFixRound2Tests {
       $0.mdns = [
         ADBMDNSService(
           name: guid, type: ADBMDNSService.connectType,
-          endpoint: Self.endpoint("198.51.100.66:40000"))
+          endpoint: Self.endpoint("192.0.2.66:40000"))
       ]
       if withGenuine {
         $0.mdns.append(
           ADBMDNSService(
             name: guid, type: ADBMDNSService.connectType,
-            endpoint: Self.endpoint("198.51.100.169:41235")))
+            endpoint: Self.endpoint("192.0.2.170:41235")))
       }
-      $0.units["198.51.100.66:40000"] = .init(info: pixel)
-      $0.units["198.51.100.169:41235"] = .init(info: pixel)
+      $0.units["192.0.2.66:40000"] = .init(info: pixel)
+      $0.units["192.0.2.170:41235"] = .init(info: pixel)
     }
     let wireless = WirelessADB(adb: adb, store: WirelessADBTests.storeFile(), timing: Self.fast)
-    let outcome = await wireless.pair(Self.endpoint("198.51.100.169:37123"), code: Self.code)
+    let outcome = await wireless.pair(Self.endpoint("192.0.2.170:37123"), code: Self.code)
     #expect(outcome == (withGenuine ? .connected : .failed(.noConnectService)))
-    #expect(!(await adb.calls.contains(.connect("198.51.100.66:40000"))))
+    #expect(!(await adb.calls.contains(.connect("192.0.2.66:40000"))))
   }
 
   @Test func hostsCompareAsAddresses() throws {

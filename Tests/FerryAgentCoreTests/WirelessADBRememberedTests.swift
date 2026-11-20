@@ -79,7 +79,7 @@ struct WirelessADBRememberedTests {
     let running = Task { await wireless.run() }
     defer { running.cancel() }
     await adb.publish()
-    let offered = Self.endpoint("198.51.100.169:41001")
+    let offered = Self.endpoint("192.0.2.170:41001")
     await adb.set {
       $0.mdns = [
         ADBMDNSService(
@@ -87,9 +87,9 @@ struct WirelessADBRememberedTests {
           endpoint: offered),
         ADBMDNSService(
           name: "adb-SOMEONE-ELSE-Q2", type: "_adb-tls-connect._tcp",
-          endpoint: Self.endpoint("198.51.100.77:41002")),
+          endpoint: Self.endpoint("192.0.2.177:41002")),
       ]
-      $0.units["198.51.100.169:41001"] = .init(info: Self.etherScope)
+      $0.units["192.0.2.170:41001"] = .init(info: Self.etherScope)
     }
     #expect(
       try await eventually {
@@ -97,11 +97,11 @@ struct WirelessADBRememberedTests {
           == [UnconfirmedAddress(address: offered, id: Self.etherScope.id, name: "EtherScope nXG")]
       })
     try await Task.sleep(for: .milliseconds(60))
-    #expect(!(await adb.calls.contains(.connect("198.51.100.169:41001"))))
-    #expect(!(await adb.calls.contains(.connect("198.51.100.77:41002"))))
+    #expect(!(await adb.calls.contains(.connect("192.0.2.170:41001"))))
+    #expect(!(await adb.calls.contains(.connect("192.0.2.177:41002"))))
     let offer = try #require(await wireless.unconfirmed().first)
     #expect(await wireless.confirm(offer) == .connected)
-    #expect(await adb.calls.contains(.connect("198.51.100.169:41001")))
+    #expect(await adb.calls.contains(.connect("192.0.2.170:41001")))
     #expect(await wireless.remembered().first?.addresses.first == offered)
     #expect(await wireless.unconfirmed().isEmpty)
   }
