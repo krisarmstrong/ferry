@@ -50,7 +50,7 @@ settings:
       # writes it here). Release only: a Debug build has no key, so Sparkle never starts in it.
       # Until it replaces the placeholder no build has updates, and a team release build fails
       # `make check-app CONFIG=Release`.
-      FERRY_SPARKLE_PUBLIC_KEY: FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER
+      FERRY_SPARKLE_PUBLIC_KEY: 7l53fvukDGsiiz8uHiNrggUK0d1bWWB2x+GFyZsEhIU=
 
 targets:
   Ferry:
