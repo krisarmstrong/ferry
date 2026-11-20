@@ -45,6 +45,12 @@ if [ "$main_allowed" = no ]; then
 fi
 echo "release environment: deployments from main only, no required reviewers"
 
+# release-please opens its release PRs with GITHUB_TOKEN, which needs this switch. The
+# default workflow permission stays read-only; jobs ask for more in their own permissions.
+gh api -X PUT "repos/$repo/actions/permissions/workflow" \
+  -F can_approve_pull_request_reviews=true -f default_workflow_permissions=read > /dev/null
+echo "GitHub Actions: may open pull requests (release-please); default token read-only"
+
 # A user-owned repo cannot name the GitHub Actions app as a ruleset bypass actor (GitHub
 # answers 422), so release-please's GITHUB_TOKEN could not create tags under a creation rule.
 # Tags are therefore creatable by anyone with push access (the owner), but never moved or
