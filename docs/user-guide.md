@@ -1,5 +1,7 @@
 # Ferry user guide
 
+<!-- Generated from Sources/FerryUI/help.json by `make guide`. Edit help.json, not this file. -->
+
 Ferry shows Android devices as locations in Finder on your Mac. It was built first for network testers, the LinkRunner 10G, EtherScope nXG and LinkRunner 100G, and it works with other Android phones too.
 
 This guide holds the same help as **Help** in the Ferry menu, plus how to install Ferry. Ferry is free and open source (MIT). It needs macOS 26 or later on an Apple silicon Mac.

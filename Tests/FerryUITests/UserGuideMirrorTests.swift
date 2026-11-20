@@ -34,6 +34,24 @@ struct UserGuideMirrorTests {
     }
   }
 
+  /// The guide is rendered from help.json by scripts/user-guide.py (`make guide`): the
+  /// committed file must be exactly what the script renders now.
+  @Test func theGuideIsWhatTheGeneratorRenders() throws {
+    let process = Process()
+    process.executableURL = URL(filePath: "/usr/bin/env")
+    process.arguments = [
+      "python3", Self.root.appending(path: "scripts/user-guide.py").path, "--stdout",
+    ]
+    let output = Pipe()
+    process.standardOutput = output
+    try process.run()
+    let rendered = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    #expect(process.terminationStatus == 0)
+    let committed = try Data(contentsOf: Self.root.appending(path: "docs/user-guide.md"))
+    #expect(rendered == committed, "docs/user-guide.md is out of date: run make guide")
+  }
+
   @Test func theReadmeLinksToTheGuide() throws {
     #expect(try Self.text("README.md").contains("](docs/user-guide.md)"))
   }

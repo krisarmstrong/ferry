@@ -1,8 +1,9 @@
 # In-app help
 
 `Sources/FerryUI/help.json` holds Ferry's help as short task topics for the SwiftUI Help
-window. `docs/user-guide.md` mirrors it, with an Install section added, and a test checks that
-every Help string appears in the guide. When one changes, change the other.
+window. `docs/user-guide.md` is rendered from it, with an Install section added, by
+`scripts/user-guide.py`. Edit help.json, then run `make guide`; a test fails if the committed
+guide differs from what the script renders by a byte.
 
 ## Schema
 
