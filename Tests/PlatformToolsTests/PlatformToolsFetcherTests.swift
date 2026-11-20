@@ -226,4 +226,43 @@ final class PlatformToolsFetcherTests: Sendable {
       .fetch(accepted: Self.accepted)
     #expect(leftovers() == ["37.0.3", "37.0.3/NOTICE.txt", "37.0.3/adb"])
   }
+
+  /// A folder that was there first is made private before anything goes in it.
+  @Test func aLooseFolderIsMadePrivate() async throws {
+    try FileManager.default.createDirectory(
+      at: folder.root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o777])
+    let data = Self.googleLike()
+    _ = try await fetcher(Self.release(for: data), serving: data).fetch(accepted: Self.accepted)
+    #expect(try mode(folder.root) == 0o700)
+  }
+
+  /// A folder someone else owns is never used, and nothing is downloaded into it.
+  @Test func aFolderOwnedByAnotherUserIsRefused() async throws {
+    try FileManager.default.createDirectory(at: folder.root, withIntermediateDirectories: true)
+    let data = Self.googleLike()
+    let fetcher = PlatformToolsFetcher(
+      release: Self.release(for: data), folder: folder,
+      download: { [downloads] _, _, _ throws(PlatformToolsError) in
+        downloads.withLock { $0 += 1 }
+        throw .offline
+      }, verify: { _ in }, user: getuid() + 1)
+    await #expect(throws: PlatformToolsError.storage) {
+      try await fetcher.fetch(accepted: Self.accepted)
+    }
+    #expect(downloads.withLock { $0 } == 0)
+  }
+
+  /// The folder must be a folder, not a link to one somewhere else.
+  @Test func aLinkInPlaceOfTheFolderIsRefused() async throws {
+    let elsewhere = home.appending(path: "elsewhere", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+      at: folder.root.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(at: folder.root, withDestinationURL: elsewhere)
+    let data = Self.googleLike()
+    await #expect(throws: PlatformToolsError.storage) {
+      try await self.fetcher(Self.release(for: data), serving: data).fetch(accepted: Self.accepted)
+    }
+    #expect(try FileManager.default.contentsOfDirectory(atPath: elsewhere.path) == [])
+  }
 }

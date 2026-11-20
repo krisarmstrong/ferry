@@ -2191,9 +2191,6 @@
     "Ferry could not reach Google's download server, or the server did not send the file." : {
       "extractionState" : "manual"
     },
-    "Ferry could not write to ~/Library/Application Support/Ferry, which may be full or locked." : {
-      "extractionState" : "manual"
-    },
     "Ferry downloads the platform tools from Google, checks that they are the release it expects and that adb is signed by Google, and keeps only adb and its notices." : {
       "extractionState" : "manual"
     },
@@ -2201,9 +2198,6 @@
       "extractionState" : "manual"
     },
     "Ferry keeps adb in ~/Library/Application Support/Ferry/platform-tools, and records that you accepted the license, and when. When a Ferry update needs a newer adb, Ferry downloads it the same way; if Google has changed the license, Ferry asks you to accept it again first. To use an adb you installed yourself instead, click **Use adb Already on This Mac**." : {
-      "extractionState" : "manual"
-    },
-    "Free some space on the Mac, then click **Try Again**." : {
       "extractionState" : "manual"
     },
     "Get adb" : {
@@ -2231,6 +2225,12 @@
       "extractionState" : "manual"
     },
     "Click **Review License…** and accept it. If this version of Ferry needs a newer adb, Ferry then downloads it." : {
+      "extractionState" : "manual"
+    },
+    "Ferry could not write to ~/Library/Application Support/Ferry/platform-tools: the Mac may be full, or the folder locked or owned by another user." : {
+      "extractionState" : "manual"
+    },
+    "Free some space on the Mac, or remove that folder if another user owns it, then click **Try Again**." : {
       "extractionState" : "manual"
     }
   },

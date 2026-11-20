@@ -21,18 +21,21 @@ public struct PlatformToolsFetcher: Sendable {
   let folder: PlatformToolsFolder
   private let download: Download
   private let verify: Verify
+  /// Who must own the folder: this process's user.
+  private let user: uid_t
 
   /// `download` returns a new file that the fetcher then owns and deletes; `verify` throws
   /// unless its file is signed by Google.
   public init(
     release: PlatformToolsRelease = .pinned, folder: PlatformToolsFolder = .standard,
     download: @escaping Download = HTTPSDownload.file(from:limit:into:),
-    verify: @escaping Verify = CodeSignature.checkGoogle
+    verify: @escaping Verify = CodeSignature.checkGoogle, user: uid_t = getuid()
   ) {
     self.release = release
     self.folder = folder
     self.download = download
     self.verify = verify
+    self.user = user
   }
 
   /// Returns the installed `adb`.
@@ -74,6 +77,7 @@ public struct PlatformToolsFetcher: Sendable {
       try files.createDirectory(
         at: folder.root, withIntermediateDirectories: true,
         attributes: [.posixPermissions: 0o700])
+      try securePrivateFolder()
       for name in try files.contentsOfDirectory(atPath: folder.root.path)
       where name.hasPrefix(Self.stagingPrefix) {
         try files.removeItem(at: folder.root.appending(path: name))
@@ -90,6 +94,18 @@ public struct PlatformToolsFetcher: Sendable {
   }
 
   private static let stagingPrefix = ".staging-"
+
+  /// The folder, created now or found there, must be a real folder this user owns, and is made
+  /// 0700 if it is not: Ferry never puts adb where another user could reach it.
+  private func securePrivateFolder() throws(PlatformToolsError) {
+    let path = folder.root.path
+    var info = stat()
+    guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR, info.st_uid == user else {
+      Self.log.error("platform tools folder is not a folder this user owns")
+      throw .storage
+    }
+    guard info.st_mode & 0o7777 == 0o700 || chmod(path, 0o700) == 0 else { throw .storage }
+  }
 
   private func write(_ data: Data, to file: URL, mode: Int) throws(PlatformToolsError) {
     guard

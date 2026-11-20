@@ -694,8 +694,8 @@
             },
             {
               "message": "Ferry couldn't save adb in its folder.",
-              "cause": "Ferry could not write to ~/Library/Application Support/Ferry, which may be full or locked.",
-              "fix": "Free some space on the Mac, then click **Try Again**."
+              "cause": "Ferry could not write to ~/Library/Application Support/Ferry/platform-tools: the Mac may be full, or the folder locked or owned by another user.",
+              "fix": "Free some space on the Mac, or remove that folder if another user owns it, then click **Try Again**."
             },
             {
               "message": "Google changed the Android SDK License",

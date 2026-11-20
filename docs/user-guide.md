@@ -555,9 +555,9 @@ Click **Try Again**. If it fails again, something on your network may be changin
 
 **Ferry couldn't save adb in its folder.**
 
-Ferry could not write to ~/Library/Application Support/Ferry, which may be full or locked.
+Ferry could not write to ~/Library/Application Support/Ferry/platform-tools: the Mac may be full, or the folder locked or owned by another user.
 
-Free some space on the Mac, then click **Try Again**.
+Free some space on the Mac, or remove that folder if another user owns it, then click **Try Again**.
 
 **Google changed the Android SDK License**
 
