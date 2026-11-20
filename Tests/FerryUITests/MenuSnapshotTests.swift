@@ -9,7 +9,7 @@ import Testing
 @testable import FerryUI
 
 /// Draws the menu offscreen, in light and dark, with a device on USB (expanded, with its known
-/// ports' details, one not connected, Copy Device Details and Port Forwarding open on one
+/// ports' details, one not connected, its rows in their groups and Port Forwarding open on one
 /// forward) and one on Wi-Fi; and once more with Pair with Code open. It must come out 320 pt
 /// wide and show something besides its background. With `FERRY_MENU_SNAPSHOTS` naming a
 /// folder, the images are also written there as `menu-light.png`, `menu-dark.png` and
