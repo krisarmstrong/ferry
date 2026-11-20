@@ -34,19 +34,27 @@ done
   || fail "$licenses/README.txt does not give both tarballs' SHA-256"
 echo "release build carries libmtp and libusb, their licences and where their source is"
 
+# Command output is captured, then tested: `codesign … | grep -q` under pipefail can fail open
+# when grep's early exit kills codesign. Each architecture of a universal binary (Sparkle's
+# helpers are x86_64 and arm64) is checked on its own: codesign -d reads only the host's.
 executables=()
 while IFS= read -r -d '' file; do
-  file -b "$file" | grep -q 'Mach-O' && executables+=("$file")
+  [[ "$(file -b "$file")" == *Mach-O* ]] && executables+=("$file")
 done < <(find "$app" -type f -print0)
+slices=0
 for file in "${executables[@]}"; do
-  if otool -L "$file" | tail -n +2 | grep -E '/opt/homebrew/|/usr/local/' >&2; then
-    fail "$file links a library outside the bundle and the system"
-  fi
-  if codesign -d --entitlements - --xml "$file" 2> /dev/null | grep -q 'get-task-allow'; then
-    fail "$file is signed with com.apple.security.get-task-allow"
-  fi
+  for arch in $(lipo -archs "$file"); do
+    slices=$((slices + 1))
+    links="$(otool -arch "$arch" -L "$file" | tail -n +2)"
+    if [[ "$links" == */opt/homebrew/* || "$links" == */usr/local/* ]]; then
+      fail "$file ($arch) links a library outside the bundle and the system: $links"
+    fi
+    entitlements="$(codesign -d --entitlements - --xml --arch "$arch" "$file" 2> /dev/null || true)"
+    [[ "$entitlements" != *get-task-allow* ]] \
+      || fail "$file ($arch) is signed with com.apple.security.get-task-allow"
+  done
 done
-echo "no executable (${#executables[@]}) links Homebrew or allows a debugger to attach"
+echo "no executable (${#executables[@]}, $slices slices) links Homebrew or allows a debugger to attach"
 
 [ "$sign" = adhoc ] && exit 0
 
@@ -63,12 +71,14 @@ feed="https://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xm
 echo "release build carries the Sparkle key and its HTTPS feed"
 
 for file in "${executables[@]}"; do
-  details="$(codesign -dv --verbose=2 "$file" 2>&1)"
-  grep -q '^CodeDirectory.*flags=.*runtime' <<< "$details" \
-    || fail "$file is not signed with the hardened runtime"
-  grep -q '^Authority=Developer ID Application:' <<< "$details" \
-    || fail "$file is not signed with a Developer ID Application certificate"
-  grep -q '^Timestamp=' <<< "$details" || fail "$file has no secure timestamp"
+  for arch in $(lipo -archs "$file"); do
+    details="$(codesign -dv --verbose=2 --arch "$arch" "$file" 2>&1)"
+    [[ "$details" =~ (^|$'\n')CodeDirectory[^$'\n']*flags=[^$'\n']*runtime ]] \
+      || fail "$file ($arch) is not signed with the hardened runtime"
+    [[ "$details" == *$'\n'"Authority=Developer ID Application:"* ]] \
+      || fail "$file ($arch) is not signed with a Developer ID Application certificate"
+    [[ "$details" == *$'\n'"Timestamp="* ]] || fail "$file ($arch) has no secure timestamp"
+  done
 done
 codesign --verify --deep --strict "$app" || fail "$app does not verify"
 echo "every executable is signed with Developer ID, the hardened runtime and a timestamp"
