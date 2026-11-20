@@ -2185,9 +2185,6 @@
     "Ferry can't find adb. Get it from the Ferry menu, then try again." : {
       "extractionState" : "manual"
     },
-    "Ferry connects to the internet for two things: the daily check for updates, to GitHub, where Ferry's releases are published, and, only when you ask for it, the one-time download of adb from Google. Neither sends anything about you or your devices." : {
-      "extractionState" : "manual"
-    },
     "Ferry could not reach Google's download server, or the server did not send the file." : {
       "extractionState" : "manual"
     },
@@ -2231,6 +2228,9 @@
       "extractionState" : "manual"
     },
     "Free some space on the Mac, or remove that folder if another user owns it, then click **Try Again**." : {
+      "extractionState" : "manual"
+    },
+    "Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices." : {
       "extractionState" : "manual"
     }
   },

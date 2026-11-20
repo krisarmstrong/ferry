@@ -1183,7 +1183,7 @@ Ferry installs an update only when it carries the signature of Ferry's own relea
 
 Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.
 
-Ferry connects to the internet for two things: the daily check for updates, to GitHub, where Ferry's releases are published, and, only when you ask for it, the one-time download of adb from Google. Neither sends anything about you or your devices.
+Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices.
 
 ### Uninstall
 

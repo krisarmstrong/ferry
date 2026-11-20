@@ -14,7 +14,9 @@ device over USB; Ferry adds one that uses Finder itself, so you browse, open, co
 delete with the tools you already know, including any app's Open and Save dialogs. With USB
 debugging and `adb`, Ferry also reaches devices over ADB, by cable or over Wi-Fi, which is faster
 and adds tools: installing apps, screenshots, screen recordings, logcat, a shell and port
-forwarding. It is free and open source (MIT), and it sends nothing to any server.
+forwarding. It is free and open source (MIT), and it sends nothing about you or your devices:
+it connects only to GitHub, to check for updates, and to Google, to download adb once you
+accept Google's license and again when a Ferry update needs a newer adb.
 
 <!-- Screenshots: add once captured on macOS 26, as docs/screenshots/{finder,menu,guide}.png.
 
