@@ -61,3 +61,8 @@ jobs:
         run: make lint fmt-check test TEST_FLAGS=--no-parallel
       - name: Build the app, ad hoc signed
         run: make app SIGN=adhoc
+      # The release build as the release workflow makes it, on the same image and Xcode: pinned
+      # libmtp and libusb, Release config, check-release (no get-task-allow, nothing from
+      # Homebrew). Signed ad hoc and not notarized: CI holds no secrets.
+      - name: Build the release, ad hoc signed, and check it
+        run: make release SIGN=adhoc
