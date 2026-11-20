@@ -42,6 +42,9 @@ final class StubServer: URLProtocol, @unchecked Sendable {
       client.urlProtocol(self, didReceive: respond(200), cacheStoragePolicy: .notAllowed)
       for _ in 0..<10 { client.urlProtocol(self, didLoad: Data(repeating: 1, count: 200)) }
       client.urlProtocolDidFinishLoading(self)
+    case "/drip":
+      client.urlProtocol(self, didReceive: respond(200), cacheStoragePolicy: .notAllowed)
+      client.urlProtocol(self, didLoad: Data(repeating: 1, count: 10))
     case "/stall":
       client.urlProtocol(self, didReceive: respond(200), cacheStoragePolicy: .notAllowed)
       client.urlProtocol(self, didLoad: Data(repeating: 1, count: 10))
@@ -73,10 +76,13 @@ final class HTTPSDownloadTests: Sendable {
     return configuration
   }
 
-  private func download(_ path: String, limit: Int = 1000) async throws(PlatformToolsError) -> URL {
+  private func download(
+    _ path: String, limit: Int = 1000,
+    resourceTimeout: Duration = HTTPSDownload.resourceTimeout
+  ) async throws(PlatformToolsError) -> URL {
     try await HTTPSDownload.file(
       from: URL(string: "https://dl.google.com\(path)")!, limit: limit, into: folder,
-      configuration: Self.configuration)
+      configuration: Self.configuration, resourceTimeout: resourceTimeout)
   }
 
   /// What the download left in its folder.
@@ -126,6 +132,24 @@ final class HTTPSDownloadTests: Sendable {
     task.cancel()
     await #expect(throws: PlatformToolsError.cancelled) { _ = try await task.value }
     #expect(leftovers() == [])
+  }
+
+  /// A body that stops arriving ends at the resource timeout, worded as a download that could
+  /// not finish (`offline`: "Couldn't download adb. Ferry needs an internet connection once.").
+  /// Without it only the 60 s idle timeout would end it, and a host that drips bytes keeps that
+  /// from ever firing.
+  @Test func aStalledBodyTimesOut() async {
+    let started = ContinuousClock.now
+    await #expect(throws: PlatformToolsError.offline) {
+      _ = try await download("/drip", resourceTimeout: .milliseconds(300))
+    }
+    #expect(started.duration(to: .now) < .seconds(30))
+    #expect(leftovers() == [])
+  }
+
+  /// The real download gives up after a few minutes, not URLSession's default of seven days.
+  @Test func theResourceTimeoutIsMinutes() {
+    #expect(HTTPSDownload.resourceTimeout == .seconds(300))
   }
 
   @Test(arguments: [

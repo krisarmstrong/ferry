@@ -12,8 +12,14 @@ public enum HTTPSDownload {
     try await file(from: url, limit: limit, into: folder, configuration: .ephemeral)
   }
 
+  /// How long the whole download may take. About 16 MB in five minutes is well under any
+  /// working connection; a host that drips bytes, which keeps the idle timeout from firing,
+  /// cannot hold the fetch longer than this.
+  static let resourceTimeout = Duration.seconds(300)
+
   static func file(
-    from url: URL, limit: Int, into folder: URL, configuration: URLSessionConfiguration
+    from url: URL, limit: Int, into folder: URL, configuration: URLSessionConfiguration,
+    resourceTimeout: Duration = resourceTimeout
   ) async throws(PlatformToolsError) -> URL {
     guard !Task.isCancelled else { throw .cancelled }
     let file = folder.appending(path: "download-\(UUID().uuidString).zip")
@@ -22,6 +28,8 @@ public enum HTTPSDownload {
         atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600]),
       let handle = try? FileHandle(forWritingTo: file)
     else { throw .storage }
+    let configuration = configuration.copy() as? URLSessionConfiguration ?? configuration
+    configuration.timeoutIntervalForResource = resourceTimeout / .seconds(1)
     let transfer = Transfer(handle: handle, limit: limit)
     let session = URLSession(configuration: configuration, delegate: transfer, delegateQueue: nil)
     defer { session.invalidateAndCancel() }
