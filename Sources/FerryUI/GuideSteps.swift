@@ -9,12 +9,11 @@ public enum DeviceFamily: String, Sendable, CaseIterable, Hashable {
   case otherAndroid8to9
   case otherAndroid10Plus
 
-  /// The name the model picker shows, NetAlly models first.
+  /// The name the model picker shows, the testers first, by their model names alone.
   public var title: LocalizedStringResource {
     switch self {
     case .netAllyAndroid8Board:
-      LocalizedStringResource(
-        "NetAlly LinkRunner 10G, LinkRunner 100G or EtherScope nXG", bundle: .module)
+      LocalizedStringResource("LinkRunner 10G, LinkRunner 100G or EtherScope nXG", bundle: .module)
     case .otherAndroid8to9:
       LocalizedStringResource("Other Android phone (Android 8 or 9)", bundle: .module)
     case .otherAndroid10Plus:

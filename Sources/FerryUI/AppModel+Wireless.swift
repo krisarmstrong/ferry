@@ -23,7 +23,7 @@ struct NetworkForm: Equatable {
   var isSending = false
   /// Why the last send failed, shown under the fields. It can carry adb's words, so it is shown
   /// verbatim.
-  var message: String?
+  var message: MenuNotice?
 
   /// What the fields send, once they hold an address (and a code); the agent checks them again.
   var request: AgentRequest? {
@@ -44,7 +44,7 @@ struct NetworkForm: Equatable {
 /// What a network request said for the user, and whether it ends the form: connected, or the
 /// rest is up to the user at the device.
 struct WirelessReply: Sendable {
-  let message: String?
+  let message: MenuNotice?
   let done: Bool
 }
 
@@ -145,15 +145,15 @@ extension AppModel {
       switch try await client.send(request, file: nil) {
       case .wireless(let outcome):
         return WirelessReply(
-          message: DevicePresentation.message(for: outcome), done: outcome.endsTheForm)
+          message: DevicePresentation.notice(for: outcome), done: outcome.endsTheForm)
       case .failure(let error):
-        return WirelessReply(message: DevicePresentation.message(for: error), done: false)
+        return WirelessReply(message: DevicePresentation.notice(for: error), done: false)
       default:
         return WirelessReply(
-          message: DevicePresentation.message(for: .io("unexpected reply")), done: false)
+          message: DevicePresentation.notice(for: .io("unexpected reply")), done: false)
       }
     } catch {
-      return WirelessReply(message: DevicePresentation.message(for: error), done: false)
+      return WirelessReply(message: DevicePresentation.notice(for: error), done: false)
     }
   }
 }

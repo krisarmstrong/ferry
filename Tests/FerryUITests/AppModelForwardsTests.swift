@@ -25,6 +25,7 @@ struct AppModelForwardsTests {
   private func model() async -> AppModel {
     let model = AppModel(client: client, services: FakeServices(log: log), sleep: { _ in })
     await model.refresh()
+    model.toggleExpansion(.device(id))
     #expect(model.isExpanded(.device(id)))
     return model
   }
@@ -78,6 +79,7 @@ struct AppModelForwardsTests {
     model.resetExpansion()
     #expect(model.openForwards(of: id) == nil)
     await model.refresh()
+    model.toggleExpansion(.device(id))
     await model.toggleForwards(of: id)
     #expect(model.openForwards(of: id)?.localPort == "8080")
     #expect(log.all.filter { $0 == "forwards \(id.serial)" }.count == 3)

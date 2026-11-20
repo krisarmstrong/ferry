@@ -67,35 +67,37 @@ struct ADBDeviceInfoTests {
     #expect(ADBDeviceInfo.battery(fromDumpsys: "level: abc\nstatus: 2\n") == nil)
   }
 
-  /// `ip -o addr` as iproute2 prints it: one line per address, its continuation after `\`.
+  /// `ip -o addr` as iproute2 prints it: one line per address, its continuation after `\`. The
+  /// addresses are documentation ones: the parser drops loopback by its interface (`lo`) and
+  /// link-local IPv6 by `scope link`, never by range, so those lines carry ordinary addresses.
   static let oneLineAddresses = #"""
-    1: lo    inet 127.0.0.1/8 scope host lo\    valid_lft forever preferred_lft forever
-    1: lo    inet6 ::1/128 scope host \    valid_lft forever preferred_lft forever
-    2: dummy0    inet 10.11.12.13/30 brd 10.11.12.15 scope global dummy0\    valid_lft forever preferred_lft forever
+    1: lo    inet 192.0.2.127/32 scope host lo\    valid_lft forever preferred_lft forever
+    1: lo    inet6 2001:db8::127/128 scope host \    valid_lft forever preferred_lft forever
+    2: dummy0    inet 192.0.2.13/30 brd 192.0.2.15 scope global dummy0\    valid_lft forever preferred_lft forever
     3: eth0    inet 192.0.2.31/24 brd 192.0.2.255 scope global eth0\    valid_lft forever preferred_lft forever
     5: wlan0    inet 192.0.2.170/24 brd 192.0.2.255 scope global wlan0\    valid_lft forever preferred_lft forever
-    5: wlan0    inet6 fe80::21a:2bff:fe3c:4d5e/64 scope link \    valid_lft forever preferred_lft forever
+    5: wlan0    inet6 2001:db8::21a:2bff:fe3c:4d5e/64 scope link \    valid_lft forever preferred_lft forever
     5: wlan0    inet6 2001:db8::5/64 scope global dynamic \    valid_lft 86000sec preferred_lft 14000sec
-    8: rmnet_data0    inet 100.64.1.2/30 scope global rmnet_data0\    valid_lft forever preferred_lft forever
-    9: ccmni1    inet 100.64.9.9/30 scope global ccmni1\    valid_lft forever preferred_lft forever
-    10: rndis0    inet 192.168.42.129/24 scope global rndis0\    valid_lft forever preferred_lft forever
-    11: usb0    inet 192.168.43.1/24 scope global usb0\    valid_lft forever preferred_lft forever
-    12: eth1@if11    inet 192.168.7.2/24 scope global eth1\    valid_lft forever preferred_lft forever
-    13: tun0    inet 10.8.0.2/24 scope global tun0\    valid_lft forever preferred_lft forever
+    8: rmnet_data0    inet 192.0.2.102/30 scope global rmnet_data0\    valid_lft forever preferred_lft forever
+    9: ccmni1    inet 192.0.2.109/30 scope global ccmni1\    valid_lft forever preferred_lft forever
+    10: rndis0    inet 192.0.2.129/24 scope global rndis0\    valid_lft forever preferred_lft forever
+    11: usb0    inet 192.0.2.143/24 scope global usb0\    valid_lft forever preferred_lft forever
+    12: eth1@if11    inet 192.0.2.72/24 scope global eth1\    valid_lft forever preferred_lft forever
+    13: tun0    inet 192.0.2.82/24 scope global tun0\    valid_lft forever preferred_lft forever
     """#
 
   /// Loopback and link-local IPv6 are left out; every other address keeps its interface.
   static let expectedAddresses: [AndroidDeviceInfo.Address] = [
-    .init(interface: "dummy0", address: "10.11.12.13"),
+    .init(interface: "dummy0", address: "192.0.2.13"),
     .init(interface: "eth0", address: "192.0.2.31"),
     .init(interface: "wlan0", address: "192.0.2.170"),
     .init(interface: "wlan0", address: "2001:db8::5"),
-    .init(interface: "rmnet_data0", address: "100.64.1.2"),
-    .init(interface: "ccmni1", address: "100.64.9.9"),
-    .init(interface: "rndis0", address: "192.168.42.129"),
-    .init(interface: "usb0", address: "192.168.43.1"),
-    .init(interface: "eth1", address: "192.168.7.2"),
-    .init(interface: "tun0", address: "10.8.0.2"),
+    .init(interface: "rmnet_data0", address: "192.0.2.102"),
+    .init(interface: "ccmni1", address: "192.0.2.109"),
+    .init(interface: "rndis0", address: "192.0.2.129"),
+    .init(interface: "usb0", address: "192.0.2.143"),
+    .init(interface: "eth1", address: "192.0.2.72"),
+    .init(interface: "tun0", address: "192.0.2.82"),
   ]
 
   @Test func eachAddressKeepsItsInterface() {

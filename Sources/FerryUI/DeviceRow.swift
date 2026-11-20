@@ -129,7 +129,9 @@ private struct DeviceDetails: View {
       }
       recordingLine
       if hint == .allowUSBDebugging {
-        Text("Allow USB debugging on the device", bundle: .module)
+        HelpLinked(key: MenuStatusText.allowUSBDebugging.key) {
+          Text(MenuStatusText.allowUSBDebugging)
+        }
       }
     }
     .font(.callout)
@@ -182,18 +184,25 @@ private struct DeviceDetails: View {
       }
     case .notSharingFiles:
       if DevicePresentation.needsFileTransferSteps(device) {
-        Text("Choose Transfer files on the device.", bundle: .module)
-          .foregroundStyle(.secondary)
+        HelpLinked(key: MenuStatusText.chooseTransferFiles.key) {
+          Text(MenuStatusText.chooseTransferFiles)
+            .foregroundStyle(.secondary)
+        }
       }
     case .ejected:
       Text("Not in Finder until you mount it again or plug it back in.", bundle: .module)
         .foregroundStyle(.secondary)
     case .busy:
-      Text("Quit Image Capture or Android File Transfer, then try again.", bundle: .module)
-        .foregroundStyle(.secondary)
+      HelpLinked(key: MenuStatusText.busy.key) {
+        Text(MenuStatusText.busy)
+          .foregroundStyle(.secondary)
+      }
     case .failed(let error):
-      Text(verbatim: DevicePresentation.message(for: error))
-        .foregroundStyle(.secondary)
+      let notice = DevicePresentation.notice(for: error)
+      HelpLinked(key: notice.help) {
+        Text(verbatim: notice.text)
+          .foregroundStyle(.secondary)
+      }
     }
   }
 
@@ -202,7 +211,9 @@ private struct DeviceDetails: View {
       Label {
         switch recording {
         case .unsaved:
-          Text("Recording couldn't be saved", bundle: .module)
+          HelpLinked(key: MenuStatusText.recordingUnsaved.key) {
+            Text(MenuStatusText.recordingUnsaved)
+          }
         case .saving:
           Text("Saving recording…", bundle: .module)
         case .running, .none:

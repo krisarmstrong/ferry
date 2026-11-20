@@ -55,7 +55,9 @@ struct AppModelSendTests {
     await model.chooseAndSendFiles(on: id)
     #expect(
       model.actionError
-        == "Couldn’t send “Report.pdf” to Pixel 8\nThe device doesn’t have enough free space.")
+        == MenuNotice(
+          text: "Couldn’t send “Report.pdf” to Pixel 8\nThe device doesn’t have enough free space.",
+          help: "Couldn’t send “%@” to %@"))
     #expect(model.toolMessage == nil)
   }
 }

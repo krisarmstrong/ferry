@@ -1,546 +1,1153 @@
 # Ferry user guide
 
-Ferry shows Android devices as locations in Finder on your Mac. It was built first for NetAlly
-network testers (LinkRunner 10G, EtherScope nXG and LinkRunner 100G), and it works with other
-Android phones too. Plug the device in with a USB cable, turn on file transfer on the device,
-and it appears in Finder's sidebar. You can then browse, open and copy files as you would on
-any drive.
+<!-- Generated from Sources/FerryUI/help.json by `make guide`. Edit help.json, not this file. -->
 
-Ferry is free and open source (MIT). It needs macOS 26 or later on an Apple silicon Mac.
+Ferry shows Android devices as locations in Finder on your Mac. It was built first for network testers, the LinkRunner 10G, EtherScope nXG and LinkRunner 100G, and it works with other Android phones too.
 
+This guide holds the same help as **Help** in the Ferry menu, plus how to install Ferry. Ferry is free and open source (MIT). It needs macOS 26 or later on an Apple silicon Mac.
+
+## Contents
+
+- [Install](#install)
 - [Getting started](#getting-started)
-- [Connect a NetAlly unit](#connect-a-netally-unit)
-- [Connect another Android phone](#connect-another-android-phone)
-- [USB debugging (ADB)](#usb-debugging-adb)
-- [Connect over the network](#connect-over-the-network)
-- [Using Ferry in Finder](#using-ferry-in-finder)
+  - [What Ferry does](#what-ferry-does)
+  - [Turn on Ferry in Finder](#turn-on-ferry-in-finder)
+  - [Connect your first device](#connect-your-first-device)
+- [Connecting](#connecting)
+  - [Connect a network tester](#connect-a-network-tester)
+  - [Connect an Android phone](#connect-an-android-phone)
+  - [Turn on USB debugging](#turn-on-usb-debugging)
+  - [Install adb](#install-adb)
+  - [Allow this Mac on the device](#allow-this-mac-on-the-device)
+  - [Use a device over Wi-Fi](#use-a-device-over-wi-fi)
+  - [Connect by address](#connect-by-address)
+  - [Pair with a code](#pair-with-a-code)
+  - [Remembered devices](#remembered-devices)
+- [Files in Finder](#files-in-finder)
+  - [Find your device in Finder](#find-your-device-in-finder)
+  - [Copy files](#copy-files)
+  - [Rename and delete](#rename-and-delete)
+  - [When a file changed on both sides](#when-a-file-changed-on-both-sides)
+  - [See changes made on the device](#see-changes-made-on-the-device)
+  - [Send files from Finder](#send-files-from-finder)
+  - [Free up space on the Mac](#free-up-space-on-the-mac)
 - [The menu](#the-menu)
-- [Tools over USB debugging](#tools-over-usb-debugging)
+  - [Read the menu](#read-the-menu)
+  - [Device details and addresses](#device-details-and-addresses)
+  - [A device's tools](#a-devices-tools)
+  - [Take a screenshot or record the screen](#take-a-screenshot-or-record-the-screen)
+  - [Install an app](#install-an-app)
+  - [Send a file from the menu](#send-a-file-from-the-menu)
+  - [Watch the device's log](#watch-the-devices-log)
+  - [Forward a port](#forward-a-port)
+  - [Open a shell in Terminal](#open-a-shell-in-terminal)
 - [Troubleshooting](#troubleshooting)
-- [Privacy](#privacy)
-- [Uninstall](#uninstall)
+  - [The device does not show up](#the-device-does-not-show-up)
+  - [Device messages](#device-messages)
+  - [USB debugging messages](#usb-debugging-messages)
+  - [Wi-Fi and network messages](#wi-fi-and-network-messages)
+  - [Messages in Finder](#messages-in-finder)
+  - [Send to and Send File messages](#send-to-and-send-file-messages)
+  - [App install messages](#app-install-messages)
+  - [Screenshot and recording messages](#screenshot-and-recording-messages)
+  - [Port forwarding and log messages](#port-forwarding-and-log-messages)
+  - [Ferry's helper and settings](#ferrys-helper-and-settings)
+  - [Remove Ferry](#remove-ferry)
+- [About Ferry](#about-ferry)
+  - [Privacy](#privacy)
+  - [Uninstall](#uninstall)
+
+## Install
+
+Ferry has no published release yet. Build it from source (see the README), then move **Ferry** to the **Applications** folder and open it.
+
+Ferry runs in the menu bar. It has no Dock icon and no main window. Until its helper answers, the menu shows **Checking…**.
 
 ## Getting started
 
-### Install
+### What Ferry does
 
-Ferry has no published release yet. Build it from source (see the README), then move
-**Ferry** to the **Applications** folder and open it.
+Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon.
 
-Ferry runs in the menu bar. It has no Dock icon and no main window.
+The first time Ferry opens, it starts a small helper that talks to your devices. The helper keeps running after you quit the menu, so devices stay in Finder.
 
-### First launch
-
-The first time Ferry opens, it starts a small helper that talks to your devices. The helper
-keeps running while Ferry is installed, so devices appear in Finder even after you quit the
-menu-bar item.
-
-Until the helper answers, the menu shows **Checking…**.
+Over a cable, Ferry uses the device's file transfer mode. With USB debugging on, or over Wi-Fi, it uses ADB, which is faster and adds tools such as screenshots and app installs.
 
 ### Turn on Ferry in Finder
 
-macOS asks you to allow Ferry to add locations to Finder. Ferry adds a location the first
-time a device is connected; from then until you turn it on, the menu shows
-**Turn on Ferry in Finder**.
+macOS asks you to allow Ferry's locations in Finder. Until you do, the menu shows **Turn on Ferry in Finder** once a device has been connected.
 
 1. Click the Ferry icon in the menu bar.
 2. Click **Open System Settings**.
-3. In **Login Items & Extensions**, turn on **Ferry** under **File Providers**.
+3. In Login Items & Extensions, turn on Ferry under File Providers.
 
-You only do this once. It stays on after Ferry or the Mac restarts.
+You only do this once.
 
-## Connect a NetAlly unit
+### Connect your first device
 
-These steps apply to the **LinkRunner 10G**, **EtherScope nXG** and **LinkRunner 100G**.
-They come from each model's user guide; the guides say "PC or tablet", and a Mac works the
-same way.
+1. Unlock the device and connect it to the Mac with a USB cable.
+2. On the device, choose **Transfer files**.
+3. Look for the device in Finder's sidebar, under Locations.
+
+The steps differ a little by model. **How to Connect** shows them for yours.
+
+In the app, **How to Connect** opens the setup guide.
+
+## Connecting
+
+### Connect a network tester
+
+For the LinkRunner 10G, EtherScope nXG and LinkRunner 100G.
 
 1. Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac.
 2. On the unit: **Settings** (bottom of the Home screen) → **Connected devices** → **USB**.
 3. Tap **Transfer files**.
 
-The unit appears in Finder a few seconds later. Until you tap **Transfer files**, the menu
-shows **No device connected** (the unit offers the Mac no file-transfer connection at all) or
-**Not sharing files** (the unit stays visible but shares no storage). Either way, click **How to
-connect** or **How to Turn On File Transfer** for these steps.
+The device appears in Finder once it shares files.
 
-AirCheck G3 support is planned; it uses different steps.
+In the app, **How to Connect** opens the setup guide.
 
-## Connect another Android phone
+### Connect an Android phone
 
-Unlock the phone first. Android hides the phone's storage while it is locked.
+Unlock the phone first. Its storage stays hidden while it is locked.
 
-### Android 8 or 9
+In the app, **How to Connect** opens the setup guide.
 
-1. Unlock the phone and connect it to the Mac with a USB cable.
+#### Android 8 or 9
+
+1. Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.
 2. Pull down the notification shade and tap **USB charging this device**.
 3. Tap **Transfer files**.
 
-### Android 10 or newer
+#### Android 10 or newer
 
-1. Unlock the phone and connect it to the Mac with a USB cable.
+1. Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.
 2. Pull down the notification shade and tap **Charging this device via USB**.
-3. Under **USB preferences**, choose **File transfer**. Or open **Settings** →
-   **Connected devices** → **USB**.
+3. Under **USB preferences**, choose **File transfer**. Or open **Settings** → **Connected devices** → **USB**.
 
-Menu names vary a little between phone makers. Look for the USB notification and the option
-that mentions file transfer.
+### Turn on USB debugging
 
-## USB debugging (ADB)
+With USB debugging on, Ferry serves the device over ADB, which is faster than file transfer and adds more tools. File transfer keeps working without it.
 
-File transfer is enough to browse and copy. With USB debugging on, Ferry serves the device over
-ADB instead, which is faster and adds more tools. File transfer keeps working without it, and
-Ferry falls back to it whenever ADB is off.
+Menu names vary a little between phone makers. Look for Developer options and the USB debugging switch.
 
-Ferry needs `adb`, from Google's Android platform tools. It never installs or bundles it. If it
-is missing, the menu shows **Install adb for more tools…** with the command to run in Terminal,
-a **Copy** button and a **Check Again** button:
+In the app, **How to Turn On USB Debugging** opens the USB debugging steps.
 
-```text
-brew install --cask android-platform-tools
-```
-
-Click **Check Again** once it is installed. From a device that is serving files over file
-transfer, **More Tools with USB Debugging…** in the menu opens the steps below for its model.
-
-### NetAlly LinkRunner 10G, LinkRunner 100G and EtherScope nXG
+#### LinkRunner 10G, LinkRunner 100G or EtherScope nXG
 
 1. Ask NetAlly to enable ADB on the tester.
-2. After that, on the tester: **Settings** → **System** → **About tester**. Tap
-   **Build number** until developer mode is on.
+2. After that, on the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on.
 3. Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.
-4. With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The
-   tester offers ADB only after this.
+4. With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester offers ADB only after this.
 5. On the device, tick **Always allow from this computer** and tap **OK**.
 
-### Android 8 or 9
+If the device accepts ADB over the network, use **Connect by Address…**.
 
-1. Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while
-   it is locked.
-2. Open **Settings** → **System** → **About phone** and tap **Build number** until developer
-   mode is on.
+#### Android 8 or 9
+
+1. Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.
+2. Open **Settings** → **System** → **About phone** and tap **Build number** until developer mode is on.
 3. Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.
 4. On the device, tick **Always allow from this computer** and tap **OK**.
 
-### Android 10 or newer
+If the device accepts ADB over the network, use **Connect by Address…**.
 
-1. Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while
-   it is locked.
+#### Android 10 or newer
+
+1. Unlock the phone and connect it to the Mac with a USB cable. Its storage stays hidden while it is locked.
 2. Open **Settings** → **About phone** and tap **Build number** until developer mode is on.
 3. Open **Settings** → **System** → **Developer options** and turn on **USB debugging**.
 4. On the device, tick **Always allow from this computer** and tap **Allow**.
 
-Menu names vary a little between phone makers. Look for Developer options and the USB
-debugging switch.
-
 If the device accepts ADB over the network, use **Connect by Address…**.
 
-## Connect over the network
+### Install adb
 
-Ferry can reach a device over ADB on your network as well as by cable. It never searches the
-network: it connects only to addresses you give it, and to the addresses a device on USB
-debugging reports for itself. A device that is also on a cable is always served by the cable.
+Ferry needs adb, from Google's Android platform tools, for USB debugging and Wi-Fi. File transfer works without it.
 
-- **Use over Wi-Fi** suits a device already on USB debugging, such as a NetAlly tester or a
-  phone with Android 8 to 10.
-- **Pair with Code** is for Android 11 and newer.
-- **Connect by Address** is for a device that already accepts ADB over the network.
+When adb is missing, the menu shows **Install adb for more tools…** with the command to run.
 
-### Use over Wi-Fi
+1. Click **Copy** in that row.
+2. Paste the command in Terminal and press Return: `brew install --cask android-platform-tools`.
+3. Click **Check Again**.
 
-With the device on USB debugging and connected by cable, click the device in the menu, then
-**Use over Wi-Fi**. Ferry reads the device's Ethernet and Wi-Fi addresses, turns on ADB over the
-network if it is off, and connects to the first address that answers. Connect the device to
-Ethernet or Wi-Fi first.
+Ferry never installs adb itself.
 
-Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a
-screen recording or a log running: let it finish, then try again.
+### Allow this Mac on the device
 
-### Pair with Code
+The first time a device meets this Mac over ADB, it asks whether to allow USB debugging. Ferry can't use ADB until you allow it.
 
-On the device, open **Developer options** → **Wireless debugging** and choose **Pair device with
-pairing code**. In Ferry's menu, click **Pair with Code…**: the form opens in the menu. Enter
-the IP address and port and the code the device shows, and click **Pair** or press Return.
-Press Escape, or click **Pair with Code…** again, to close it. Ferry then connects to the
-address the device offers for connections, which is not the one it paired on.
+Until then, the device shows **Waiting for Allow** in the menu, with **Allow USB debugging on the device** under it. Over the network, the menu shows **Waiting for you to allow this Mac on** and the address.
 
-### Connect by Address
+1. Unlock the device.
+2. Tick **Always allow from this computer**, so it does not ask again.
+3. Tap **OK** or **Allow**.
 
-Click **Connect by Address…**, type the device's IP address or name in the field that opens in
-the menu, and click **Connect** or press Return. Ferry uses adb's usual port unless you add
-another after a colon. If the device asks, tap **Allow** on it: the menu shows that it is
-waiting until you do.
+If the prompt never appears, unplug the cable and plug it back in. On a tester, turn **USB debugging** off and on again.
+
+### Use a device over Wi-Fi
+
+Use over Wi-Fi suits a device already on USB debugging, such as a network tester or a phone with Android 8 to 10.
+
+Ferry never searches the network. It connects only to addresses you give it, and to the addresses a device on USB debugging reports for itself. A device that is also on a cable is always served by the cable.
+
+1. Connect the device to Ethernet or Wi-Fi.
+2. Connect it to the Mac by cable, with USB debugging on.
+3. Click the device in the menu, then **Use over Wi-Fi**.
+4. Unplug the cable. The device stays in Finder over the network.
+
+Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again.
+
+### Connect by address
+
+For a device that already accepts ADB over the network.
+
+1. Click **Connect by Address…**. A field opens in the menu.
+2. Type the device's IP address or name. Add a port after a colon if it does not use port 5555.
+3. Click **Connect** or press Return.
+4. If the device asks, tap **Allow** on it.
+
+Press Escape, or click **Connect by Address…** again, to close the field.
+
+### Pair with a code
+
+For phones with Android 11 and newer, which pair over Wi-Fi without a cable.
+
+1. On the device, open **Developer options** → **Wireless debugging** and choose **Pair device with pairing code**.
+2. In Ferry's menu, click **Pair with Code…**. A form opens in the menu.
+3. Enter the IP address and port, and the code, that the device shows.
+4. Click **Pair** or press Return.
+
+Ferry then connects to the address the device offers for connections, which is not the one it paired on.
 
 ### Remembered devices
 
-Ferry remembers each device it connects this way by its serial number, and connects to it again
-when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered
-· not nearby**: click it, then **Connect Again** to try again.
+Ferry remembers each device it connects over the network by its serial number, and connects to it again when Ferry starts and when adb restarts. A remembered device it cannot reach shows **Remembered · not nearby**: click it, then **Connect Again** to try again.
 
-**Forget This Device** disconnects the device and forgets its addresses. Ferry no longer
-connects to it by itself.
+**Forget This Device** disconnects the device and forgets its addresses. Ferry no longer connects to it by itself.
 
-### "Is this address your device?"
+#### Is this address your device?
 
-Anyone on a network can claim a device's serial number. So when a new address answers as a
-device Ferry already knows, Ferry does not use it on its own: the menu asks
-"Is *address* your *device*?", with the address and the name Ferry has for the device.
-**Use It** connects the address and remembers it for that device. **Ignore** leaves it unused
-until Ferry restarts.
+Anyone on a network can claim a device's serial number. So when a new address answers as a device Ferry already knows, Ferry does not use it on its own: the menu asks “Is *address* your *device*?”
 
-Until you tap **OK** or **Allow**, the menu shows **Allow USB debugging on the device** and
-Ferry keeps serving the device over file transfer. A device that only adb lists shows
-**Waiting for Allow** instead of a state. The method it uses shows under each ready device.
+**Use It** connects the address and remembers it for that device. **Ignore** leaves it unused until Ferry restarts.
 
-## Using Ferry in Finder
+## Files in Finder
 
-### Where to find your device
+### Find your device in Finder
 
-Each device appears in Finder's sidebar under **Locations**. A device with an SD card shows
-two locations: the internal storage, and the card with " – SD card" after the name. If two
-devices of the same model are connected, each name ends with the last four characters of
-its serial number. The SD card has one location over USB debugging and another over File
-transfer, because File transfer cannot tell one card from another of the same kind.
+Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs.
 
-Your devices also appear in every app's Open and Save dialogs.
+A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number.
 
-### Browse and open
+Double-click a file to open it. Ferry copies it to the Mac when you open it.
 
-Click a folder to see what is in it. Double-click a file to open it. Ferry copies the file to
-the Mac when you open it, so a large file can take a moment the first time.
-
-Changes made on the device while it is connected reach Finder on their own:
-
-- Over USB debugging or Wi-Fi, Ferry watches the folders you have open, so changes show up
-  within a few seconds, and within about 30 seconds at most.
-- In file transfer mode, new and deleted files show up within about 30 seconds. A file that was
-  changed in place or renamed on the device shows only after you choose **Refresh** in the
-  Ferry menu.
+With one device location, macOS labels it with the app's name, so the sidebar says Ferry. This is normal.
 
 ### Copy files
 
-- **From the device to the Mac:** drag files or folders from the device's location to a
-  folder on the Mac.
-- **From the Mac to the device:** drag files or folders onto the device's location, or into
-  a folder on it.
+Drag files or folders between the device and the Mac to copy them. A half-copied file never appears under its real name.
 
-Finder shows how far each copy has got, and the Ferry menu lists copies in progress under
-their device with a percentage. Ferry writes each file under a hidden temporary name and
-renames it only when the copy is complete, so a half-copied file never appears under its real
-name.
+Finder shows how far each copy has got, and the Ferry menu lists copies in progress under their device.
 
-Ferry copies files and folders. A package, such as an `.rtfd` or Keynote document, an app, a
-plug-in or a framework, is one item on the Mac but a folder on the device, so Ferry does not
-copy it: Finder shows "Packages and app bundles can't be copied to the device. Compress it into
-a .zip first." Control-click it, choose **Compress**, and copy the `.zip`. Symbolic links and
-aliases can't be copied to the device either: Finder shows "Symbolic links and aliases can't be
-copied to the device" for them.
+Files over 4 GB copy to internal storage. Many SD cards cannot hold a file over 4 GB; Ferry shows an error instead of copying part of it.
 
-A folder on the device named like an app or a document package (`Tool.app`, `Notes.rtfd`)
-shows in Finder as an app or a document, because macOS goes by the name. Such a folder, and
-everything in it, is read-only on the Mac: an app saving it would replace the whole folder,
-which Ferry can't copy. Edit it on the device, or copy it to the Mac. Something you put inside
-one stays on the Mac only: Finder shows "Folders named like an app or a document package, and
-what they hold, can't be changed from this Mac. Change them on the device." For the same
-reason a folder on the device can't be renamed to such a name. Android's app folders, such as
-`Android/data/com.example.app`, count too: macOS reads `.app` as an app.
+A package, such as an .rtfd document or an app, can't be copied to the device: compress it into a .zip first. Symbolic links and aliases can't be copied to the device either; Finder shows an error for them.
 
-Saving such a document from a Mac app (TextEdit, Keynote) is not sent to the device either.
-The app may leave a copy beside it, such as `Notes 2.rtfd`, which Finder marks with an error:
-your edit is only in that copy, on the Mac. To keep it, copy it to a folder on the Mac. Edit
-these documents on the device, or copy them to the Mac first.
+If the device is unplugged during a copy, plug it back in and turn on file transfer. Finder finishes the copy when the device reconnects.
 
-To remove such a folder, delete it on the device, or delete the folder that holds it from
-Finder. Finder may put the holding folder back once, if it had not shown everything inside;
-delete it again.
+### Rename and delete
 
-### A file changed on both sides
+Rename files and make folders on the device as you would on any drive.
 
-If a file changed on the device (an app on it, or someone at the unit) after the Mac read it,
-and you then save your version from the Mac, Ferry keeps the device's version and saves yours
-beside it as **name (conflict from Mac)**, for example `report (conflict from Mac).txt`. Finder
-then shows the device's version under the original name. Nothing is overwritten.
+The device has no Trash. Finder offers **Delete Immediately**, and the file is removed from the device at once.
 
-### Send to a device from Finder
+A folder is deleted with its contents only if Finder has shown everything in it, at every level, as it is now. If anything inside is new or changed on the device, or a folder inside was never opened, the whole folder stays and Finder puts it back. Delete it again to remove it. A folder nested more than 64 levels deep, or holding more than 100,000 items, also stays. A folder that holds a file whose name the Mac can't show stays too; delete it on the device.
 
-Control-click files anywhere on the Mac and choose **Send to** and the device (for example
-**Send to LinkRunner 10G**). Ferry copies them into the `Download` folder on the device's
-internal storage, and makes that folder if the device has none. Ferry's button in the Finder
-toolbar has the same menu: add it with **View** → **Customize Toolbar**. With no device
-connected, the menu says **No device connected**.
+A file the device changed since Finder last showed it is not deleted. Finder puts it back with the device's version.
 
-Sending never replaces a file. If `Download` already has one with the same name, Ferry keeps it
-and saves yours beside it as **name (conflict from Mac)**, as for a file changed on both sides.
+#### Folders named like apps
 
-Only files can be sent this way. A folder shows "Folders can't be sent from this menu. Copy the
-folder into the device's location in Finder, or compress it into a .zip first." A package, such
-as an `.rtfd` document or an app, and a symbolic link or alias are refused with the same
-messages Finder shows when you copy them to the device.
+A folder on the device named like an app or a document package, such as Tool.app or Notes.rtfd, shows in Finder as an app or a document, because macOS goes by the name. Android's own app folders count too: Android/data/com.example.app reads as an app. It is read-only on the Mac, with everything in it: edit it on the device, or copy it to the Mac. Something put inside one stays on the Mac, and Finder shows an error for it. Saving one from a Mac app can leave a copy beside it, such as Notes 2.rtfd, which Finder marks with an error, with the edit only on the Mac: copy it to the Mac to keep it. A folder can't be renamed to such a name. To remove one, delete it on the device, or delete the folder that holds it; Finder may put that folder back once, so delete it again.
 
-When every selected file is an `.apk` and Ferry reaches the device over ADB (with USB debugging
-on, or over Wi-Fi), the menu also has **Install on** the device. It installs each app
-as **Install App…** in the menu does.
+### When a file changed on both sides
 
-Finder shows no progress for these. A notification says when the files are on the device or the
-apps are installed, or why not. The Ferry menu shows a send in progress when you click its
-device.
+If a file changed on the device after the Mac read it, Ferry keeps the device's version and saves yours beside it as **name (conflict from Mac)**.
 
-To turn on the Finder menu, once:
+Ferry never replaces a file the device changed without you seeing it.
 
-1. Open System Settings, then **General** → **Login Items & Extensions**.
+### See changes made on the device
+
+How quickly Finder shows a change made on the device depends on how Ferry reaches it.
+
+Ferry watches the 32 folders Finder showed most recently on each device. A change in a folder you have not opened shows up when you open it. While a copy to or from the device runs, Ferry checks for changes again once it ends.
+
+- **USB debugging or Wi-Fi**: Changes show up in Finder within a few seconds, and within about 30 seconds at most.
+- **File transfer**: New and deleted files show up within about 30 seconds. A file changed in place or renamed on the device needs **Refresh**.
+
+**Refresh** in the Ferry menu (⌘R while the menu is open) shows every change at once.
+
+### Send files from Finder
+
+Control-click files on the Mac and choose **Send to** and the device. Ferry copies them into the Download folder on the device's internal storage. Ferry's button in the Finder toolbar has the same menu once you add it with **View** → **Customize Toolbar**.
+
+If Download already has a file with the same name, Ferry keeps it and saves yours beside it as **name (conflict from Mac)**. Sending never replaces a file.
+
+When every selected file is an .apk and Ferry reaches the device over ADB (with USB debugging on, or over Wi-Fi), the menu also has **Install on** the device, which installs the apps as Install App… does.
+
+A notification says when the files are on the device or the app is installed, or why not.
+
+#### Turn on Send to
+
+1. To turn on this menu, open System Settings, then **General** → **Login Items & Extensions**.
 2. Under Extensions, find Ferry's Finder extension and turn it on.
-
-### Large files
-
-Files larger than 4 GB copy normally to internal storage. Many SD cards use a format (FAT32)
-that cannot hold a file larger than 4 GB; Ferry then shows an error rather than copying part
-of the file.
-
-### Rename, new folder
-
-Rename files and folders, and create new folders, the same way as on any drive.
-
-### Delete
-
-The device has no Trash. Finder offers **Delete Immediately** instead of **Move to Trash**,
-and the file is removed from the device at once. It cannot be recovered from the Mac.
-
-Ferry deletes a folder with its contents only if Finder has shown everything in it, at every
-level, as it is now on the device. If anything inside it is new or changed on the device, or a
-folder inside it was never opened in Finder, the whole folder stays and Finder puts it back,
-showing what is there; delete it again to remove it. A folder nested more than 64 levels deep,
-or holding more than 100,000 items, also stays, and so does a folder that holds a file whose
-name the Mac can't show (Finder leaves that file out of the folder): delete it on the device. A
-file the device changed since Finder last showed it is not deleted either: Finder puts it back
-with the device's version.
 
 ### Free up space on the Mac
 
-When you open a file, macOS keeps a copy on the Mac. To remove that copy and keep the file on
-the device, Control-click the file and choose **Remove Download**.
+Control-click a file you opened and choose **Remove Download**. The file stays on the device.
 
 ## The menu
 
-Click the Ferry icon in the menu bar to see each connected device. Each one is a row with a
-round tile (in color while Ferry serves the device, grey otherwise), its name, and a line under
-the name: how Ferry reaches it and its free space, such as **USB · 21 GB free**, its address
-over Wi-Fi, or its state. Click a device to see what you can do with it, and click it again to
-close it. One device is open at a time; the first ready one is open when the menu opens.
+### Read the menu
 
-| State | Meaning |
-| ----- | ------- |
-| **Ready** | The device is sharing files and is in Finder. Click it to see each storage and its free space. |
-| **Not sharing files** | The device is connected but file transfer is off or it is locked. Click **How to Turn On File Transfer** for the steps. |
-| **Ejected** | You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in. |
-| **In use by another app** | Another app has the device. Quit it, then click **Check Again**. See [Troubleshooting](#in-use-by-another-app). |
-| **Can't open** | The device reported an error, shown when you click it. Click **Check Again**, or unplug it and plug it back in. |
+The menu has a header with **Refresh**, then any problem that needs you, then your devices, then **Connect by Address…** and **Pair with Code…**, then **Open at Login**, **Help** and **Quit Ferry**.
 
-Above the devices, the menu can also show:
+Every device starts closed each time the menu opens. Click a device to see its details and what you can do with it, and click it again to close it. One device is open at a time, and it stays open while the menu is.
 
+- **Ready**: The device is sharing files and is in Finder. Under its name the menu shows how Ferry reaches it and the free space, such as USB · 21 GB free, or its address over Wi-Fi.
+- **Not sharing files**: File transfer is off or the device is locked. Choose **Transfer files** on the device, then **Refresh**.
+- **Waiting for Allow**: USB debugging is on, but this Mac is not allowed yet. Tap **OK** or **Allow** on the device.
+- **Ejected**: You ejected the device. It stays out of Finder until you click **Mount**, choose **Refresh**, or unplug it and plug it back in.
+- **In use by another app**: Another app has the device. Quit that app, then click **Check Again**.
+- **Can't open**: The device reported an error. Click **Check Again**, or unplug it and plug it back in.
 - **Checking…**: Ferry is waiting for its helper to answer, for example just after Ferry opens.
-- **Turn on Ferry in Finder**: see [Turn on Ferry in Finder](#turn-on-ferry-in-finder). It
-  shows only once a device has been connected, since there is nothing to turn on before.
-- **Allow Ferry's helper** or **macOS can't find Ferry's helper**: macOS is not letting the
-  helper run. See [Ferry's helper is not responding](#ferrys-helper-is-not-responding).
-- A copy in progress, when you click its device: **Copying "name" to the device** or **to this
-  Mac**, with how far it has got.
-- **No device connected**, with **How to Connect** under it. The first time the menu stays
-  open for about 10 seconds with no device, Ferry opens the setup guide.
+- **Remembered · not nearby**: A device Ferry connects over the network that it can't reach now.
 
-While the menu is open, Ferry checks for devices every 2 seconds.
+#### Menu items
 
-A device over ADB (with USB debugging on, or over Wi-Fi) lists the
-[tools](#tools-over-usb-debugging) when you click it. A device on file transfer also shows
-**More Tools with USB Debugging…**, which opens the [steps](#usb-debugging-adb), or **Allow USB
-debugging on the device** once USB debugging is on and waits for you to tap **Allow**. When
-`adb` is not installed and a device is connected, the menu shows **Install adb for more
-tools…**. When `adb` is installed but its server is not answering, it shows **adb isn't
-running** with **Check Again**. A device on your network that waits for you to allow this Mac
-shows **Waiting for you to allow this Mac on** its address.
+- **Refresh**: Press ⌘R while the menu is open. Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds.
+- **Open at Login**: Starts Ferry when you log in. A checkmark shows it is on. **Needs approval in System Settings** means macOS is waiting for you to allow it there.
+- **Help**: Opens this window. Press ⌘? while the menu is open. Here, ⌘F goes to the search field, Return opens the best match, and ⌘[ and ⌘] step through the topics. A **?** beside a problem in the menu opens its entry here.
+- **Quit Ferry**: Closes the menu. The helper keeps running, so devices stay in Finder.
 
-Menu items:
+### Device details and addresses
 
-- **Refresh** (⌘R): reads each ready device's folders again at once, so every change made on
-  the device shows in Finder, including files changed in place or renamed in file transfer
-  mode; mounts every device you ejected; and checks again a device that is not sharing files.
-- **Eject** (in a ready device's list): removes the device from Finder and releases it, so you
-  can unplug it or use it with another app. The device then shows **Ejected** until you click
-  **Mount**, choose **Refresh**, or unplug it and plug it back in. Changes that had not reached
-  the device are saved to a folder on the Mac: the menu says **Unsent changes were saved to**
-  that folder and offers **Reveal in Finder**. Deletes and renames that had not reached the
-  device are dropped, so the device keeps those files under their old names.
-- **Mount** (in an ejected device's list): puts it back in Finder.
-- **Check Again** (in the list of a device that is in use or can't open): asks Ferry to open
-  the device again.
-- **Send File…** (in a ready device's list): sends files you choose into the device's
-  `Download` folder, as **Send to** does in Finder.
-- **Open at Login**: starts the Ferry menu-bar item when you log in. A checkmark shows it is on.
-- **Help** (⌘?): opens Ferry Help.
-- **Quit Ferry** (⌘Q): closes the menu-bar item. The helper keeps running, so devices stay in
-  Finder.
+An open device lists its network ports with their IPv4 addresses, then its Android version and battery, such as Android 8.1.0 · Battery 87%. For a model Ferry knows, every port is listed by the name on the unit, with Not connected for one that has no address. Ferry only reads them, when you open the device and every 10 seconds while the menu stays open.
 
-Ferry has no Settings window. **How to Connect** is in the menu while no device is connected,
-and in Help; **Remove Ferry…** is in Help, under Troubleshooting (see [Uninstall](#uninstall)).
+Click an address to copy it; the line shows Copied for a moment. Option-click an address to copy everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage. The line shows Copied All for a moment.
 
-## Tools over USB debugging
+Details need USB debugging or Wi-Fi.
 
-Click a device Ferry reaches over ADB, with USB debugging on or over Wi-Fi, to see its details
-and its tools: **Take Screenshot**, **Record Screen**, **Send File…**, **Install App…**,
-**Logcat**, **Port Forwarding** and **Open in Terminal**. A device on file transfer shows
-**More Tools with USB Debugging…** instead.
+### A device's tools
+
+Under an open device, its tools sit in groups divided by thin lines. A device on file transfer shows More Tools with USB Debugging… instead of the ADB tools.
+
+- **Take Screenshot, Record Screen**: Capture the device's screen.
+- **Send File…, Install App…**: Copy files into Download, or install an app.
+- **Logcat, Port Forwarding, Open in Terminal**: Developer tools.
+- **Use over Wi-Fi, Forget This Device, Eject**: Connection and Finder.
+
+#### Rows that depend on the state
+
+- **Eject**: Removes a ready device from Finder and releases it; it then shows **Ejected**. Changes that had not reached the device are saved to a folder on the Mac, and the menu offers **Reveal in Finder**. Deletes and renames that had not reached the device are dropped, so the device keeps those files under their old names.
+- **Mount**: For an ejected device: puts it back in Finder.
+- **Check Again**: For a device in use by another app, or one that can't open: tries it again.
+- **How to Turn On File Transfer**: For a device not sharing files: opens the steps for it.
+- **More Tools with USB Debugging…**: Opens the steps that turn on USB debugging.
+
+### Take a screenshot or record the screen
+
+Click **Take Screenshot** to save what the device's screen shows. Click **Record Screen** to record it, for up to three minutes; the menu shows how long it has been recording, and **Stop Recording** ends it.
+
+Ferry turns the device's screen on before a screenshot or a recording, so a screen that was off is not captured black. A recording of a screen that does not change has a single frame.
+
+Ferry saves them in Documents, in Ferry, then a folder for each device with Screenshots and Screen Recordings in it, named like macOS's own, such as Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png, and shows them in Finder. macOS asks whether Ferry may use Documents the first time it saves one. It never replaces a file. A recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry then removes it from the device.
+
+If Ferry can't save a recording, the menu shows Recording couldn't be saved: Choose Folder… saves it where you pick, and Discard deletes it from the device. Record Screen returns once it is saved or discarded. An ejected device keeps its recording until Ferry serves it again.
 
 ### Install an app
 
-Click **Install App…** and choose an `.apk` file, or drag one `.apk` onto the device in the
-menu. Ferry checks that the file is an Android app, copies it to the device and installs it,
-replacing an older version of the same app. The menu shows how far the copy has got, then says
-when the app is installed.
+Click Install App… and choose an .apk file, or drag one .apk onto the device in the menu. Ferry checks that the file is an Android app, copies it to the device and installs it, replacing an older version of the same app. The menu shows how far the copy has got, then says when the app is installed.
 
-If the device refuses the app, the menu says why, for example that a newer version is installed
-or that the app needs a newer version of Android. Ferry removes its copy of the app from the
-device either way.
+Click **Cancel** to stop while the app is still being copied. Once the device is installing it, the install finishes.
 
-### Screenshots and screen recordings
+If the device refuses the app, the menu says why, for example that a newer version is installed or that the app needs a newer version of Android. Ferry removes its copy of the app from the device either way.
 
-Click **Take Screenshot** to save what the device's screen shows. Click **Record Screen** to
-record it, for up to three minutes; the menu shows how long it has been recording, and **Stop
-Recording** ends it.
+### Send a file from the menu
 
-Ferry saves them in `Documents/Ferry/<device>/`, screenshots in `Screenshots` and recordings in
-`Screen Recordings`, named like macOS's own, such as
-`Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png`, and shows them in Finder. macOS asks
-whether Ferry may use Documents the first time it saves one. It never replaces a file. A
-recording waits on the device until Ferry has saved it, even if you quit Ferry meanwhile; Ferry
-then removes it from the device.
+Click **Send File…** under a device and choose files. Ferry copies them into the device's Download folder, as **Send to** does in Finder.
 
-If Ferry can't save a recording, the menu shows **Recording couldn't be saved**:
-**Choose Folder…** saves it where you pick, and **Discard** deletes it from the device.
-**Record Screen** returns once it is saved or discarded. An ejected device keeps its recording
-until Ferry serves it again.
+The menu says when they are there, or why not.
 
-Ferry turns the device's screen on before a screenshot or a recording, so a screen that was off
-is not captured black. A recording of a screen that does not change has a single frame.
+### Watch the device's log
 
-### Logcat
+Click Logcat to watch the device's log in a window of its own. Ferry keeps the newest 50,000 lines. Level shows lines at that level and above, and Filter shows the lines that contain your text, whatever its case. Pause freezes the window while lines keep arriving, and Resume catches up. Clear empties it.
 
-Click **Logcat** to watch the device's log in a window of its own.
-Ferry keeps the newest 50,000 lines. **Level** shows lines at that level and above, and
-**Filter** shows the lines that contain your text, whatever its case. **Pause** freezes the
-window while lines keep arriving, and **Resume** catches up. **Clear** empties it.
-
-**Save…** writes the lines that match the filters to a plain text file where you choose. The log
-stops when you close the window or the device goes away.
-
-### Open a shell
-
-Click **Open in Terminal** for a shell on the device (`adb shell`) in Terminal. Ferry needs adb
-for this, and says so if it can't find it. Nothing on the device changes unless you type a
-command that changes it.
+Save… writes the lines that match the filters to a plain text file where you choose. The log stops when you close the window or the device goes away.
 
 ### Forward a port
 
-Click **Port Forwarding** under the device to send connections to a port on this Mac to a port
-on the device. It opens in place and lists each forward as **Mac 8080 → Device 80**. Type the
-port on this Mac (1024 or higher) and the port on the device, then click **Add** or press
-Return. The remove button beside a forward ends it.
+Port forwarding sends connections to a port on this Mac to a port on the device.
 
-If the port on this Mac is already in use, adb's message shows under the ports. Ferry lists only
-the TCP forwards adb holds for this device.
+If the port on this Mac is already in use, adb's message shows under the ports. Ferry lists only the TCP forwards adb holds for this device.
 
-### Device details
+1. Click **Port Forwarding** under the device. It opens in place and lists each forward as Mac 8080 → Device 80.
+2. Type the port on this Mac (1024 or higher) and the port on the device.
+3. Click **Add** or press Return.
 
-An open device lists its network ports with their IPv4 addresses, then its Android version and
-battery. For a model Ferry knows, every port is listed by the name on the unit, with **Not
-connected** for one that has no address. Ferry only reads them, when you open the device and
-every 10 seconds while the menu stays open.
+The remove button beside a forward ends it.
 
-Click an address to copy it; the line shows **Copied** for a moment. Option-click any line to
-copy everything the device reports: model, Android version, build, serial number, battery,
-every address on every port including IPv6, and storage. The line shows **Copied All** for a
-moment.
+### Open a shell in Terminal
+
+Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it.
 
 ## Troubleshooting
 
 ### The device does not show up
 
-1. Check the cable. Some USB cables carry power only. Try another cable or port.
+1. Try another cable. Some carry power only.
 2. Unlock the device.
-3. Turn on file transfer: see [Connect a NetAlly unit](#connect-a-netally-unit) or
-   [Connect another Android phone](#connect-another-android-phone).
-4. Check that Ferry is turned on under **File Providers** (see
-   [Turn on Ferry in Finder](#turn-on-ferry-in-finder)).
+3. Turn on file transfer on the device.
+4. Check that Ferry is on under File Providers in Login Items & Extensions.
 5. Choose **Refresh** in the Ferry menu.
 
-### "Not sharing files"
+In the app, **How to Turn On File Transfer** opens the setup guide.
 
-The device is connected, but file transfer is off or the device is locked. Unlock it and
-choose **Transfer files** (or **File transfer**) on the device. You do not need to replug the
-cable. A device you ejected shows **Ejected** instead: click **Mount**.
+#### An app or script from the device does not open at once
 
-### "In use by another app"
+Files copied from a device, and folders on it named like an app or a document package, are marked as downloaded, so macOS checks an app or script with Gatekeeper before it first opens, as it does for one from the internet.
 
-Only one app can use the device at a time. Quit any of these that are open, then click
-**Check Again**:
+### Device messages
 
-- Image Capture
-- Preview
-- Android File Transfer
-- MacDroid
-- OpenMTP
+What the menu says about a connected device, and what to do.
 
-Photos, Google Drive and Dropbox can also grab a phone when it is plugged in.
+**No device connected**
 
-### The sidebar shows "Ferry" instead of the device name
+No device is connected and sharing files.
 
-When only one device location exists, macOS labels it in the sidebar with the app's name,
-"Ferry". This is how macOS shows it, not an error. The device name shows when two or more
-locations are present.
+Connect the device and choose **Transfer files** on it.
 
-### The device was unplugged during a copy
+**Choose Transfer files on the device.**
 
-Plug it back in and turn on file transfer again. Finder finishes the copy when the device
-reconnects. Nothing is left on the device under the file's real name until the copy is
-complete.
+The device is connected but is not sharing files, or no device has shared files yet.
 
-### "Ferry's helper is not responding"
+Unlock the device and choose **Transfer files** on it.
 
-If the menu says **Allow Ferry's helper** or **macOS can't find Ferry's helper**, macOS is not
-letting the helper run. Click **Open System Settings**, then in **Login Items & Extensions**
-turn on **Ferry** under **Allow in the Background**.
+**Not sharing files**
 
-If the menu says "Ferry's helper is not responding. Quit Ferry and open it again.", quit Ferry
-from the menu and open it again from Applications.
+File transfer is off or the device is locked.
 
-### "Packages and app bundles can't be copied to the device"
+Unlock the device and choose **Transfer files** on it, then choose **Refresh**. You do not need to replug the cable.
 
-A package, such as an `.rtfd` or Keynote document, an app, a plug-in or a framework, is one item
-on the Mac but a folder on the device, so Ferry does not copy it. Control-click it, choose
-**Compress**, and copy the `.zip` instead.
+**The device is not sharing files.**
 
-### An app or script from the device does not open at once
+The device locked or turned off file transfer during the task.
 
-Files copied from a device are marked as downloaded, like files from the internet, so macOS
-checks an app or script with Gatekeeper before it first opens, and may ask you to confirm. A
-folder on the device named like an app or a document package (`Tool.app`, `Notes.rtfd`) shows
-in Finder as one, and is marked the same way.
+Unlock the device and choose **Transfer files** on it, then try again.
+
+**In use by another app**
+
+Another Mac app has the device open, so Ferry can't reach it.
+
+Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then click **Check Again**.
+
+**Quit Image Capture or Android File Transfer, then try again.**
+
+Another Mac app has the device open.
+
+Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then click **Check Again**.
+
+**Another app is using the device. Quit Image Capture or Android File Transfer.**
+
+Another Mac app has the device open, so Ferry can't reach it.
+
+Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then click **Check Again**.
+
+**Can't open**
+
+The device reported an error when Ferry opened it.
+
+Click **Check Again**, or unplug the device and plug it back in.
+
+**The device reported an error.**
+
+The device refused the request without saying why.
+
+Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**.
+
+**The device was disconnected.**
+
+The device went away during the task: the cable came out, it went to sleep, or it left the network.
+
+Reconnect the device and try again.
+
+**The device reports no storage.**
+
+The device shares no storage, which happens while it is locked.
+
+Unlock the device and choose **Refresh**.
+
+**The device does not support this: ….**
+
+The device can't do what was asked. The rest of the message says what.
+
+Do it another way, for example on the device itself.
+
+**Error: …**
+
+Something failed on the device, the Mac or the connection. The rest of the message says what.
+
+Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**.
+
+**Cancelled.**
+
+The task stopped before it finished, usually because you cancelled it.
+
+Start it again if you still need it.
+
+**Ferry can't watch USB for devices, so it looks for them every 30 seconds.**
+
+macOS did not let Ferry watch for devices being plugged in.
+
+Nothing to do: devices still appear, a little later. Restart the Mac if it stays.
+
+**Unsent changes were saved to …**
+
+You ejected the device before some changes reached it. macOS kept those files in a folder on the Mac. Deletes and renames that had not reached the device were dropped.
+
+Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again.
+
+### USB debugging messages
+
+Messages about ADB, adb and allowing this Mac.
+
+**Waiting for Allow**
+
+USB debugging is on, but this Mac is not allowed on the device yet.
+
+Unlock the device, tick **Always allow from this computer** and tap **OK** or **Allow**.
+
+**Allow USB debugging on the device**
+
+The device is asking whether to allow this Mac.
+
+Unlock the device, tick **Always allow from this computer** and tap **OK** or **Allow**.
+
+**Install adb for more tools…**
+
+adb is not installed, so Ferry can use file transfer only.
+
+Click **Copy**, run the command in Terminal, then click **Check Again**.
+
+**adb isn't running**
+
+adb is installed but its server is not answering.
+
+Click **Check Again**. If that does not help, run `adb start-server` in Terminal.
+
+**This needs USB debugging. Turn it on, then try again.**
+
+This tool works only over ADB, and the device is on file transfer.
+
+Turn on USB debugging on the device, then try again.
+
+**Ferry can't find adb. Install it, then try again.**
+
+This tool runs adb, and Ferry can't find it on this Mac.
+
+In Terminal, run `brew install --cask android-platform-tools`, then try again.
+
+**Ferry couldn't open Terminal.**
+
+macOS did not let Ferry open Terminal, or Terminal is missing.
+
+Open Terminal once yourself, then try again. If macOS asks whether Ferry may control Terminal, allow it.
+
+### Wi-Fi and network messages
+
+Messages from Use over Wi-Fi, Connect by Address, Pair with Code and remembered devices.
+
+**Waiting for you to allow this Mac on …**
+
+A device on your network is asking whether to allow this Mac.
+
+Tap **Allow** on the device.
+
+**Tap Allow on the device to finish connecting.**
+
+The device answered and is asking whether to allow this Mac.
+
+Tap **Allow** on the device.
+
+**Ferry knows this device at another address. Confirm the new one in the menu.**
+
+A new address answered as a device Ferry already knows, and Ferry will not use it until you say so.
+
+Click the address in the menu and choose **Use It** if it is your device, or **Ignore**.
+
+**The device has no network address. Connect it to Ethernet or Wi-Fi first.**
+
+The device is not on Ethernet or Wi-Fi.
+
+Connect the device to Ethernet or Wi-Fi, then click **Use over Wi-Fi** again.
+
+**adb isn't running. Install it, or choose Check Again.**
+
+Network connections need adb, and it is missing or not answering.
+
+Install adb, then click **Check Again**.
+
+**Connect the device with a cable and allow USB debugging first.**
+
+Use over Wi-Fi starts from a device Ferry serves over USB debugging.
+
+Connect the device by cable, allow this Mac on it, then try again.
+
+**Ferry has no address for this device. Connect it by address.**
+
+Ferry has never reached this device over the network.
+
+Click **Connect by Address…** and type its address.
+
+**Paired, but the device isn't offering a connection. Check Wireless debugging is on.**
+
+Pairing worked, but the device stopped offering a connection, usually because Wireless debugging turned off.
+
+On the device, turn on **Wireless debugging**, then click **Connect Again**.
+
+**That address belongs to another device.**
+
+The address answered as a different device from the one you chose.
+
+Check the address on the device and try again.
+
+**The device didn't say which device it is, so Ferry disconnected it.**
+
+The device answered without a serial number, so Ferry could not tell it from others.
+
+Connect the device by cable once, then try again.
+
+**Use the IP address the device shows under Pair device with pairing code.**
+
+Pairing needs the address from the pairing screen, which has its own port.
+
+Copy the IP address and port from **Pair device with pairing code** on the device.
+
+**That address changed. Check the menu and try again.**
+
+The address changed after the menu showed it.
+
+Open the menu again and choose from what it shows now.
+
+**Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again.**
+
+Turning on ADB over Wi-Fi restarts ADB on the device, which would stop a transfer, a screen recording or a log.
+
+Let them finish, then try again.
+
+**adb: …**
+
+adb refused the request. The rest of the message is adb's reason.
+
+Check the address and that the device is on the network, then try again.
+
+**Remembered · not nearby**
+
+Ferry knows the device but can't reach it on the network now.
+
+Connect the device to the network, click it in the menu, then **Connect Again**.
+
+### Messages in Finder
+
+Finder shows these when a copy, rename or delete on the device does not work.
+
+**Connect the device and choose Transfer files to see its files.**
+
+Finder shows this in a device's location while the device is not connected or not sharing files.
+
+Connect the device and choose **Transfer files** on it.
+
+**Packages and app bundles can’t be copied to the device. Compress it into a .zip first.**
+
+A package is one item on the Mac but a folder on the device, so Ferry does not copy it.
+
+Control-click it, choose **Compress**, and copy the .zip instead.
+
+**Symbolic links and aliases can’t be copied to the device.**
+
+The device has no links or aliases.
+
+Copy the original file instead.
+
+**A folder on the device can’t take a package name, such as .app or .rtfd: macOS would open it as an app or a document.**
+
+macOS would show a folder with that name as an app or a document.
+
+Choose a name without a package extension, such as .app or .rtfd.
+
+**Folders named like an app or a document package, and what they hold, can’t be changed from this Mac. Change them on the device.**
+
+macOS shows such a folder as an app or a document, so Ferry keeps it read-only.
+
+Change it on the device, or copy it to the Mac.
+
+**The device does not support ….**
+
+The device can't do what Finder asked, such as moving a file in one step.
+
+Copy the file to its new place, then delete the original.
+
+**The device saved “…” as “…”.**
+
+The device changed the name, for example because it cannot store some characters.
+
+Use the name the device chose, or rename it with characters the device accepts.
+
+**The device sent … bytes of a file it lists as … bytes.**
+
+The file arrived with a different size than the device listed, so the copy is not complete.
+
+Choose **Refresh**, then open the file again.
+
+**The device stored … bytes where … were sent.**
+
+The device kept a different size than Ferry sent, so the copy is not complete.
+
+Check the device has free space, then copy the file again.
+
+**“…” holds folders nested more than … deep, which Ferry does not delete.**
+
+Ferry does not delete a folder nested more than 64 levels deep.
+
+Delete it on the device.
+
+**Unexpected response from the Ferry agent.**
+
+Ferry's helper answered in a way the Finder extension does not expect, which can happen right after an update.
+
+Quit Ferry from the menu and open it again from Applications.
+
+### Send to and Send File messages
+
+The notification or menu line says which file failed, then why. Look up the reason here too.
+
+**Couldn’t send “…” to …**
+
+The file did not reach the device. The next line says why.
+
+Fix what the next line says, then send it again.
+
+**Couldn’t send … files to …**
+
+None of the files reached the device. The next line says why for one of them.
+
+Fix what the next line says, then send them again.
+
+**Sent … of … to …**
+
+Some files reached the device and some did not. The next line names one that did not, and why.
+
+Fix what the next line says, then send the rest again.
+
+**“…” wasn’t sent. …**
+
+The file named did not reach the device. The reason follows.
+
+Fix the reason, then send it again.
+
+**Also not sent: ….**
+
+More files failed besides the one named.
+
+Fix the reason given, then send them again.
+
+**Couldn’t install “…” on …**
+
+The app did not install. The next line says why.
+
+Fix what the next line says, then install it again.
+
+**Couldn’t install … apps on …**
+
+None of the apps installed. The next line says why for one of them.
+
+Fix what the next line says, then install them again.
+
+**Installed … of … on …**
+
+Some apps installed and some did not. The next line names one that did not, and why.
+
+Fix what the next line says, then install the rest again.
+
+**“…” wasn’t installed. …**
+
+The app named did not install. The reason follows.
+
+Fix the reason, then install it again.
+
+**Also not installed: ….**
+
+More apps failed besides the one named.
+
+Fix the reason given, then install them again.
+
+**Only files can be sent.**
+
+You chose something that is not a regular file.
+
+Choose files. To copy a folder, drag it into the device's location in Finder.
+
+**Folders can’t be sent from this menu. Copy the folder into the device’s location in Finder, or compress it into a .zip first.**
+
+Send to sends files only.
+
+Drag the folder into the device's location in Finder, or compress it into a .zip first.
+
+**The device can’t store a file with that name.**
+
+The name has characters the device's storage does not allow.
+
+Rename the file on the Mac, then send it again.
+
+**The device doesn’t have enough free space.**
+
+The device's storage is full.
+
+Free up space on the device, then try again.
+
+**The device has a file named Download where its Download folder should be. Rename or remove it on the device, then try again.**
+
+Ferry sends into Download, and a file on the device has that name.
+
+Rename or remove that file on the device, then try again.
+
+**The file can’t be read.**
+
+Ferry could not read the file on the Mac, for example because of its permissions.
+
+Check that you can open the file, then try again.
+
+**The file is too large for the device’s storage.**
+
+The storage cannot hold a file this large. Many SD cards stop at 4 GB.
+
+Compress or split the file, or copy it to internal storage.
+
+**This Mac doesn’t have enough free space to copy the file.**
+
+Ferry needs room on the Mac for the copy.
+
+Free up space on the Mac, then try again.
+
+### App install messages
+
+Install App…, Install on and dropping an .apk on a device can end with these.
+
+**That file isn't an Android app (.apk).**
+
+The file does not hold an Android app, even if its name ends in .apk.
+
+Choose a real .apk file. A split app (.apks or .xapk) can't be installed this way.
+
+**That app is larger than 4 GB.**
+
+Ferry installs apps up to 4 GB.
+
+Install it another way, such as from an app store on the device.
+
+**The app is already installed.**
+
+The device already has this app.
+
+Nothing to do. To reinstall it, uninstall it on the device first.
+
+**A newer version of the app is installed. Uninstall it first.**
+
+The device has a newer version of this app than the .apk you chose.
+
+Uninstall the app on the device, then install again. Or install a newer .apk.
+
+**The installed app is signed differently. Uninstall it first.**
+
+The app on the device was signed by someone else, so Android will not replace it.
+
+Uninstall the app on the device, then install again. Its data on the device goes with it.
+
+**The app needs a newer version of Android.**
+
+The app needs a newer Android than the device runs.
+
+Use a version of the app that supports this Android version.
+
+**The app doesn't support this device's processor.**
+
+The app is built for a different kind of processor than this device has.
+
+Get a version of the app built for this device.
+
+**The app is a test build, which the device won't install.**
+
+The app is marked as a test build, which Android installs only with a developer command.
+
+Use a release build of the app.
+
+**Another app on the device already defines one of this app's permissions.**
+
+An app already on the device defines a permission this app also defines.
+
+Uninstall the other app, then install again.
+
+**Another app on the device already uses this app's content provider.**
+
+An app already on the device claims the same content provider.
+
+Uninstall the other app, then install again.
+
+**The app needs a library the device doesn't have.**
+
+The app depends on a system library this device lacks.
+
+Use a version of the app made for this device.
+
+**The app couldn't be read by the device. It may be damaged or unsigned.**
+
+The device could not read the .apk. It may be incomplete, damaged or unsigned.
+
+Download or build the .apk again, then install it.
+
+**The device doesn't allow installing apps over USB.**
+
+A setting on the device blocks installs over USB.
+
+In **Developer options**, turn on **Install via USB** if the device has it, then try again.
+
+**The device's app verification refused the app.**
+
+The device's app checks blocked the app.
+
+Install apps only from sources you trust. The device's security settings may let you allow it.
+
+**The install was cancelled on the device.**
+
+Someone tapped Cancel on the device, or the device stopped the install.
+
+Install again and accept the prompt on the device.
+
+**The device doesn't have enough space for the app.**
+
+The device's internal storage is too full to install the app.
+
+Free up space on the device, then try again.
+
+**Couldn't install the app: …**
+
+The device refused the app for a reason Ferry has no plain words for. The rest of the message is the device's own reason.
+
+Look up that reason, or check that the app suits this device.
+
+### Screenshot and recording messages
+
+Take Screenshot and Record Screen can end with these.
+
+**The device didn't send a screenshot. Unlock it and try again.**
+
+The device returned no image, which happens while it is locked.
+
+Unlock the device and click **Take Screenshot** again.
+
+**Ferry can't save to its folder in Documents. Allow Ferry in Privacy & Security.**
+
+macOS is not letting Ferry write to Documents, where it saves screenshots and recordings.
+
+Open System Settings → **Privacy & Security** → **Files & Folders**, and turn on Documents for Ferry.
+
+**The device is already recording its screen.**
+
+A recording is already running on the device.
+
+Click **Stop Recording** first.
+
+**The device isn't recording its screen.**
+
+No recording is running, so there is nothing to stop. It may have reached its three-minute limit.
+
+Click **Record Screen** to start a new one.
+
+**The device didn't record its screen.**
+
+The device's screen recorder stopped without a recording.
+
+Unlock the device and try again.
+
+**The device didn't record its screen: …**
+
+The device's screen recorder failed. The rest of the message is the device's own reason.
+
+Unlock the device and try again. Some screens, such as protected video, can't be recorded.
+
+**The device sent more than a recording can be, so Ferry deleted it.**
+
+The file the device sent was larger than a three-minute recording can be, so Ferry did not keep it.
+
+Record again.
+
+**The recording stopped arriving. It's still on the device: choose a folder, or discard it.**
+
+The recording stopped coming from the device before Ferry saved it.
+
+Click **Choose Folder…** to save it, or **Discard** to delete it from the device.
+
+**The recording is still being finished. Try again in a moment.**
+
+Ferry is still saving the last recording.
+
+Wait until the menu stops showing **Saving recording…**, then try again.
+
+**Recording couldn't be saved**
+
+Ferry could not save the recording in Documents. It is still on the device.
+
+Click **Choose Folder…** to save it where you pick, or **Discard** to delete it.
+
+**Ferry's helper couldn't start copying the recording.**
+
+Ferry's helper could not make the file to copy the recording into.
+
+Check the Mac has free space, then click **Choose Folder…** again.
+
+### Port forwarding and log messages
+
+**Ports on this Mac start at 1024.**
+
+Ports below 1024 on a Mac need administrator rights.
+
+Type a port from 1024 to 65535.
+
+**Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device.**
+
+One of the ports is missing or out of range.
+
+Type a Mac port from 1024 to 65535 and a device port from 1 to 65535.
+
+**adb couldn't forward the port: …**
+
+adb refused the forward. The rest of the message is adb's reason. Often the port on this Mac is already in use.
+
+Choose another port on this Mac, or quit the app that uses it.
+
+**That forward is already gone.**
+
+adb removed the forward already, for example because the device disconnected.
+
+Nothing to do. Add it again if you need it.
+
+**The device ended the log.**
+
+The device stopped sending its log, for example because it restarted.
+
+Close the window and click **Logcat** again.
+
+**— Lines skipped: …. The log came faster than Ferry could show it. —**
+
+The log came faster than Ferry could show it, so some lines were left out.
+
+Set **Level** or **Filter** to show fewer lines.
+
+**Couldn't save the log: …**
+
+Ferry could not write the file. The rest of the message says why.
+
+Choose another folder, or check there is free space, then click **Save…** again.
+
+### Ferry's helper and settings
+
+Messages about Ferry itself.
+
+**Turn on Ferry in Finder**
+
+Ferry's locations are all off in System Settings.
+
+Click **Open System Settings** and turn on Ferry under File Providers.
+
+**Allow Ferry's helper**
+
+macOS is not letting Ferry's helper run.
+
+Click **Open System Settings** and turn on Ferry under Allow in the Background.
+
+**macOS can't find Ferry's helper**
+
+macOS has lost track of Ferry's helper, often after Ferry moved.
+
+Click **Open System Settings** and turn on Ferry under Allow in the Background. If it is missing, move Ferry to Applications and open it again.
+
+**Ferry's helper is not responding. Quit Ferry and open it again.**
+
+Ferry's helper stopped answering.
+
+Quit Ferry from the menu and open it again from Applications.
+
+**Ferry's helper didn't answer in time. Try again in a moment.**
+
+Ferry's helper is busy or stuck.
+
+Wait a moment and try again. If it keeps happening, quit Ferry and open it again.
+
+**Ferry was updated. Quit and reopen Ferry.**
+
+A newer Ferry replaced this one while it was running.
+
+Click **Relaunch**.
+
+**Ferry's helper couldn't read the request.**
+
+The helper got a request it could not read, which can happen right after an update.
+
+Quit Ferry from the menu and open it again from Applications.
+
+**Ferry's helper doesn't take this request from here.**
+
+A part of Ferry asked for something only another part may ask, which points to a mixed or damaged install.
+
+Install Ferry again, then open it.
+
+**Could not change Open at Login.**
+
+macOS did not accept the change.
+
+Try again. Or open System Settings → **General** → **Login Items & Extensions** and change it there.
+
+**Needs approval in System Settings**
+
+macOS is waiting for you to allow Ferry to open at login.
+
+Open System Settings → **General** → **Login Items & Extensions** and allow Ferry.
+
+**Could not remove Ferry. Make sure Ferry is running, then try again.**
+
+Ferry's helper did not answer, so its locations could not be removed.
+
+Quit Ferry, open it again, then click **Remove Ferry…** again.
+
+**Help isn't available**
+
+Ferry's help is missing from the app.
+
+Install Ferry again.
 
 ### Remove Ferry
 
-In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Ferry removes its
-locations from Finder, stops its helper and quits. Files on your devices are not touched. Use it
-before you move Ferry to the Trash, or to start again from a clean state.
+Removes Ferry's locations from Finder, stops Ferry's helper and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state.
 
-## Privacy
+The **Remove Ferry…** button is here in Ferry Help. Ferry asks you to confirm first.
 
-Ferry has no telemetry, analytics, crash reporting or account, and sends nothing to any server.
-Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to
-that device on your network and nowhere else.
+## About Ferry
 
-## Uninstall
+### Privacy
 
-1. In Ferry Help, under **Troubleshooting**, click **Remove Ferry…**, then confirm.
-   Your devices disappear from Finder, Ferry's helper stops and Ferry quits. Files on your
-   devices are not touched.
-2. Drag **Ferry** from Applications to the Trash.
+Ferry has no telemetry, no analytics and no account, and sends nothing to any server. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.
 
-Do step 1 first. It is the step that removes the Finder locations and stops the helper.
+### Uninstall
+
+1. In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched.
+2. Drag Ferry from Applications to the Trash.

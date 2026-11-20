@@ -109,15 +109,16 @@ struct InfoRowsTests {
     #expect(DevicePresentation.infoRows(bare).map(\.label) == ["Model", "Serial number"])
   }
 
-  /// Every word is the device's: an escape sequence in it is shown as text, in the rows and in
-  /// what Copy copies.
-  @Test func deviceTextIsEscaped() {
+  /// Every word is the device's, and the rows go to the pasteboard: control and bidi characters
+  /// are dropped, and the rest is copied as the device said it, a backslash included.
+  @Test func deviceTextIsCopiedSanitisedAndRaw() {
     let hostile = AndroidDeviceInfo(
-      model: "A\u{1B}[2Jb", androidVersion: "8\u{202E}", build: "x", serial: "S", battery: nil,
-      addresses: [.init(interface: "x\u{202E}0", address: "192.0.2.1")], storage: nil)
+      model: "A\u{1B}[2Jb\\c", androidVersion: "8\u{202E}", build: "x", serial: "S",
+      battery: nil, addresses: [.init(interface: "x\u{202E}0", address: "192.0.2.1")],
+      storage: nil)
     let rows = DevicePresentation.infoRows(hostile)
-    #expect(rows[0].value == "A\\u{1B}[2Jb")
-    #expect(rows[1].value == "8\\u{202E}")
-    #expect(rows[4].value == "192.0.2.1 (x\\u{202E}0)")
+    #expect(rows[0].value == "A[2Jb\\c")
+    #expect(rows[1].value == "8")
+    #expect(rows[4].value == "192.0.2.1 (x0)")
   }
 }

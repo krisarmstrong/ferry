@@ -92,7 +92,7 @@ struct AppModelWirelessTests {
     client.setWireless(.wireless(.awaitingAllow(address)))
     let model = model(client)
     #expect(await send(model, .address, address: "192.0.2.31") == true)
-    #expect(model.wirelessMessage == "Tap Allow on the device to finish connecting.")
+    #expect(model.wirelessMessage?.text == "Tap Allow on the device to finish connecting.")
   }
 
   @Test(arguments: [
@@ -112,7 +112,8 @@ struct AppModelWirelessTests {
     client.setWireless(.wireless(outcome))
     let model = model(client)
     #expect(await send(model, .address, address: "192.0.2.99") == false)
-    #expect(model.networkForm?.message == message)
+    #expect(model.networkForm?.message?.text == message)
+    #expect(model.networkForm?.message?.help != nil)
   }
 
   @Test func useOverWiFiAndForgetAndConnectAgainReachTheAgent() async {

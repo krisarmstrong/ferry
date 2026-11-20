@@ -55,7 +55,7 @@ struct AppModelRecordingTests {
     await model.refresh()
     await model.collectRecording(on: id)
     #expect(model.recordingUnsaved(on: id))
-    #expect(model.actionError == DevicePresentation.message(for: .cannotSave))
+    #expect(model.actionError == DevicePresentation.notice(for: .cannotSave))
     for _ in 0..<3 {
       await model.refresh()
       await settle()

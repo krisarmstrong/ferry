@@ -18,6 +18,11 @@ public enum PresentationText {
     String(localized: resource(for: error))
   }
 
+  /// The catalog key of `error`'s message, which names its entry in Help.
+  public static func helpKey(for error: TransportError) -> String {
+    resource(for: error).key
+  }
+
   private static func resource(for error: TransportError) -> LocalizedStringResource {
     switch error {
     case .deviceBusy:
@@ -49,6 +54,11 @@ public enum PresentationText {
 
   public static func message(for failure: ToolFailure) -> String {
     String(localized: resource(for: failure))
+  }
+
+  /// The catalog key of `failure`'s message, which names its entry in Help.
+  public static func helpKey(for failure: ToolFailure) -> String {
+    resource(for: failure).key
   }
 
   private static func resource(for failure: ToolFailure) -> LocalizedStringResource {

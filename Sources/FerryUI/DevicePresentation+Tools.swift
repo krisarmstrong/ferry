@@ -42,8 +42,8 @@ extension DevicePresentation {
 
 /// Text for the developer tools: the log window and port forwarding.
 extension DevicePresentation {
-  static var logEndedLine: String {
-    String(localized: LocalizedStringResource("The device ended the log.", bundle: .module))
+  static var logEnded: MenuNotice {
+    MenuNotice(LocalizedStringResource("The device ended the log.", bundle: .module))
   }
 
   static func skippedLinesLine(_ count: Int) -> String {
@@ -53,14 +53,14 @@ extension DevicePresentation {
         bundle: .module))
   }
 
-  static func saveLogFailure(_ reason: String) -> String {
+  static func saveLogFailure(_ reason: String) -> MenuNotice {
     let shown = DisplayText.escaped(reason)
-    return String(
-      localized: LocalizedStringResource("Couldn't save the log: \(shown)", bundle: .module))
+    return MenuNotice(
+      LocalizedStringResource("Couldn't save the log: \(shown)", bundle: .module))
   }
 
-  static var terminalFailure: String {
-    String(localized: LocalizedStringResource("Ferry couldn't open Terminal.", bundle: .module))
+  static var terminalFailure: MenuNotice {
+    MenuNotice(LocalizedStringResource("Ferry couldn't open Terminal.", bundle: .module))
   }
 
   static func logCountLine(shown: Int, held: Int) -> String {

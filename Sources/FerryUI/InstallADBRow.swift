@@ -7,7 +7,10 @@ struct InstallADBRow: View {
   @State private var copied = false
 
   var body: some View {
-    StatusRow(symbol: "terminal", title: Text("Install adb for more tools…", bundle: .module)) {
+    StatusRow(
+      symbol: "terminal", title: Text(MenuStatusText.installADB),
+      help: MenuStatusText.installADB.key
+    ) {
       Text(verbatim: DevicePresentation.installCommand)
         .font(.callout.monospaced())
         .textSelection(.enabled)
@@ -35,7 +38,7 @@ struct ADBNotRunningRow: View {
   var body: some View {
     StatusRow(
       symbol: "exclamationmark.triangle", tint: .yellow,
-      title: Text("adb isn't running", bundle: .module)
+      title: Text(MenuStatusText.adbNotRunning), help: MenuStatusText.adbNotRunning.key
     ) {
       StatusAction(title: Text("Check Again", bundle: .module), action: checkAgain)
     }

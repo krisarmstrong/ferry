@@ -5,7 +5,8 @@ import Foundation
 
 /// What a device says about itself, as an expanded device shows it inline (a line per port or
 /// interface with its IPv4 address, then its Android version and battery) and as an Option-click
-/// on a line copies it all. Every value is the device's, so it is escaped.
+/// on a line copies it all. Every value is the device's: the menu shows it escaped, and the copy
+/// carries it raw with control and bidi characters dropped.
 extension DevicePresentation {
   /// One port or interface: its name on the left, its IPv4 address (or "Not connected") on the
   /// right.
@@ -79,11 +80,11 @@ extension DevicePresentation {
     case nothing
   }
 
-  /// With Option held, a click on any line copies every detail; otherwise it copies the line's
-  /// address, and a line with none copies nothing.
+  /// A click on an address line copies its address, or with Option held every detail. A line
+  /// with no address is plain text and takes no click.
   static func detailClick(on line: DetailLine, modifiers: NSEvent.ModifierFlags) -> DetailClick {
-    if modifiers.contains(.option) { return .copyAll }
-    return line.address == nil ? .nothing : .copyLine
+    guard line.address != nil else { return .nothing }
+    return modifiers.contains(.option) ? .copyAll : .copyLine
   }
 
   /// What VoiceOver reads for a line: its label, then its value, or the word a copy shows in its
@@ -129,19 +130,21 @@ extension DevicePresentation {
 
   /// Everything the device said about itself, a row each; a part it could not say has no row. A
   /// model whose ports Ferry knows (`KnownPorts`) has a row per port with all its addresses, and
-  /// "IP addresses" only for any other interface.
+  /// "IP addresses" only for any other interface. The rows go to the pasteboard, so each value is
+  /// the device's own, sanitised, not the menu's escaped form.
   static func infoRows(_ info: AndroidDeviceInfo) -> [InfoRow] {
     var rows: [InfoRow] = []
     func add(_ label: LocalizedStringResource, _ value: String) {
       guard !value.isEmpty else { return }
       rows.append(InfoRow(label: String(localized: label), value: value))
     }
-    add(LocalizedStringResource("Model", bundle: .module), DisplayText.escaped(info.model))
+    add(LocalizedStringResource("Model", bundle: .module), DisplayText.sanitized(info.model))
     add(
       LocalizedStringResource("Android version", bundle: .module),
-      DisplayText.escaped(info.androidVersion))
-    add(LocalizedStringResource("Build", bundle: .module), DisplayText.escaped(info.build))
-    add(LocalizedStringResource("Serial number", bundle: .module), DisplayText.escaped(info.serial))
+      DisplayText.sanitized(info.androidVersion))
+    add(LocalizedStringResource("Build", bundle: .module), DisplayText.sanitized(info.build))
+    add(
+      LocalizedStringResource("Serial number", bundle: .module), DisplayText.sanitized(info.serial))
     if let battery = info.battery {
       add(LocalizedStringResource("Battery", bundle: .module), batteryLine(battery))
     }
@@ -152,7 +155,8 @@ extension DevicePresentation {
         add(
           port.name,
           found.isEmpty
-            ? notConnected : found.map { DisplayText.escaped($0.address) }.joined(separator: ", "))
+            ? notConnected
+            : found.map { DisplayText.sanitized($0.address) }.joined(separator: ", "))
       }
       others.removeAll { address in ports.contains { $0.interface == address.interface } }
     }
@@ -165,21 +169,24 @@ extension DevicePresentation {
     return rows
   }
 
-  /// The kind of link an interface is, or the interface's own name for any other.
-  private static func linkName(_ kind: InterfaceKind) -> String {
+  /// The kind of link an interface is, or the interface's own name for any other: escaped to be
+  /// shown, or sanitised to be copied.
+  private static func linkName(
+    _ kind: InterfaceKind, made safe: (String) -> String = DisplayText.escaped
+  ) -> String {
     switch kind {
     case .wifi: String(localized: LocalizedStringResource("Wi-Fi", bundle: .module))
     case .ethernet: String(localized: LocalizedStringResource("Ethernet", bundle: .module))
     case .mobileData: String(localized: LocalizedStringResource("Mobile data", bundle: .module))
     case .usb: String(localized: LocalizedStringResource("USB", bundle: .module))
-    case .other(let name): DisplayText.escaped(name)
+    case .other(let name): safe(name)
     }
   }
 
-  /// The address, then the kind of link it is on.
+  /// The address, then the kind of link it is on, for the copy.
   private static func addressLine(_ address: AndroidDeviceInfo.Address) -> String {
-    let link = linkName(address.kind)
-    let value = DisplayText.escaped(address.address)
+    let link = linkName(address.kind, made: DisplayText.sanitized)
+    let value = DisplayText.sanitized(address.address)
     return String(localized: LocalizedStringResource("\(value) (\(link))", bundle: .module))
   }
 

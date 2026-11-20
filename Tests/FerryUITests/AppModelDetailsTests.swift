@@ -40,19 +40,20 @@ struct AppModelDetailsTests {
 
   private var reads: Int { log.all.filter { $0 == "deviceInfo \(id.serial)" }.count }
 
-  /// The menu's first status expanded the device, and its read has started.
+  /// The user expanded the device after the first status, and its read has started.
   private func expanded(_ client: FakeClient) async -> AppModel {
     let model = model(client)
     await model.refresh()
+    model.toggleExpansion(.device(id))
     #expect(model.isExpanded(.device(id)))
-    model.loadExpandedDetailsIfDue()
     return model
   }
 
   @Test func expandingADeviceReadsItsDetails() async {
     let model = model(client())
     await model.refresh()
-    model.toggleExpansion(.device(id))
+    // Nothing is expanded, so nothing is read, until the user opens the device.
+    #expect(!model.isExpanded(.device(id)))
     await model.detailsSettled()
     #expect(reads == 0)
     model.toggleExpansion(.device(id))
@@ -79,13 +80,16 @@ struct AppModelDetailsTests {
     #expect(reads == 2)
   }
 
-  /// While the menu is open, the expanded device is read on its first status and every 10 s
+  /// While the menu is open, the device the user expanded is read at once and every 10 s
   /// after, on the menu's 2 s cadence: at 0, 10 and 20 s of 22.
   @Test func anOpenMenuRefreshesTheExpandedDevice() async {
     let holder = ModelHolder()
     let ticks = Mutex(0)
     let clock = clock
+    let id = id
     let model = model(client()) { _ in
+      // The user opens the device after the first status, before any time passes.
+      if ticks.withLock({ $0 }) == 0 { await holder.model?.toggleExpansion(.device(id)) }
       clock.advance(.seconds(2))
       await holder.model?.detailsSettled()
       let tick = ticks.withLock { tick in
@@ -142,28 +146,19 @@ struct AppModelDetailsTests {
     #expect(model.shownDetails(of: id) == .loaded(Self.info))
   }
 
-  /// The menu closing while the status request runs starts no read.
-  @Test func noReadStartsOnceTheMenuCloses() async {
-    let client = HeldInfoClient(client())
-    let model = AppModel(
-      client: client, services: FakeServices(log: log), sleep: { _ in }, now: clock.now)
-    let watch = Task { await model.watchWhileMenuOpen() }
-    client.onStatus.withLock { $0 = { watch.cancel() } }
-    await watch.value
-    #expect(model.isExpanded(.device(id)))
-    #expect(model.detailReads.isEmpty)
-    #expect(model.shownDetails(of: id) == DetailsShown.hidden)
-  }
-
-  /// Closing the menu cancels a read still running, and the next open reads again at once.
+  /// Closing the menu cancels a read still running, and the row's next read starts at once.
   @Test func closingTheMenuCancelsARunningRead() async {
     let client = HeldInfoClient(client())
+    let holder = ModelHolder()
+    let id = id
     let model = AppModel(
       client: client, services: FakeServices(log: log),
       sleep: { _ in
+        await holder.model?.toggleExpansion(.device(id))
         await client.arrival()
         throw CancellationError()
       }, now: clock.now)
+    holder.model = model
     await model.watchWhileMenuOpen()
     let read = model.detailReads[id]
     #expect(read?.task.isCancelled == true)
@@ -188,7 +183,7 @@ struct AppModelDetailsTests {
     let model = AppModel(
       client: client, services: FakeServices(log: log), sleep: { _ in }, now: clock.now)
     await model.refresh()
-    model.loadExpandedDetailsIfDue()
+    model.toggleExpansion(.device(id))
     await client.arrival()
 
     let status = fake.statusReply
@@ -222,8 +217,9 @@ struct AppModelDetailsTests {
 
   /// No view reads the running reads, so starting one redraws nothing on their account.
   @Test func theRunningReadsAreNotObserved() async {
-    let model = model(client())
-    await model.refresh()
+    let model = await expanded(client())
+    await model.detailsSettled()
+    clock.advance(.seconds(10))
     let changed = Mutex(false)
     withObservationTracking {
       _ = model.detailReads
@@ -252,12 +248,25 @@ struct AppModelDetailsTests {
   var model: AppModel?
 }
 
-/// Sleeps that last until the test wakes them, recording what each asked for.
+/// Sleeps that last until the test wakes them, recording what each asked for. Cancellation
+/// ends a sleep (it throws) and a wait for one (it returns false), so a test's time limit can
+/// always end a test whose awaited sleep never comes.
 final class HeldSleeps: Sendable {
+  private struct Waiter {
+    let id: UUID
+    let count: Int
+    let continuation: CheckedContinuation<Bool, Never>
+  }
+
+  private struct Held {
+    let id: UUID
+    let continuation: CheckedContinuation<Void, any Error>
+  }
+
   private struct State {
-    var held: [CheckedContinuation<Void, Never>] = []
+    var held: [Held] = []
     var durations: [Duration] = []
-    var waiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    var waiters: [Waiter] = []
   }
 
   private let state = Mutex(State())
@@ -266,35 +275,56 @@ final class HeldSleeps: Sendable {
 
   var sleep: @Sendable (Duration) async throws -> Void {
     { duration in
-      await withCheckedContinuation { continuation in
-        let ready = self.state.withLock { state in
-          state.held.append(continuation)
-          state.durations.append(duration)
-          let count = state.durations.count
-          let ready = state.waiters.filter { $0.count <= count }
-          state.waiters.removeAll { $0.count <= count }
-          return ready
+      let id = UUID()
+      try await withTaskCancellationHandler {
+        try await withCheckedThrowingContinuation { continuation in
+          let (ready, cancelled) = self.state.withLock { state in
+            state.durations.append(duration)
+            let count = state.durations.count
+            let ready = state.waiters.filter { $0.count <= count }
+            state.waiters.removeAll { $0.count <= count }
+            guard !Task.isCancelled else { return (ready, true) }
+            state.held.append(Held(id: id, continuation: continuation))
+            return (ready, false)
+          }
+          for waiter in ready { waiter.continuation.resume(returning: true) }
+          if cancelled { continuation.resume(throwing: CancellationError()) }
         }
-        for waiter in ready { waiter.continuation.resume() }
+      } onCancel: {
+        let held = self.state.withLock { state in
+          defer { state.held.removeAll { $0.id == id } }
+          return state.held.first { $0.id == id }
+        }
+        held?.continuation.resume(throwing: CancellationError())
       }
     }
   }
 
-  /// Returns once `count` sleeps have been asked for.
-  func waitForSleeper(count: Int = 1) async {
-    await withCheckedContinuation { continuation in
-      let now = state.withLock { state in
-        guard state.durations.count < count else { return true }
-        state.waiters.append((count, continuation))
-        return false
+  /// Whether `count` sleeps have been asked for; false if the waiting task was cancelled first.
+  func waitForSleeper(count: Int = 1) async -> Bool {
+    let id = UUID()
+    return await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        let answer: Bool? = state.withLock { state in
+          guard state.durations.count < count else { return true }
+          guard !Task.isCancelled else { return false }
+          state.waiters.append(Waiter(id: id, count: count, continuation: continuation))
+          return nil
+        }
+        if let answer { continuation.resume(returning: answer) }
       }
-      if now { continuation.resume() }
+    } onCancel: {
+      let waiter = state.withLock { state in
+        defer { state.waiters.removeAll { $0.id == id } }
+        return state.waiters.first { $0.id == id }
+      }
+      waiter?.continuation.resume(returning: false)
     }
   }
 
   func wakeFirst() {
     let first = state.withLock { $0.held.isEmpty ? nil : $0.held.removeFirst() }
-    first?.resume()
+    first?.continuation.resume()
   }
 
   func wakeAll() {
@@ -302,6 +332,6 @@ final class HeldSleeps: Sendable {
       defer { state.held = [] }
       return state.held
     }
-    for continuation in held { continuation.resume() }
+    for sleeper in held { sleeper.continuation.resume() }
   }
 }

@@ -22,6 +22,15 @@ enum DevicePresentation {
     PresentationText.message(for: failure)
   }
 
+  /// `error`'s message, with its entry in Help.
+  static func notice(for error: TransportError) -> MenuNotice {
+    MenuNotice(text: message(for: error), help: PresentationText.helpKey(for: error))
+  }
+
+  static func notice(for failure: ToolFailure) -> MenuNotice {
+    MenuNotice(text: message(for: failure), help: PresentationText.helpKey(for: failure))
+  }
+
   /// The status word for `device`: one only adb lists, as unauthorised, waits for Allow rather
   /// than for file transfer.
   static func status(of device: AttachedDevice) -> LocalizedStringResource {
@@ -89,86 +98,74 @@ enum DevicePresentation {
       localized: LocalizedStringResource("Is \(address) your \(name)?", bundle: .module))
   }
 
-  /// What a network request ended with, for the user; `nil` when it connected. adb's own words
-  /// are escaped.
-  static func message(for outcome: WirelessOutcome) -> String? {
+  /// What a network request ended with, for the user, with its entry in Help; `nil` when it
+  /// connected. adb's own words are escaped.
+  static func notice(for outcome: WirelessOutcome) -> MenuNotice? {
     switch outcome {
     case .connected:
       nil
     case .awaitingAllow:
-      String(
-        localized: LocalizedStringResource(
-          "Tap Allow on the device to finish connecting.", bundle: .module))
+      MenuNotice(
+        LocalizedStringResource("Tap Allow on the device to finish connecting.", bundle: .module))
     case .needsConfirmation:
-      String(
-        localized: LocalizedStringResource(
+      MenuNotice(
+        LocalizedStringResource(
           "Ferry knows this device at another address. Confirm the new one in the menu.",
           bundle: .module))
     case .needsNetwork:
-      String(
-        localized: LocalizedStringResource(
+      MenuNotice(
+        LocalizedStringResource(
           "The device has no network address. Connect it to Ethernet or Wi-Fi first.",
           bundle: .module))
     case .failed(let failure):
-      message(for: failure)
+      MenuNotice(resource(for: failure))
     }
   }
 
-  private static func message(for failure: WirelessFailure) -> String {
+  private static func resource(for failure: WirelessFailure) -> LocalizedStringResource {
     switch failure {
     case .adbUnavailable:
-      String(
-        localized: LocalizedStringResource(
-          "adb isn't running. Install it, or choose Check Again.", bundle: .module))
+      LocalizedStringResource(
+        "adb isn't running. Install it, or choose Check Again.", bundle: .module)
     case .notOverUSB:
-      String(
-        localized: LocalizedStringResource(
-          "Connect the device with a cable and allow USB debugging first.", bundle: .module))
+      LocalizedStringResource(
+        "Connect the device with a cable and allow USB debugging first.", bundle: .module)
     case .notRemembered:
-      String(
-        localized: LocalizedStringResource(
-          "Ferry has no address for this device. Connect it by address.", bundle: .module))
+      LocalizedStringResource(
+        "Ferry has no address for this device. Connect it by address.", bundle: .module)
     case .noConnectService:
-      String(
-        localized: LocalizedStringResource(
-          "Paired, but the device isn't offering a connection. Check Wireless debugging is on.",
-          bundle: .module))
+      LocalizedStringResource(
+        "Paired, but the device isn't offering a connection. Check Wireless debugging is on.",
+        bundle: .module)
     case .otherDevice:
-      String(
-        localized: LocalizedStringResource(
-          "That address belongs to another device.", bundle: .module))
+      LocalizedStringResource("That address belongs to another device.", bundle: .module)
     case .unidentified:
-      String(
-        localized: LocalizedStringResource(
-          "The device didn't say which device it is, so Ferry disconnected it.", bundle: .module))
+      LocalizedStringResource(
+        "The device didn't say which device it is, so Ferry disconnected it.", bundle: .module)
     case .pairingNeedsAddress:
-      String(
-        localized: LocalizedStringResource(
-          "Use the IP address the device shows under Pair device with pairing code.",
-          bundle: .module))
+      LocalizedStringResource(
+        "Use the IP address the device shows under Pair device with pairing code.",
+        bundle: .module)
     case .offerChanged:
-      String(
-        localized: LocalizedStringResource(
-          "That address changed. Check the menu and try again.", bundle: .module))
+      LocalizedStringResource(
+        "That address changed. Check the menu and try again.", bundle: .module)
     case .deviceInUse:
-      String(
-        localized: LocalizedStringResource(
-          "Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again.",
-          bundle: .module))
+      LocalizedStringResource(
+        """
+        Ferry is using this device. Wait for its transfers, screen recording and log to \
+        finish, then try again.
+        """, bundle: .module)
     case .adb(let detail):
-      String(
-        localized: LocalizedStringResource(
-          "adb: \(DisplayText.escaped(detail))", bundle: .module))
+      LocalizedStringResource("adb: \(DisplayText.escaped(detail))", bundle: .module)
     }
   }
 
   /// A network device waiting for the user to allow this Mac on it. The address comes from
   /// adb's listing, so it is escaped.
-  static func waitingLine(for address: String) -> String {
+  static func waitingLine(for address: String) -> MenuNotice {
     let address = DisplayText.escaped(address)
-    return String(
-      localized: LocalizedStringResource(
-        "Waiting for you to allow this Mac on \(address)", bundle: .module))
+    return MenuNotice(
+      LocalizedStringResource("Waiting for you to allow this Mac on \(address)", bundle: .module))
   }
 
   static func storageLine(_ storage: StorageInfo) -> String {

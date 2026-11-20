@@ -81,9 +81,10 @@ private struct ForwardsList: View {
       // Return adds: the menu has no single default button, so it is the fields that submit.
       .onSubmit { Task { await session.add() } }
       if let error = session.error {
-        Text(verbatim: error)
-          .foregroundStyle(.red)
-          .fixedSize(horizontal: false, vertical: true)
+        HelpLinked(key: error.help) {
+          Text(verbatim: error.text)
+            .foregroundStyle(.red)
+        }
       } else {
         Text("Ports on this Mac start at 1024.", bundle: .module)
           .foregroundStyle(.secondary)

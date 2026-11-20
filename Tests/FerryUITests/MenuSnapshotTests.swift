@@ -8,7 +8,7 @@ import Testing
 
 @testable import FerryUI
 
-/// Draws the menu offscreen, in light and dark, with a device on USB (expanded, with its known
+/// Draws the menu offscreen, in light and dark, with a device on USB (opened, with its known
 /// ports' details, one not connected, its rows in their groups and Port Forwarding open on one
 /// forward) and one on Wi-Fi; and once more with Pair with Code open. It must come out 320 pt
 /// wide and show something besides its background. With `FERRY_MENU_SNAPSHOTS` naming a
@@ -60,8 +60,9 @@ struct MenuSnapshotTests {
     client.forwardList.withLock { $0 = [PortForward(local: 8080, remote: 80)] }
     // The menu stays open while it is drawn: a sleep that throws would close it, and closing
     // cancels the details read the drawing waits for.
+    let sleeps = HeldSleeps()
     let model = AppModel(
-      client: client, services: FakeServices(log: CallLog()), sleep: HeldSleeps().sleep)
+      client: client, services: FakeServices(log: CallLog()), sleep: sleeps.sleep)
     // Launching reads the login item, which the fake has on: Open at Login shows its checkmark.
     await model.launch()
     #expect(model.opensAtLogin)
@@ -77,11 +78,10 @@ struct MenuSnapshotTests {
     view.appearance = appearance
     view.frame = CGRect(origin: .zero, size: view.fittingSize)
     view.layoutSubtreeIfNeeded()
-    // The view's own task resets the expansion as the menu opens; its first status opens the
-    // first ready device again.
-    while model.expansion.expanded == nil {
-      await Self.change(of: model) { _ = $0.expansion }
-    }
+    // The view's own task collapses every row as the menu opens and reads the first status,
+    // then waits for its next refresh: the device is opened after that, as a user would.
+    #expect(await sleeps.waitForSleeper())
+    model.toggleExpansion(.device(Self.usb.id))
     // Then its details are read.
     while model.shownDetails(of: Self.usb.id) != .loaded(Self.details) {
       await Self.change(of: model) { _ = $0.details }

@@ -8,10 +8,13 @@ import Foundation
 public struct FinderNotice: Equatable, Sendable {
   public let title: String
   public let body: String
+  /// For a failure, the title's catalog key, which names its entry in Ferry's Help.
+  public let help: String?
 
-  public init(title: String, body: String) {
+  public init(title: String, body: String, help: String? = nil) {
     self.title = title
     self.body = body
+    self.help = help
   }
 }
 
@@ -218,24 +221,19 @@ extension FinderSender {
         : LocalizedStringResource("Also not sent: \(others).", bundle: .module)
       text += " " + String(localized: more)
     }
-    return FinderNotice(title: String(localized: title), body: text)
+    return FinderNotice(title: String(localized: title), body: text, help: title.key)
   }
 
   private static func notice(for only: Outcome, install: Bool, device: String) -> FinderNotice {
     let name = only.name
     switch (only.result, install) {
     case (.failed(let reason), true):
-      return FinderNotice(
-        title: String(
-          localized: LocalizedStringResource(
-            "Couldn’t install “\(name)” on \(device)", bundle: .module)),
-        body: reason)
+      let title = LocalizedStringResource(
+        "Couldn’t install “\(name)” on \(device)", bundle: .module)
+      return FinderNotice(title: String(localized: title), body: reason, help: title.key)
     case (.failed(let reason), false):
-      return FinderNotice(
-        title: String(
-          localized: LocalizedStringResource(
-            "Couldn’t send “\(name)” to \(device)", bundle: .module)),
-        body: reason)
+      let title = LocalizedStringResource("Couldn’t send “\(name)” to \(device)", bundle: .module)
+      return FinderNotice(title: String(localized: title), body: reason, help: title.key)
     case (.done, true):
       return FinderNotice(
         title: String(

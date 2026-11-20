@@ -76,7 +76,7 @@ struct AppModelNetworkFormTests {
     await model.submitNetworkForm()
     #expect(model.networkForm?.address == "192.0.2.99")
     #expect(model.networkForm?.isSending == false)
-    #expect(model.networkForm?.message == "That address belongs to another device.")
+    #expect(model.networkForm?.message?.text == "That address belongs to another device.")
     #expect(model.wirelessMessage == nil)
     // Typing again, or sending again, starts without the old reason.
     model.toggleNetworkForm(.address)
@@ -93,7 +93,7 @@ struct AppModelNetworkFormTests {
     model.networkForm?.address = "192.0.2.31"
     await model.submitNetworkForm()
     #expect(model.networkForm == nil)
-    #expect(model.wirelessMessage == "Tap Allow on the device to finish connecting.")
+    #expect(model.wirelessMessage?.text == "Tap Allow on the device to finish connecting.")
   }
 
   /// Collapsing the form while it sends cancels the request, and its answer is never shown.

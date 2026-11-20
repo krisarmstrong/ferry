@@ -32,6 +32,8 @@ public struct MenuContent: View {
     }
     .padding(6)
     .frame(width: 320, alignment: .leading)
+    // For the Help links beside its problems (see `HelpLinkButton`).
+    .environment(model)
     .task { await model.watchWhileMenuOpen() }
     .onChange(of: model.guideOpenPending, initial: true) { _, _ in
       if model.takeGuideOpenRequest() {
@@ -74,15 +76,16 @@ public struct MenuContent: View {
     }
     if model.agent == .replaced {
       StatusRow(
-        symbol: "arrow.clockwise.circle", tint: .yellow,
-        title: Text("Ferry was updated. Quit and reopen Ferry.", bundle: .module)
+        symbol: "arrow.clockwise.circle", tint: .yellow, title: Text(MenuStatusText.updated),
+        help: MenuStatusText.updated.key
       ) {
         StatusAction(title: Text("Relaunch", bundle: .module)) { model.relaunch() }
       }
     }
     if model.showsTurnOnRow {
       StatusRow(
-        symbol: "questionmark.circle", title: Text("Turn on Ferry in Finder", bundle: .module)
+        symbol: "questionmark.circle", title: Text(MenuStatusText.turnOnInFinder),
+        help: MenuStatusText.turnOnInFinder.key
       ) {
         Text("In Login Items & Extensions, turn on Ferry under File Providers.", bundle: .module)
       } actions: {
@@ -92,8 +95,11 @@ public struct MenuContent: View {
       }
     }
     if model.showsNoDevice {
-      StatusRow(symbol: "cable.connector", title: Text("No device connected", bundle: .module)) {
-        Text("Choose Transfer files on the device.", bundle: .module)
+      StatusRow(
+        symbol: "cable.connector", title: Text(MenuStatusText.noDevice),
+        help: MenuStatusText.noDevice.key
+      ) {
+        Text(MenuStatusText.chooseTransferFiles)
       } actions: {
         StatusAction(title: Text("How to Connect", bundle: .module)) { openGuide(for: nil) }
       }
@@ -106,18 +112,21 @@ public struct MenuContent: View {
         copy: { model.copyInstallCommand() }, checkAgain: { Task { await model.recheckADB() } })
     }
     ForEach(model.awaitingAuthorization, id: \.self) { address in
-      StatusRow(
-        symbol: "hand.raised", title: Text(verbatim: DevicePresentation.waitingLine(for: address)))
+      let line = DevicePresentation.waitingLine(for: address)
+      StatusRow(symbol: "hand.raised", title: Text(verbatim: line.text), help: line.help)
     }
     if let message = model.wirelessMessage {
-      StatusRow(symbol: "wifi.exclamationmark", title: Text(verbatim: message))
+      StatusRow(
+        symbol: "wifi.exclamationmark", title: Text(verbatim: message.text), help: message.help)
     }
     if let message = model.toolMessage {
       StatusRow(symbol: "info.circle", title: Text(verbatim: message))
     }
     // Once the agent refuses this copy every action fails the same way: the row says why.
     if let error = model.actionError, model.agent != .replaced {
-      StatusRow(symbol: "exclamationmark.triangle", tint: .red, title: Text(verbatim: error))
+      StatusRow(
+        symbol: "exclamationmark.triangle", tint: .red, title: Text(verbatim: error.text),
+        help: error.help)
     }
     if !model.preservedChanges.isEmpty {
       PreservedChangesRow(locations: model.preservedChanges) {
@@ -126,10 +135,8 @@ public struct MenuContent: View {
     }
     if model.agent == .running, model.usbWatchFailed {
       StatusRow(
-        symbol: "info.circle",
-        title: Text(
-          "Ferry can't watch USB for devices, so it looks for them every 30 seconds.",
-          bundle: .module))
+        symbol: "info.circle", title: Text(MenuStatusText.usbWatchFailed),
+        help: MenuStatusText.usbWatchFailed.key)
     }
   }
 
@@ -208,17 +215,19 @@ private struct HelperRow: View {
     case .allowed:
       StatusRow(
         symbol: "exclamationmark.triangle", tint: .yellow,
-        title: Text(
-          "Ferry's helper is not responding. Quit Ferry and open it again.", bundle: .module))
+        title: Text(MenuStatusText.helperNotResponding),
+        help: MenuStatusText.helperNotResponding.key)
     case .requiresApproval:
-      blocked(Text("Allow Ferry's helper", bundle: .module))
+      blocked(MenuStatusText.allowHelper)
     case .notFound:
-      blocked(Text("macOS can't find Ferry's helper", bundle: .module))
+      blocked(MenuStatusText.helperNotFound)
     }
   }
 
-  private func blocked(_ title: Text) -> some View {
-    StatusRow(symbol: "exclamationmark.triangle", tint: .yellow, title: title) {
+  private func blocked(_ title: LocalizedStringResource) -> some View {
+    StatusRow(
+      symbol: "exclamationmark.triangle", tint: .yellow, title: Text(title), help: title.key
+    ) {
       Text(
         "In Login Items & Extensions, turn on Ferry under Allow in the Background.",
         bundle: .module)

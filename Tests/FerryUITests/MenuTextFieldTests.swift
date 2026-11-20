@@ -136,6 +136,7 @@ struct MenuTextFieldTests {
     client.setStatus([device(id.serial, model: "EtherScope-nXG", .ready([]), method: .usbADB)])
     let model = AppModel(client: client, services: FakeServices(log: log))
     await model.refresh()
+    model.toggleExpansion(.device(id))
     await model.toggleForwards(of: id)
     let session = try #require(model.openForwards(of: id))
     let window = hosted(PortForwardRows(tools: ToolActions(model: model, device: id) {}))

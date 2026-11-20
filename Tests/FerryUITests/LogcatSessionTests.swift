@@ -213,21 +213,23 @@ struct LogcatSessionTests {
     let session = session()
     client.endStream(with: .done)
     await session.run()
-    #expect(session.state == .ended("The device ended the log."))
+    #expect(
+      session.state
+        == .ended(MenuNotice(text: "The device ended the log.", help: "The device ended the log.")))
   }
 
   @Test func aLostDeviceSaysSo() async throws {
     let session = session()
     client.endStream(with: .failure(.deviceDisconnected))
     await session.run()
-    #expect(session.state == .ended(DevicePresentation.message(for: .deviceDisconnected)))
+    #expect(session.state == .ended(DevicePresentation.notice(for: .deviceDisconnected)))
   }
 
   @Test func aDeviceWithoutDebuggingSaysSo() async throws {
     let session = session()
     client.endStream(with: .toolFailed(.notOverADB))
     await session.run()
-    #expect(session.state == .ended(DevicePresentation.message(for: .notOverADB)))
+    #expect(session.state == .ended(DevicePresentation.notice(for: .notOverADB)))
   }
 
   // MARK: Save
@@ -277,6 +279,6 @@ struct LogcatSessionTests {
       await client.push(LogBatch(lines: ["a"], skipped: 0))
       await session.save()
     }
-    #expect(session.saveError != nil)
+    #expect(session.saveError?.help == "Couldn't save the log: %@")
   }
 }

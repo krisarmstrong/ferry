@@ -48,9 +48,10 @@ struct NetworkFormView: View {
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
         if let message = form.message {
-          Text(verbatim: message)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
+          HelpLinked(key: message.help) {
+            Text(verbatim: message.text)
+              .foregroundStyle(.red)
+          }
         }
         HStack {
           if form.isSending {
@@ -79,12 +80,12 @@ struct NetworkFormView: View {
   @ViewBuilder private func fields(_ kind: WirelessForm) -> some View {
     switch kind {
     case .address:
-      TextField(text: address, prompt: Text(verbatim: "10.0.0.20:5555")) {
+      TextField(text: address, prompt: Text(verbatim: "192.0.2.10:5555")) {
         Text("Address", bundle: .module)
       }
       .focused($focused, equals: .address)
     case .code:
-      TextField(text: address, prompt: Text(verbatim: "10.0.0.20:37123")) {
+      TextField(text: address, prompt: Text(verbatim: "192.0.2.10:37123")) {
         Text("IP address and port", bundle: .module)
       }
       .focused($focused, equals: .address)

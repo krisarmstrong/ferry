@@ -16,6 +16,11 @@ extension AppModel {
     services.relaunch()
   }
 
+  /// Help opened: Remove Ferry… starts afresh, without a failure from an earlier attempt.
+  public func helpAppeared() {
+    removalError = nil
+  }
+
   /// Removes Ferry's locations from Finder, unregisters the agent and the login item, and
   /// quits. Stops if the locations or the agent remain, so the user can try again rather than
   /// being left with locations no agent serves. Once the agent is gone a retry could only fail,

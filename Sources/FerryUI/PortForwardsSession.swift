@@ -14,7 +14,7 @@ import Observation
   /// The port on this Mac and the port on the device, as typed.
   var localPort = ""
   var remotePort = ""
-  private(set) var error: String?
+  private(set) var error: MenuNotice?
   private(set) var isBusy = false
 
   init(device: DeviceID, client: any AgentSending) {
@@ -34,7 +34,7 @@ import Observation
         error = Self.message(for: other)
       }
     } catch {
-      self.error = DevicePresentation.message(for: error)
+      self.error = DevicePresentation.notice(for: error)
     }
   }
 
@@ -42,7 +42,7 @@ import Observation
   func add() async {
     guard !isBusy else { return }
     guard let forward = parsed(), forward.isAllowed else {
-      error = DevicePresentation.message(for: .invalidPort)
+      error = DevicePresentation.notice(for: .invalidPort)
       return
     }
     guard await send(.addForward(device, forward)) else { return }
@@ -76,16 +76,16 @@ import Observation
       error = nil
       return true
     } catch {
-      self.error = DevicePresentation.message(for: error)
+      self.error = DevicePresentation.notice(for: error)
       return false
     }
   }
 
-  private static func message(for response: AgentResponse) -> String {
+  private static func message(for response: AgentResponse) -> MenuNotice {
     switch response {
-    case .toolFailed(let failure): DevicePresentation.message(for: failure)
-    case .failure(let error): DevicePresentation.message(for: error)
-    default: DevicePresentation.message(for: .io("unexpected reply"))
+    case .toolFailed(let failure): DevicePresentation.notice(for: failure)
+    case .failure(let error): DevicePresentation.notice(for: error)
+    default: DevicePresentation.notice(for: .io("unexpected reply"))
     }
   }
 }

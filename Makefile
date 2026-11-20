@@ -1,6 +1,6 @@
 export DEVELOPER_DIR := /Applications/Xcode.app/Contents/Developer
 
-.PHONY: lint fmt fmt-check test build app check-app
+.PHONY: lint fmt fmt-check test build app check-app guide
 
 lint:
 	swiftlint --strict
@@ -13,6 +13,10 @@ fmt-check:
 
 test:
 	swift test
+
+# docs/user-guide.md, rendered from Sources/FerryUI/help.json; a test fails if they differ.
+guide:
+	python3 scripts/user-guide.py
 
 build:
 	swift build -c release
