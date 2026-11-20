@@ -47,3 +47,35 @@ final class RequestPark: Sendable {
     }
   }
 }
+
+/// Holds the next request that passes it until `release()`, with no sleeping: the request held
+/// is announced on `arrivals` once it waits. Requests pass straight through unless `hold()` was
+/// called first.
+final class RequestGate: Sendable {
+  private let holds = Mutex(false)
+  private let held = Mutex<CheckedContinuation<Void, Never>?>(nil)
+  let (arrivals, arrived) = AsyncStream<Void>.makeStream()
+
+  func hold() {
+    holds.withLock { $0 = true }
+  }
+
+  func passWhenReleased() async {
+    let holding = holds.withLock { holds in
+      defer { holds = false }
+      return holds
+    }
+    guard holding else { return }
+    await withCheckedContinuation { continuation in
+      held.withLock { $0 = continuation }
+      arrived.yield()
+    }
+  }
+
+  func release() {
+    held.withLock { held in
+      held?.resume()
+      held = nil
+    }
+  }
+}

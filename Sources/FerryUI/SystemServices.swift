@@ -1,4 +1,5 @@
 import AppKit
+import PlatformTools
 import ServiceManagement
 import UniformTypeIdentifiers
 import os
@@ -68,6 +69,13 @@ public protocol SystemServicing {
   func chooseLogDestination(suggestedName: String) async -> URL?
   /// Opens the `.command` file in Terminal, which runs it. False if Terminal could not.
   func openInTerminal(_ script: URL) async -> Bool
+  /// The Android SDK License acceptance recorded in Ferry's defaults.
+  func platformToolsAcceptance() -> LicenseAcceptance?
+  func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance)
+  /// The version of the platform tools Ferry fetched and would use, if any.
+  func fetchedPlatformToolsVersion() -> String?
+  /// Fetches the pinned platform tools (see `PlatformToolsFetcher`).
+  func fetchPlatformTools(accepted: LicenseAcceptance?) async throws(PlatformToolsError)
 }
 
 /// `SMAppService`, `NSWorkspace` and `NSApplication`.
@@ -294,6 +302,24 @@ public final class SystemServices: SystemServicing {
 
   public func captureFolders() -> [URL] {
     [CaptureFiles.documentsRoot()]
+  }
+
+  public func platformToolsAcceptance() -> LicenseAcceptance? {
+    LicenseAcceptance.recorded(in: .standard)
+  }
+
+  public func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance) {
+    acceptance.record(in: .standard)
+  }
+
+  public func fetchedPlatformToolsVersion() -> String? {
+    PlatformToolsFolder.standard.installedADB(pinned: PlatformToolsRelease.pinned.version)?
+      .deletingLastPathComponent().lastPathComponent
+  }
+
+  /// Downloads, checks and extracts off the main actor.
+  public func fetchPlatformTools(accepted: LicenseAcceptance?) async throws(PlatformToolsError) {
+    _ = try await PlatformToolsFetcher().fetch(accepted: accepted)
   }
 
   private nonisolated static func describe(_ status: SMAppService.Status) -> String {

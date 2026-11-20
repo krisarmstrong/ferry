@@ -1,6 +1,7 @@
 import DeviceKit
 import FerryIPC
 import Foundation
+import PlatformTools
 
 @testable import FerryUI
 
@@ -164,5 +165,53 @@ final class FakeServices: SystemServicing {
     log.record("openInTerminal \(script.lastPathComponent)")
     terminalScripts.append(script)
     return terminalOpens
+  }
+
+  /// The license acceptance in Ferry's defaults, and the version Ferry has fetched.
+  var acceptance: LicenseAcceptance?
+  var fetchedVersion: String?
+  /// How the next fetches end, in order; once it is empty they succeed.
+  var fetchOutcomes: [PlatformToolsError] = []
+  /// Set: a fetch waits until it is cancelled or `releaseFetch()` lets it go on, and each one
+  /// held is announced on `fetchesHeld`.
+  var holdsFetch = false
+  private var heldFetch: CheckedContinuation<Void, Never>?
+  let (fetchesHeld, fetchHeld) = AsyncStream<Void>.makeStream()
+
+  func platformToolsAcceptance() -> LicenseAcceptance? { acceptance }
+
+  func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance) {
+    log.record("acceptLicense \(acceptance.version)")
+    self.acceptance = acceptance
+  }
+
+  func fetchedPlatformToolsVersion() -> String? { fetchedVersion }
+
+  /// Lets the held fetch go on to its outcome.
+  func releaseFetch() {
+    holdsFetch = false
+    heldFetch?.resume()
+    heldFetch = nil
+  }
+
+  func fetchPlatformTools(accepted: LicenseAcceptance?) async throws(PlatformToolsError) {
+    log.record("fetchPlatformTools \(accepted?.version ?? "none")")
+    if holdsFetch {
+      await withTaskCancellationHandler {
+        await withCheckedContinuation { continuation in
+          guard !Task.isCancelled else { return continuation.resume() }
+          heldFetch = continuation
+          fetchHeld.yield()
+        }
+      } onCancel: {
+        Task { @MainActor in
+          self.heldFetch?.resume()
+          self.heldFetch = nil
+        }
+      }
+      if Task.isCancelled { throw .cancelled }
+    }
+    if !fetchOutcomes.isEmpty { throw fetchOutcomes.removeFirst() }
+    fetchedVersion = PlatformToolsRelease.pinned.version
   }
 }

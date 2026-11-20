@@ -26,21 +26,6 @@ struct AppModelADBTests {
     #expect(model.awaitingAuthorization == ["192.0.2.31:5555"])
   }
 
-  /// A Mac with no Android device has no use for adb, so the menu does not nag about it.
-  @Test(arguments: [
-    (ADBStatus?.some(.notInstalled), true, true), (.some(.notInstalled), false, false),
-    (.some(.available), true, false), (.some(.serverDown), true, false), (nil, true, false),
-  ])
-  func installRowShowsOnlyWithADeviceAndNoAdb(
-    status: ADBStatus?, withDevice: Bool, shows: Bool
-  ) async {
-    let client = FakeClient(log: log)
-    client.setStatus(withDevice ? [device("A1", model: "Pixel 8", .ready([]))] : [], adb: status)
-    let model = model(client)
-    await model.refresh()
-    #expect(model.showsInstallADB == shows)
-  }
-
   /// adb is installed but its server does not answer: Check Again is how the user retries.
   @Test(arguments: [
     (ADBStatus?.some(.serverDown), true, true), (.some(.serverDown), false, false),
@@ -80,12 +65,7 @@ struct AppModelADBTests {
     await model.recheckADB()
     #expect(log.all.suffix(2) == ["recheckADB", "status"])
     #expect(model.adbStatus == .available)
-    #expect(!model.showsInstallADB)
-  }
-
-  @Test func copyPutsTheInstallCommandOnThePasteboard() {
-    model(FakeClient(log: log)).copyInstallCommand()
-    #expect(log.all == ["copy brew install --cask android-platform-tools"])
+    #expect(model.platformToolsRow == nil)
   }
 
   @Test func usbDebuggingGuideOpensOnTheDevicesFamily() {
@@ -125,8 +105,8 @@ struct AppModelADBTests {
     #expect(!model.isGuidePresented)
   }
 
-  /// A Wi-Fi-only user (a device remembered on the network, nothing on USB) gets the install
-  /// hint, and no "No device connected" or file-transfer guide.
+  /// A Wi-Fi-only user (a device remembered on the network, nothing on USB) is offered adb, and
+  /// gets no "No device connected" or file-transfer guide.
   @Test func aRememberedNetworkDeviceCountsAsADevice() async {
     let client = FakeClient(log: log)
     let address = WirelessEndpoint(parsing: "192.0.2.31")!
@@ -137,7 +117,7 @@ struct AppModelADBTests {
       ])
     let model = model(client)
     await model.refresh()
-    #expect(model.showsInstallADB)
+    #expect(model.platformToolsRow == .offer)
     #expect(!model.showsNoDevice)
     model.considerEmptyGuide(openFor: .seconds(60))
     #expect(!model.isGuidePresented)
@@ -150,8 +130,8 @@ struct AppModelADBTests {
     let model = model(client)
     await model.refresh()
     #expect(model.showsNoDevice)
-    #expect(!model.showsInstallADB)
+    #expect(model.platformToolsRow == nil)
     model.toggleNetworkForm(.address)
-    #expect(model.showsInstallADB)
+    #expect(model.platformToolsRow == .offer)
   }
 }

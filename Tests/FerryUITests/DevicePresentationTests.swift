@@ -72,10 +72,6 @@ struct DevicePresentationTests {
     #expect(String(localized: DevicePresentation.status(of: ready)) == "Ready")
   }
 
-  @Test func theInstallCommandIsExact() {
-    #expect(DevicePresentation.installCommand == "brew install --cask android-platform-tools")
-  }
-
   @Test func aWaitingAddressIsEscaped() {
     #expect(
       DevicePresentation.waitingLine(for: "192.0.2.31:5555")
@@ -158,7 +154,7 @@ struct ToolPresentationTests {
         == "Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device.")
     #expect(
       DevicePresentation.message(for: .adbNotFound)
-        == "Ferry can't find adb. Install it, then try again.")
+        == "Ferry can't find adb. Get it from the Ferry menu, then try again.")
     #expect(
       DevicePresentation.message(
         for: .forwardFailed("cannot bind listener: Address already in use"))
