@@ -153,8 +153,10 @@ enum DevicePresentation {
     case .deviceInUse:
       String(
         localized: LocalizedStringResource(
-          "Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again.",
-          bundle: .module))
+          """
+          Ferry is using this device. Wait for its transfers, screen recording and log to \
+          finish, then try again.
+          """, bundle: .module))
     case .adb(let detail):
       String(
         localized: LocalizedStringResource(

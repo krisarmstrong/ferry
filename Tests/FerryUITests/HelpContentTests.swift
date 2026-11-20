@@ -123,7 +123,8 @@ struct HelpContentTests {
   @Test func debuggingLinkTargetsDecode() throws {
     let json = """
       {"version": 1, "title": "T", "sections": [
-        {"id": "a", "title": "A", "symbol": "folder", "link": {"title": "L", "target": "debugging"}},
+        {"id": "a", "title": "A", "symbol": "folder",
+         "link": {"title": "L", "target": "debugging"}},
         {"id": "b", "title": "B", "symbol": "folder",
          "link": {"title": "L", "target": "debugging:netAllyAndroid8Board"}}
       ]}
