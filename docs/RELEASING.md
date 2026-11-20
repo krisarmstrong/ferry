@@ -8,7 +8,12 @@ Releases come from release-please and `.github/workflows/release.yml`; nobody ta
    required reviewers, so releases stay automatic), a ruleset that lets only GitHub Actions
    create `v*` tags and nobody move or delete them, and branch protection requiring the CI
    `check`.
-2. `scripts/release-secrets.sh <developer-id.p12> <AuthKey_….p8>`: the signing, notarization and
+2. `scripts/verify-tag-bypass.sh`: proves the ruleset refuses you a `v*` tag but lets GitHub
+   Actions (release-please's token) create one. If it fails, drop the `creation` rule from the
+   ruleset in `repo-settings.sh` and run that again: tags can then be created by anyone with
+   push access, but still not moved or deleted, and the build checks each tag against its draft.
+   Without a working tag, the release-please job fails with "no tag".
+3. `scripts/release-secrets.sh <developer-id.p12> <AuthKey_….p8>`: the signing, notarization and
    Sparkle secrets, in the `release` environment, and the Sparkle public key in `project.yml`
    (commit it through a PR).
 

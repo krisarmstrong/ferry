@@ -32,12 +32,33 @@ jobs:
     outputs:
       created: ${{ steps.release.outputs.release_created }}
       tag: ${{ steps.release.outputs.tag_name }}
+      id: ${{ steps.release.outputs.id }}
+      sha: ${{ steps.release.outputs.sha }}
     steps:
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      # release-please takes any refusal to create the tag (HTTP 422) for "it exists already",
+      # then creates the draft, which as a draft makes no tag. If the Release tags ruleset ever
+      # refuses GitHub Actions (scripts/verify-tag-bypass.sh), say so here rather than leave a
+      # draft whose build can never check out its tag.
+      - name: Check release-please tagged the release
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a release tag: $TAG"; exit 1; }
+          tagged="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)" || {
+            echo "::error::release-please made the draft release $TAG but no tag $TAG. The Release tags" \
+              "ruleset may refuse GitHub Actions: run scripts/verify-tag-bypass.sh, and see docs/RELEASING.md"
+            exit 1
+          }
+          [ "$tagged" = "$SHA" ] \
+            || { echo "::error::tag $TAG is $tagged, but release-please released $SHA"; exit 1; }
       # A push by GITHUB_TOKEN starts no pull_request run, so the release PR would never get the
       # check main requires. A workflow_dispatch is exempt: run CI on the PR's branch, and its
       # check lands on the PR's head commit.

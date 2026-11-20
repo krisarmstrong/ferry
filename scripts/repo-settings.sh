@@ -14,6 +14,8 @@
 #    secrets (1), and the release job also checks the tag is release-please's draft on main.
 # 3. Branch protection on main: the CI `check` must pass, on an up-to-date branch.
 #
+# Then run scripts/verify-tag-bypass.sh: it proves the bypass in (2) applies to release-please.
+#
 # Usage: scripts/repo-settings.sh
 set -euo pipefail
 
