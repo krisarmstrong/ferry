@@ -1,9 +1,10 @@
 name: Release
 
-# release-please keeps a release PR open on main. Merging it tags the version and publishes the
-# GitHub release; the build job then attaches a notarized Ferry, a DMG and the Sparkle appcast
-# that every installed Ferry reads from releases/latest/download/appcast.xml. A release published
-# with GITHUB_TOKEN starts no other workflow, so the build runs here, after release-please.
+# release-please keeps a release PR open on main. Merging it tags the version and creates the
+# GitHub release as a draft; the build job then attaches a notarized Ferry, a DMG and the Sparkle
+# appcast, and publishes the release as the latest, whose appcast every installed Ferry reads
+# from releases/latest/download/appcast.xml. A release made with GITHUB_TOKEN starts no other
+# workflow, so the build runs here, after release-please.
 # workflow_dispatch builds the assets of an existing release again.
 
 on:
@@ -175,6 +176,12 @@ jobs:
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
             ".build/dist/appcast/Ferry-$version.zip" ".build/dist/Ferry-$version.dmg" \
             .build/dist/appcast/appcast.xml
+      # Only now does releases/latest point here. A failed build leaves the draft, and every
+      # installed Ferry keeps reading the previous release's appcast.
+      - name: Publish the release as the latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
       - name: Remove the keychain
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/release.keychain-db" || true

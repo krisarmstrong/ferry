@@ -8,7 +8,11 @@
       "release-type": "simple",
       "package-name": "ferry",
       "changelog-path": "CHANGELOG.md",
-      "extra-files": ["project.yml"]
+      "extra-files": [
+        "project.yml"
+      ],
+      "draft": true,
+      "force-tag-creation": true
     }
   }
 }

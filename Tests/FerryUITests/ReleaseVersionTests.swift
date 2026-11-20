@@ -47,4 +47,14 @@ struct ReleaseVersionTests {
     #expect(package["changelog-path"] as? String == "CHANGELOG.md")
     #expect((package["extra-files"] as? [String])?.contains("project.yml") == true)
   }
+
+  /// The release stays a draft, with its tag, until the release workflow has attached the
+  /// appcast and published it: the latest release's feed never points at a missing file.
+  @Test func releasePleaseCreatesADraftWithItsTag() throws {
+    let config = try Self.json("release-please-config.json")
+    let packages = try #require(config["packages"] as? [String: Any])
+    let package = try #require(packages["."] as? [String: Any])
+    #expect(package["draft"] as? Bool == true)
+    #expect(package["force-tag-creation"] as? Bool == true)
+  }
 }
