@@ -84,6 +84,10 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: "1"
       TAG: ${{ needs.release-please.outputs.tag }}
+      # The draft release-please made in this run, by id: every call below names it so, and no
+      # other release with the same tag can stand in for it.
+      RELEASE_ID: ${{ needs.release-please.outputs.id }}
+      RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
       XCODEGEN_VERSION: 2.46.0
       XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
       SPARKLE_VERSION: 2.10.1
@@ -114,19 +118,32 @@ jobs:
           ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
           persist-credentials: false
-      # Nothing is signed unless the tag is the draft release-please just made, on main.
-      - name: Check the tag is release-please's, on main
+      # Nothing is signed unless the draft is the one release-please made in this run and the tag
+      # is its commit, on main. The author check alone proves little: any workflow's
+      # GITHUB_TOKEN creates releases as github-actions[bot]. What binds the build to this
+      # release is the id from this run's release-please output, and the tag's commit equalling
+      # both release-please's released commit and the draft's target. The release notes, which
+      # the signed feed embeds, are read here, once, from that draft.
+      - name: Check the draft and its tag are release-please's, on main
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
-          git merge-base --is-ancestor "$commit" origin/main \
-            || { echo "::error::$TAG ($commit) is not on main"; exit 1; }
-          release="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,tagName,author)"
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$RELEASE_ID" =~ ^[0-9]+$ ]] || fail "release-please gave no release id: $RELEASE_ID"
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "release-please gave no commit: $RELEASE_SHA"
+          release="$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID")"
           jq -e --arg tag "$TAG" \
-            '.isDraft and .tagName == $tag and .author.login == "github-actions[bot]"' \
+            '.draft and .tag_name == $tag and .author.login == "github-actions[bot]"' \
             <<< "$release" > /dev/null \
-            || { echo "::error::$TAG is not a draft release by release-please: $release"; exit 1; }
+            || fail "release $RELEASE_ID is not release-please's draft of $TAG"
+          target="$(jq -r .target_commitish <<< "$release")"
+          [[ "$target" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "unexpected target_commitish: $target"
+          target="$(gh api "repos/$GITHUB_REPOSITORY/commits/$target" --jq .sha)"
+          commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          [ "$commit" = "$RELEASE_SHA" ] || fail "$TAG is $commit, release-please released $RELEASE_SHA"
+          [ "$commit" = "$target" ] || fail "$TAG is $commit, the draft targets $target"
+          git merge-base --is-ancestor "$commit" origin/main || fail "$TAG ($commit) is not on main"
+          jq -r .body <<< "$release" > "$RUNNER_TEMP/release-notes.md"
       - name: Install XcodeGen, pkg-config and Sparkle's tools
         run: |
           test -d "$DEVELOPER_DIR" || { echo "::error::$DEVELOPER_DIR is not on this image"; exit 1; }
@@ -204,12 +221,10 @@ jobs:
       - name: Sign the appcast
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           version="${TAG#v}"
-          # The release's notes, shown by Sparkle.
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body \
-            > ".build/dist/appcast/Ferry-$version.md"
+          # The draft's notes, read by the check above; Sparkle shows them.
+          cp "$RUNNER_TEMP/release-notes.md" ".build/dist/appcast/Ferry-$version.md"
           printf '%s' "$SPARKLE_PRIVATE_KEY" | "$RUNNER_TEMP/tools/sparkle/bin/generate_appcast" \
             --ed-key-file - --embed-release-notes \
             --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" \
@@ -237,15 +252,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${TAG#v}"
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            ".build/dist/appcast/Ferry-$version.zip" ".build/dist/Ferry-$version.dmg" \
-            .build/dist/appcast/appcast.xml
+          releases="repos/$GITHUB_REPOSITORY/releases"
+          for file in ".build/dist/appcast/Ferry-$version.zip" ".build/dist/Ferry-$version.dmg" \
+            .build/dist/appcast/appcast.xml; do
+            name="$(basename "$file")"
+            # A re-run replaces what an earlier attempt attached.
+            for asset in $(gh api "$releases/$RELEASE_ID/assets" \
+              --jq ".[] | select(.name == \"$name\") | .id"); do
+              gh api -X DELETE "$releases/assets/$asset"
+            done
+            gh api -X POST "https://uploads.github.com/$releases/$RELEASE_ID/assets?name=$name" \
+              -H 'Content-Type: application/octet-stream' --input "$file" > /dev/null
+          done
       # Only now does releases/latest point here. A failed build leaves the draft, and every
       # installed Ferry keeps reading the previous release's appcast.
       - name: Publish the release as the latest
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+        run: |
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            -F draft=false -f make_latest=true > /dev/null
       # Also when a step failed before removing its own.
       - name: Remove the keychain and the key files
         if: always()
