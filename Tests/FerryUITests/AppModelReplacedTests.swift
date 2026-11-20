@@ -31,7 +31,7 @@ struct AppModelReplacedTests {
     services.replaced = true
     let model = AppModel(client: UnreachableClient(), services: services)
     await model.removeFerry()
-    #expect(model.actionError == "Ferry was updated. Quit and reopen Ferry.")
+    #expect(model.removalError == "Ferry was updated. Quit and reopen Ferry.")
     #expect(model.agent == .replaced)
     #expect(!log.all.contains("quit"))
   }
@@ -40,7 +40,7 @@ struct AppModelReplacedTests {
     let model = AppModel(client: UnreachableClient(), services: FakeServices(log: log))
     await model.removeFerry()
     #expect(
-      model.actionError == "Could not remove Ferry. Make sure Ferry is running, then try again.")
+      model.removalError == "Could not remove Ferry. Make sure Ferry is running, then try again.")
   }
 
   @Test func relaunchOpensFerryAgain() {

@@ -22,6 +22,7 @@ extension AppModel {
   /// so a login item that will not unregister is logged and Ferry quits anyway. Changes the
   /// locations had not sent to a device are shown in Finder, since the menu goes away.
   public func removeFerry() async {
+    removalError = nil
     let preserved: [URL]
     do {
       guard case .removed(let saved) = try await client.send(.removeAllDomains, file: nil) else {
@@ -33,9 +34,9 @@ extension AppModel {
       Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .private)")
       if services.appWasReplaced() {
         agent = .replaced
-        actionError = Self.replacedMessage
+        removalError = Self.replacedMessage
       } else {
-        actionError = String(
+        removalError = String(
           localized: LocalizedStringResource(
             "Could not remove Ferry. Make sure Ferry is running, then try again.", bundle: .module))
       }

@@ -46,7 +46,28 @@ extension AppModelTests {
     let model = AppModel(client: client, services: FakeServices(log: log))
     await model.removeFerry()
     #expect(log.all == ["removeAllDomains"])
+    // Help shows it under Remove Ferry…; the menu's error row is for the menu's own actions.
+    #expect(model.removalError != nil)
+    #expect(model.actionError == nil)
+  }
+
+  /// Remove Ferry… shows only its own failure: not one from before it, nor a later one.
+  @Test func removeFerryKeepsItsOwnError() async {
+    let client = FakeClient(log: log)
+    client.failRemoveAll()
+    let services = FakeServices(log: log)
+    services.failLoginItem = true
+    let model = AppModel(client: client, services: services)
+    model.requestOpensAtLogin(false)
+    await model.loginItemSettled()
     #expect(model.actionError != nil)
+    #expect(model.removalError == nil)
+    await model.removeFerry()
+    let removal = model.removalError
+    #expect(removal != nil)
+    model.requestOpensAtLogin(true)
+    await model.loginItemSettled()
+    #expect(model.removalError == removal)
   }
 
   @Test func ejectShowsWhereUnsentChangesWereSaved() async throws {

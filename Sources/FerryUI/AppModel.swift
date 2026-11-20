@@ -101,6 +101,9 @@ import os
   var forwardSessions: [DeviceID: PortForwardsSession] = [:]
   /// The device whose Port Forwarding disclosure is open, one at most.
   var forwardsOpen: DeviceID?
+  /// Why Remove Ferry… failed, shown under it in Help; the menu's error row is for its own
+  /// actions.
+  public internal(set) var removalError: String?
   /// Read from the system once launched (see `launch()`); `false` until then.
   public private(set) var opensAtLogin = false
   /// The login item change being applied, and how many have been requested.

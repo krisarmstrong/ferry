@@ -155,7 +155,6 @@ private struct HelpBodyView: View {
 private struct RemoveFerryButton: View {
   let model: AppModel
   @State private var confirming = false
-  @State private var asked = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -165,7 +164,7 @@ private struct RemoveFerryButton: View {
         Text("Remove Ferry…", bundle: .module)
       }
       .buttonStyle(.bordered)
-      if asked, let error = model.actionError {
+      if let error = model.removalError {
         Text(verbatim: error)
           .font(.callout)
           .foregroundStyle(.red)
@@ -174,7 +173,6 @@ private struct RemoveFerryButton: View {
     }
     .confirmationDialog(Text("Remove Ferry?", bundle: .module), isPresented: $confirming) {
       Button(role: .destructive) {
-        asked = true
         Task { await model.removeFerry() }
       } label: {
         Text("Remove Ferry", bundle: .module)
