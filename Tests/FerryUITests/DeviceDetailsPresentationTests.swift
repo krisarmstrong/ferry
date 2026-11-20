@@ -179,12 +179,12 @@ struct DeviceDetailsPresentationTests {
   }
 
   /// Option, with or without other keys, copies every detail; otherwise a click copies the
-  /// line's address, and a line with none copies nothing. The flags travel as their raw value,
-  /// which test arguments can carry.
+  /// line's address. A line with no address is plain text and takes no click at all. The flags
+  /// travel as their raw value, which test arguments can carry.
   @Test(arguments: [
     (NSEvent.ModifierFlags.option.rawValue, String?.some("192.0.2.159"), Click.copyAll),
     (NSEvent.ModifierFlags([.option, .shift]).rawValue, "192.0.2.159", .copyAll),
-    (NSEvent.ModifierFlags.option.rawValue, nil, .copyAll),
+    (NSEvent.ModifierFlags.option.rawValue, nil, .nothing),
     (0, "192.0.2.159", .copyLine),
     (NSEvent.ModifierFlags.command.rawValue, "192.0.2.159", .copyLine),
     (0, nil, .nothing),

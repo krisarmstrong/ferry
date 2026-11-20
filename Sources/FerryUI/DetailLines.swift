@@ -2,9 +2,9 @@ import SwiftUI
 
 /// What an expanded device says about itself, after Control Center's Option-click Wi-Fi details:
 /// a line per port or interface, its name on the left and its IPv4 address on the right, then
-/// its Android version and battery. Clicking a line copies its address; Option-clicking any line
-/// copies every detail. While the first read runs it says so in one line; a failed read shows
-/// nothing.
+/// its Android version and battery. Clicking an address copies it; Option-clicking one copies
+/// every detail. A port with no address is plain text. While the first read runs it says so in
+/// one line; a failed read shows nothing.
 struct DetailLines: View {
   let tools: ToolActions
 
@@ -21,7 +21,16 @@ struct DetailLines: View {
     case .loaded(let info):
       VStack(alignment: .leading, spacing: 0) {
         ForEach(DevicePresentation.detailLines(info)) { line in
-          detailLine(line)
+          if line.address == nil {
+            DetailLineContent(line: line, copied: nil)
+              .padding(.horizontal, MenuMetrics.rowPadding)
+              .padding(.vertical, 2)
+              .accessibilityElement(children: .ignore)
+              .accessibilityLabel(
+                Text(verbatim: DevicePresentation.detailLabel(line, copied: nil)))
+          } else {
+            addressLine(line)
+          }
         }
         if let system = DevicePresentation.systemLine(info) {
           Text(verbatim: system)
@@ -36,7 +45,7 @@ struct DetailLines: View {
   }
 
   /// The modifier keys are read as the click lands: Option copies every detail.
-  private func detailLine(_ line: DevicePresentation.DetailLine) -> some View {
+  private func addressLine(_ line: DevicePresentation.DetailLine) -> some View {
     let copied = tools.copied(line)
     return Button {
       tools.click(line, NSEvent.modifierFlags)
@@ -46,12 +55,10 @@ struct DetailLines: View {
     .buttonStyle(MenuRowStyle(verticalPadding: 2))
     .accessibilityLabel(Text(verbatim: DevicePresentation.detailLabel(line, copied: copied)))
     .accessibilityActions {
-      if line.address != nil {
-        Button {
-          tools.copyAddress(line)
-        } label: {
-          Text(DevicePresentation.copyAddressResource(line))
-        }
+      Button {
+        tools.copyAddress(line)
+      } label: {
+        Text(DevicePresentation.copyAddressResource(line))
       }
       Button {
         tools.copyAllDetails(line)

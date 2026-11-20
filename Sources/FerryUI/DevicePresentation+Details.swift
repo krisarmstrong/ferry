@@ -80,11 +80,11 @@ extension DevicePresentation {
     case nothing
   }
 
-  /// With Option held, a click on any line copies every detail; otherwise it copies the line's
-  /// address, and a line with none copies nothing.
+  /// A click on an address line copies its address, or with Option held every detail. A line
+  /// with no address is plain text and takes no click.
   static func detailClick(on line: DetailLine, modifiers: NSEvent.ModifierFlags) -> DetailClick {
-    if modifiers.contains(.option) { return .copyAll }
-    return line.address == nil ? .nothing : .copyLine
+    guard line.address != nil else { return .nothing }
+    return modifiers.contains(.option) ? .copyAll : .copyLine
   }
 
   /// What VoiceOver reads for a line: its label, then its value, or the word a copy shows in its
