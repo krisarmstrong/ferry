@@ -5,15 +5,11 @@ Releases come from release-please and `.github/workflows/release.yml`; nobody ta
 ## Once
 
 1. `scripts/repo-settings.sh`: the `release` environment (deployments from `main` only, no
-   required reviewers, so releases stay automatic), a ruleset that lets only GitHub Actions
-   create `v*` tags and nobody move or delete them, and branch protection requiring the CI
-   `check`.
-2. `scripts/verify-tag-bypass.sh`: proves the ruleset refuses you a `v*` tag but lets GitHub
-   Actions (release-please's token) create one. If it fails, drop the `creation` rule from the
-   ruleset in `repo-settings.sh` and run that again: tags can then be created by anyone with
-   push access, but still not moved or deleted, and the build checks each tag against its draft.
-   Without a working tag, the release-please job fails with "no tag".
-3. `scripts/release-secrets.sh <developer-id.p12> <AuthKey_….p8>`: the signing, notarization and
+   required reviewers, so releases stay automatic), a ruleset that lets nobody move or delete a
+   `v*` tag, and branch protection requiring the CI `check`. Tag creation stays open: a
+   user-owned repo cannot name GitHub Actions as a ruleset bypass actor, so a `creation` rule
+   would stop release-please too. The build checks each tag against its draft before signing.
+2. `scripts/release-secrets.sh <developer-id.p12> <AuthKey_….p8>`: the signing, notarization and
    Sparkle secrets, in the `release` environment, and the Sparkle public key in `project.yml`
    (commit it through a PR).
 
@@ -41,8 +37,7 @@ workflow run, within 30 days. It builds the same tag again.
 **Anything in the code or the configuration** (a build error, a failed check, notarization
 refusing the app): a re-run cannot help. It runs the workflow file of the original run and checks
 out the tag, so a fix on `main` never reaches it, and the tag cannot be moved to the fix: the
-`Release tags` ruleset forbids moving or deleting a `v*` tag, the owner included (only GitHub
-Actions bypasses it). Instead:
+`Release tags` ruleset forbids moving or deleting a `v*` tag, the owner included. Instead:
 
 1. Land the fix on `main` as a conventional commit (`fix: …`).
 2. Delete the stale draft (`gh release delete vX.Y.Z`; it is a draft, so nobody saw it).

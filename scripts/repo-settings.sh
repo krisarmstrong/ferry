@@ -10,24 +10,18 @@
 #    release run. Branch protection (3) stops others from merging without CI, but not you: it
 #    does not bind admins (enforce_admins is false), and you are the only admin, so merging a
 #    PR into main is itself the decision to ship.
-# 2. A ruleset on v* tags: nobody creates, moves or deletes one except GitHub Actions, through
-#    which release-please tags each release. GitHub cannot narrow that bypass to one workflow:
-#    any workflow with contents: write could create a v* tag, but such a tag never reaches the
-#    secrets (1), and the release job also checks the tag is release-please's draft on main.
-#    The bypass covers every rule, not just creation: any workflow on any branch with
-#    contents: write could also move or delete a v* tag. GitHub cannot narrow it. A moved tag
-#    cannot get a different commit signed, though: the release job requires the tag's commit to
-#    equal the commit release-please released and its draft's target.
+# 2. A ruleset on v* tags: no tag is ever moved or deleted. Creation stays open, because a
+#    user-owned repo cannot make GitHub Actions a ruleset bypass actor; anyone with push
+#    access can create a v* tag, but it never reaches the secrets (1), and the release job
+#    signs only the commit release-please recorded for its own draft release.
 # 3. Branch protection on main: the CI `check` must pass, on an up-to-date branch, and it must
 #    come from GitHub Actions: a status named `check` posted by anything else does not count.
-#
-# Then run scripts/verify-tag-bypass.sh: it proves the bypass in (2) applies to release-please.
 #
 # Usage: scripts/repo-settings.sh
 set -euo pipefail
 
 repo=krisarmstrong/ferry
-# The GitHub Actions app, whose GITHUB_TOKEN release-please uses.
+# The GitHub Actions app: only its `check` status satisfies branch protection (3).
 actions_app_id=15368
 
 gh api -X PUT "repos/$repo/environments/release" --input - > /dev/null << 'JSON'
@@ -51,15 +45,19 @@ if [ "$main_allowed" = no ]; then
 fi
 echo "release environment: deployments from main only, no required reviewers"
 
+# A user-owned repo cannot name the GitHub Actions app as a ruleset bypass actor (GitHub
+# answers 422), so release-please's GITHUB_TOKEN could not create tags under a creation rule.
+# Tags are therefore creatable by anyone with push access (the owner), but never moved or
+# deleted. The release workflow still refuses to sign any tag that is not the commit
+# release-please recorded for its own draft release.
 ruleset="{
   \"name\": \"Release tags\",
   \"target\": \"tag\",
   \"enforcement\": \"active\",
   \"conditions\": {\"ref_name\": {\"include\": [\"refs/tags/v*\"], \"exclude\": []}},
-  \"rules\": [{\"type\": \"creation\"}, {\"type\": \"update\"}, {\"type\": \"deletion\"},
+  \"rules\": [{\"type\": \"update\"}, {\"type\": \"deletion\"},
     {\"type\": \"non_fast_forward\"}],
-  \"bypass_actors\": [{\"actor_id\": $actions_app_id, \"actor_type\": \"Integration\",
-    \"bypass_mode\": \"always\"}]
+  \"bypass_actors\": []
 }"
 id="$(gh api "repos/$repo/rulesets" --jq '.[] | select(.name == "Release tags") | .id')"
 if [ -n "$id" ]; then
@@ -67,7 +65,7 @@ if [ -n "$id" ]; then
 else
   gh api -X POST "repos/$repo/rulesets" --input - <<< "$ruleset" > /dev/null
 fi
-echo "v* tags: created only by GitHub Actions; never updated or deleted"
+echo "v* tags: never updated or deleted (creation is open: see the note above)"
 
 gh api -X PUT "repos/$repo/branches/main/protection" --input - > /dev/null << JSON
 {"required_status_checks": {"strict": true, "contexts": [],
