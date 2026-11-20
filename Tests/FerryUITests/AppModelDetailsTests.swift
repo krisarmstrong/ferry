@@ -252,12 +252,25 @@ struct AppModelDetailsTests {
   var model: AppModel?
 }
 
-/// Sleeps that last until the test wakes them, recording what each asked for.
+/// Sleeps that last until the test wakes them, recording what each asked for. Cancellation
+/// ends a sleep (it throws) and a wait for one (it returns false), so a test's time limit can
+/// always end a test whose awaited sleep never comes.
 final class HeldSleeps: Sendable {
+  private struct Waiter {
+    let id: UUID
+    let count: Int
+    let continuation: CheckedContinuation<Bool, Never>
+  }
+
+  private struct Held {
+    let id: UUID
+    let continuation: CheckedContinuation<Void, any Error>
+  }
+
   private struct State {
-    var held: [CheckedContinuation<Void, Never>] = []
+    var held: [Held] = []
     var durations: [Duration] = []
-    var waiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    var waiters: [Waiter] = []
   }
 
   private let state = Mutex(State())
@@ -266,35 +279,56 @@ final class HeldSleeps: Sendable {
 
   var sleep: @Sendable (Duration) async throws -> Void {
     { duration in
-      await withCheckedContinuation { continuation in
-        let ready = self.state.withLock { state in
-          state.held.append(continuation)
-          state.durations.append(duration)
-          let count = state.durations.count
-          let ready = state.waiters.filter { $0.count <= count }
-          state.waiters.removeAll { $0.count <= count }
-          return ready
+      let id = UUID()
+      try await withTaskCancellationHandler {
+        try await withCheckedThrowingContinuation { continuation in
+          let (ready, cancelled) = self.state.withLock { state in
+            state.durations.append(duration)
+            let count = state.durations.count
+            let ready = state.waiters.filter { $0.count <= count }
+            state.waiters.removeAll { $0.count <= count }
+            guard !Task.isCancelled else { return (ready, true) }
+            state.held.append(Held(id: id, continuation: continuation))
+            return (ready, false)
+          }
+          for waiter in ready { waiter.continuation.resume(returning: true) }
+          if cancelled { continuation.resume(throwing: CancellationError()) }
         }
-        for waiter in ready { waiter.continuation.resume() }
+      } onCancel: {
+        let held = self.state.withLock { state in
+          defer { state.held.removeAll { $0.id == id } }
+          return state.held.first { $0.id == id }
+        }
+        held?.continuation.resume(throwing: CancellationError())
       }
     }
   }
 
-  /// Returns once `count` sleeps have been asked for.
-  func waitForSleeper(count: Int = 1) async {
-    await withCheckedContinuation { continuation in
-      let now = state.withLock { state in
-        guard state.durations.count < count else { return true }
-        state.waiters.append((count, continuation))
-        return false
+  /// Whether `count` sleeps have been asked for; false if the waiting task was cancelled first.
+  func waitForSleeper(count: Int = 1) async -> Bool {
+    let id = UUID()
+    return await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        let answer: Bool? = state.withLock { state in
+          guard state.durations.count < count else { return true }
+          guard !Task.isCancelled else { return false }
+          state.waiters.append(Waiter(id: id, count: count, continuation: continuation))
+          return nil
+        }
+        if let answer { continuation.resume(returning: answer) }
       }
-      if now { continuation.resume() }
+    } onCancel: {
+      let waiter = state.withLock { state in
+        defer { state.waiters.removeAll { $0.id == id } }
+        return state.waiters.first { $0.id == id }
+      }
+      waiter?.continuation.resume(returning: false)
     }
   }
 
   func wakeFirst() {
     let first = state.withLock { $0.held.isEmpty ? nil : $0.held.removeFirst() }
-    first?.resume()
+    first?.continuation.resume()
   }
 
   func wakeAll() {
@@ -302,6 +336,6 @@ final class HeldSleeps: Sendable {
       defer { state.held = [] }
       return state.held
     }
-    for continuation in held { continuation.resume() }
+    for sleeper in held { sleeper.continuation.resume() }
   }
 }

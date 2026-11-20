@@ -131,14 +131,16 @@ struct AppModelLoginItemStatusTests {
   }
 
   /// A read while the user's change is on its way does not undo the switch.
-  @Test func aReadDuringAChangeKeepsTheChosenValue() async {
+  @Test(.timeLimit(.minutes(1))) func aReadDuringAChangeKeepsTheChosenValue() async throws {
     let services = FakeServices(log: log)
     let model = model(services)
     await model.launch()
     services.holdsLoginItemChange = true
+    defer { services.releaseLoginItemChange() }
     var held = services.loginItemChangesHeld.makeAsyncIterator()
     model.requestOpensAtLogin(false)
-    await held.next()
+    // nil once the time limit cancels the test: the change never reached macOS.
+    try #require(await held.next() != nil)
     await model.readLoginItem()
     #expect(!model.opensAtLogin)
     services.releaseLoginItemChange()

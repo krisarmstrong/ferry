@@ -38,12 +38,14 @@ struct AppModelDetailCopyTests {
   }
 
   /// A click copies the address and shows "Copied" until the injected clock's 1.5 s have passed.
-  @Test func clickingALineCopiesItsAddress() async {
+  @Test func clickingALineCopiesItsAddress() async throws {
     let sleeps = HeldSleeps()
+    // A failed expectation must not strand a copy's sleep, which the test awaits on its way out.
+    defer { sleeps.wakeAll() }
     let model = model(client(), sleep: sleeps.sleep)
     await model.refresh()
     async let copied: Void = model.copyAddress(Self.line, on: id)
-    await sleeps.waitForSleeper()
+    try #require(await sleeps.waitForSleeper())
     #expect(log.all.contains("copy 192.0.2.159"))
     // VoiceOver hears it too: the line's new value is not where its focus is.
     #expect(log.all.contains("announce Copied"))
@@ -55,14 +57,16 @@ struct AppModelDetailCopyTests {
   }
 
   /// A second click keeps "Copied" for its own 1.5 s: the first click's timer does not end it.
-  @Test func aSecondCopyIsNotClearedByTheFirst() async {
+  @Test func aSecondCopyIsNotClearedByTheFirst() async throws {
     let sleeps = HeldSleeps()
+    // A failed expectation must not strand a copy's sleep, which the test awaits on its way out.
+    defer { sleeps.wakeAll() }
     let model = model(client(), sleep: sleeps.sleep)
     await model.refresh()
     async let first: Void = model.copyAddress(Self.line, on: id)
-    await sleeps.waitForSleeper()
+    try #require(await sleeps.waitForSleeper())
     async let second: Void = model.copyAddress(Self.line, on: id)
-    await sleeps.waitForSleeper(count: 2)
+    try #require(await sleeps.waitForSleeper(count: 2))
     sleeps.wakeFirst()
     await first
     #expect(model.copied(Self.line, on: id) == .line)
@@ -78,15 +82,17 @@ struct AppModelDetailCopyTests {
   /// Option-click on any line copies everything the device said, in the full format (every
   /// address including IPv6), and shows "Copied All" on that line for 1.5 s.
   @Test(arguments: [true, false])
-  func optionClickCopiesEveryDetail(onAnAddress: Bool) async {
+  func optionClickCopiesEveryDetail(onAnAddress: Bool) async throws {
     let line = onAnAddress ? Self.line : Self.notConnected
     let sleeps = HeldSleeps()
+    // A failed expectation must not strand a copy's sleep, which the test awaits on its way out.
+    defer { sleeps.wakeAll() }
     let model = model(client(), sleep: sleeps.sleep)
     await model.refresh()
     model.loadExpandedDetailsIfDue()
     await model.detailsSettled()
     async let copied: Void = model.click(line, modifiers: [.option], on: id)
-    await sleeps.waitForSleeper()
+    try #require(await sleeps.waitForSleeper())
     #expect(log.all.contains("copy \(DevicePresentation.detailsText(Self.info))"))
     #expect(DevicePresentation.detailsText(Self.info).contains("2001:db8::159"))
     #expect(log.all.contains("announce Copied All"))
@@ -115,16 +121,18 @@ struct AppModelDetailCopyTests {
   }
 
   /// A plain click after an Option-click shows "Copied" for its own 1.5 s.
-  @Test func aPlainClickReplacesCopiedAll() async {
+  @Test func aPlainClickReplacesCopiedAll() async throws {
     let sleeps = HeldSleeps()
+    // A failed expectation must not strand a copy's sleep, which the test awaits on its way out.
+    defer { sleeps.wakeAll() }
     let model = model(client(), sleep: sleeps.sleep)
     await model.refresh()
     model.loadExpandedDetailsIfDue()
     await model.detailsSettled()
     async let all: Void = model.click(Self.line, modifiers: [.option], on: id)
-    await sleeps.waitForSleeper()
+    try #require(await sleeps.waitForSleeper())
     async let one: Void = model.click(Self.line, modifiers: [], on: id)
-    await sleeps.waitForSleeper(count: 2)
+    try #require(await sleeps.waitForSleeper(count: 2))
     #expect(model.copied(Self.line, on: id) == .line)
     #expect(log.all.last == "announce Copied")
     sleeps.wakeFirst()

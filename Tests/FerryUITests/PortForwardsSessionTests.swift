@@ -106,14 +106,16 @@ struct PortForwardsSessionTests {
 
   /// Return while a forward is on its way sends nothing more: one request at a time, as the Add
   /// button, disabled while busy, already allows.
-  @Test func returnWhileAddingSendsNothingMore() async {
+  @Test(.timeLimit(.minutes(1))) func returnWhileAddingSendsNothingMore() async throws {
     let client = HeldForwardClient()
     let session = PortForwardsSession(device: id, client: client)
     session.localPort = "8080"
     session.remotePort = "80"
     let first = Task { await session.add() }
+    defer { client.release() }
     var arrivals = client.arrivals.makeAsyncIterator()
-    await arrivals.next()
+    // nil once the time limit cancels the test: the add never reached the client.
+    try #require(await arrivals.next() != nil)
     #expect(session.isBusy)
     await session.add()
     #expect(client.adds == 1)
