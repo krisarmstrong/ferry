@@ -59,9 +59,9 @@ jobs:
           }
           [ "$tagged" = "$SHA" ] \
             || { echo "::error::tag $TAG is $tagged, but release-please released $SHA"; exit 1; }
-      # A push by GITHUB_TOKEN starts no pull_request run, so the release PR would never get the
-      # check main requires. A workflow_dispatch is exempt: run CI on the PR's branch, and its
-      # check lands on the PR's head commit.
+      # A PR opened with GITHUB_TOKEN gets a pull_request run only once someone approves it. A
+      # workflow_dispatch is exempt: run CI on the PR's branch. Its check run does not count for
+      # the PR, so ci.yml's report job posts the result as the status `check` on the head commit.
       - name: Run CI on the release PR
         if: steps.release.outputs.prs_created == 'true'
         env:

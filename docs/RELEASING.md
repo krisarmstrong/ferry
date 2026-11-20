@@ -19,7 +19,10 @@ the tag's commit is on `main`.
 ## Each release
 
 1. Merge conventional commits to `main`. release-please keeps a release PR open with the next
-   version (before 1.0: `feat` is minor, `fix` a patch) and the CHANGELOG.
+   version (before 1.0: `feat` is minor, `fix` a patch) and the CHANGELOG. The release job runs
+   CI on the PR's branch by dispatch, and that run reports the required `check` as a commit
+   status. The PR's own pull_request run waits for approval (GitHub asks for it on any PR
+   GITHUB_TOKEN opens); it need not be approved.
 2. Merge the release PR. release-please tags `vX.Y.Z` and creates the GitHub release as a
    **draft**.
 3. The build job signs, notarizes and staples Ferry, attaches `Ferry-X.Y.Z.zip`,
