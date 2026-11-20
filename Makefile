@@ -13,7 +13,7 @@ fmt-check:
 	xcrun swift-format lint --strict -r Apps Sources Tests
 
 test:
-	swift test
+	swift test $(TEST_FLAGS)
 
 # docs/user-guide.md, rendered from Sources/FerryUI/help.json; a test fails if they differ.
 guide:
