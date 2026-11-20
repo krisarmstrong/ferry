@@ -7,12 +7,15 @@
 #    created the release, so its ref is main; no tag and no other branch can reach the secrets.
 #    There are no required reviewers: releases are fully automatic, by the owner's choice. The
 #    cost is that whatever lands on main is signed and shipped without a human approving the
-#    release run, so main's protection (3) is the gate.
+#    release run. Branch protection (3) stops others from merging without CI, but not you: it
+#    does not bind admins (enforce_admins is false), and you are the only admin, so merging a
+#    PR into main is itself the decision to ship.
 # 2. A ruleset on v* tags: nobody creates, moves or deletes one except GitHub Actions, through
 #    which release-please tags each release. GitHub cannot narrow that bypass to one workflow:
 #    any workflow with contents: write could create a v* tag, but such a tag never reaches the
 #    secrets (1), and the release job also checks the tag is release-please's draft on main.
-# 3. Branch protection on main: the CI `check` must pass, on an up-to-date branch.
+# 3. Branch protection on main: the CI `check` must pass, on an up-to-date branch, and it must
+#    come from GitHub Actions: a status named `check` posted by anything else does not count.
 #
 # Then run scripts/verify-tag-bypass.sh: it proves the bypass in (2) applies to release-please.
 #
@@ -62,8 +65,9 @@ else
 fi
 echo "v* tags: created only by GitHub Actions; never updated or deleted"
 
-gh api -X PUT "repos/$repo/branches/main/protection" --input - > /dev/null << 'JSON'
-{"required_status_checks": {"strict": true, "contexts": ["check"]},
+gh api -X PUT "repos/$repo/branches/main/protection" --input - > /dev/null << JSON
+{"required_status_checks": {"strict": true,
+   "checks": [{"context": "check", "app_id": $actions_app_id}]},
  "enforce_admins": false, "required_pull_request_reviews": null, "restrictions": null}
 JSON
-echo "main: the check job must pass before a merge"
+echo "main: GitHub Actions' check job must pass before a merge (admins excepted)"
