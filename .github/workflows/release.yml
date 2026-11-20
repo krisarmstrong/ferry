@@ -176,8 +176,24 @@ jobs:
             --ed-key-file - --embed-release-notes \
             --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" \
             .build/dist/appcast
-          grep -q 'sparkle:edSignature=' .build/dist/appcast/appcast.xml \
-            || { echo "::error::the appcast's update is not signed"; exit 1; }
+      # As an installed Ferry will: with the public key built into the app, the archive's
+      # signature and the feed's own (SURequireSignedFeed). A private key that is not the
+      # app's fails here, not on every Mac.
+      - name: Check the appcast against the app's public key
+        run: |
+          version="${TAG#v}"
+          appcast=.build/dist/appcast/appcast.xml
+          key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist")"
+          archive="$(sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p' "$appcast")"
+          feed="$(sed -n 's/^edSignature: //p' "$appcast")"
+          length="$(sed -n 's/^length: //p' "$appcast")"
+          [ -n "$archive" ] && [ -n "$feed" ] && [ -n "$length" ] \
+            || { echo "::error::the appcast lacks the archive's or its own signature"; exit 1; }
+          xcrun swift scripts/verify-ed-signature.swift "$key" "$archive" \
+            ".build/dist/appcast/Ferry-$version.zip" \
+            || { echo "::error::the archive's signature does not match SUPublicEDKey"; exit 1; }
+          xcrun swift scripts/verify-ed-signature.swift "$key" "$feed" "$appcast" "$length" \
+            || { echo "::error::the appcast's signature does not match SUPublicEDKey"; exit 1; }
       - name: Attach the release assets
         env:
           GH_TOKEN: ${{ github.token }}
