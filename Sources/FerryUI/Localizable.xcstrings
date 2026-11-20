@@ -2164,7 +2164,7 @@
     "After an update, Ferry restarts its helper the first time it opens. Your devices leave Finder for a moment and come back; a copy that was running then stops, so copy it again." : {
       "extractionState" : "manual"
     },
-    "Every update is signed twice: by Ferry's developer, as macOS checks, and with Ferry's own release key. Ferry installs an update only when both signatures match the copy you have, and it reads the list of releases from GitHub over a secure connection." : {
+    "Ferry installs an update only when it carries the signature of Ferry's own release key and a valid code signature. Releases are signed with the developer's Developer ID and notarized by Apple. Ferry reads the list of releases from GitHub over a secure connection." : {
       "extractionState" : "manual"
     },
     "Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else." : {

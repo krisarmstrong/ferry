@@ -1153,7 +1153,7 @@ To check now, choose **Check for Updates…** in the Ferry menu. Ferry shows wha
 
 After an update, Ferry restarts its helper the first time it opens. Your devices leave Finder for a moment and come back; a copy that was running then stops, so copy it again.
 
-Every update is signed twice: by Ferry's developer, as macOS checks, and with Ferry's own release key. Ferry installs an update only when both signatures match the copy you have, and it reads the list of releases from GitHub over a secure connection.
+Ferry installs an update only when it carries the signature of Ferry's own release key and a valid code signature. Releases are signed with the developer's Developer ID and notarized by Apple. Ferry reads the list of releases from GitHub over a secure connection.
 
 ### Privacy
 

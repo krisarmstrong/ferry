@@ -45,7 +45,8 @@ forwarding. It is free and open source (MIT), and it sends nothing to any server
 
 Ferry updates itself. It checks GitHub once a day, downloads a new release in the background
 and installs it when Ferry quits; **Check for Updates…** in the menu checks now. Every update
-must carry Ferry's EdDSA release signature and the same Developer ID as the installed copy. See
+must carry the signature of Ferry's EdDSA release key and a valid code signature; releases are
+signed with a Developer ID and notarized by Apple. See
 [Updates](docs/user-guide.md#updates).
 
 ## Quick start
