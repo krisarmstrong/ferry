@@ -61,15 +61,13 @@ final class FinderSync: FIFinderSync {
   /// Acts on the device and the selection of the menu the item came from.
   @objc func choose(_ item: NSMenuItem) {
     guard let choice = book.choice(for: item.tag), !choice.selection.isEmpty else { return }
-    // Plain values, not the guard's binding: Swift 6.3's region-based isolation checker stops
-    // with an internal error on a task that captures a value bound by `guard let`.
     let sender = sender
-    let action = choice.action
-    let selection = choice.selection
-    let device = choice.device
+    // FinderSync, not Self: Swift 6.3's region-based isolation checker stops with an internal
+    // error on a task that captures the dynamic Self type.
     Task {
-      let notice = await sender.perform(action, on: selection, deviceName: device)
-      await Self.post(notice)
+      let notice = await sender.perform(
+        choice.action, on: choice.selection, deviceName: choice.device)
+      await FinderSync.post(notice)
     }
   }
 
