@@ -162,8 +162,8 @@ struct ItemTableTests {
     }
     #expect(Set(ids).count == names.count)
     // Nor does the table's file name carry the device serial.
-    let file = ItemTable.file(for: tableDomain, in: folder).lastPathComponent
-    #expect(!file.contains("SER0000AAAA"))
+    let tableFile = ItemTable.file(for: tableDomain, in: folder).lastPathComponent
+    #expect(!tableFile.contains("SER0000AAAA"))
     #expect(ItemID(rawValue: "/Secret Plans") == nil)
   }
 

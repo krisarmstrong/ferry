@@ -105,6 +105,9 @@ import os
   /// Read from the system once launched (see `launch()`) and each time the menu opens; off
   /// until then.
   public private(set) var loginItem = LoginItemStatus.disabled
+  /// Set by the app when the build can update itself; the menu shows Check for Updates… only
+  /// then.
+  public var updater: (any UpdateChecking)?
   /// The login item change being applied, how many have been requested, and how many applied.
   private var loginItemChange: Task<Void, Never>?
   private var loginItemRequests = 0
@@ -240,12 +243,26 @@ import os
     services.open(Self.loginItemsSettings)
   }
 
-  /// Registers the agent, reads its status, then whether Ferry opens at login. The system calls
+  /// Starts the agent, reads its status, then whether Ferry opens at login. The system calls
   /// run off the main actor (see `SystemServices`), so the app opens without waiting on them.
   public func launch() async {
-    await services.registerAgent()
+    await startAgent()
     await refresh()
     loginItem = await services.loginItemStatus()
+  }
+
+  /// Registers the agent, or restarts it when the agent in the bundle is not the one last
+  /// started: after an update the old agent keeps running until it stops, and would serve the
+  /// new app and extensions its old code. Without the agent's identity it only registers. A
+  /// restart that failed to register is not recorded, so the next launch tries again.
+  private func startAgent() async {
+    guard let build = services.agentBuild(), build != services.startedAgentBuild() else {
+      await services.registerAgent()
+      return
+    }
+    if await services.restartAgent() {
+      services.recordStartedAgent(build)
+    }
   }
 
   /// The Open at Login row: shows `enabled` at once, then applies it after any change still

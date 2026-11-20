@@ -26,6 +26,26 @@ final class FakeServices: SystemServicing {
     log.record("registerAgent")
   }
 
+  /// The agent in the bundle, and the one last started; alike unless a test sets them.
+  var agentOnDisk: String? = "agent-1"
+  var startedAgent: String? = "agent-1"
+
+  func agentBuild() -> String? { agentOnDisk }
+  func startedAgentBuild() -> String? { startedAgent }
+
+  func recordStartedAgent(_ build: String) {
+    log.record("recordStartedAgent \(build)")
+    startedAgent = build
+  }
+
+  /// Whether a restart registers the new agent.
+  var restartSucceeds = true
+
+  func restartAgent() async -> Bool {
+    log.record("restartAgent")
+    return restartSucceeds
+  }
+
   func helperStatus() async -> HelperStatus {
     helper
   }

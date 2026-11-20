@@ -350,7 +350,7 @@
           "title": "Read the menu",
           "symbol": "menubar.rectangle",
           "paragraphs": [
-            "The menu has a header with **Refresh**, then any problem that needs you, then your devices, then **Connect by Address…** and **Pair with Code…**, then **Open at Login**, **Help** and **Quit Ferry**.",
+            "The menu has a header with **Refresh**, then any problem that needs you, then your devices, then **Connect by Address…** and **Pair with Code…**, then **Open at Login**, **Check for Updates…**, **Help** and **Quit Ferry**.",
             "Every device starts closed each time the menu opens. Click a device to see its details and what you can do with it, and click it again to close it. One device is open at a time, and it stays open while the menu is."
           ],
           "definitions": [
@@ -398,6 +398,10 @@
                 {
                   "term": "Open at Login",
                   "detail": "Starts Ferry when you log in. A checkmark shows it is on. **Needs approval in System Settings** means macOS is waiting for you to allow it there."
+                },
+                {
+                  "term": "Check for Updates…",
+                  "detail": "Looks for a newer Ferry now. Ferry also looks once a day by itself. See **Updates**."
                 },
                 {
                   "term": "Help",
@@ -1237,11 +1241,23 @@
       "title": "About Ferry",
       "topics": [
         {
+          "id": "updates",
+          "title": "Updates",
+          "symbol": "arrow.down.circle",
+          "paragraphs": [
+            "Ferry checks for a new version once a day. When there is one, it downloads it in the background and installs it the next time Ferry quits, so nothing stops while you work.",
+            "To check now, choose **Check for Updates…** in the Ferry menu. Ferry shows what is new in the release and offers to install it.",
+            "After an update, Ferry restarts its helper the first time it opens. Your devices leave Finder for a moment and come back; a copy that was running then stops, so copy it again.",
+            "Ferry installs an update only when it carries the signature of Ferry's own release key and a valid code signature. Releases are signed with the developer's Developer ID and notarized by Apple. Ferry reads the list of releases from GitHub over a secure connection."
+          ]
+        },
+        {
           "id": "privacy",
           "title": "Privacy",
           "symbol": "hand.raised.slash",
           "paragraphs": [
-            "Ferry has no telemetry, no analytics and no account, and sends nothing to any server. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else."
+            "Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.",
+            "The one connection Ferry makes to the internet is the daily check for updates, to GitHub, where Ferry's releases are published. It sends nothing about you or your devices."
           ]
         },
         {

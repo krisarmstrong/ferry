@@ -62,10 +62,12 @@ final class FinderSync: FIFinderSync {
   @objc func choose(_ item: NSMenuItem) {
     guard let choice = book.choice(for: item.tag), !choice.selection.isEmpty else { return }
     let sender = sender
+    // FinderSync, not Self: Swift 6.3's region-based isolation checker stops with an internal
+    // error on a task that captures the dynamic Self type.
     Task {
       let notice = await sender.perform(
         choice.action, on: choice.selection, deviceName: choice.device)
-      await Self.post(notice)
+      await FinderSync.post(notice)
     }
   }
 

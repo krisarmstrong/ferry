@@ -1,0 +1,291 @@
+name: Release
+
+# release-please keeps a release PR open on main. Merging it tags the version and creates the
+# GitHub release as a draft; the build job then attaches a notarized Ferry, a DMG and the Sparkle
+# appcast, and publishes the release as the latest, whose appcast every installed Ferry reads
+# from releases/latest/download/appcast.xml. A release made with GITHUB_TOKEN starts no other
+# workflow, so the build runs here, after release-please.
+# Signing runs only for the tag release-please just made, on main, in the protected `release`
+# environment that holds the secrets (scripts/repo-settings.sh). To retry a failed build, re-run
+# the failed jobs: the release is still a draft.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+      # To start CI on the release PR.
+      actions: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      id: ${{ steps.release.outputs.id }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+      # release-please takes any refusal to create the tag (HTTP 422) for "it exists already",
+      # then creates the draft, which as a draft makes no tag. If the Release tags ruleset ever
+      # refuses GitHub Actions (scripts/verify-tag-bypass.sh), say so here rather than leave a
+      # draft whose build can never check out its tag.
+      - name: Check release-please tagged the release
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a release tag: $TAG"; exit 1; }
+          tagged="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)" || {
+            echo "::error::release-please made the draft release $TAG but no tag $TAG. The Release tags" \
+              "ruleset may refuse GitHub Actions: run scripts/verify-tag-bypass.sh, and see docs/RELEASING.md"
+            exit 1
+          }
+          [ "$tagged" = "$SHA" ] \
+            || { echo "::error::tag $TAG is $tagged, but release-please released $SHA"; exit 1; }
+      # A push by GITHUB_TOKEN starts no pull_request run, so the release PR would never get the
+      # check main requires. A workflow_dispatch is exempt: run CI on the PR's branch, and its
+      # check lands on the PR's head commit.
+      - name: Run CI on the release PR
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.release.outputs.pr }}
+        run: |
+          branch="$(jq -r .headBranchName <<< "$PR")"
+          [[ "$branch" =~ ^release-please--[A-Za-z0-9._/-]+$ ]] \
+            || { echo "::error::unexpected release PR branch: $branch"; exit 1; }
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
+
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: macos-26
+    environment: release
+    permissions:
+      contents: write
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      TAG: ${{ needs.release-please.outputs.tag }}
+      # The draft release-please made in this run, by id: every call below names it so, and no
+      # other release with the same tag can stand in for it.
+      RELEASE_ID: ${{ needs.release-please.outputs.id }}
+      RELEASE_SHA: ${{ needs.release-please.outputs.sha }}
+      XCODEGEN_VERSION: 2.46.0
+      XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+      SPARKLE_VERSION: 2.10.1
+      SPARKLE_SHA256: 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27
+      APP: .build/release/Build/Products/Release/Ferry.app
+    steps:
+      - name: Check the tag and the secrets
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a release tag: $TAG"; exit 1; }
+          missing=()
+          for name in DEVELOPER_ID_P12_BASE64 DEVELOPER_ID_P12_PASSWORD NOTARY_KEY_ID \
+            NOTARY_ISSUER_ID NOTARY_KEY_P8 SPARKLE_PRIVATE_KEY; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::missing secrets of the release environment: ${missing[*]} (see scripts/release-secrets.sh)"
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+      # Nothing is signed unless the draft is the one release-please made in this run and the tag
+      # is its commit, on main. The author check alone proves little: any workflow's
+      # GITHUB_TOKEN creates releases as github-actions[bot]. What binds the build to this
+      # release is the id from this run's release-please output, and the tag's commit equalling
+      # both release-please's released commit and the draft's target. The release notes, which
+      # the signed feed embeds, are read here, once, from that draft.
+      - name: Check the draft and its tag are release-please's, on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$RELEASE_ID" =~ ^[0-9]+$ ]] || fail "release-please gave no release id: $RELEASE_ID"
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "release-please gave no commit: $RELEASE_SHA"
+          release="$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID")"
+          jq -e --arg tag "$TAG" \
+            '.draft and .tag_name == $tag and .author.login == "github-actions[bot]"' \
+            <<< "$release" > /dev/null \
+            || fail "release $RELEASE_ID is not release-please's draft of $TAG"
+          target="$(jq -r .target_commitish <<< "$release")"
+          [[ "$target" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "unexpected target_commitish: $target"
+          target="$(gh api "repos/$GITHUB_REPOSITORY/commits/$target" --jq .sha)"
+          commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          [ "$commit" = "$RELEASE_SHA" ] || fail "$TAG is $commit, release-please released $RELEASE_SHA"
+          [ "$commit" = "$target" ] || fail "$TAG is $commit, the draft targets $target"
+          git merge-base --is-ancestor "$commit" origin/main || fail "$TAG ($commit) is not on main"
+          jq -r .body <<< "$release" > "$RUNNER_TEMP/release-notes.md"
+      - name: Install XcodeGen, pkg-config and Sparkle's tools
+        run: |
+          test -d "$DEVELOPER_DIR" || { echo "::error::$DEVELOPER_DIR is not on this image"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/tools"
+          cd "$RUNNER_TEMP/tools"
+          curl -fsSL -o xcodegen.zip \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/$XCODEGEN_VERSION/xcodegen.zip"
+          echo "$XCODEGEN_SHA256  xcodegen.zip" | shasum -a 256 -c
+          unzip -q xcodegen.zip
+          echo "$RUNNER_TEMP/tools/xcodegen/bin" >> "$GITHUB_PATH"
+          curl -fsSL -o sparkle.tar.xz \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          echo "$SPARKLE_SHA256  sparkle.tar.xz" | shasum -a 256 -c
+          mkdir sparkle
+          tar -xJf sparkle.tar.xz -C sparkle
+          brew install pkgconf
+      - name: Import the Developer ID certificate
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        # security import takes a .p12 password only as an argument, where any process on the
+        # runner could read it. So the secret password reaches only openssl, through the
+        # environment, which re-wraps the identity under a throwaway password made here. The
+        # files live in a 0700 folder, removed when the step ends.
+        run: |
+          umask 077
+          work="$(mktemp -d "$RUNNER_TEMP/developer-id.XXXXXX")"
+          trap 'rm -rf "$work"' EXIT
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$work/developer-id.p12"
+          /usr/bin/openssl pkcs12 -in "$work/developer-id.p12" -passin env:DEVELOPER_ID_P12_PASSWORD \
+            -nodes -out "$work/identity.pem" 2> /dev/null \
+            || { echo "::error::DEVELOPER_ID_P12_PASSWORD does not open DEVELOPER_ID_P12_BASE64"; exit 1; }
+          TRANSPORT="$(uuidgen)"
+          export TRANSPORT
+          /usr/bin/openssl pkcs12 -export -in "$work/identity.pem" -out "$work/import.p12" \
+            -passout env:TRANSPORT -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+          security import "$work/import.p12" -k "$keychain" -P "$TRANSPORT" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain
+      - name: Build and sign
+        run: make release
+      - name: Notarize and staple the app, then package it
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          umask 077
+          version="${TAG#v}"
+          key="$RUNNER_TEMP/notary.p8"
+          printf '%s\n' "$NOTARY_KEY_P8" > "$key"
+          notarize() {
+            local result id
+            result="$(xcrun notarytool submit "$1" --key "$key" --key-id "$NOTARY_KEY_ID" \
+              --issuer "$NOTARY_ISSUER_ID" --wait --output-format json)"
+            id="$(jq -r .id <<< "$result")"
+            if [ "$(jq -r .status <<< "$result")" != Accepted ]; then
+              xcrun notarytool log "$id" --key "$key" --key-id "$NOTARY_KEY_ID" \
+                --issuer "$NOTARY_ISSUER_ID"
+              echo "::error::notarization of $1 was not accepted: $result"
+              exit 1
+            fi
+          }
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
+          notarize "$RUNNER_TEMP/notarize.zip"
+          xcrun stapler staple "$APP"
+          mkdir -p .build/dist/appcast
+          ditto -c -k --keepParent "$APP" ".build/dist/appcast/Ferry-$version.zip"
+
+          staging="$RUNNER_TEMP/dmg"
+          mkdir -p "$staging"
+          ditto "$APP" "$staging/Ferry.app"
+          ln -s /Applications "$staging/Applications"
+          dmg=".build/dist/Ferry-$version.dmg"
+          hdiutil create -volname Ferry -srcfolder "$staging" -format UDZO -ov "$dmg"
+          identity="$(codesign -dv --verbose=2 "$APP" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+          codesign --sign "$identity" --timestamp "$dmg"
+          notarize "$dmg"
+          xcrun stapler staple "$dmg"
+          rm -f "$key"
+      - name: Sign the appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          version="${TAG#v}"
+          # The draft's notes, read by the check above; Sparkle shows them.
+          cp "$RUNNER_TEMP/release-notes.md" ".build/dist/appcast/Ferry-$version.md"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | "$RUNNER_TEMP/tools/sparkle/bin/generate_appcast" \
+            --ed-key-file - --embed-release-notes \
+            --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/" \
+            .build/dist/appcast
+      # As an installed Ferry will: with the public key built into the app, the archive's
+      # signature and the feed's own (SURequireSignedFeed). A private key that is not the
+      # app's fails here, not on every Mac.
+      - name: Check the appcast against the app's public key
+        run: |
+          version="${TAG#v}"
+          appcast=.build/dist/appcast/appcast.xml
+          key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist")"
+          archive="$(sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p' "$appcast")"
+          feed="$(sed -n 's/^edSignature: //p' "$appcast")"
+          length="$(sed -n 's/^length: //p' "$appcast")"
+          [ -n "$archive" ] && [ -n "$feed" ] && [ -n "$length" ] \
+            || { echo "::error::the appcast lacks the archive's or its own signature"; exit 1; }
+          xcrun swift scripts/verify-ed-signature.swift "$key" "$archive" \
+            ".build/dist/appcast/Ferry-$version.zip" \
+            || { echo "::error::the archive's signature does not match SUPublicEDKey"; exit 1; }
+          xcrun swift scripts/verify-ed-signature.swift "$key" "$feed" "$appcast" "$length" \
+            || { echo "::error::the appcast's signature does not match SUPublicEDKey"; exit 1; }
+      - name: Attach the release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${TAG#v}"
+          releases="repos/$GITHUB_REPOSITORY/releases"
+          for file in ".build/dist/appcast/Ferry-$version.zip" ".build/dist/Ferry-$version.dmg" \
+            .build/dist/appcast/appcast.xml; do
+            name="$(basename "$file")"
+            # A re-run replaces what an earlier attempt attached.
+            for asset in $(gh api "$releases/$RELEASE_ID/assets" \
+              --jq ".[] | select(.name == \"$name\") | .id"); do
+              gh api -X DELETE "$releases/assets/$asset"
+            done
+            gh api -X POST "https://uploads.github.com/$releases/$RELEASE_ID/assets?name=$name" \
+              -H 'Content-Type: application/octet-stream' --input "$file" > /dev/null
+          done
+      # Only now does releases/latest point here. A failed build leaves the draft, and every
+      # installed Ferry keeps reading the previous release's appcast.
+      - name: Publish the release as the latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            -F draft=false -f make_latest=true > /dev/null
+      # Also when a step failed before removing its own.
+      - name: Remove the keychain and the key files
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" || true
+          rm -rf "$RUNNER_TEMP"/developer-id.* "$RUNNER_TEMP/notary.p8"

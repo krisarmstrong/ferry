@@ -9,6 +9,13 @@ options:
 packages:
   Ferry:
     path: .
+  # Updates. Only the app links it. Pinned to the commit of the 2.10.1 tag, not the tag, which
+  # could be moved: that commit's Package.swift fixes the checksum SwiftPM checks the framework
+  # against. Xcode records the pin in Package.resolved too; this line, not that file, decides.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    # 2.10.1
+    revision: ab7d71291238df6e0492143b120c9b696a35f603
 
 settings:
   base:
@@ -23,10 +30,27 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     # Off for development: the agent loads Homebrew's libmtp, which library validation would
-    # refuse. Plan 3 bundles libmtp and turns this on.
+    # refuse. A release build bundles libmtp, signed by the team, and turns it on (configs).
     ENABLE_HARDENED_RUNTIME: NO
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0" # x-release-please-version
+    # Sparkle compares CFBundleVersion: it moves with the version on every release.
+    CURRENT_PROJECT_VERSION: "0.1.0" # x-release-please-version
+    # Where Sparkle reads the releases: the appcast attached to the latest GitHub release.
+    FERRY_FEED_URL: https://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xml
+  # A release is signed with Developer ID for notarization (scripts/release-build.sh).
+  configs:
+    Release:
+      CODE_SIGN_STYLE: Manual
+      CODE_SIGN_IDENTITY: Developer ID Application
+      ENABLE_HARDENED_RUNTIME: YES
+      OTHER_CODE_SIGN_FLAGS: --timestamp
+      # No get-task-allow: notarization refuses it, and it would let a debugger attach.
+      CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+      # The public half of the Sparkle EdDSA key that signs releases (scripts/release-secrets.sh
+      # writes it here). Release only: a Debug build has no key, so Sparkle never starts in it.
+      # Until it replaces the placeholder no build has updates, and a team release build fails
+      # `make check-app CONFIG=Release`.
+      FERRY_SPARKLE_PUBLIC_KEY: 7l53fvukDGsiiz8uHiNrggUK0d1bWWB2x+GFyZsEhIU=
 
 targets:
   Ferry:
@@ -72,6 +96,7 @@ targets:
         product: FerryUI
       - package: Ferry
         product: FerryIPC
+      - package: Sparkle
       - target: FerryAgent
         embed: true
         codeSign: false
@@ -101,6 +126,8 @@ targets:
         # binary.
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
         SKIP_INSTALL: YES
+        # A release build's libmtp and libusb, in Contents/Frameworks beside Contents/MacOS.
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
     dependencies:
       - package: Ferry
         product: FerryAgentCore

@@ -35,8 +35,9 @@ HEADER = [
 INSTALL = [
     "## Install",
     "",
-    "Ferry has no published release yet. Build it from source (see the README), then move "
-    "**Ferry** to the **Applications** folder and open it.",
+    "Download Ferry from the [latest release](https://github.com/krisarmstrong/ferry/releases/"
+    "latest), move **Ferry** to the **Applications** folder and open it. After that, Ferry keeps "
+    "itself up to date (see **Updates**).",
     "",
     "Ferry runs in the menu bar. It has no Dock icon and no main window. Until its helper "
     "answers, the menu shows **Checking…**.",

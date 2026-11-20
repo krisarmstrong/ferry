@@ -54,12 +54,13 @@ This guide holds the same help as **Help** in the Ferry menu, plus how to instal
   - [Ferry's helper and settings](#ferrys-helper-and-settings)
   - [Remove Ferry](#remove-ferry)
 - [About Ferry](#about-ferry)
+  - [Updates](#updates)
   - [Privacy](#privacy)
   - [Uninstall](#uninstall)
 
 ## Install
 
-Ferry has no published release yet. Build it from source (see the README), then move **Ferry** to the **Applications** folder and open it.
+Download Ferry from the [latest release](https://github.com/krisarmstrong/ferry/releases/latest), move **Ferry** to the **Applications** folder and open it. After that, Ferry keeps itself up to date (see **Updates**).
 
 Ferry runs in the menu bar. It has no Dock icon and no main window. Until its helper answers, the menu shows **Checking…**.
 
@@ -310,7 +311,7 @@ Control-click a file you opened and choose **Remove Download**. The file stays o
 
 ### Read the menu
 
-The menu has a header with **Refresh**, then any problem that needs you, then your devices, then **Connect by Address…** and **Pair with Code…**, then **Open at Login**, **Help** and **Quit Ferry**.
+The menu has a header with **Refresh**, then any problem that needs you, then your devices, then **Connect by Address…** and **Pair with Code…**, then **Open at Login**, **Check for Updates…**, **Help** and **Quit Ferry**.
 
 Every device starts closed each time the menu opens. Click a device to see its details and what you can do with it, and click it again to close it. One device is open at a time, and it stays open while the menu is.
 
@@ -327,6 +328,7 @@ Every device starts closed each time the menu opens. Click a device to see its d
 
 - **Refresh**: Press ⌘R while the menu is open. Shows every change made on the device in Finder at once, including files changed in place or renamed in file transfer mode, mounts every device you ejected, and checks again a device that is not sharing files. While the menu is open, Ferry also checks for devices every 2 seconds.
 - **Open at Login**: Starts Ferry when you log in. A checkmark shows it is on. **Needs approval in System Settings** means macOS is waiting for you to allow it there.
+- **Check for Updates…**: Looks for a newer Ferry now. Ferry also looks once a day by itself. See **Updates**.
 - **Help**: Opens this window. Press ⌘? while the menu is open. Here, ⌘F goes to the search field, Return opens the best match, and ⌘[ and ⌘] step through the topics. A **?** beside a problem in the menu opens its entry here.
 - **Quit Ferry**: Closes the menu. The helper keeps running, so devices stay in Finder.
 
@@ -1143,9 +1145,21 @@ The **Remove Ferry…** button is here in Ferry Help. Ferry asks you to confirm 
 
 ## About Ferry
 
+### Updates
+
+Ferry checks for a new version once a day. When there is one, it downloads it in the background and installs it the next time Ferry quits, so nothing stops while you work.
+
+To check now, choose **Check for Updates…** in the Ferry menu. Ferry shows what is new in the release and offers to install it.
+
+After an update, Ferry restarts its helper the first time it opens. Your devices leave Finder for a moment and come back; a copy that was running then stops, so copy it again.
+
+Ferry installs an update only when it carries the signature of Ferry's own release key and a valid code signature. Releases are signed with the developer's Developer ID and notarized by Apple. Ferry reads the list of releases from GitHub over a secure connection.
+
 ### Privacy
 
-Ferry has no telemetry, no analytics and no account, and sends nothing to any server. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.
+Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.
+
+The one connection Ferry makes to the internet is the daily check for updates, to GitHub, where Ferry's releases are published. It sends nothing about you or your devices.
 
 ### Uninstall
 

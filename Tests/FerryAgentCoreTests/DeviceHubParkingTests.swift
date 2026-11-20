@@ -41,6 +41,9 @@ extension DeviceHubTests {
     let device = await makeHubDevice("A")
     var harness = HubHarness()
     defer { harness.finish() }
+    // Otherwise the hub's first scan can report the device, and the tick's scan, still under
+    // way, parks it again after the recheck unparks it.
+    await harness.hub.firstScan()
     await harness.transport.failNextOpen(of: device.info.id, with: .deviceBusy)
     await harness.transport.attach(device)
     harness.tick()
@@ -184,6 +187,9 @@ extension DeviceHubTests {
   @Test func hubScansAgainWhenTheTransportAsks() async {
     var harness = HubHarness()
     defer { harness.finish() }
+    // The hub's own first scan must be over: run after the tick's, it would read the nil set
+    // below and cancel the rescan the tick's scan scheduled.
+    await harness.hub.firstScan()
     await harness.transport.setRescanAfter(.seconds(3))
     harness.tick()
     await harness.clock.waitForSleeper()

@@ -1,6 +1,7 @@
-export DEVELOPER_DIR := /Applications/Xcode.app/Contents/Developer
+# CI points this at the runner's newest Xcode.
+export DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 
-.PHONY: lint fmt fmt-check test build app check-app guide
+.PHONY: lint fmt fmt-check test build app check-app guide release
 
 lint:
 	swiftlint --strict
@@ -12,7 +13,7 @@ fmt-check:
 	xcrun swift-format lint --strict -r Apps Sources Tests
 
 test:
-	swift test
+	swift test $(TEST_FLAGS)
 
 # docs/user-guide.md, rendered from Sources/FerryUI/help.json; a test fails if they differ.
 guide:
@@ -22,17 +23,22 @@ build:
 	swift build -c release
 
 # The app bundle (Ferry.app with the agent and the FileProvider extension), built into
-# .build/xcode/Build/Products/Debug.
+# .build/xcode/Build/Products/Debug. `SIGN=adhoc` signs to run locally, for CI, which has no
+# signing identity; every part still records the team.
+SIGN ?= team
+SIGN_FLAGS_team = -allowProvisioningUpdates
+SIGN_FLAGS_adhoc = CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
 app:
 	xcodegen generate --quiet
 	xcodebuild -project Ferry.xcodeproj -scheme Ferry -configuration Debug \
 		-destination 'platform=macOS,arch=arm64' -derivedDataPath .build/xcode \
-		-allowProvisioningUpdates -quiet $(if $(TEAM),FERRY_TEAM_ID=$(TEAM)) build
+		-quiet $(SIGN_FLAGS_$(SIGN)) $(if $(TEAM),FERRY_TEAM_ID=$(TEAM)) build
 	$(MAKE) check-app
 
 # The FerryUI resource bundle inside the app must carry the help and the strings: without them
 # Help says it is not available and the menu shows its string keys.
-APP ?= .build/xcode/Build/Products/Debug/Ferry.app
+CONFIG ?= Debug
+APP ?= .build/xcode/Build/Products/$(CONFIG)/Ferry.app
 UI_RESOURCES = $(APP)/Contents/Resources/Ferry_FerryUI.bundle/Contents/Resources
 SYNC_RESOURCES = $(APP)/Contents/PlugIns/FerrySync.appex/Contents/Resources
 check-app:
@@ -60,21 +66,37 @@ check-app:
 	@test -d "$(APP)/Contents/Resources/Ferry_FerryAgentCore.bundle/Contents/Resources/en.lproj" \
 	  || { echo "error: no FerryAgentCore strings in $(APP)/Contents/Resources" >&2; exit 1; }
 	@echo "FileProvider extension and agent carry their strings"
-	@# It may send files to devices and install apps: no injected library may run in it.
+	@# It may send files to devices and install apps: no injected library may run in it. Xcode
+	@# leaves the hardened runtime out of an ad hoc signature, so then the setting is checked.
+ifeq ($(SIGN),adhoc)
+	@xcodebuild -project Ferry.xcodeproj -target FerrySync -configuration $(CONFIG) -showBuildSettings \
+	  2>/dev/null | grep -q '^ *ENABLE_HARDENED_RUNTIME = YES$$' \
+	  || { echo "error: the Finder Sync extension is not built with the hardened runtime" >&2; exit 1; }
+	@echo "Finder Sync extension is built with the hardened runtime (not signed: ad hoc)"
+else
 	@codesign -dv '$(APP)/Contents/PlugIns/FerrySync.appex' 2>&1 | grep -q '^CodeDirectory.*flags=.*runtime' \
 	  || { echo "error: the Finder Sync extension is not signed with the hardened runtime" >&2; exit 1; }
 	@echo "Finder Sync extension runs with the hardened runtime"
+endif
 	@# Every part reads its team from FerryTeamID, and the agent's Mach service is named for it:
 	@# all of them, and the team that signed the bundle, must be one team.
 	@agent="$(APP)/Contents/Library/LaunchAgents/io.github.krisarmstrong.ferry.agent.plist"; \
+	  signer="$$(codesign -dv '$(APP)' 2>&1 | sed -n 's/^TeamIdentifier=//p')"; \
+	  parts=6; \
+	  if [ '$(SIGN)' = adhoc ]; then \
+	    codesign -dv '$(APP)' 2>&1 | grep -q '^Signature=adhoc' \
+	      || { echo "error: SIGN=adhoc but $(APP) is not signed ad hoc" >&2; exit 1; }; \
+	    signer=; \
+	    parts=5; \
+	  fi; \
 	  teams="$$(/usr/libexec/PlistBuddy -c 'Print :FerryTeamID' '$(APP)/Contents/Info.plist') \
 	  $$(/usr/libexec/PlistBuddy -c 'Print :FerryTeamID' '$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Info.plist') \
 	  $$(/usr/libexec/PlistBuddy -c 'Print :FerryTeamID' '$(APP)/Contents/PlugIns/FerrySync.appex/Contents/Info.plist') \
 	  $$(launchctl plist __TEXT,__info_plist '$(APP)/Contents/MacOS/FerryAgent' | sed -n 's/.*"FerryTeamID" = "\([A-Z0-9]*\)".*/\1/p') \
 	  $$(sed -n 's/.*<key>\([A-Z0-9]\{10\}\)[.]io[.]github[.]krisarmstrong[.]ferry[.]agent<.key>.*/\1/p' "$$agent") \
-	  $$(codesign -dv '$(APP)' 2>&1 | sed -n 's/^TeamIdentifier=//p')"; \
+	  $$signer"; \
 	  set -- $$teams; \
-	  [ $$# -eq 6 ] || { echo "error: a part of $(APP) records no team ID: $$teams" >&2; exit 1; }; \
+	  [ $$# -eq $$parts ] || { echo "error: a part of $(APP) records no team ID: $$teams" >&2; exit 1; }; \
 	  for team in "$$@"; do \
 	    echo "$$team" | grep -Eq '^[A-Z0-9]{10}$$' && [ "$$team" = "$$1" ] \
 	      || { echo "error: the parts of $(APP) name different teams: $$teams" >&2; exit 1; }; \
@@ -84,3 +106,12 @@ check-app:
 	@/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionFileProviderAdditionalSyncableExtendedAttributes' \
 	  '$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Info.plist' | grep -q 'com.apple.quarantine' \
 	  || { echo "error: the extension does not declare com.apple.quarantine syncable" >&2; exit 1; }
+ifeq ($(CONFIG),Release)
+	@scripts/check-release.sh '$(APP)' '$(SIGN)'
+endif
+
+# A release build, signed with the Developer ID identity in the keychain, its libmtp and libusb
+# in Contents/Frameworks, in .build/release/Build/Products/Release. Not notarized: the release
+# workflow does that. `SIGN=adhoc` signs to run locally (scripts/update-dry-run.sh).
+release:
+	scripts/release-build.sh $(SIGN)
