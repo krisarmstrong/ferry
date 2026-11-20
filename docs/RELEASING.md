@@ -19,12 +19,36 @@ the tag's commit is on `main`.
 ## Each release
 
 1. Merge conventional commits to `main`. release-please keeps a release PR open with the next
-   version (before 1.0: `feat` is minor, `fix` a patch) and the CHANGELOG.
+   version (before 1.0: `feat` is minor, `fix` a patch) and the CHANGELOG. The release job runs
+   CI on the PR's branch by dispatch, and that run reports the required `check` on the PR's
+   head commit, as a commit status and a check run. The PR's own pull_request run waits for
+   approval (GitHub asks for it on any PR GITHUB_TOKEN opens); it need not be approved. If the
+   PR shows no passing `check`, see below.
 2. Merge the release PR. release-please tags `vX.Y.Z` and creates the GitHub release as a
    **draft**.
 3. The build job signs, notarizes and staples Ferry, attaches `Ferry-X.Y.Z.zip`,
    `Ferry-X.Y.Z.dmg` and `appcast.xml`, then publishes the release as the latest. Installed
    copies read `releases/latest/download/appcast.xml` and update within a day.
+
+## When the release PR shows no passing `check`
+
+The dispatched CI run reports `check` on the commit it tested, and nothing else does. So:
+
+**The dispatched run failed** (or was cancelled). It left `check` failed on the head commit,
+and that blocks the merge. Approving and passing the PR's own pull_request run does not clear
+it: GitHub requires every `check` of that name to pass. Re-run the dispatched run (Actions →
+CI → the `workflow_dispatch` run → **Re-run all jobs**), or start a new one on the release
+branch:
+
+```sh
+gh workflow run ci.yml --ref release-please--branches--main--components--ferry
+```
+
+**The head commit was never tested.** No dispatch covers a head that release-please did not
+push: after **Update branch** on the PR (branch protection wants it up to date with `main`, and
+main moved on with only `ci:`, `test:` or `docs:` commits, which change no release notes), or
+after any other push to the branch. The PR then waits for `check` with nothing running. Start
+CI on the branch with the same `gh workflow run` command.
 
 ## When the build fails
 

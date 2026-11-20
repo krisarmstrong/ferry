@@ -8,7 +8,7 @@ import Testing
 extension DeviceHubTests {
   @Test func ejectParksTheDeviceInTheTransport() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
     await harness.hub.eject(device.info.id)
@@ -19,7 +19,7 @@ extension DeviceHubTests {
   @Test func deviceWithoutFileTransferIsNotSharing() async {
     let info = DeviceInfo(
       id: DeviceID(serial: "usb-0-3"), manufacturer: "freescale", model: "LinkRunner-100G")
-    var harness = HubHarness()
+    var harness = await HubHarness()
     defer { harness.finish() }
     await harness.transport.attachWithoutFileTransfer(info)
     harness.tick()
@@ -39,11 +39,8 @@ extension DeviceHubTests {
 
   @Test func recheckOfBusyDeviceUnparksAndScans() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness()
+    var harness = await HubHarness()
     defer { harness.finish() }
-    // Otherwise the hub's first scan can report the device, and the tick's scan, still under
-    // way, parks it again after the recheck unparks it.
-    await harness.hub.firstScan()
     await harness.transport.failNextOpen(of: device.info.id, with: .deviceBusy)
     await harness.transport.attach(device)
     harness.tick()
@@ -63,7 +60,7 @@ extension DeviceHubTests {
   @Test func pollDoesNotUnparkADeviceEjectedMeanwhile() async {
     let first = await makeHubDevice("A", locked: true)
     let second = await makeHubDevice("B", locked: true)
-    var harness = HubHarness(devices: [first, second])
+    var harness = await HubHarness(devices: [first, second])
     defer { harness.finish() }
     _ = await harness.next()
     _ = await harness.next()
@@ -90,7 +87,7 @@ extension DeviceHubTests {
   /// keeps reporting it as ejected, and it is not opened until Mount.
   @Test func ejectSticksAcrossTheDevicesOwnResetUntilMount() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
     await harness.hub.eject(device.info.id)
@@ -116,7 +113,7 @@ extension DeviceHubTests {
   /// than showing "Ejected" for a device it could hold.
   @Test func ejectedDeviceTheTransportOffersAgainIsMounted() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
     await harness.hub.eject(device.info.id)
@@ -132,7 +129,7 @@ extension DeviceHubTests {
 
   @Test func ejectedDeviceUnpluggedAndReplugggedIsOpenedAgain() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
     await harness.hub.eject(device.info.id)
@@ -153,7 +150,7 @@ extension DeviceHubTests {
   @Test func failingDeviceIsRetriedWithBackoff() async {
     let device = await makeHubDevice("A")
     await device.failStorages(with: .io("broken"))
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     let failed = AttachedDevice(
       info: device.info, state: .failed(.io("broken")), method: .usbFileTransfer)
@@ -185,11 +182,8 @@ extension DeviceHubTests {
   /// An ejected device's port is empty: the transport asks for another scan once that would count
   /// as an unplug, and the hub scans then without waiting for a USB event.
   @Test func hubScansAgainWhenTheTransportAsks() async {
-    var harness = HubHarness()
+    var harness = await HubHarness()
     defer { harness.finish() }
-    // The hub's own first scan must be over: run after the tick's, it would read the nil set
-    // below and cancel the rescan the tick's scan scheduled.
-    await harness.hub.firstScan()
     await harness.transport.setRescanAfter(.seconds(3))
     harness.tick()
     await harness.clock.waitForSleeper()

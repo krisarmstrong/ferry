@@ -24,7 +24,9 @@ func hubReady(_ device: FakeDevice) -> AttachedDevice {
     info: device.info, state: .ready([hubStorage(of: device.info.id)]), method: .usbFileTransfer)
 }
 
-/// A hub over a fake transport, with USB ticks and time under the test's control.
+/// A hub over a fake transport, with USB ticks and time under the test's control. It is made once
+/// the hub's start-up scan is over, so every later scan is one a test asked for (a tick, a
+/// recheck, the clock) and nothing the test sets up races that scan.
 struct HubHarness {
   let transport: FakeTransport
   let clock = ManualClock()
@@ -32,12 +34,13 @@ struct HubHarness {
   private let ticks: AsyncStream<Void>.Continuation
   var events: AsyncStream<HubEvent>.Iterator
 
-  init(devices: [FakeDevice] = []) {
+  init(devices: [FakeDevice] = []) async {
     transport = FakeTransport(devices: devices)
     let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
     self.ticks = ticks
     hub = DeviceHub(transport: transport, arrivals: arrivals, clock: clock)
     events = hub.events.makeAsyncIterator()
+    await hub.firstScan()
   }
 
   func tick() {
@@ -66,7 +69,7 @@ struct HubHarness {
 @Suite(.timeLimit(.minutes(1)))
 struct DeviceHubTests {
   @Test func attachEmitsReadyWithStorages() async throws {
-    var harness = HubHarness()
+    var harness = await HubHarness()
     defer { harness.finish() }
     let device = await makeHubDevice("A")
     await harness.transport.attach(device)
@@ -79,7 +82,7 @@ struct DeviceHubTests {
 
   @Test func lockedDeviceIsNotSharingFilesThenBecomesReady() async {
     let device = await makeHubDevice("A", locked: true)
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
 
     #expect(
@@ -98,7 +101,7 @@ struct DeviceHubTests {
 
   @Test func heldDeviceIsNeverBusy() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
@@ -113,7 +116,7 @@ struct DeviceHubTests {
 
   @Test func openBusyDeviceIsBusyUntilItFrees() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness()
+    var harness = await HubHarness()
     defer { harness.finish() }
     await harness.transport.failNextOpen(of: device.info.id, with: .deviceBusy)
     await harness.transport.attach(device)
@@ -132,7 +135,7 @@ struct DeviceHubTests {
       info: DeviceInfo(
         id: FakeTransport.busyID(for: device.info.id), manufacturer: "Fake", model: "Phone"),
       state: .busy, method: .usbFileTransfer)
-    var harness = HubHarness()
+    var harness = await HubHarness()
     defer { harness.finish() }
     await harness.transport.attach(device)
     await harness.transport.setHeldByAnotherApp(device.info.id, true)
@@ -152,7 +155,7 @@ struct DeviceHubTests {
 
   @Test func scanNeverOpensHeldDevice() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
     let probes = await harness.transport.probeCount(of: device.info.id)
@@ -166,7 +169,7 @@ struct DeviceHubTests {
 
   @Test func noRepeatedOpensPerTick() async {
     let devices = [await makeHubDevice("A"), await makeHubDevice("B"), await makeHubDevice("C")]
-    var harness = HubHarness()
+    var harness = await HubHarness()
     defer { harness.finish() }
     for device in devices { await harness.transport.attach(device) }
     let scansBefore = await harness.transport.scanCount
@@ -182,7 +185,7 @@ struct DeviceHubTests {
 
   @Test func failedStoragesReleasesSessionForRetry() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
@@ -205,7 +208,7 @@ struct DeviceHubTests {
 
   @Test func detachClosesSessionAndEmits() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
@@ -222,7 +225,7 @@ struct DeviceHubTests {
 
   @Test func replugBeforeTickIsReattached() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
@@ -240,7 +243,7 @@ struct DeviceHubTests {
   /// reported before the departure it follows.
   @Test func replugDuringCloseIsReportedAfterDetach() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
@@ -261,7 +264,7 @@ struct DeviceHubTests {
 
   @Test func ejectKeepsDeviceListed() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
@@ -283,7 +286,7 @@ struct DeviceHubTests {
 
   @Test func ejectDuringRecheckStaysEjected() async {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
@@ -305,7 +308,7 @@ struct DeviceHubTests {
   @Test func noPollingWhenNothingWaits() async {
     let device = await makeHubDevice("A")
     let locked = await makeHubDevice("L", locked: true)
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
     #expect(await !harness.hub.isRechecking)

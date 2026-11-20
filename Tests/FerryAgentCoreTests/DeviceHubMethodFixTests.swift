@@ -11,7 +11,7 @@ extension DeviceHubMethodTests {
   /// A held USB session is never moved to the network in place: the cable pull is learnt from
   /// the session, the device is detached, and the network then serves it afresh.
   @Test func pullingTheCableHandsOverToTheNetworkThroughADetach() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     await harness.adb.setMethod(.wifiADB, for: id)
@@ -27,7 +27,7 @@ extension DeviceHubMethodTests {
 
   /// MTP's scan fails while the unit is also on the network: it stays on MTP.
   @Test func aFailedScanNeverMovesAUSBDeviceToTheNetwork() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     await harness.adb.setMethod(.wifiADB, for: id)
@@ -46,7 +46,7 @@ extension DeviceHubMethodTests {
   /// The unit is served over the network and is then plugged in with file transfer off: USB
   /// presents it, so the network stops serving it and it shows as not sharing.
   @Test func aUSBDeviceNotSharingTakesTheDeviceFromTheNetwork() async throws {
-    var harness = MethodHarness()
+    var harness = await MethodHarness()
     defer { harness.finish() }
     await harness.adb.setMethod(.wifiADB, for: id)
     await harness.adb.attach(adbDevice)
@@ -65,7 +65,7 @@ extension DeviceHubMethodTests {
 
   /// Once an eject has begun, no new request gets the device's session.
   @Test func noLeaseOnceAnEjectHasBegun() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     let lease = try await harness.hub.lease(id)
@@ -81,7 +81,7 @@ extension DeviceHubMethodTests {
 
   /// ADB that stays not ready is tried again after a back-off, not on every scan.
   @Test func aNotReadyADBIsRetriedAfterABackOff() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     await adbDevice.setLocked(true)
@@ -109,7 +109,7 @@ extension DeviceHubMethodTests {
   /// again before the copy ends. Once the copy ends, the device is served over the network
   /// again, not left as not sharing.
   @Test func aReleaseReconcilesOnceTheRequestsFinish() async throws {
-    var harness = MethodHarness()
+    var harness = await MethodHarness()
     defer { harness.finish() }
     await harness.adb.setMethod(.wifiADB, for: id)
     await harness.adb.attach(adbDevice)

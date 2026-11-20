@@ -5,6 +5,7 @@ import Testing
 @testable import FerryAgentCore
 
 /// A hub over MTP and ADB fakes behind a `CompositeTransport`, with ticks under the test's control.
+/// Like `HubHarness`, it is made once the hub's start-up scan is over.
 struct MethodHarness {
   let mtp: FakeTransport
   let adb: FakeTransport
@@ -13,7 +14,7 @@ struct MethodHarness {
   private let ticks: AsyncStream<Void>.Continuation
   var events: AsyncStream<HubEvent>.Iterator
 
-  init(mtp: [FakeDevice] = [], adb: [FakeDevice] = []) {
+  init(mtp: [FakeDevice] = [], adb: [FakeDevice] = []) async {
     self.mtp = FakeTransport(devices: mtp)
     self.adb = FakeTransport(devices: adb, method: .usbADB)
     let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
@@ -22,6 +23,7 @@ struct MethodHarness {
       transport: CompositeTransport(mtp: self.mtp, adb: self.adb), arrivals: arrivals,
       clock: clock)
     events = hub.events.makeAsyncIterator()
+    await hub.firstScan()
   }
 
   func tick() {
@@ -55,7 +57,7 @@ struct DeviceHubMethodTests {
   /// MTP session is kept, idle: releasing it would reset the unit, and the reset would drop the
   /// ADB route that replaces it.
   @Test func adbReplacesAHeldMTPSessionWithoutReleasingIt() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
 
@@ -72,7 +74,7 @@ struct DeviceHubMethodTests {
   /// USB debugging revoked: adb lists the device as unauthorized and MTP serves it again, from
   /// the session it kept.
   @Test func revokingADBFallsBackToTheKeptMTPSession() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice], adb: [])
+    var harness = await MethodHarness(mtp: [mtpDevice], adb: [])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     await harness.adb.attach(adbDevice)
@@ -91,7 +93,7 @@ struct DeviceHubMethodTests {
 
   /// Review Focus 2: seen over both from the start, the device is one entry with one session.
   @Test func aDeviceSeenTwiceIsOpenedOnce() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice], adb: [adbDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice], adb: [adbDevice])
     defer { harness.finish() }
 
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbADB)))
@@ -103,7 +105,7 @@ struct DeviceHubMethodTests {
   /// The cable goes in while the device is served over the network: ADB's own session moves to
   /// USB. adb holds one session per device, so the old one is closed first.
   @Test func pluggingInMovesAnADBSessionFromTheNetworkToUSB() async throws {
-    var harness = MethodHarness()
+    var harness = await MethodHarness()
     defer { harness.finish() }
     await harness.adb.setMethod(.wifiADB, for: id)
     await harness.adb.attach(adbDevice)
@@ -121,7 +123,7 @@ struct DeviceHubMethodTests {
   /// Review Focus 1: the hub swaps only between requests. A request in flight finishes on the
   /// old session; one that arrives meanwhile waits and runs on the new one.
   @Test func aSwapWaitsForRequestsInFlight() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     let lease = try await harness.hub.lease(id)
@@ -149,7 +151,7 @@ struct DeviceHubMethodTests {
 
   /// A device ejected while its swap waits is not reopened by the swap.
   @Test func anEjectDuringASwapWins() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     let lease = try await harness.hub.lease(id)
@@ -170,7 +172,7 @@ struct DeviceHubMethodTests {
 
   /// Ejecting closes the kept MTP session too, so the device is left alone over both.
   @Test func ejectClosesTheKeptSession() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     await harness.adb.attach(adbDevice)
@@ -192,7 +194,7 @@ struct DeviceHubMethodTests {
   /// The network drops while USB has gone: the ADB session reports the device gone, and the kept
   /// MTP session is gone too, so the device is detached rather than served by a dead session.
   @Test func aGoneDeviceClosesItsKeptSession() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     await harness.adb.attach(adbDevice)
@@ -210,7 +212,7 @@ struct DeviceHubMethodTests {
   /// ADB answers but cannot read its storages yet (locked, or `df` it cannot read): the device
   /// stays on the MTP session that works, rather than going dark on the way to ADB.
   @Test func anADBSessionThatIsNotReadyDoesNotReplaceMTP() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     await adbDevice.setLocked(true)
@@ -229,7 +231,7 @@ struct DeviceHubMethodTests {
   /// A swap that fails leaves the MTP session serving as it was: its number does not change, so
   /// clients do not take it for a device reached again and retry their work.
   @Test func aFailedSwapKeepsTheSessionNumber() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
     let before = await harness.hub.heldSessions()[id]
@@ -248,7 +250,7 @@ struct DeviceHubMethodTests {
   /// Ejecting waits for requests on the device to finish before parking it: parking releases the
   /// MTP handle a scan kept, which resets the unit under the session serving the copy.
   @Test func ejectWaitsForRequestsBeforeParking() async throws {
-    var harness = MethodHarness(mtp: [mtpDevice], adb: [adbDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice], adb: [adbDevice])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbADB)))
     let lease = try await harness.hub.lease(id)
@@ -268,7 +270,7 @@ struct DeviceHubMethodTests {
   /// MTP serves it rather than it showing as not sharing, and ADB takes over once it is ready.
   @Test func aNotReadyADBAtFirstSightLeavesTheDeviceOnMTP() async throws {
     await adbDevice.setLocked(true)
-    var harness = MethodHarness(mtp: [mtpDevice], adb: [adbDevice])
+    var harness = await MethodHarness(mtp: [mtpDevice], adb: [adbDevice])
     defer { harness.finish() }
 
     #expect(await harness.next() == .attached(ready(mtpDevice, .usbFileTransfer)))
@@ -283,7 +285,7 @@ struct DeviceHubMethodTests {
 
   /// A network device waiting for "Allow" is reported for the menu, not listed as a device.
   @Test func devicesAwaitingAuthorizationAreReported() async {
-    let harness = MethodHarness()
+    let harness = await MethodHarness()
     defer { harness.finish() }
     await harness.adb.awaitAuthorization("192.0.2.31:5555")
     harness.tick()
@@ -301,7 +303,7 @@ struct DeviceHubMethodTests {
 extension DeviceHubTests {
   @Test func aHeldUSBDeviceIsNeverSwappedToTheNetwork() async throws {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
