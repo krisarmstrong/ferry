@@ -36,9 +36,9 @@ public enum GuideTopic: String, Sendable, CaseIterable, Hashable {
   }
 }
 
-/// How to turn on file transfer and USB debugging, per device family. The NetAlly steps follow each model's
-/// AllyWare 3.x user guide ("Using a USB Type-C to USB Cable"); the guides say "PC or tablet",
-/// so these name the Mac instead.
+/// How to turn on file transfer and USB debugging, per device family. The NetAlly steps follow
+/// each model's AllyWare 3.x user guide ("Using a USB Type-C to USB Cable"); the guides say "PC
+/// or tablet", so these name the Mac instead.
 public enum GuideSteps {
   /// Model names as the devices report them, lowercased with spaces and punctuation removed.
   private static let netAllyAndroid8Models: Set<String> = [

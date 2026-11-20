@@ -18,8 +18,8 @@ enum UnsavedRecording: Equatable {
 }
 
 /// Screen recordings: Record Screen, the indicator with Stop, then saving the video in the
-/// device's Screen Recordings folder. A video the app could not save waits on the device, with Choose
-/// Folder… and Discard, and is tried again on its own only once a capture folder becomes
+/// device's Screen Recordings folder. A video the app could not save waits on the device, with
+/// Choose Folder… and Discard, and is tried again on its own only once a capture folder becomes
 /// writable or the device comes back, never on every refresh.
 extension AppModel {
   /// The device's recording: as the agent reports it, or as asked for until the agent answers.

@@ -352,8 +352,8 @@ import os
     let adb = report.adbStatus.map { String(describing: $0) } ?? "unknown"
     Self.log.info(
       """
-      devices: [\(states, privacy: .public)] provider: \(report.provider.rawValue, privacy: .public) \
-      adb: \(adb, privacy: .public)
+      devices: [\(states, privacy: .public)] \
+      provider: \(report.provider.rawValue, privacy: .public) adb: \(adb, privacy: .public)
       """)
     for device in devices where DevicePresentation.needsFileTransferSteps(device) {
       guard guidedDevices.insert(device.id).inserted, !isGuidePresented else { continue }

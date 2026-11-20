@@ -96,14 +96,12 @@ extension AppModel {
         if case .deviceInfo(let read) = reply {
           info = read
         } else {
-          Self.log.debug(
-            "details of \(id.serial, privacy: .private): \(String(describing: reply), privacy: .private)"
-          )
+          let reason = String(describing: reply)
+          Self.log.debug("details of \(id.serial, privacy: .private): \(reason, privacy: .private)")
         }
       } catch {
-        Self.log.debug(
-          "details of \(id.serial, privacy: .private): \(String(describing: error), privacy: .private)"
-        )
+        let reason = String(describing: error)
+        Self.log.debug("details of \(id.serial, privacy: .private): \(reason, privacy: .private)")
       }
     }
     if detailReads[id]?.token == token { detailReads[id] = nil }
