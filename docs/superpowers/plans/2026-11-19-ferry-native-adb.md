@@ -795,3 +795,8 @@ The spec is silent. Today `ShellLaunch` runs the located `adb -s <serial> shell`
 ## Reserve (1 d)
 
 Review rounds and live-run defects. A whole-branch review runs after Task 27, or after the last gate reached if a kill criterion stopped the work.
+
+## Owner rulings on the plan (2026-11-19)
+
+- Open in Terminal: shown only when Ferry can actually provide a shell. With the native engine the shell comes over the ADB protocol (one-shot loopback bridge, Task 16); the row is hidden for any device or state with no shell path. Confirmed.
+- Pair with Code between P3 and P4: through an adb server the user already runs; otherwise the form says pairing needs adb for now. Ferry never starts a server. Confirmed.
