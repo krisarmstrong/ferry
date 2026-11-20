@@ -239,6 +239,8 @@ Anyone on a network can claim a device's serial number. So when a new address an
 
 Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs.
 
+A device appears in Finder only while it is connected. When you unplug it, or it leaves the network, its location leaves the sidebar, and it comes back with its files when the device connects again.
+
 A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number.
 
 Double-click a file to open it. Ferry copies it to the Mac when you open it.

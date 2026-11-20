@@ -364,8 +364,12 @@ must not contain file names. Therefore:
   never parsed back, so the serial is not in FileProvider's logs or paths. Item
   identifiers are the agent's opaque random IDs (see "Item identity" above), kept
   across reconnects and agent restarts; MTP object IDs are a per-session cache inside
-  the agent and never leave it. When a device is unplugged, its domain is
-  disconnected (shown as unavailable), not removed. "Eject" in the menu removes
+  the agent and never leave it. When a device is unplugged (or otherwise not
+  served, including at agent start), its domain is disconnected and hidden from
+  Finder (`NSFileProviderDomain.isHidden`, set by adding the domain again under
+  the same identifier), not removed: Finder shows a device only while it is
+  connected, and a replug reconnects and shows the same domain with its files
+  and unsent changes. "Eject" in the menu removes
   it, keeping any changes not yet sent to the device (the system moves them aside
   and the menu says where). Removing a location, by Eject or "Remove Ferry", keeps
   unsent file contents only: pending deletes and renames are dropped, which errs

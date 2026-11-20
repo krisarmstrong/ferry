@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "A device appears in Finder only while it is connected. When you unplug it, or it leaves the network, its location leaves the sidebar, and it comes back with its files when the device connects again." : {
+      "extractionState" : "manual"
+    },
     "Click an address to copy it; the line shows Copied for a moment. Option-click an address to copy everything the device reports: model, Android version, build, serial number, battery, every address on every port including IPv6, and storage. The line shows Copied All for a moment." : {
       "extractionState" : "manual"
     },
