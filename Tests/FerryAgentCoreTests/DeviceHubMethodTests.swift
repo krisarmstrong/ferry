@@ -301,7 +301,7 @@ struct DeviceHubMethodTests {
 extension DeviceHubTests {
   @Test func aHeldUSBDeviceIsNeverSwappedToTheNetwork() async throws {
     let device = await makeHubDevice("A")
-    var harness = HubHarness(devices: [device])
+    var harness = await HubHarness(devices: [device])
     defer { harness.finish() }
     #expect(await harness.next() == .attached(hubReady(device)))
 
