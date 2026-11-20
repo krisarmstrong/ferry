@@ -96,7 +96,8 @@ struct HelpNavigatorTests {
 
   // MARK: Keyboard
 
-  @Test func theArrowKeysMoveTopicByTopic() {
+  /// ⌘[ and ⌘]; the sidebar's arrow keys are the list's own.
+  @Test func theStepKeysMoveTopicByTopic() {
     let ids = Self.help.topics.map(\.id)
     var navigator = Self.navigator(at: ids[0])
     navigator.move(by: 1)

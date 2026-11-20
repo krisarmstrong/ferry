@@ -245,7 +245,8 @@ private struct HelpMessageView: View {
       RoundedRectangle(cornerRadius: 8)
         .fill(isHighlighted ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.quinary))
     }
-    .accessibilityElement(children: .combine)
+    // Kept as separate elements: combined, the wording's heading would swallow the cause and fix.
+    .accessibilityElement(children: .contain)
   }
 }
 
