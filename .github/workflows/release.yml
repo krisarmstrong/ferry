@@ -27,6 +27,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # To start CI on the release PR.
+      actions: write
     outputs:
       created: ${{ steps.release.outputs.release_created }}
       tag: ${{ steps.release.outputs.tag_name }}
@@ -36,6 +38,19 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      # A push by GITHUB_TOKEN starts no pull_request run, so the release PR would never get the
+      # check main requires. A workflow_dispatch is exempt: run CI on the PR's branch, and its
+      # check lands on the PR's head commit.
+      - name: Run CI on the release PR
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.release.outputs.pr }}
+        run: |
+          branch="$(jq -r .headBranchName <<< "$PR")"
+          [[ "$branch" =~ ^release-please--[A-Za-z0-9._/-]+$ ]] \
+            || { echo "::error::unexpected release PR branch: $branch"; exit 1; }
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
 
   build:
     needs: release-please
