@@ -30,7 +30,8 @@ case "$sign" in
       echo "error: no Developer ID Application identity of team $team in the keychain" >&2
       exit 1
     }
-    signing=(CODE_SIGN_IDENTITY="$identity")
+    # On the command line it reaches the package's resource bundles too, which need the team.
+    signing=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$identity" DEVELOPMENT_TEAM="$team")
     runtime=(--options runtime --timestamp)
     ;;
   adhoc)

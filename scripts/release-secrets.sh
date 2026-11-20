@@ -25,7 +25,7 @@ sparkle_account=io.github.krisarmstrong.ferry
 # Developer ID certificate and key, for signing in the release workflow.
 read -r -s -p "Password of $p12: " p12_password
 echo
-base64 -i "$p12" | gh secret set DEVELOPER_ID_P12_BASE64 --repo "$repo"
+base64 < "$p12" | gh secret set DEVELOPER_ID_P12_BASE64 --repo "$repo"
 printf '%s' "$p12_password" | gh secret set DEVELOPER_ID_P12_PASSWORD --repo "$repo"
 unset p12_password
 

@@ -33,7 +33,7 @@ key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$info")"
 [ "$key" != FERRY_SPARKLE_PUBLIC_KEY_PLACEHOLDER ] \
   || fail "SUPublicEDKey is still the placeholder: set FERRY_SPARKLE_PUBLIC_KEY in project.yml" \
     "to the public key scripts/release-secrets.sh prints"
-[ "$(printf '%s' "$key" | base64 -D 2> /dev/null | wc -c | tr -d ' ')" = 32 ] \
+[ "$(printf '%s' "$key" | base64 --decode 2> /dev/null | wc -c | tr -d ' ')" = 32 ] \
   || fail "SUPublicEDKey is not an Ed25519 public key (32 bytes, base64): $key"
 feed="https://github.com/krisarmstrong/ferry/releases/latest/download/appcast.xml"
 [ "$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$info")" = "$feed" ] \
