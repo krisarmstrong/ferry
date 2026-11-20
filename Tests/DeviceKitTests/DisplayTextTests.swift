@@ -3,6 +3,13 @@ import Testing
 @testable import DeviceKit
 
 struct DisplayTextTests {
+  /// For text that leaves Ferry, such as the pasteboard: the unsafe characters are dropped, not
+  /// spelled out, and everything else, a backslash included, is kept as it was.
+  @Test func sanitizedDropsUnsafeCharactersAndKeepsTheRest() {
+    #expect(DisplayText.sanitized("a\u{1B}[2Jb\u{202E}c\\d\u{2066}é") == "a[2Jbc\\dé")
+    #expect(DisplayText.sanitized("IMG_0001 café 写真.jpg") == "IMG_0001 café 写真.jpg")
+  }
+
   @Test func plainTextIsUnchanged() {
     #expect(DisplayText.escaped("IMG_0001 café 写真.jpg") == "IMG_0001 café 写真.jpg")
   }

@@ -16,6 +16,14 @@ public enum DisplayText {
     return result
   }
 
+  /// For text that leaves Ferry, such as the pasteboard: the same unsafe characters are dropped
+  /// rather than spelled out, and everything else, a backslash included, is kept as it was.
+  public static func sanitized(_ text: String) -> String {
+    var result = ""
+    result.unicodeScalars.append(contentsOf: text.unicodeScalars.filter { !isUnsafe($0) })
+    return result
+  }
+
   private static func isUnsafe(_ scalar: Unicode.Scalar) -> Bool {
     switch scalar.value {
     case 0x61C, 0x200E, 0x200F, 0x202A...0x202E, 0x2066...0x2069: true

@@ -132,6 +132,15 @@ struct DeviceDetailsPresentationTests {
     #expect(line == "Android 8\\u{202E}")
   }
 
+  /// A model with a control character in it reaches the pasteboard without it, and with its
+  /// backslash as the device sent it, never as the menu's escaped form.
+  @Test func theFullTextIsSanitisedNotEscaped() {
+    let text = DevicePresentation.detailsText(info(model: "Ether\u{1B}[2JScope\\X", []))
+    #expect(text.hasPrefix("Model: Ether[2JScope\\X\n"))
+    #expect(!text.contains("\u{1B}"))
+    #expect(!text.contains("\\u{"))
+  }
+
   /// An Option-click on a detail line puts the Device Info text on the pasteboard: a
   /// `Label: value` line per row, every address of every port included.
   @Test func theFullTextHasEveryAddress() {
