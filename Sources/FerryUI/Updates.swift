@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// Checks for a newer Ferry. The app passes Sparkle's updater; tests pass a fake.
 @MainActor
@@ -18,13 +19,16 @@ public struct UpdateFeed: Equatable, Sendable {
   public init?(info: [String: Any]) {
     guard let feed = info["SUFeedURL"] as? String, let url = URL(string: feed),
       let scheme = url.scheme?.lowercased(), let host = url.host(percentEncoded: false),
-      scheme == "https" || (scheme == "http" && Self.loopback.contains(host.lowercased())),
+      scheme == "https" || (scheme == "http" && Self.isLoopback(host)),
       let key = info["SUPublicEDKey"] as? String, Data(base64Encoded: key)?.count == 32
     else { return nil }
     self.url = url
   }
 
-  private static let loopback: Set<String> = ["127.0.0.1", "::1", "localhost"]
+  private static func isLoopback(_ host: String) -> Bool {
+    host.lowercased() == "localhost" || IPv4Address(host)?.isLoopback == true
+      || IPv6Address(host)?.isLoopback == true
+  }
 }
 
 extension AppModel {
