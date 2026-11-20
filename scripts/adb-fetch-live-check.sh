@@ -22,6 +22,8 @@
 # that adb, so the check itself never makes a mismatched client restart the server.
 set -euo pipefail
 
+[[ -n "${HOME:-}" && "$HOME" == /* && -d "$HOME" ]] || { echo "HOME is not set to a folder" >&2; exit 2; }
+
 version=37.0.3
 team=EQHXZ8M8AV
 requirement='identifier "adb" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "'"$team"'"'
@@ -80,6 +82,8 @@ if $clear; then
   echo "This removes '$folder' and the $defaults_key default of $defaults_domain."
   read -r -p "Type yes to go on: " answer
   [[ "$answer" == yes ]] || fail "not cleared"
+  [[ "$folder" == "$HOME/Library/Application Support/Ferry/platform-tools" && "$HOME" != / ]] \
+    || fail "refusing to remove '$folder'"
   rm -rf -- "$folder"
   defaults delete "$defaults_domain" "$defaults_key" 2>/dev/null || true
   echo "cleared"
@@ -107,7 +111,7 @@ contents="$(cd "$folder" && find . -mindepth 1 | LC_ALL=C sort | tr '\n' ' ')"
   || fail "the folder holds more than adb and its notices: $contents"
 [[ "$(/usr/bin/stat -f %Lp "$folder/$version")" == 700 ]] || fail "$folder/$version is not 0700"
 [[ "$(/usr/bin/stat -f %Lp "$adb")" == 755 ]] || fail "$adb is not 0755"
-codesign --verify --strict --verbose=2 -R="$requirement" "$adb" \
+codesign --verify --strict --all-architectures --verbose=2 -R="$requirement" "$adb" \
   || fail "$adb does not carry Google's signature"
 signer="$(codesign -dv "$adb" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
 [[ "$signer" == "$team" ]] || fail "$adb is signed by team '$signer', not $team"
@@ -130,3 +134,4 @@ echo "== adb devices"
 ready="$("$lister" devices | awk 'NR > 1 && $2 == "device"' | wc -l | tr -d ' ')"
 ((ready >= expect)) || fail "adb lists $ready ready units, expected $expect"
 echo "PASS: adb from Google, fetched by Ferry, lists $ready ready units"
+echo "(An adb server is still running; Ferry and this script never stop one.)"
