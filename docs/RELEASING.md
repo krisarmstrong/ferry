@@ -28,8 +28,25 @@ the tag's commit is on `main`.
 ## When the build fails
 
 The release stays a draft, so `releases/latest` still points at the previous release and no
-installed Ferry sees a missing feed. Fix the cause on `main`, then re-run the failed workflow run
-(**Re-run failed jobs**): it builds the same tag again.
+installed Ferry sees a missing feed. What to do depends on the cause.
+
+**Transient** (the runner, Apple's notary service, the network): **Re-run failed jobs** on that
+workflow run, within 30 days. It builds the same tag again.
+
+**Anything in the code or the configuration** (a build error, a failed check, notarization
+refusing the app): a re-run cannot help. It runs the workflow file of the original run and checks
+out the tag, so a fix on `main` never reaches it, and the tag cannot be moved to the fix: the
+`Release tags` ruleset forbids moving or deleting a `v*` tag, the owner included (only GitHub
+Actions bypasses it). Instead:
+
+1. Land the fix on `main` as a conventional commit (`fix: …`).
+2. Delete the stale draft (`gh release delete vX.Y.Z`; it is a draft, so nobody saw it).
+3. Let release-please cut the next version. The merged release PR already recorded `X.Y.Z` in
+   `.release-please-manifest.json` and the tag exists, so its next release PR is `X.Y.Z+1`.
+   Merge that.
+
+The orphaned `vX.Y.Z` tag stays, which is harmless: no release names it. Removing it means
+editing the ruleset for a moment.
 
 ## Rolling back
 
