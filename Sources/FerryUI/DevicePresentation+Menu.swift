@@ -6,21 +6,65 @@ import Foundation
 /// What each row of the menu shows and offers: a round tile, a one-line summary under the name,
 /// and the actions its expansion lists.
 extension DevicePresentation {
-  /// The round tile at the start of a row: filled with the accent colour while Ferry serves the
-  /// device, neutral otherwise.
+  /// The round tile at the start of a row: what kind of device it is, filled with the accent
+  /// colour while Ferry serves the device and neutral otherwise. How Ferry reaches it is the
+  /// first word of the summary under its name.
   struct Tile: Equatable {
-    let symbol: String
+    let glyph: TileGlyph
     let isActive: Bool
   }
 
-  static func tile(of device: AttachedDevice) -> Tile {
-    let symbol = device.method == .wifiADB ? "wifi" : "cable.connector"
-    if case .ready = device.state { return Tile(symbol: symbol, isActive: true) }
-    return Tile(symbol: symbol, isActive: false)
+  /// What a tile draws.
+  enum TileGlyph: Equatable {
+    case phone
+    /// A handheld network tester, drawn by `DeviceGlyph`.
+    case tester
+    /// Drawn by `DeviceGlyph`: SF Symbols' tablets are all iPads.
+    case tablet
+    case symbol(String)
+
+    /// The SF Symbol it is, or `nil` for one `DeviceGlyph` draws.
+    var symbolName: String? {
+      switch self {
+      case .phone: "smartphone"
+      case .symbol(let name): name
+      case .tester, .tablet: nil
+      }
+    }
   }
 
-  static let rememberedTile = Tile(symbol: "wifi.slash", isActive: false)
-  static let offerTile = Tile(symbol: "wifi", isActive: false)
+  static func tile(of device: AttachedDevice) -> Tile {
+    let glyph = kind(manufacturer: device.info.manufacturer, model: device.info.model)
+    if case .ready = device.state { return Tile(glyph: glyph, isActive: true) }
+    return Tile(glyph: glyph, isActive: false)
+  }
+
+  static let rememberedTile = Tile(glyph: .symbol("wifi.slash"), isActive: false)
+  static let offerTile = Tile(glyph: .symbol("wifi"), isActive: false)
+
+  /// NetAlly's Android testers, by the start of their model names (lowercased, letters and
+  /// digits only, any leading "netally" dropped).
+  private static let testerModels = ["linkrunner", "etherscope", "aircheck", "cyberscope"]
+
+  /// What kind of device reports this manufacturer and model. Only names decide it: a tester by
+  /// its model or its maker, a tablet by "tablet", "tab" or "pad" in its name, or by Samsung's
+  /// tablet model numbers (SM-T, SM-X, SM-P) and Lenovo's (TB-), and anything else is a phone.
+  static func kind(manufacturer: String, model: String) -> TileGlyph {
+    let maker = manufacturer.lowercased()
+    var key = String(
+      String.UnicodeScalarView(
+        model.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains)))
+    if key.hasPrefix("netally") { key.removeFirst("netally".count) }
+    if maker == "netally" || testerModels.contains(where: key.hasPrefix) { return .tester }
+    let words = model.lowercased().split { !$0.isLetter && !$0.isNumber }
+    if words.contains(where: { ["tablet", "tab", "pad"].contains($0) }) { return .tablet }
+    let code = model.uppercased()
+    if maker == "samsung", ["SM-T", "SM-X", "SM-P"].contains(where: code.hasPrefix) {
+      return .tablet
+    }
+    if code.contains("TB-") { return .tablet }
+    return .phone
+  }
 
   /// The line under a device's name. A ready device shows how Ferry reaches it, then its network
   /// address over Wi-Fi when Ferry has one, or else the first storage's free space; any other

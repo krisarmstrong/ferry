@@ -16,6 +16,7 @@ struct MenuRowStyle: ButtonStyle {
     @State private var hovering = false
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.isFocused) private var isFocused
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
       configuration.label
@@ -24,12 +25,24 @@ struct MenuRowStyle: ButtonStyle {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .background {
-          if isEnabled, hovering || isFocused || configuration.isPressed {
-            RoundedRectangle(cornerRadius: 6).fill(.quaternary)
+          if let highlight {
+            RoundedRectangle(cornerRadius: MenuMetrics.highlightRadius, style: .continuous)
+              .fill(highlight)
           }
         }
-        .opacity(isEnabled ? 1 : 0.45)
+        .opacity(isEnabled ? 1 : contrast == .increased ? 0.6 : 0.45)
         .onHover { hovering = $0 }
+    }
+
+    /// Under the pointer or keyboard focus a light fill, darker while pressed. Increase Contrast
+    /// already darkens every level, so it takes the next lighter one each: one more would bury
+    /// the secondary symbols and hints the row draws on it.
+    private var highlight: HierarchicalShapeStyle? {
+      guard isEnabled else { return nil }
+      let increased = contrast == .increased
+      if configuration.isPressed { return increased ? .quaternary : .tertiary }
+      if hovering || isFocused { return increased ? .quinary : .quaternary }
+      return nil
     }
   }
 }
@@ -38,6 +51,8 @@ struct MenuRowStyle: ButtonStyle {
 enum MenuMetrics {
   /// Inside a row's highlight, before its content.
   static let rowPadding: CGFloat = 8
+  /// The corner radius of a row's highlight, inside the menu window's own corners.
+  static let highlightRadius: CGFloat = 7
   static let tileSize: CGFloat = 26
   /// A device's action rows start under its name, past the tile.
   static let actionIndent: CGFloat = tileSize + 8
@@ -178,8 +193,7 @@ struct DeviceTile: View {
   let tile: DevicePresentation.Tile
 
   var body: some View {
-    Image(systemName: tile.symbol)
-      .font(.system(size: 12, weight: .semibold))
+    glyph
       .foregroundStyle(tile.isActive ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
       .frame(width: MenuMetrics.tileSize, height: MenuMetrics.tileSize)
       .background {
@@ -190,6 +204,16 @@ struct DeviceTile: View {
         }
       }
       .accessibilityHidden(true)
+  }
+
+  @ViewBuilder private var glyph: some View {
+    if let symbol = tile.glyph.symbolName {
+      Image(systemName: symbol)
+        .font(.system(size: 12, weight: .semibold))
+    } else {
+      DeviceGlyph(kind: tile.glyph == .tester ? .tester : .tablet)
+        .frame(width: 15, height: 15)
+    }
   }
 }
 

@@ -8,12 +8,13 @@ import Testing
 
 @testable import FerryUI
 
-/// Draws the menu offscreen, in light and dark, with a device on USB (opened, with its known
+/// Draws the menu offscreen, in light and dark, with a tester on USB (opened, with its known
 /// ports' details, one not connected, its rows in their groups and Port Forwarding open on one
-/// forward) and one on Wi-Fi; and once more with Pair with Code open. It must come out 320 pt
-/// wide and show something besides its background. With `FERRY_MENU_SNAPSHOTS` naming a
-/// folder, the images are also written there as `menu-light.png`, `menu-dark.png` and
-/// `menu-pair.png`.
+/// forward), a phone on Wi-Fi and a tablet not sharing files; once more with Pair with Code
+/// open; and with Increase Contrast, light and dark. It must come out 320 pt wide and show
+/// something besides its background. With `FERRY_MENU_SNAPSHOTS` naming a folder, the images
+/// are also written there as `menu-light.png`, `menu-dark.png`, `menu-pair.png`,
+/// `menu-contrast-light.png` and `menu-contrast-dark.png`.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct MenuSnapshotTests {
@@ -31,6 +32,9 @@ struct MenuSnapshotTests {
         id: StorageID(device: DeviceID(serial: "S24"), key: "internal"),
         description: "Internal shared storage", capacity: 256_000_000_000, free: 98_000_000_000)
     ]), method: .wifiADB)
+  private static let tablet = AttachedDevice(
+    info: DeviceInfo(id: DeviceID(serial: "TAB"), manufacturer: "Samsung", model: "Galaxy Tab S9"),
+    state: .notSharingFiles, method: .usbFileTransfer)
 
   /// What the expanded device says: Wired Management (`eth0`) has no address.
   private static let details = AndroidDeviceInfo(
@@ -50,11 +54,12 @@ struct MenuSnapshotTests {
   }
 
   private func drawnMenu(
-    _ scheme: ColorScheme, showing shown: Shown = .forwards
+    _ appearanceName: NSAppearance.Name, contrast: ColorSchemeContrast = .standard,
+    showing shown: Shown = .forwards
   ) async throws -> NSBitmapImageRep {
     let client = FakeClient(log: CallLog())
     client.setStatus(
-      [Self.usb, Self.wifi], adb: .available,
+      [Self.usb, Self.wifi, Self.tablet], adb: .available,
       connectedAddresses: [Self.wifi.id: try #require(WirelessEndpoint(parsing: "192.0.2.42"))])
     client.infoReply.withLock { $0 = .deviceInfo(Self.details) }
     client.forwardList.withLock { $0 = [PortForward(local: 8080, remote: 80)] }
@@ -71,9 +76,12 @@ struct MenuSnapshotTests {
       model.toggleNetworkForm(.code)
       model.networkForm?.address = "192.0.2.31:37123"
     }
-    let appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+    let appearance = NSAppearance(named: appearanceName)
     let view = NSHostingView(
       rootView: MenuContent(model: model)
+        // Increase Contrast, as the system sets it: AppKit offers no high-contrast appearance
+        // to draw with unless the setting is on.
+        .environment(\._colorSchemeContrast, contrast)
         .background(Color(nsColor: .windowBackgroundColor)))
     view.appearance = appearance
     view.frame = CGRect(origin: .zero, size: view.fittingSize)
@@ -123,27 +131,65 @@ struct MenuSnapshotTests {
     return count
   }
 
-  @Test(arguments: [ColorScheme.light, .dark])
-  func theMenuDraws(scheme: ColorScheme) async throws {
-    let bitmap = try await drawnMenu(scheme)
-    #expect(bitmap.size.width == 320)
-    // Header, two devices with one expanded with its details, the forms and the footer.
-    #expect(bitmap.size.height > 500)
-    #expect(drawnPixels(bitmap) > 1_000)
+  private func save(_ bitmap: NSBitmapImageRep, as name: String) throws {
     guard let folder = ProcessInfo.processInfo.environment["FERRY_MENU_SNAPSHOTS"] else { return }
     let png = try #require(bitmap.representation(using: .png, properties: [:]))
-    let name = scheme == .dark ? "menu-dark.png" : "menu-light.png"
     try png.write(to: URL(filePath: folder).appending(path: name))
   }
 
+  @Test(arguments: [
+    (NSAppearance.Name.aqua, ColorSchemeContrast.standard, "menu-light.png"),
+    (.darkAqua, .standard, "menu-dark.png"),
+    (.aqua, .increased, "menu-contrast-light.png"),
+    (.darkAqua, .increased, "menu-contrast-dark.png"),
+  ])
+  func theMenuDraws(
+    appearance: NSAppearance.Name, contrast: ColorSchemeContrast, file: String
+  ) async throws {
+    let bitmap = try await drawnMenu(appearance, contrast: contrast)
+    #expect(bitmap.size.width == 320)
+    // Header, three devices with one expanded with its details, the forms and the footer.
+    #expect(bitmap.size.height > 500)
+    #expect(drawnPixels(bitmap) > 1_000)
+    try save(bitmap, as: file)
+  }
+
   @Test func theMenuDrawsWithPairWithCodeOpen() async throws {
-    let bitmap = try await drawnMenu(.light, showing: .pairForm)
+    let bitmap = try await drawnMenu(.aqua, showing: .pairForm)
     #expect(bitmap.size.width == 320)
     // Everything from the header to Quit Ferry, with the form's two fields and hint.
     #expect(bitmap.size.height > 700)
     #expect(drawnPixels(bitmap) > 1_000)
-    guard let folder = ProcessInfo.processInfo.environment["FERRY_MENU_SNAPSHOTS"] else { return }
-    let png = try #require(bitmap.representation(using: .png, properties: [:]))
-    try png.write(to: URL(filePath: folder).appending(path: "menu-pair.png"))
+    try save(bitmap, as: "menu-pair.png")
+  }
+
+  /// Every tile, active and not, in light and dark: the kinds of device, then a remembered
+  /// device and an offered address. Written as `device-tiles.png`.
+  @Test func theDeviceTilesDraw() throws {
+    let glyphs: [DevicePresentation.TileGlyph] = [
+      .tester, .phone, .tablet, .symbol("wifi.slash"), .symbol("wifi"),
+    ]
+    let tiles = VStack(spacing: 0) {
+      ForEach([ColorScheme.light, .dark], id: \.self) { scheme in
+        VStack(spacing: 10) {
+          ForEach([true, false], id: \.self) { active in
+            HStack(spacing: 14) {
+              ForEach(glyphs.indices, id: \.self) { index in
+                DeviceTile(tile: .init(glyph: glyphs[index], isActive: active))
+              }
+            }
+          }
+        }
+        .padding(16)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .environment(\.colorScheme, scheme)
+      }
+    }
+    let renderer = ImageRenderer(content: tiles)
+    renderer.scale = 4
+    let image = try #require(renderer.cgImage)
+    let bitmap = NSBitmapImageRep(cgImage: image)
+    #expect(drawnPixels(bitmap) > 1_000)
+    try save(bitmap, as: "device-tiles.png")
   }
 }
