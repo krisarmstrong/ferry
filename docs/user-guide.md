@@ -283,7 +283,7 @@ Ferry never replaces a file the device changed without you seeing it.
 
 How quickly Finder shows a change made on the device depends on how Ferry reaches it.
 
-Ferry watches the 32 folders Finder showed most recently on each device. A change in a folder you have not opened shows up when you open it. While a copy to or from the device runs, Ferry checks for changes again once it ends.
+Ferry watches the 32 folders Finder showed most recently on each device. A change in a folder you have not opened shows up when you open it. While a copy to or from the device runs, Ferry checks for changes again once it ends. To save battery, Ferry stops checking every 30 seconds once nothing has used the device in Finder for about 10 minutes; it checks again as soon as you open a folder or a file on it.
 
 - **USB debugging or Wi-Fi**: Changes show up in Finder within a few seconds, and within about 30 seconds at most.
 - **File transfer**: New and deleted files show up within about 30 seconds. A file changed in place or renamed on the device needs **Refresh**.

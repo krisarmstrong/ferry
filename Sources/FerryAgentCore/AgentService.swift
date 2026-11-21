@@ -293,12 +293,17 @@ public actor AgentService: AgentHandling {
     }
   }
 
+  static let workingSetPageSize = 500
+}
+
+extension AgentService {
   /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
   /// `body` recorded a change, even one followed by a failure.
   func gated<T: Sendable>(
     _ domain: String, _ body: (DomainController.Route) async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
     let route = try await domains.route(domain)
+    await changes?.used(route.storage.device)
     let (result, changed) = await route.items.gate.run {
       () async -> (Result<T, TransportError>, Bool) in
       let before = await route.items.changeCount
@@ -321,8 +326,6 @@ public actor AgentService: AgentHandling {
     }
     return try result.get()
   }
-
-  static let workingSetPageSize = 500
 }
 
 extension AgentService {
