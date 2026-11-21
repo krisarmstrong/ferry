@@ -106,6 +106,16 @@ endif
 	      || { echo "error: the parts of $(APP) name different teams: $$teams" >&2; exit 1; }; \
 	  done
 	@echo "app bundle carries its team ID in every part"
+	@# macOS asks before the agent, and the adb server it starts, reach the local network
+	@# (TN3179): the agent and the app both say why, and name the services adb browses for.
+	@for part in "$$(launchctl plist __TEXT,__info_plist '$(APP)/Contents/MacOS/FerryAgent')" \
+	  "$$(plutil -p '$(APP)/Contents/Info.plist')"; do \
+	  for key in NSLocalNetworkUsageDescription _adb-tls-connect._tcp _adb-tls-pairing._tcp; do \
+	    echo "$$part" | grep -q -- "$$key" \
+	      || { echo "error: the agent or the app does not declare $$key" >&2; exit 1; }; \
+	  done; \
+	done
+	@echo "agent and app declare their local network use"
 	@# Files from a device are quarantined through this syncable attribute (see ProviderItem).
 	@/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionFileProviderAdditionalSyncableExtendedAttributes' \
 	  '$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Info.plist' | grep -q 'com.apple.quarantine' \

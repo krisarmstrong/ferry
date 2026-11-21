@@ -4,6 +4,13 @@
 <dict>
 	<key>FerryTeamID</key>
 	<string>$(FERRY_TEAM_ID)</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Ferry connects to Android devices on your network over Wi-Fi.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_adb-tls-connect._tcp</string>
+		<string>_adb-tls-pairing._tcp</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
