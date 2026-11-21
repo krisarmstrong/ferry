@@ -14,9 +14,19 @@ private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "
 /// the next pass that finds none), nor while the Mac sleeps. A watch that ends is started again
 /// by the next pass or listing, so a device whose watcher exits at once is tried every 30 s, not
 /// in a loop.
+///
+/// The 30 s relisting runs only while a Ferry location on the device is in use: a client
+/// request on one of its domains (Finder listing a folder, reading an item, opening, copying,
+/// renaming or deleting) in the last `idlePasses` passes, about 10 minutes. After that only the
+/// device's hints list anything, until the next request; a device that has just connected, or
+/// an agent that has just started, counts as in use. The signal is the extension's own requests
+/// rather than FileProvider's change enumeration, which follows every signal the relisting
+/// sends and so would keep a busy device listed for ever (audit M3).
 public actor ChangeWatch {
   public static let interval = Duration.seconds(30)
   public static let folderLimit = 32
+  /// Passes without a request on the device after which the periodic relisting stops.
+  public static let idlePasses = 20
   /// How long hints are gathered before their folders are listed: a burst (Ferry's own delete
   /// of many files, which the device reports one by one) costs one listing.
   static let hintWindow = Duration.seconds(1)
@@ -46,6 +56,8 @@ public actor ChangeWatch {
   /// Hints not acted on yet: a transfer was running, or a listing was under way.
   private var pending: [DeviceID: Set<FolderHint>] = [:]
   private var draining: Set<DeviceID> = []
+  /// Passes since a client last used each device's locations.
+  private var idle: [DeviceID: Int] = [:]
   private var asleep = false
   /// Passes finished, hints taken in, hint windows closed, and watches ended, for tests to
   /// wait on.
@@ -96,9 +108,15 @@ public actor ChangeWatch {
     }
   }
 
+  /// A client used one of the device's locations: the periodic relisting runs for it again.
+  func used(_ device: DeviceID) {
+    idle[device] = 0
+  }
+
   /// A client listed `folder` of `domain`: it becomes the device's newest watched folder.
   func listed(_ folder: RemotePath, in domain: String) async {
     guard let storage = await domains.connectedStorage(of: domain) else { return }
+    used(storage.device)
     let entry = Listed(domain: domain, hint: FolderHint(storage: storage, folder: folder))
     var list = recent[storage.device, default: []]
     list.removeAll { $0 == entry }
@@ -129,8 +147,11 @@ public actor ChangeWatch {
         continue
       }
       guard await !busy(device) else { continue }
+      let passes = idle[device, default: 0]
+      idle[device] = passes + 1
       let hinted = pending.removeValue(forKey: device) ?? []
-      await relist(Array(Set(folders.map(\.hint)).union(hinted)), of: device)
+      let due = passes < Self.idlePasses ? Set(folders.map(\.hint)).union(hinted) : hinted
+      if !due.isEmpty { await relist(Array(due), of: device) }
       await rewatch(device)
     }
   }
@@ -199,6 +220,7 @@ public actor ChangeWatch {
     stopWatch(device)
     recent[device] = nil
     pending[device] = nil
+    idle[device] = nil
   }
 
   private func stopWatch(_ device: DeviceID) {

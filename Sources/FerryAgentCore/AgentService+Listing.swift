@@ -42,7 +42,8 @@ extension AgentService {
       }
       return id
     }
-    let (entries, next) = try await gated(domain) { route in
+    // FileProvider reads the working set after a signal of Ferry's own, so it is not a use.
+    let (entries, next) = try await gated(domain, marksUse: false) { route in
       await route.items.workingSet(after: cursor, size: Self.workingSetPageSize)
     }
     return .page(entries: entries, next: next.map { Data($0.rawValue.utf8) })
