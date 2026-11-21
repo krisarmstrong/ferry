@@ -181,6 +181,9 @@ jobs:
           /usr/bin/openssl pkcs12 -in "$work/developer-id.p12" -passin env:DEVELOPER_ID_P12_PASSWORD \
             -nodes -out "$work/identity.pem" 2> /dev/null \
             || { echo "::error::DEVELOPER_ID_P12_PASSWORD does not open DEVELOPER_ID_P12_BASE64"; exit 1; }
+          # A Developer ID Installer .p12 imports as well as the right one, and the build fails
+          # much later. Stop here, naming the certificates it holds.
+          scripts/check-developer-id.sh "$work/identity.pem"
           TRANSPORT="$(uuidgen)"
           export TRANSPORT
           /usr/bin/openssl pkcs12 -export -in "$work/identity.pem" -out "$work/import.p12" \
@@ -212,20 +215,10 @@ jobs:
           version="${TAG#v}"
           key="$RUNNER_TEMP/notary.p8"
           printf '%s\n' "$NOTARY_KEY_P8" > "$key"
-          notarize() {
-            local result id
-            result="$(xcrun notarytool submit "$1" --key "$key" --key-id "$NOTARY_KEY_ID" \
-              --issuer "$NOTARY_ISSUER_ID" --wait --output-format json)"
-            id="$(jq -r .id <<< "$result")"
-            if [ "$(jq -r .status <<< "$result")" != Accepted ]; then
-              xcrun notarytool log "$id" --key "$key" --key-id "$NOTARY_KEY_ID" \
-                --issuer "$NOTARY_ISSUER_ID"
-              echo "::error::notarization of $1 was not accepted: $result"
-              exit 1
-            fi
-          }
+          # Retries a dropped connection to Apple, never a verdict.
+          export NOTARY_KEY="$key"
           ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
-          notarize "$RUNNER_TEMP/notarize.zip"
+          scripts/notarize.sh "$RUNNER_TEMP/notarize.zip"
           xcrun stapler staple "$APP"
           mkdir -p .build/dist/appcast
           ditto -c -k --keepParent "$APP" ".build/dist/appcast/Ferry-$version.zip"
@@ -238,7 +231,7 @@ jobs:
           hdiutil create -volname Ferry -srcfolder "$staging" -format UDZO -ov "$dmg"
           identity="$(codesign -dv --verbose=2 "$APP" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
           codesign --sign "$identity" --timestamp "$dmg"
-          notarize "$dmg"
+          scripts/notarize.sh "$dmg"
           xcrun stapler staple "$dmg"
           rm -f "$key"
       - name: Sign the appcast

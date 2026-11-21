@@ -56,7 +56,14 @@ The release stays a draft, so `releases/latest` still points at the previous rel
 installed Ferry sees a missing feed. What to do depends on the cause.
 
 **Transient** (the runner, Apple's notary service, the network): **Re-run failed jobs** on that
-workflow run, within 30 days. It builds the same tag again.
+workflow run, within 30 days. It builds the same tag again. A connection to the notary service
+that drops (`NSURLErrorDomain` -1005 or -1001) is already tried three times by
+`scripts/notarize.sh`, so a re-run is for an outage that lasts longer.
+
+**The wrong certificate**: the import step fails, naming what `DEVELOPER_ID_P12_BASE64` holds,
+when it is not a Developer ID Application identity (a Developer ID Installer certificate looks the
+same in Keychain Access). Export the right one and run `scripts/release-secrets.sh` again, then
+re-run the failed jobs: the secrets are read when the job runs.
 
 **Anything in the code or the configuration** (a build error, a failed check, notarization
 refusing the app): a re-run cannot help. It runs the workflow file of the original run and checks
