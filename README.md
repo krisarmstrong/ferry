@@ -1,10 +1,9 @@
 <p align="center">
-  <img src="Design/Icon/Ferry.png" width="128" height="128" alt="Ferry icon">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="Design/README/hero-dark.png">
+    <img src="Design/README/hero-light.png" width="800" alt="The Ferry icon, the name Ferry with the line Android devices in Finder, over USB and Wi-Fi, and the Ferry menu with a network tester, a phone and a tablet">
+  </picture>
 </p>
-
-<h1 align="center">Ferry</h1>
-
-<p align="center">Android devices in Finder, over USB and Wi-Fi.</p>
 
 Ferry is a small menu-bar app that shows Android devices as locations in Finder. It was built
 for field engineers who carry network testers (LinkRunner 10G, EtherScope nXG,
@@ -18,12 +17,17 @@ forwarding. It is free and open source (MIT), and it sends nothing about you or 
 it connects only to GitHub, to check for updates, and to Google, to download adb once you
 accept Google's license and again when a Ferry update needs a newer adb.
 
-<!-- Screenshots: add once captured on macOS 26, as docs/screenshots/{finder,menu,guide}.png.
+| Finder | The menu |
+| ------ | -------- |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="Design/README/finder-dark.png"><img src="Design/README/finder-light.png" alt="Illustration: a network tester as a location in Finder's sidebar, showing its folders"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="Design/README/menu-dark.png"><img src="Design/README/menu-light.png" width="320" alt="The Ferry menu: a network tester open with its details and tools, a phone over Wi-Fi and a tablet"></picture> |
+| Each device is a location in Finder's sidebar. (Illustration: Finder can't be drawn offscreen.) | One row per device; open one for its details and tools. |
 
-| Finder | Menu | Setup guide |
-| ------ | ---- | ----------- |
-| ![A network tester as a Finder location](docs/screenshots/finder.png) | ![The Ferry menu with one device](docs/screenshots/menu.png) | ![Steps to turn on file transfer](docs/screenshots/guide.png) |
--->
+| Device details | Help |
+| -------------- | ---- |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="Design/README/details-dark.png"><img src="Design/README/details-light.png" width="320" alt="A network tester's addresses, Android version and battery, inline in the menu"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="Design/README/help-dark.png"><img src="Design/README/help-light.png" alt="The Help topic for connecting a network tester, in numbered steps"></picture> |
+| A device's addresses, Android version and battery, right in the menu. | Step-by-step help, opened from any problem the menu shows. |
+
+The images are drawn from the app's own views; `scripts/readme-images.sh` renders them again.
 
 ## Requirements
 
