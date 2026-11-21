@@ -101,9 +101,10 @@ struct SystemProcessTable: ProcessTable {
   }
 
   func path(_ pid: pid_t) -> String? {
-    var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
-    guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
-    return String(cString: buffer)
+    var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) * 4)
+    let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+    guard length > 0 else { return nil }
+    return String(bytes: buffer.prefix(Int(length)), encoding: .utf8)
   }
 
   func listener(onTCPPort port: UInt16) -> pid_t? {
