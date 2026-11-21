@@ -36,6 +36,8 @@ public actor ADBTransport: DeviceTransport {
 
   let host: ADBHost
   private let locator: ADBLocator
+  /// Runs before `startADBServer` starts a server (see `ADBServerKeeper.replaceServerOfDeletedADB`).
+  private let beforeStart: @Sendable () async -> Void
   /// Scans take turns, so one never commits what it read over a later one's.
   private let scans = OperationGate()
   private let answerLimit: Duration
@@ -92,7 +94,8 @@ public actor ADBTransport: DeviceTransport {
     self.init(
       host: ADBHost(port: port, locator: locator, keeper: keeper), locator: locator,
       serving: serving,
-      opened: opened)
+      opened: opened,
+      beforeStart: { _ = await keeper.replaceServerOfDeletedADB() })
   }
 
   /// How long a parked device must be missing from adb's list to count as unplugged. A
@@ -119,9 +122,11 @@ public actor ADBTransport: DeviceTransport {
     clock: any Clock<Duration> = ContinuousClock(),
     serving: @escaping ADBNetworkPolicy = { _, _ in true },
     opened: @escaping ADBOpenHandler = { _, _, _ in },
-    now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
+    now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now },
+    beforeStart: @escaping @Sendable () async -> Void = {}
   ) {
     self.host = host
+    self.beforeStart = beforeStart
     self.serving = serving
     self.opened = opened
     self.locator = locator
@@ -372,8 +377,10 @@ extension ADBTransport {
   }
 
   /// Looks for `adb` again and starts its server: Ferry may have just fetched it, or the user
-  /// installed it. A missing `adb` is no error: the next scan reports `.notInstalled`.
+  /// installed it. A server still running a fetched adb that was deleted is replaced first, so
+  /// the new copy runs. A missing `adb` is no error: the next scan reports `.notInstalled`.
   public func startADBServer() async {
+    await beforeStart()
     do throws(ADBError) {
       try await host.startServer()
     } catch {

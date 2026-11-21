@@ -250,10 +250,13 @@ public actor ADBHost {
         emit(.unavailable)
       }
       if !connected && !startedThisOutage {
-        startedThisOutage = true
         do throws(ADBError) {
+          startedThisOutage = true
           try await startServer()
           continue
+        } catch .adbNotInstalled {
+          // Nothing ran: look again on the next try, since Ferry may fetch adb meanwhile.
+          startedThisOutage = false
         } catch {
           Self.log.error("adb server not started: \(String(describing: error), privacy: .private)")
         }

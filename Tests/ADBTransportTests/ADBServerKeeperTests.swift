@@ -84,6 +84,7 @@ struct ADBServerKeeperTests {
   static func keeper(
     _ fakes: Fakes, record: URL, exits: Duration? = nil, limit: Duration = .seconds(2),
     callLimit: Duration = .milliseconds(300), clock: any Clock<Duration> = ManualClock(),
+    exists: @escaping @Sendable (String) -> Bool = { _ in true },
     whileStopping: (@Sendable () async -> Void)? = nil
   ) -> ADBServerKeeper {
     ADBServerKeeper(
@@ -121,7 +122,7 @@ struct ADBServerKeeperTests {
           exit()
         }
       },
-      limit: limit, poll: .milliseconds(10), callLimit: callLimit, clock: clock)
+      limit: limit, poll: .milliseconds(10), callLimit: callLimit, clock: clock, exists: exists)
   }
 
   /// A keeper for tests of what runs inside its gate: there is never a replacement.

@@ -46,7 +46,13 @@ let toolJournal = ToolJournal(store: toolStore)
 // before the trackers and the reconnects below exist. Bounded: a wedged server must not keep
 // the agent from serving. A replacement still running then is held off by the keeper's gate.
 let adbServer = ADBServerKeeper(record: adbServerRecord)
-if !AgentStartup.wait(upTo: .seconds(10), for: { await adbServer.replaceRecordedOrphan() }) {
+// A server still running a fetched adb that was deleted (Remove Ferry, or the user) is replaced
+// too: it answers, so nothing would start the copy Ferry fetches next.
+let replaceStaleServers: @Sendable () async -> Void = {
+  await adbServer.replaceRecordedOrphan()
+  _ = await adbServer.replaceServerOfDeletedADB()
+}
+if !AgentStartup.wait(upTo: .seconds(10), for: replaceStaleServers) {
   log.error("replacing an earlier agent's adb server took too long; starting anyway")
 }
 let adb = ADBTransport(

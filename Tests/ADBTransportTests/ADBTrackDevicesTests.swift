@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import ADBTransport
@@ -121,6 +122,33 @@ struct ADBTrackDevicesTests {
     await consumer.value
     #expect(await lists.value == [[]])
     #expect(await launches.value == 1)
+    withExtendedLifetime(closed) {}
+  }
+
+  /// No adb anywhere when the outage began (Ferry's fetched copy deleted): the start found
+  /// nothing to run, which is no start. Once Ferry fetches adb again, the next retry starts it.
+  @Test(.timeLimit(.minutes(1)))
+  func anOutageWithNoAdbStartsTheServerOnceAdbArrives() async throws {
+    let closed = try ClosedPort()
+    let present = Mutex(false)
+    let launches = Box(0)
+    let host = ADBHost(
+      port: closed.port,
+      locator: ADBLocator(
+        environment: [:], home: "/x",
+        isExecutable: { $0 == "/opt/homebrew/bin/adb" && present.withLock { $0 } }),
+      launcher: { _ in await launches.set(await launches.value + 1) },
+      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)))
+    let lists = Box<[[ADBDevice]]>([])
+    let consumer = Task {
+      for await list in host.trackDevices() { await lists.set(await lists.value + [list]) }
+    }
+    #expect(try await eventually { await !lists.value.isEmpty })
+    #expect(await launches.value == 0)
+    present.withLock { $0 = true }
+    #expect(try await eventually { await launches.value == 1 })
+    consumer.cancel()
+    await consumer.value
     withExtendedLifetime(closed) {}
   }
 

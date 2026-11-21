@@ -57,6 +57,8 @@ public actor ADBServerKeeper {
   /// What `limit`, `poll` and `callLimit` are measured on, and the time passed on it.
   private let clock: any Clock<Duration>
   private let elapsed: @Sendable () -> Duration
+  /// Whether a file is on disk: a server's program may have been deleted under it.
+  private let exists: @Sendable (String) -> Bool
   /// The server this agent started, while it may be running.
   private var child: pid_t?
   private var replacedFerryServer = false
@@ -87,7 +89,8 @@ public actor ADBServerKeeper {
     port: UInt16, record: URL, spawner: any ADBServerSpawner, table: any ProcessTable,
     answers: @escaping @Sendable () async -> Bool, kill: @escaping @Sendable () async -> Void,
     limit: Duration = .seconds(10), poll: Duration = .milliseconds(100),
-    callLimit: Duration = .seconds(5), clock: C = ContinuousClock()
+    callLimit: Duration = .seconds(5), clock: C = ContinuousClock(),
+    exists: @escaping @Sendable (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
   ) {
     self.port = port
     self.record = record
@@ -99,6 +102,7 @@ public actor ADBServerKeeper {
     self.poll = poll
     self.callLimit = callLimit
     self.clock = clock
+    self.exists = exists
     let origin = clock.now
     elapsed = { origin.duration(to: clock.now) }
   }
@@ -252,6 +256,28 @@ public actor ADBServerKeeper {
     replacedFerryServer = true
     Self.log.notice("replacing an adb server cut off from the network (\(pid, privacy: .private))")
     return await replace(pid, if: isFerrys)
+  }
+
+  /// `replaceServerOfDeletedADB(fetched:)` for Ferry's own platform-tools folder.
+  public func replaceServerOfDeletedADB() async -> Bool {
+    await replaceServerOfDeletedADB(fetched: PlatformToolsFolder.standard.root)
+  }
+
+  /// A server running a Ferry-fetched adb (under `fetched`, Ferry's platform-tools folder)
+  /// whose program is gone from disk: Remove Ferry, or the user, deleted the folder while it ran.
+  /// It still answers, so `host.startServer` would keep it, and the copy Ferry fetches next would
+  /// never run. It is replaced, unless it is this agent's own child. Returns whether it was.
+  public func replaceServerOfDeletedADB(fetched: URL) async -> Bool {
+    guard let pid = table.listener(onTCPPort: port), pid != child, let program = table.path(pid)
+    else { return false }
+    let folder = fetched.resolvingSymlinksInPath().path + "/"
+    let isDeleted = { [table, port, exists] in
+      table.listener(onTCPPort: port) == pid && table.path(pid) == program
+        && program.hasPrefix(folder) && !exists(program)
+    }
+    guard isDeleted() else { return false }
+    Self.log.notice("replacing an adb server whose program was deleted (\(pid, privacy: .private))")
+    return await replace(pid, if: isDeleted)
   }
 
   /// `answers`, bounded: a server that does not answer in time is not answering.
