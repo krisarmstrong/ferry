@@ -10,6 +10,7 @@ import Testing
 /// A recording the app could not save: it waits, with Choose Folder… and Discard, and is tried
 /// again on its own only when a capture folder becomes writable.
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct AppModelRecordingTests {
   let log = CallLog()
   let id = DeviceID(serial: "0123456789abcdef")

@@ -8,6 +8,7 @@ import Testing
 
 /// The menu's tools: what is sent, what the user sees, and that a saved file is shown in Finder.
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct AppModelToolsTests {
   let log = CallLog()
   let id = DeviceID(serial: "0123456789abcdef")

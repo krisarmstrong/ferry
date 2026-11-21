@@ -80,7 +80,7 @@ import os
   var collectingRecordings: Set<DeviceID> = []
   /// The collection a status started for each device, kept until the device is no longer listed
   /// with a recording: a caller (a test) can wait for it to end.
-  var backgroundCollections: [DeviceID: Task<Void, Never>] = [:]
+  @ObservationIgnored var backgroundCollections: [DeviceID: Task<Void, Never>] = [:]
   /// Finished recordings the app could not save, and why.
   var unsavedRecordings: [DeviceID: UnsavedRecording] = [:]
   /// Unsaved recordings whose capture folders are being checked, so each is checked once.

@@ -36,7 +36,7 @@ extension ADBTransport {
   /// `body`'s result, or a failure once `limit` has passed on `clock`. `body` is cancelled then,
   /// which closes the connection it waits on.
   static func within<T: Sendable>(
-    _ limit: Duration, on clock: any Clock<Duration> = ContinuousClock(),
+    _ limit: Duration, on clock: any Clock<Duration>,
     _ body: @escaping @Sendable () async throws(ADBError) -> T
   ) async throws(ADBError) -> T {
     let result = await withTaskGroup(of: Result<T, ADBError>?.self) { group in

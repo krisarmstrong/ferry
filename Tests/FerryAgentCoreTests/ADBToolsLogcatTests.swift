@@ -98,8 +98,8 @@ struct ADBToolsLogcatTests {
     limits: ADBTools.Limits = Self.fast, clock: any Clock<Duration> = ContinuousClock()
   ) -> ADBTools {
     ADBTools(
-      device: fake, target: target, journal: journal, scratch: scratch, limits: limits,
-      clock: clock)
+      device: fake, target: target, journal: journal, scratch: scratch, now: Date.init,
+      limits: limits, clock: clock)
   }
 
   static var fast: ADBTools.Limits {

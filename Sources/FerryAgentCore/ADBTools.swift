@@ -179,8 +179,17 @@ public actor ADBTools {
   public init(
     device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> ADBRoute?,
     journal: ToolJournal, scratch: URL = FileManager.default.temporaryDirectory,
-    now: @escaping @Sendable () -> Date = Date.init, limits: Limits = Limits(),
-    clock: any Clock<Duration> = ContinuousClock()
+    now: @escaping @Sendable () -> Date = Date.init, limits: Limits = Limits()
+  ) {
+    self.init(
+      device: device, target: target, journal: journal, scratch: scratch, now: now,
+      limits: limits, clock: ContinuousClock())
+  }
+
+  init(
+    device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> ADBRoute?,
+    journal: ToolJournal, scratch: URL, now: @escaping @Sendable () -> Date, limits: Limits,
+    clock: any Clock<Duration>
   ) {
     self.clock = clock
     self.device = device

@@ -85,14 +85,22 @@ struct ADBWakeTests {
     #expect(device.commands == [["input", "keyevent", "KEYCODE_WAKEUP"], ["dumpsys", "power"]])
   }
 
-  /// A display that never comes on is given up at the limit.
-  @Test func aDisplayThatStaysOffIsGivenUpAtTheLimit() async throws {
+  /// A read of the display that never answers is given up at the wake limit, in time: the paced
+  /// bound alone would wait on it forever.
+  @Test func aReadThatNeverAnswersIsGivenUpAtTheLimit() async throws {
     let device = FakeAndroid()
     device.setTools { $0.displayOn = false }
-    let woke = try await withTools(device, wakeLimit: .milliseconds(300)) {
-      await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
+    device.state.withLock { $0.hangingPrograms = ["dumpsys"] }
+    let clock = ManualClock()
+    let limit = Duration.milliseconds(300)
+    let woke = try await withTools(device, wakeLimit: limit, clock: clock) { tools in
+      let waking = Task { await tools.wakeScreen(route: ADBRoute(serial: Self.serial)) }
+      await device.waitForHangs(1)
+      return await clock.advancing(by: limit) { await waking.value }
     }
     #expect(!woke)
+    // One read, never answered and never repeated.
+    #expect(device.state.withLock { $0.hangs } == 1)
   }
 
   /// A device that refuses the key is not read at all: the capture goes ahead at once.

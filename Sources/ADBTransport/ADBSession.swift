@@ -46,8 +46,17 @@ public actor ADBSession: DeviceSession {
   public init(
     host: ADBHost, serial: String, transportID: String?, info: DeviceInfo,
     features: Set<String>, method: ConnectionMethod, partials: PartialRegistry = PartialRegistry(),
-    clock: any Clock<Duration> = ContinuousClock(),
     onRelease: @escaping @Sendable () async -> Void = {}
+  ) {
+    self.init(
+      host: host, serial: serial, transportID: transportID, info: info, features: features,
+      method: method, partials: partials, clock: ContinuousClock(), onRelease: onRelease)
+  }
+
+  init(
+    host: ADBHost, serial: String, transportID: String?, info: DeviceInfo,
+    features: Set<String>, method: ConnectionMethod, partials: PartialRegistry = PartialRegistry(),
+    clock: any Clock<Duration>, onRelease: @escaping @Sendable () async -> Void = {}
   ) {
     self.clock = clock
     self.host = host
