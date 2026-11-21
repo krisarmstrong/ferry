@@ -38,18 +38,11 @@ public actor ADBHost {
   private let launcher: @Sendable (URL) async throws(ADBError) -> Void
   private let backoff: Backoff
 
-  /// With a `keeper`, the server Ferry starts is the agent's child and ends with it (see
-  /// `ADBServerKeeper`). Without one, as for `ferryctl`, it is `adb start-server`'s daemon.
-  public init(port: UInt16 = 5037, locator: ADBLocator, keeper: ADBServerKeeper? = nil) {
+  /// The server Ferry starts is the agent's child and ends with it (see `ADBServerKeeper`).
+  public init(port: UInt16 = 5037, locator: ADBLocator, keeper: ADBServerKeeper) {
     self.init(
       port: port, locator: locator,
-      launcher: { (adb) async throws(ADBError) in
-        if let keeper {
-          try await keeper.start(adb)
-        } else {
-          try await Self.startServer(adb: adb, port: port)
-        }
-      },
+      launcher: { (adb) async throws(ADBError) in try await keeper.start(adb) },
       backoff: Backoff())
   }
 
@@ -187,10 +180,10 @@ public actor ADBHost {
   }
 
   /// Starts a server only when none answers. A server already running is used as it is,
-  /// whichever adb started it: another adb's `start-server` against it could restart it.
+  /// whichever adb started it (see `ADBServerKeeper` for the ones Ferry replaces).
   public func startServer() async throws(ADBError) {
     // Any failure counts as no server; one that appears between this probe and the launch is
-    // left to `adb start-server`, a no-op against a server of its own version.
+    // found by the keeper, which checks again before it starts one.
     if (try? await version()) != nil { return }
     guard let adb = locator.adbURL() else { throw .adbNotInstalled }
     try await launcher(adb)
@@ -275,53 +268,5 @@ public actor ADBHost {
     } onCancel: {
       stream.cancel()
     }
-  }
-
-  /// Runs `adb start-server`, which returns once the server is up. A cancelled caller stops
-  /// waiting at once: adb is terminated (if it was launched) and `.cancelled` thrown.
-  static func startServer(adb: URL, port: UInt16) async throws(ADBError) {
-    let process = Process()
-    process.executableURL = adb
-    process.arguments = (port == 5037 ? [] : ["-P", String(port)]) + ["start-server"]
-    // The server daemonises and would keep a pipe open, so nothing is captured.
-    process.standardInput = FileHandle.nullDevice
-    process.standardOutput = FileHandle.nullDevice
-    process.standardError = FileHandle.nullDevice
-    // `terminate()` raises on a process not yet launched, so it is sent only after `run()`.
-    let launch = OSAllocatedUnfairLock(initialState: (launched: false, cancelled: false))
-    let status: Result<Int32, ADBError> = await withTaskCancellationHandler {
-      await withCheckedContinuation { continuation in
-        process.terminationHandler = {
-          continuation.resume(returning: .success($0.terminationStatus))
-        }
-        guard !launch.withLock({ $0.cancelled }) else {
-          process.terminationHandler = nil
-          continuation.resume(returning: .failure(.cancelled))
-          return
-        }
-        do {
-          try process.run()
-        } catch {
-          process.terminationHandler = nil
-          continuation.resume(
-            returning: .failure(.failed("could not run adb: \(error.localizedDescription)")))
-          return
-        }
-        let cancelled = launch.withLock { state in
-          state.launched = true
-          return state.cancelled
-        }
-        if cancelled { process.terminate() }
-      }
-    } onCancel: {
-      let launched = launch.withLock { state in
-        state.cancelled = true
-        return state.launched
-      }
-      if launched { process.terminate() }
-    }
-    let code = try status.get()
-    if launch.withLock({ $0.cancelled }) { throw .cancelled }
-    guard code == 0 else { throw .failed("adb start-server exited with status \(code)") }
   }
 }

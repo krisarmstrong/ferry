@@ -55,7 +55,7 @@ public struct ADBWireless: Sendable {
   }
 
   /// The real server and the `adb` the locator finds.
-  public init(locator: ADBLocator = ADBLocator(), keeper: ADBServerKeeper? = nil) {
+  public init(locator: ADBLocator = ADBLocator(), keeper: ADBServerKeeper) {
     self.init(
       host: ADBHost(locator: locator, keeper: keeper), run: ADBCommand.runner(locator: locator),
       keeper: keeper)

@@ -34,23 +34,26 @@ final class SystemServerSpawner: ADBServerSpawner {
 
   func spawn(_ adb: URL, arguments: [String]) throws(ADBError) -> pid_t {
     var attributes: posix_spawnattr_t?
-    posix_spawnattr_init(&attributes)
+    guard posix_spawnattr_init(&attributes) == 0 else { throw .failed("could not run adb") }
     defer { posix_spawnattr_destroy(&attributes) }
     var none = sigset_t()
     var all = sigset_t()
     sigemptyset(&none)
     sigfillset(&all)
-    posix_spawnattr_setsigmask(&attributes, &none)
-    posix_spawnattr_setsigdefault(&attributes, &all)
-    posix_spawnattr_setflags(
-      &attributes,
-      Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF))
     var actions: posix_spawn_file_actions_t?
-    posix_spawn_file_actions_init(&actions)
+    guard posix_spawn_file_actions_init(&actions) == 0 else { throw .failed("could not run adb") }
     defer { posix_spawn_file_actions_destroy(&actions) }
-    posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
-    posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0)
-    posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
+    let prepared = [
+      posix_spawnattr_setsigmask(&attributes, &none),
+      posix_spawnattr_setsigdefault(&attributes, &all),
+      posix_spawnattr_setflags(
+        &attributes,
+        Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF)),
+      posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0),
+      posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0),
+      posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0),
+    ]
+    guard prepared.allSatisfy({ $0 == 0 }) else { throw .failed("could not run adb") }
     let argv = ([adb.path] + arguments).map { strdup($0) } + [nil]
     defer {
       for argument in argv { free(argument) }
@@ -67,8 +70,12 @@ final class SystemServerSpawner: ADBServerSpawner {
       exited.withLock { _ = $0.insert(pid) }
       reapers.withLock { $0.removeValue(forKey: pid) }?.cancel()
     }
+    // A PID reused from an earlier child is not that child, which exited.
+    exited.withLock { _ = $0.remove(pid) }
     reapers.withLock { $0[pid] = reaper }
     reaper.resume()
+    // One that exited before the reaper listened is reaped here, not left a zombie.
+    _ = hasExited(pid)
     return pid
   }
 

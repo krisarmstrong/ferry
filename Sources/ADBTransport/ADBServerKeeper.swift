@@ -30,7 +30,7 @@ public struct ADBServerRecord: Codable, Sendable, Equatable {
 /// client/commandline.cpp runs `nodaemon` in the foreground, and only `fork-server` calls
 /// `setsid`). It stays in the agent's process group, so launchd ends it with the agent.
 ///
-/// The server `adb start-server` forks instead outlives the agent, and macOS keeps holding its
+/// The daemon `adb start-server` forks instead outlives the agent, and macOS keeps holding its
 /// network traffic to the agent that started it. Once that agent has exited macOS cannot name
 /// it, and denies the server the local network: `adb connect` fails with "No route to host".
 ///
@@ -86,7 +86,7 @@ public actor ADBServerKeeper {
     self.poll = poll
   }
 
-  /// `adb.json` beside the agent's other state.
+  /// `adb-server.json` beside the agent's other state.
   public static func defaultRecord() throws -> URL {
     try FileManager.default.url(
       for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
