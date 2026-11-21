@@ -51,6 +51,8 @@ public actor ADBServerKeeper {
   /// The server this agent started, while it may be running.
   private var child: pid_t?
   private var replacedFerryServer = false
+  /// A start under way: both trackers start the server after an outage, and must share it.
+  private var starting: Task<Result<Void, ADBError>, Never>?
 
   /// `record` is where the server's start is kept, in the agent's own folder.
   public init(port: UInt16 = 5037, record: URL) {
@@ -84,8 +86,27 @@ public actor ADBServerKeeper {
     ).appending(path: "io.github.krisarmstrong.ferry.agent/adb-server.json")
   }
 
-  /// Starts a server unless one answers, and returns once it answers.
+  /// Starts a server unless one answers, and returns once it answers. A start already under way
+  /// is waited for, not repeated.
   func start(_ adb: URL) async throws(ADBError) {
+    if let starting { return try await starting.value.get() }
+    let task = Task { await self.launch(adb) }
+    starting = task
+    let result = await task.value
+    starting = nil
+    try result.get()
+  }
+
+  private func launch(_ adb: URL) async -> Result<Void, ADBError> {
+    do throws(ADBError) {
+      try await spawnAndWait(adb)
+      return .success(())
+    } catch {
+      return .failure(error)
+    }
+  }
+
+  private func spawnAndWait(_ adb: URL) async throws(ADBError) {
     if await answers() { return }
     let pid = try spawner.spawn(adb, arguments: ["-L", "tcp:\(port)", "server", "nodaemon"])
     child = pid

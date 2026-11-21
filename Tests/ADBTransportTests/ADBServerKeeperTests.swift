@@ -19,6 +19,10 @@ struct ADBServerKeeperTests {
     var paths: [pid_t: String] = [:]
     var listener: pid_t?
     var kills = 0
+    /// How many more times a started server does not answer yet, as one coming up does.
+    var notYet = 0
+    /// What a spawned server sets `notYet` to.
+    var slowStart = 0
   }
 
   final class Fakes: Sendable {
@@ -38,6 +42,8 @@ struct ADBServerKeeperTests {
         state.spawned.append((adb.path, arguments))
         state.paths[pid] = adb.path
         state.started[pid] = 777
+        state.nextPID += 1
+        state.notYet = state.slowStart
         if state.serverComesUp { state.answering = true } else { state.exited.insert(pid) }
         return pid
       }
@@ -65,7 +71,15 @@ struct ADBServerKeeperTests {
     ADBServerKeeper(
       port: 5037, record: record, spawner: FakeSpawner(fakes: fakes),
       table: FakeTable(fakes: fakes),
-      answers: { fakes { $0.answering } },
+      answers: {
+        fakes { state in
+          guard state.notYet == 0 else {
+            state.notYet -= 1
+            return false
+          }
+          return state.answering
+        }
+      },
       kill: {
         fakes { state in
           state.kills += 1
@@ -98,6 +112,21 @@ struct ADBServerKeeperTests {
     #expect(
       ADBServerRecord.load(record) == ADBServerRecord(pid: 4242, started: 777, path: Self.adb.path)
     )
+  }
+
+  /// The transport's and the wireless side's trackers both start the server after an outage:
+  /// one server is started, and the record names it.
+  @Test func startsAtOnceRunOneServer() async throws {
+    let fakes = Fakes()
+    fakes { $0.slowStart = 5 }
+    let record = Self.recordFile()
+    defer { try? FileManager.default.removeItem(at: record) }
+    let keeper = Self.keeper(fakes, record: record)
+    async let first: Void = keeper.start(Self.adb)
+    async let second: Void = keeper.start(Self.adb)
+    _ = try await (first, second)
+    #expect(fakes { $0.spawned.count } == 1)
+    #expect(ADBServerRecord.load(record)?.pid == 4242)
   }
 
   @Test func aServerThatAnswersIsLeftAlone() async throws {
