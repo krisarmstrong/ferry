@@ -29,7 +29,7 @@ struct ADBWirelessLimitTests {
     let wireless = ADBWireless(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb),
       run: FakeADBRunner(output: "connected to 192.0.2.31:5555\n").run,
-      answerLimit: .milliseconds(200))
+      answerLimit: .milliseconds(200), keeper: ADBServerKeeperTests.idle())
     let serial = "192.0.2.31:5555"
     let error = await #expect(throws: ADBError.self) {
       switch call {

@@ -119,6 +119,14 @@ struct ADBServerKeeperTests {
       limit: .seconds(2), poll: .milliseconds(10), callLimit: .milliseconds(300))
   }
 
+  /// A keeper for tests of what runs inside its gate: there is never a replacement.
+  static func idle() -> ADBServerKeeper {
+    let fakes = Fakes()
+    return ADBServerKeeper(
+      port: 0, record: recordFile(), spawner: FakeSpawner(fakes: fakes),
+      table: FakeTable(fakes: fakes), answers: { true }, kill: {})
+  }
+
   /// Suspends for good, cancelled or not.
   static func never() async {
     await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in }
@@ -306,6 +314,21 @@ struct ADBServerProcessTests {
     #expect(table.started(getpid()) != nil)
     #expect(table.started(getpid()) == table.started(getpid()))
     #expect(table.path(getpid()) == Bundle.main.executableURL?.resolvingSymlinksInPath().path)
+  }
+
+  /// `host:kill` goes to 127.0.0.1, so only an IPv4 loopback listener is the one it reaches.
+  @Test func onlyIPv4LoopbackIsTheKillTarget() {
+    var ipv4 = in_sockinfo()
+    ipv4.insi_vflag = UInt8(INI_IPV4)
+    ipv4.insi_laddr.ina_46.i46a_addr4.s_addr = inet_addr("127.0.0.1")
+    var ipv6 = in_sockinfo()
+    ipv6.insi_vflag = UInt8(INI_IPV6)
+    ipv6.insi_laddr.ina_6 = in6addr_loopback
+    var anywhere = in_sockinfo()
+    anywhere.insi_vflag = UInt8(INI_IPV4)
+    #expect(SystemProcessTable.isLoopback(ipv4))
+    #expect(SystemProcessTable.isLoopback(ipv6) == false)
+    #expect(SystemProcessTable.isLoopback(anywhere) == false)
   }
 
   @Test func thisProcessDoesNotRunGooglesADB() {

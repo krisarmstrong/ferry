@@ -17,7 +17,7 @@ protocol ProcessTable: Sendable {
   func started(_ pid: pid_t) -> UInt64?
   /// The process's program.
   func path(_ pid: pid_t) -> String?
-  /// The process listening on `port` over TCP on a loopback address, where `host:kill` goes.
+  /// The process listening on `port` over TCP on 127.0.0.1, where `host:kill` goes.
   func listener(onTCPPort port: UInt16) -> pid_t?
   /// Whether the code the process runs is Google's `adb`.
   func runsGoogleADB(_ pid: pid_t) -> Bool
@@ -139,14 +139,9 @@ struct SystemProcessTable: ProcessTable {
     }
   }
 
-  /// 127.0.0.0/8 or ::1: the addresses `host:kill` to localhost reaches.
+  /// 127.0.0.1, where `host:kill` goes (`ADBStream` connects to IPv4 loopback only).
   static func isLoopback(_ address: in_sockinfo) -> Bool {
-    if address.insi_vflag & UInt8(INI_IPV4) != 0 {
-      let ipv4 = UInt32(bigEndian: address.insi_laddr.ina_46.i46a_addr4.s_addr)
-      return ipv4 >> 24 == 127
-    }
-    var loopback = in6addr_loopback
-    var local = address.insi_laddr.ina_6
-    return memcmp(&local, &loopback, MemoryLayout<in6_addr>.size) == 0
+    address.insi_vflag & UInt8(INI_IPV4) != 0
+      && UInt32(bigEndian: address.insi_laddr.ina_46.i46a_addr4.s_addr) == 0x7F00_0001
   }
 }

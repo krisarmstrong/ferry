@@ -42,11 +42,11 @@ public struct ADBWireless: Sendable {
   private let run: ADBCommandRunner
   private let answerLimit: Duration
   /// Holds a server replacement off while a command runs (`ADBServerKeeper.whileServing`).
-  private let keeper: ADBServerKeeper?
+  private let keeper: ADBServerKeeper
 
   public init(
     host: ADBHost, run: @escaping ADBCommandRunner,
-    answerLimit: Duration = ADBTransport.defaultAnswerLimit, keeper: ADBServerKeeper? = nil
+    answerLimit: Duration = ADBTransport.defaultAnswerLimit, keeper: ADBServerKeeper
   ) {
     self.host = host
     self.run = run
@@ -67,7 +67,6 @@ public struct ADBWireless: Sendable {
       try await requireServer()
       return try await run(arguments)
     }
-    guard let keeper else { return try await body() }
     return try await keeper.whileServing(body)
   }
 
