@@ -16,11 +16,11 @@ extension DevicePresentation {
 
   /// What a tile draws.
   enum TileGlyph: Equatable {
+    /// A tester, a tablet, or a phone whose family has its own shape, drawn by `DeviceGlyph`:
+    /// SF Symbols has none for these but Apple's.
+    case device(DeviceGlyph.Kind)
+    /// Any other phone.
     case phone
-    /// A handheld network tester, drawn by `DeviceGlyph`.
-    case tester
-    /// Drawn by `DeviceGlyph`: SF Symbols' tablets are all iPads.
-    case tablet
     case symbol(String)
 
     /// The SF Symbol a phone is drawn with.
@@ -36,36 +36,50 @@ extension DevicePresentation {
   static let rememberedTile = Tile(glyph: .symbol("wifi.slash"), isActive: false)
   static let offerTile = Tile(glyph: .symbol("wifi"), isActive: false)
 
-  /// NetAlly's Android testers, by the start of their model names (lowercased, letters and
-  /// digits only, any leading "netally" dropped).
-  private static let testerModels = ["linkrunner", "etherscope", "aircheck", "cyberscope"]
-
   /// Words in a model name that make it a tablet.
   private static let tabletWords: Set<Substring> = ["tablet", "tab", "pad", "matepad", "mediapad"]
 
   /// What kind of device reports this manufacturer and model. Only names decide it: a tester by
   /// its model or its maker; a tablet by a "tablet", "tab", "pad", "matepad" or "mediapad" word
   /// in its name, or, from their makers only, Samsung's tablet model numbers (SM-T, SM-X, SM-P),
-  /// Lenovo's (TB) and Amazon's Fire tablets (KF, or "fire"); anything else is a phone.
+  /// Lenovo's (TB) and Amazon's Fire tablets (KF, or "fire"); then Samsung's foldables (SM-F, or
+  /// a "fold" or "flip" word), its other phones, and Google's Pixels; anything else is a phone.
   static func kind(manufacturer: String, model: String) -> TileGlyph {
     let maker = manufacturer.lowercased()
     var key = String(
       String.UnicodeScalarView(
         model.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains)))
     if key.hasPrefix("netally") { key.removeFirst("netally".count) }
-    if maker == "netally" || testerModels.contains(where: key.hasPrefix) { return .tester }
+    if let tester = tester(model: key) { return .device(tester) }
+    if maker == "netally" { return .device(.tester) }
     let words = model.lowercased().split { !$0.isLetter && !$0.isNumber }
-    if words.contains(where: tabletWords.contains) { return .tablet }
+    if words.contains(where: tabletWords.contains) { return .device(.tablet) }
     // Model numbers, without a leading maker name ("Lenovo TB-X606F").
     var code = model.uppercased()
     if code.hasPrefix(manufacturer.uppercased() + " ") { code.removeFirst(manufacturer.count + 1) }
     switch maker {
-    case "samsung" where ["SM-T", "SM-X", "SM-P"].contains(where: code.hasPrefix): return .tablet
-    case "lenovo" where code.hasPrefix("TB"): return .tablet
-    case "amazon" where code.hasPrefix("KF") || words.contains("fire"): return .tablet
-    default: break
+    case "samsung" where ["SM-T", "SM-X", "SM-P"].contains(where: code.hasPrefix):
+      return .device(.tablet)
+    case "samsung"
+    where code.hasPrefix("SM-F") || words.contains { $0.hasPrefix("fold") || $0.hasPrefix("flip") }:
+      return .device(.foldable)
+    case "samsung": return .device(.galaxy)
+    case "google" where key.hasPrefix("pixel"): return .device(.pixel)
+    case "lenovo" where code.hasPrefix("TB"): return .device(.tablet)
+    case "amazon" where code.hasPrefix("KF") || words.contains("fire"): return .device(.tablet)
+    default: return .phone
     }
-    return .phone
+  }
+
+  /// NetAlly's Android testers, by the start of their model names (lowercased, letters and
+  /// digits only, any leading "netally" dropped). CyberScope is drawn as the EtherScope, whose
+  /// body it shares; LinkRunner 10G, 100G and G2 share the LinkRunner's.
+  private static func tester(model key: String) -> DeviceGlyph.Kind? {
+    if key.hasPrefix("linkrunnerat") { return .linkRunnerAT }
+    if key.hasPrefix("linkrunner") { return .linkRunner }
+    if key.hasPrefix("etherscope") || key.hasPrefix("cyberscope") { return .etherScope }
+    if key.hasPrefix("aircheck") { return .airCheck }
+    return nil
   }
 
   /// The line under a device's name. A ready device shows how Ferry reaches it, then its network

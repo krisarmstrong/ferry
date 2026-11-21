@@ -213,10 +213,8 @@ struct DeviceTile: View {
 
   @ViewBuilder private var glyph: some View {
     switch tile.glyph {
-    case .tester:
-      DeviceGlyph(kind: .tester).frame(width: 15, height: 15)
-    case .tablet:
-      DeviceGlyph(kind: .tablet).frame(width: 15, height: 15)
+    case .device(let kind):
+      DeviceGlyph(kind: kind).frame(width: 15, height: 15)
     case .phone:
       symbol(DevicePresentation.TileGlyph.phoneSymbol)
     case .symbol(let name):
