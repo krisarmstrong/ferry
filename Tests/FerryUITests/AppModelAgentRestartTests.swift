@@ -15,7 +15,7 @@ struct AppModelAgentRestartTests {
     services.startedAgent = "agent-1"
     let model = AppModel(client: FakeClient(log: log), services: services)
     await model.launch()
-    #expect(log.all == ["registerAgent", "registerExtensions", "status", "readLoginItem"])
+    #expect(log.all == ["registerAgent", "status", "registerExtensions", "readLoginItem"])
   }
 
   @Test func updatedAgentIsRestartedBeforeTheFirstStatus() async {
@@ -26,7 +26,7 @@ struct AppModelAgentRestartTests {
     await model.launch()
     #expect(
       log.all == [
-        "restartAgent", "registerExtensions", "status", "recordStartedAgent agent-2",
+        "restartAgent", "status", "recordStartedAgent agent-2", "registerExtensions",
         "readLoginItem",
       ])
     #expect(services.startedAgent == "agent-2")
@@ -42,7 +42,7 @@ struct AppModelAgentRestartTests {
     await model.launch()
     #expect(
       log.all == [
-        "restartAgent", "registerExtensions", "status", "recordStartedAgent agent-1",
+        "restartAgent", "status", "recordStartedAgent agent-1", "registerExtensions",
         "readLoginItem",
       ])
   }
@@ -64,7 +64,7 @@ struct AppModelAgentRestartTests {
     await AppModel(client: FakeClient(log: log), services: services).launch()
     #expect(
       log.all.suffix(5) == [
-        "restartAgent", "registerExtensions", "status", "recordStartedAgent agent-2",
+        "restartAgent", "status", "recordStartedAgent agent-2", "registerExtensions",
         "readLoginItem",
       ])
   }
@@ -77,7 +77,7 @@ struct AppModelAgentRestartTests {
     services.startedAgent = "agent-1"
     let model = AppModel(client: FakeClient(log: log), services: services)
     await model.launch()
-    #expect(log.all == ["registerAgent", "registerExtensions", "status", "readLoginItem"])
+    #expect(log.all == ["registerAgent", "status", "registerExtensions", "readLoginItem"])
     #expect(services.startedAgent == "agent-1")
   }
 }

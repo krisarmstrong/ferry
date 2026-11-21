@@ -11,10 +11,12 @@ import Testing
 final class FlakyClient: AgentSending {
   let inner: FakeClient
   private let failures: Mutex<Int>
+  private let error: TransportError
 
-  init(_ inner: FakeClient, failures: Int) {
+  init(_ inner: FakeClient, failures: Int, error: TransportError = .deviceDisconnected) {
     self.inner = inner
     self.failures = Mutex(failures)
+    self.error = error
   }
 
   func setFailures(_ count: Int) { failures.withLock { $0 = count } }
@@ -29,10 +31,35 @@ final class FlakyClient: AgentSending {
       }
       if fails {
         inner.log.record("status unreachable")
-        throw .deviceDisconnected
+        throw error
       }
     }
     return try await inner.send(request, file: file, progress: progress)
+  }
+}
+
+/// The first status is lost; the second waits until its task is cancelled, as the menu closing
+/// cancels it, then throws `.cancelled` as `AgentClient` does.
+final class HeldSecondStatusClient: AgentSending {
+  let log: CallLog
+  private let calls = Mutex(0)
+
+  init(log: CallLog) { self.log = log }
+
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError) -> AgentResponse {
+    let call = calls.withLock { count in
+      count += 1
+      return count
+    }
+    if call == 1 {
+      log.record("status unreachable")
+      throw .deviceDisconnected
+    }
+    log.record("status held")
+    while !Task.isCancelled { await Task.yield() }
+    throw .cancelled
   }
 }
 
@@ -56,8 +83,8 @@ struct AppModelAgentRecoveryTests {
     await model.launch()
     #expect(
       log.all == [
-        "registerAgent", "registerExtensions", "status unreachable", "status unreachable",
-        "restartAgent", "status", "readLoginItem",
+        "registerAgent", "status unreachable", "status unreachable", "restartAgent", "status",
+        "registerExtensions", "readLoginItem",
       ])
     #expect(model.agent == .running)
   }
@@ -129,6 +156,32 @@ struct AppModelAgentRecoveryTests {
     #expect(log.all.filter { $0 == "restartAgent" }.count == 2)
   }
 
+  /// The menu closing while the second status is on its way says nothing about the agent.
+  @Test(.timeLimit(.minutes(1)))
+  func closingTheMenuDuringTheSecondCheckRestartsNothing() async {
+    let services = FakeServices(log: log)
+    services.agentEnabled = true
+    let model = model(HeldSecondStatusClient(log: log), services)
+    let refresh = Task { await model.refresh() }
+    while !log.all.contains("status held") { await Task.yield() }
+    refresh.cancel()
+    await refresh.value
+    #expect(!log.all.contains("restartAgent"))
+  }
+
+  /// A live agent that is slow (`agentNotResponding`) or answers something unreadable (`io`) is
+  /// not a stuck job: only a lost connection restarts it.
+  @Test(arguments: [TransportError.agentNotResponding, .io("bad response from agent")])
+  func aLiveAgentsFailuresRestartNothing(_ error: TransportError) async {
+    let services = FakeServices(log: log)
+    services.agentEnabled = true
+    let model = model(FlakyClient(FakeClient(log: log), failures: 1000, error: error), services)
+    await model.launch()
+    await model.refresh()
+    #expect(!log.all.contains("restartAgent"))
+    #expect(model.agent == .unreachable)
+  }
+
   /// The menu refreshes every 2 s and after each action: refreshes that overlap restart once.
   @Test func overlappingRefreshesRestartOnce() async {
     let services = FakeServices(log: log)
@@ -155,8 +208,30 @@ struct AppModelAgentRecoveryTests {
     #expect(services.startedAgent == "agent-2")
     #expect(
       log.all.suffix(5) == [
-        "restartAgent", "registerExtensions", "status", "recordStartedAgent agent-2",
+        "restartAgent", "status", "recordStartedAgent agent-2", "registerExtensions",
         "readLoginItem",
       ])
+  }
+}
+
+/// Re-registering a copy that will vanish (a translocated copy, one on a mounted disk image) would
+/// make macOS use it, and lose the extensions when it goes.
+struct ExtensionRegistrationTests {
+  @Test func anInstalledCopyIsRegistered() {
+    #expect(
+      SystemServices.registersExtensions(
+        of: URL(filePath: "/Applications/Ferry.app"), onReadOnlyVolume: false))
+  }
+
+  @Test func aTranslocatedCopyIsNot() {
+    let translocated = URL(
+      filePath: "/private/var/folders/ab/cd/T/AppTranslocation/0A1B2C3D/d/Ferry.app")
+    #expect(!SystemServices.registersExtensions(of: translocated, onReadOnlyVolume: false))
+  }
+
+  @Test func aCopyOnAReadOnlyVolumeIsNot() {
+    #expect(
+      !SystemServices.registersExtensions(
+        of: URL(filePath: "/Volumes/Ferry/Ferry.app"), onReadOnlyVolume: true))
   }
 }

@@ -164,27 +164,28 @@ import os
   }
 
   public func refresh() async {
-    guard !(await readStatus()) else { return }
-    if agent == .unreachable { await recoverAgent() }
+    if await readStatus() == .lost, agent == .unreachable { await recoverAgent() }
   }
 
-  /// Asks the agent for its status and shows it; false when it did not answer.
-  func readStatus() async -> Bool {
+  /// Asks the agent for its status and shows it.
+  func readStatus() async -> StatusRead {
     do {
       switch try await client.send(.status, file: nil) {
       case .status(let report):
         apply(report)
-        return true
+        return .answered
       default:
         Self.log.error("agent answered status with something else")
         agent = .unreachable
-        return false
+        return .failed
       }
+    } catch .cancelled {
+      return .cancelled
     } catch {
       Self.log.error("status request failed: \(String(describing: error), privacy: .private)")
       agent = services.appWasReplaced() ? .replaced : .unreachable
       helper = await services.helperStatus()
-      return false
+      return error == .deviceDisconnected ? .lost : .failed
     }
   }
 

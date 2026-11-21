@@ -163,10 +163,23 @@ public final class SystemServices: SystemServicing {
     }.value
   }
 
+  /// Not a copy that will go away: one macOS translocated, or one on a read-only volume such as a
+  /// mounted disk image. Registered, it would be the copy macOS uses, and the installed one would
+  /// lose its extensions once it went.
+  nonisolated static func registersExtensions(of bundle: URL, onReadOnlyVolume: Bool) -> Bool {
+    !onReadOnlyVolume && !bundle.path.contains("/AppTranslocation/")
+  }
+
   public func registerExtensions() async {
     let bundle = Bundle.main.bundleURL
     let plugIns = Bundle.main.builtInPlugInsURL
     await Task.detached(priority: .utility) {
+      let readOnly =
+        (try? bundle.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false
+      guard Self.registersExtensions(of: bundle, onReadOnlyVolume: readOnly) else {
+        Self.log.info("not registering a translocated or read-only copy with Launch Services")
+        return
+      }
       let extensions =
         plugIns.flatMap {
           try? FileManager.default.contentsOfDirectory(
