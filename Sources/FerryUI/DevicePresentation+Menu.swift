@@ -23,14 +23,8 @@ extension DevicePresentation {
     case tablet
     case symbol(String)
 
-    /// The SF Symbol it is, or `nil` for one `DeviceGlyph` draws.
-    var symbolName: String? {
-      switch self {
-      case .phone: "smartphone"
-      case .symbol(let name): name
-      case .tester, .tablet: nil
-      }
-    }
+    /// The SF Symbol a phone is drawn with.
+    static let phoneSymbol = "smartphone"
   }
 
   static func tile(of device: AttachedDevice) -> Tile {
@@ -46,9 +40,13 @@ extension DevicePresentation {
   /// digits only, any leading "netally" dropped).
   private static let testerModels = ["linkrunner", "etherscope", "aircheck", "cyberscope"]
 
+  /// Words in a model name that make it a tablet.
+  private static let tabletWords: Set<Substring> = ["tablet", "tab", "pad", "matepad", "mediapad"]
+
   /// What kind of device reports this manufacturer and model. Only names decide it: a tester by
-  /// its model or its maker, a tablet by "tablet", "tab" or "pad" in its name, or by Samsung's
-  /// tablet model numbers (SM-T, SM-X, SM-P) and Lenovo's (TB-), and anything else is a phone.
+  /// its model or its maker; a tablet by a "tablet", "tab", "pad", "matepad" or "mediapad" word
+  /// in its name, or, from their makers only, Samsung's tablet model numbers (SM-T, SM-X, SM-P),
+  /// Lenovo's (TB) and Amazon's Fire tablets (KF, or "fire"); anything else is a phone.
   static func kind(manufacturer: String, model: String) -> TileGlyph {
     let maker = manufacturer.lowercased()
     var key = String(
@@ -57,12 +55,16 @@ extension DevicePresentation {
     if key.hasPrefix("netally") { key.removeFirst("netally".count) }
     if maker == "netally" || testerModels.contains(where: key.hasPrefix) { return .tester }
     let words = model.lowercased().split { !$0.isLetter && !$0.isNumber }
-    if words.contains(where: { ["tablet", "tab", "pad"].contains($0) }) { return .tablet }
-    let code = model.uppercased()
-    if maker == "samsung", ["SM-T", "SM-X", "SM-P"].contains(where: code.hasPrefix) {
-      return .tablet
+    if words.contains(where: tabletWords.contains) { return .tablet }
+    // Model numbers, without a leading maker name ("Lenovo TB-X606F").
+    var code = model.uppercased()
+    if code.hasPrefix(manufacturer.uppercased() + " ") { code.removeFirst(manufacturer.count + 1) }
+    switch maker {
+    case "samsung" where ["SM-T", "SM-X", "SM-P"].contains(where: code.hasPrefix): return .tablet
+    case "lenovo" where code.hasPrefix("TB"): return .tablet
+    case "amazon" where code.hasPrefix("KF") || words.contains("fire"): return .tablet
+    default: break
     }
-    if code.contains("TB-") { return .tablet }
     return .phone
   }
 

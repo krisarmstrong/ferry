@@ -30,7 +30,7 @@ def transform(path: str) -> str:
     out = []
     for command, args in re.findall(r"([MHVLQZ])([^MHVLQZ]*)", path):
         numbers = [float(n) for n in args.replace(",", " ").split()]
-        if command in "ML Q":
+        if command in "MLQ":
             coords = []
             for x, y in zip(numbers[0::2], numbers[1::2]):
                 coords += [f"{(x - LEFT) * SCALE:g}", f"{(y - KEEL) * SCALE:g}"]
