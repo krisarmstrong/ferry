@@ -34,7 +34,12 @@ enum ProviderText {
     """, bundle: .module)
 
   static let unexpectedResponse = LocalizedStringResource(
-    "Unexpected response from the Ferry agent.", bundle: .module)
+    "Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again.",
+    bundle: .module)
+
+  static let lostContact = LocalizedStringResource(
+    "Ferry lost contact with the device partway through. Reconnect it, then try again.",
+    bundle: .module)
 
   static let package = LocalizedStringResource(
     "Packages and app bundles can’t be copied to the device. Compress it into a .zip first.",
@@ -53,6 +58,6 @@ enum ProviderText {
   static let all: [LocalizedStringResource] = [
     nameChanged(requested: "a", actual: "b"), unsupported("copy"),
     sizeMismatch(expected: 2, actual: 1), downloadSizeMismatch(listed: 2, received: 1),
-    folderTooDeep("Deep"), readOnly, unexpectedResponse, package, packageName, link,
+    folderTooDeep("Deep"), readOnly, unexpectedResponse, lostContact, package, packageName, link,
   ]
 }

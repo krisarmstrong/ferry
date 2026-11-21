@@ -47,13 +47,17 @@ struct ErrorMappingTests {
   }
 
   /// The FileProvider headers ask for the error no code represents as the underlying error of
-  /// the `NSXPCConnectionReplyInvalid` Cocoa error.
+  /// the `NSXPCConnectionReplyInvalid` Cocoa error. Finder shows plain words, never the
+  /// developer text the failure carries (audit M2).
   @Test func anIOFailureCarriesItselfAsTheUnderlyingError() {
     let failure = TransportError.io("pipe broke")
     let mapped = ErrorMapping.fileProviderError(failure) as NSError
 
     #expect(mapped.code == CocoaError.Code.xpcConnectionReplyInvalid.rawValue)
-    #expect(mapped.localizedDescription == "pipe broke")
+    #expect(
+      mapped.localizedDescription
+        == "Ferry lost contact with the device partway through. Reconnect it, then try again.")
+    #expect(!mapped.localizedDescription.contains("pipe broke"))
     #expect(mapped.userInfo[NSUnderlyingErrorKey] as? TransportError == failure)
   }
 
@@ -104,7 +108,7 @@ struct ErrorMappingTests {
     case .unsupported(let what): .cocoa(.featureUnsupported, [what])
     case .sizeMismatch: .cocoa(.fileWriteUnknown, ["2", "1"])
     case .downloadSizeMismatch: .cocoa(.fileReadCorruptFile, ["7", "3"])
-    case .io(let message): .cocoa(.xpcConnectionReplyInvalid, [message])
+    case .io: .cocoa(.xpcConnectionReplyInvalid, ["lost contact"])
     case .folderTooDeep: .cocoa(.featureUnsupported, ["Deep", "64"])
     case .readOnly: .fileProvider(.cannotSynchronize)
     // T3: a metadata call the agent did not answer in time is retried later.

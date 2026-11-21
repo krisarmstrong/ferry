@@ -12,6 +12,26 @@
         }
       }
     },
+    "Ferry lost contact with the device partway through. Reconnect it, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry lost contact with the device partway through. Reconnect it, then try again."
+          }
+        }
+      }
+    },
+    "Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again."
+          }
+        }
+      }
+    },
     "Folders named like an app or a document package, and what they hold, can’t be changed from this Mac. Change them on the device." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -85,17 +105,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device stored %1$llu bytes where %2$llu were sent."
-          }
-        }
-      }
-    },
-    "Unexpected response from the Ferry agent." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unexpected response from the Ferry agent."
           }
         }
       }

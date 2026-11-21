@@ -594,9 +594,94 @@
               "fix": "Unlock the device and choose **Transfer files** on it, then choose **Refresh**. You do not need to replug the cable."
             },
             {
-              "message": "The device is not sharing files.",
+              "message": "The device is not sharing files. Unlock it and choose Transfer files, then try again.",
               "cause": "The device locked or turned off file transfer during the task.",
               "fix": "Unlock the device and choose **Transfer files** on it, then try again."
+            },
+            {
+              "message": "The device was disconnected. Reconnect it, then try again.",
+              "cause": "The device went away during the task: the cable came out, it went to sleep, or it left the network.",
+              "fix": "Reconnect the device and try again."
+            },
+            {
+              "message": "The device shows no storage. Unlock it, then try again.",
+              "cause": "The device shares no storage, which happens while it is locked.",
+              "fix": "Unlock the device and choose **Refresh**, then try again."
+            },
+            {
+              "message": "The device can't do this. Do it on the device instead.",
+              "cause": "The device doesn't offer what was asked, such as moving a file in one step.",
+              "fix": "Do it on the device itself, or copy the file to its new place and delete the original."
+            },
+            {
+              "message": "Ferry lost contact with the device partway through. Reconnect it, then try again.",
+              "cause": "The connection to the device failed in the middle of the task: a loose cable, a USB hub, or the device going to sleep.",
+              "fix": "Plug the device straight into the Mac, keep it unlocked, and try again. If it keeps failing, restart the device. A copy in Finder retries by itself once the device is back."
+            },
+            {
+              "message": "That item is no longer on the device. Refresh, then try again.",
+              "cause": "Someone deleted or moved the item on the device, or another app did.",
+              "fix": "Choose **Refresh** for the device, then find the item where it is now."
+            },
+            {
+              "message": "The device already has an item with that name. Rename one, then try again.",
+              "cause": "An item with the same name is already in that folder on the device.",
+              "fix": "Rename the item on the Mac or on the device, then try again."
+            },
+            {
+              "message": "The device can't store that name. Choose another name.",
+              "cause": "The name has characters the device's storage does not allow, such as : * ? \" < > | or a trailing dot.",
+              "fix": "Rename the item with letters, digits, spaces, dashes and dots, then try again."
+            },
+            {
+              "message": "The device is out of space. Free some space on it, then try again.",
+              "cause": "The device's storage does not have room for the file.",
+              "fix": "Delete files you no longer need on the device, or copy to another storage such as its SD card."
+            },
+            {
+              "message": "The file is too large for that storage. Use internal storage, or a smaller file.",
+              "cause": "Cards formatted FAT32 take files up to 4 GB.",
+              "fix": "Copy the file to the device's internal storage, or split it into smaller files."
+            },
+            {
+              "message": "The file didn't arrive complete. Try again.",
+              "cause": "The device stored or sent a different number of bytes than the file has, so the copy is not complete.",
+              "fix": "Try again. If it keeps happening, choose **Refresh** and copy the file once more."
+            },
+            {
+              "message": "The device saved the file under another name. Look for it in the folder.",
+              "cause": "The device changed the name, for example because its storage cannot hold some characters.",
+              "fix": "Find the file in the folder under its new name, and rename it if you like."
+            },
+            {
+              "message": "The folder isn't empty. Delete what it holds first.",
+              "cause": "Something arrived in the folder on the device while it was being deleted.",
+              "fix": "Open the folder, delete what it holds, then delete the folder."
+            },
+            {
+              "message": "The file changed on the device. Refresh, then try again.",
+              "cause": "The device's copy of the file changed since the Mac last read it.",
+              "fix": "Choose **Refresh**, check which copy you want, then try again."
+            },
+            {
+              "message": "This Mac is out of space. Free some space, then try again.",
+              "cause": "The Mac's disk does not have room for a copy of the file.",
+              "fix": "Free space on the Mac (see **Free up space on the Mac**), then try again."
+            },
+            {
+              "message": "That folder is nested too deep to delete from the Mac. Delete it on the device.",
+              "cause": "The folder holds folders more than 64 levels down, which Ferry does not delete.",
+              "fix": "Delete the folder on the device itself."
+            },
+            {
+              "message": "That item is read-only from the Mac. Change it on the device.",
+              "cause": "The item is a folder named like an app or a document package, or lies inside one, which Ferry keeps read-only.",
+              "fix": "Change it on the device, or copy it to the Mac."
+            },
+            {
+              "message": "The folder's listing went out of date. Try again.",
+              "cause": "Ferry's helper restarted, or many folders were opened, while Finder was still reading a large folder.",
+              "fix": "Open the folder again. Finder reads it from the start."
             },
             {
               "message": "In use by another app",
@@ -617,31 +702,6 @@
               "message": "Can't open",
               "cause": "The device reported an error when Ferry opened it.",
               "fix": "Click **Check Again**, or unplug the device and plug it back in."
-            },
-            {
-              "message": "The device reported an error.",
-              "cause": "The device refused the request without saying why.",
-              "fix": "Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**."
-            },
-            {
-              "message": "The device was disconnected.",
-              "cause": "The device went away during the task: the cable came out, it went to sleep, or it left the network.",
-              "fix": "Reconnect the device and try again."
-            },
-            {
-              "message": "The device reports no storage.",
-              "cause": "The device shares no storage, which happens while it is locked.",
-              "fix": "Unlock the device and choose **Refresh**."
-            },
-            {
-              "message": "The device does not support this: %@.",
-              "cause": "The device can't do what was asked. The rest of the message says what.",
-              "fix": "Do it another way, for example on the device itself."
-            },
-            {
-              "message": "Error: %@",
-              "cause": "Something failed on the device, the Mac or the connection. The rest of the message says what.",
-              "fix": "Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**."
             },
             {
               "message": "Cancelled.",
@@ -884,7 +944,7 @@
               "fix": "Delete it on the device."
             },
             {
-              "message": "Unexpected response from the Ferry agent.",
+              "message": "Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again.",
               "cause": "Ferry's helper answered in a way the Finder extension does not expect, which can happen right after an update.",
               "fix": "Quit Ferry from the menu and open it again from Applications."
             }
@@ -1293,7 +1353,7 @@
           "symbol": "hand.raised.slash",
           "paragraphs": [
             "Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.",
-            "Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices."
+            "Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices: like any download, they see your Mac's IP address, and GitHub sees which versions of Ferry and its updater ask."
           ]
         },
         {

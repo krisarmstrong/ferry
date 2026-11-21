@@ -19,11 +19,130 @@ private struct CoverageCatalog: Decodable {
 /// listed by hand; the ones the code words from an error are checked case by case in
 /// `HelpLinkTests`.
 struct HelpMessageCoverageTests {
+
+  private static let help = HelpContent.bundled ?? HelpContent(version: 0, categories: [])
+
+  private static func catalogKeys(_ module: String) throws -> Set<String> {
+    let url = URL(filePath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+      .appending(path: "Sources/\(module)/Localizable.xcstrings")
+    return Set(
+      try JSONDecoder().decode(CoverageCatalog.self, from: Data(contentsOf: url)).strings.keys)
+  }
+
+  /// The table and the help's messages are the same list, each message once.
+  @Test func theTableIsTheHelpsMessages() {
+    let messages = Self.help.topics.flatMap(\.messages).map(\.message)
+    #expect(Set(Self.table.map(\.message)).count == Self.table.count)
+    #expect(Set(messages) == Set(Self.table.map(\.message)))
+  }
+
+  @Test func eachMessageIsExplainedInItsTopicUnderTroubleshooting() throws {
+    let troubleshooting = try #require(
+      Self.help.categories.first { $0.title == "Troubleshooting" })
+    let ids = Set(troubleshooting.topics.map(\.id))
+    for row in Self.table {
+      #expect(Self.help.topic(forMessage: row.message)?.id == row.topic, "\(row.message)")
+      #expect(ids.contains(row.topic), "\(row.topic)")
+    }
+  }
+
+  @Test func eachMessageIsAStringFerryShows() throws {
+    var keys = Set<String>()
+    for module in ["FerryUI", "FerryText", "FerryAgentCore", "FerryProviderCore", "FerrySyncCore"] {
+      keys.formUnion(try Self.catalogKeys(module))
+    }
+    for row in Self.table {
+      #expect(keys.contains(row.message), "in no catalog: \(row.message)")
+    }
+  }
+
+  /// A key added to these catalogs is a message with Help, or named as not a message.
+  @Test(arguments: ["FerryText", "FerryAgentCore", "FerryProviderCore", "FerrySyncCore"])
+  func everyStringInTheCatalogIsCovered(module: String) throws {
+    let keys = try Self.catalogKeys(module)
+    let others = Self.notMessages[module] ?? []
+    let covered = Set(Self.table.map(\.message))
+    #expect(others.isSubset(of: keys), "\(module): \(others.subtracting(keys).sorted())")
+    #expect(others.isDisjoint(with: covered))
+    let missing = keys.subtracting(covered).subtracting(others)
+    #expect(missing.isEmpty, "\(module) messages without Help: \(missing.sorted())")
+  }
+
+  /// Every FerryUI key is Help's own words, a message in the table, or a label listed in
+  /// `FerryUILabels`: a new problem line cannot reach the menu without someone deciding.
+  @Test func everyFerryUIStringIsHelpAMessageOrALabel() throws {
+    let keys = try Self.catalogKeys("FerryUI")
+    let help = Set(Self.help.categories.map(\.title) + Self.help.topics.flatMap(\.strings))
+    let messages = Set(Self.table.map(\.message))
+    let unclassified = keys.subtracting(help).subtracting(messages).subtracting(FerryUILabels.keys)
+    #expect(unclassified.isEmpty, "FerryUI strings to classify: \(unclassified.sorted())")
+    #expect(FerryUILabels.keys.isSubset(of: keys), "\(FerryUILabels.keys.subtracting(keys))")
+    #expect(FerryUILabels.keys.isDisjoint(with: messages.union(help)))
+  }
+
+  /// Help shows each message in its exact words, with "…" for a value shown with it.
+  @Test func eachMessageIsShownInItsExactWords() throws {
+    for message in Self.help.topics.flatMap(\.messages) {
+      let expected = message.message.replacing(/%(?:@|lld|llu)/, with: "…")
+      #expect(HelpText.plain(message.wording) == expected, "\(message.message)")
+      #expect(!message.cause.isEmpty && !message.fix.isEmpty, "\(message.message)")
+    }
+  }
+}
+
+extension HelpMessageCoverageTests {
+  /// Keys in the small catalogs that are not messages: names, notices of success, menu titles.
+  private static let notMessages: [String: Set<String>] = [
+    "FerryText": ["Unknown device"],
+    "FerryAgentCore": ["conflict from Mac", "conflict from Mac %lld"],
+    "FerryProviderCore": [],
+    "FerrySyncCore": [
+      "Download already had a file with that name, so it’s there as “%@”.", "Install on %@",
+      "Installed %lld apps on %@", "Installed “%@” on %@", "It’s in Download.",
+      "Select files to send", "Send selected files to a device", "Send to %@",
+      "Sent %lld files to %@", "Sent “%@” to %@", "They’re in Download.",
+    ],
+  ]
+}
+
+extension HelpMessageCoverageTests {
   static let table: [(topic: String, message: String)] = [
     ("trouble-device", "No device connected"),
     ("trouble-device", "Choose Transfer files on the device."),
     ("trouble-device", "Not sharing files"),
-    ("trouble-device", "The device is not sharing files."),
+    (
+      "trouble-device",
+      "The device is not sharing files. Unlock it and choose Transfer files, then try again."
+    ),
+    ("trouble-device", "The device was disconnected. Reconnect it, then try again."),
+    ("trouble-device", "The device shows no storage. Unlock it, then try again."),
+    ("trouble-device", "The device can't do this. Do it on the device instead."),
+    (
+      "trouble-device",
+      "Ferry lost contact with the device partway through. Reconnect it, then try again."
+    ),
+    ("trouble-device", "That item is no longer on the device. Refresh, then try again."),
+    (
+      "trouble-device", "The device already has an item with that name. Rename one, then try again."
+    ),
+    ("trouble-device", "The device can't store that name. Choose another name."),
+    ("trouble-device", "The device is out of space. Free some space on it, then try again."),
+    (
+      "trouble-device",
+      "The file is too large for that storage. Use internal storage, or a smaller file."
+    ),
+    ("trouble-device", "The file didn't arrive complete. Try again."),
+    ("trouble-device", "The device saved the file under another name. Look for it in the folder."),
+    ("trouble-device", "The folder isn't empty. Delete what it holds first."),
+    ("trouble-device", "The file changed on the device. Refresh, then try again."),
+    ("trouble-device", "This Mac is out of space. Free some space, then try again."),
+    (
+      "trouble-device",
+      "That folder is nested too deep to delete from the Mac. Delete it on the device."
+    ),
+    ("trouble-device", "That item is read-only from the Mac. Change it on the device."),
+    ("trouble-device", "The folder's listing went out of date. Try again."),
     ("trouble-device", "In use by another app"),
     ("trouble-device", "Quit Image Capture or Android File Transfer, then try again."),
     (
@@ -31,11 +150,6 @@ struct HelpMessageCoverageTests {
       "Another app is using the device. Quit Image Capture or Android File Transfer."
     ),
     ("trouble-device", "Can't open"),
-    ("trouble-device", "The device reported an error."),
-    ("trouble-device", "The device was disconnected."),
-    ("trouble-device", "The device reports no storage."),
-    ("trouble-device", "The device does not support this: %@."),
-    ("trouble-device", "Error: %@"),
     ("trouble-device", "Cancelled."),
     ("trouble-device", "Ferry can't watch USB for devices, so it looks for them every 30 seconds."),
     ("trouble-device", "Unsent changes were saved to %@"),
@@ -120,7 +234,10 @@ struct HelpMessageCoverageTests {
       "trouble-finder",
       "“%@” holds folders nested more than %lld deep, which Ferry does not delete."
     ),
-    ("trouble-finder", "Unexpected response from the Ferry agent."),
+    (
+      "trouble-finder",
+      "Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again."
+    ),
     ("trouble-send", "Couldn’t send “%@” to %@"),
     ("trouble-send", "Couldn’t send %lld files to %@"),
     ("trouble-send", "Sent %lld of %lld to %@"),
@@ -207,90 +324,5 @@ struct HelpMessageCoverageTests {
     ("trouble-helper", "Needs approval in System Settings"),
     ("trouble-helper", "Could not remove Ferry. Make sure Ferry is running, then try again."),
     ("trouble-helper", "Help isn't available"),
-  ]
-
-  private static let help = HelpContent.bundled ?? HelpContent(version: 0, categories: [])
-
-  private static func catalogKeys(_ module: String) throws -> Set<String> {
-    let url = URL(filePath: #filePath)
-      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-      .appending(path: "Sources/\(module)/Localizable.xcstrings")
-    return Set(
-      try JSONDecoder().decode(CoverageCatalog.self, from: Data(contentsOf: url)).strings.keys)
-  }
-
-  /// The table and the help's messages are the same list, each message once.
-  @Test func theTableIsTheHelpsMessages() {
-    let messages = Self.help.topics.flatMap(\.messages).map(\.message)
-    #expect(Set(Self.table.map(\.message)).count == Self.table.count)
-    #expect(Set(messages) == Set(Self.table.map(\.message)))
-  }
-
-  @Test func eachMessageIsExplainedInItsTopicUnderTroubleshooting() throws {
-    let troubleshooting = try #require(
-      Self.help.categories.first { $0.title == "Troubleshooting" })
-    let ids = Set(troubleshooting.topics.map(\.id))
-    for row in Self.table {
-      #expect(Self.help.topic(forMessage: row.message)?.id == row.topic, "\(row.message)")
-      #expect(ids.contains(row.topic), "\(row.topic)")
-    }
-  }
-
-  @Test func eachMessageIsAStringFerryShows() throws {
-    var keys = Set<String>()
-    for module in ["FerryUI", "FerryText", "FerryAgentCore", "FerryProviderCore", "FerrySyncCore"] {
-      keys.formUnion(try Self.catalogKeys(module))
-    }
-    for row in Self.table {
-      #expect(keys.contains(row.message), "in no catalog: \(row.message)")
-    }
-  }
-
-  /// A key added to these catalogs is a message with Help, or named as not a message.
-  @Test(arguments: ["FerryText", "FerryAgentCore", "FerryProviderCore", "FerrySyncCore"])
-  func everyStringInTheCatalogIsCovered(module: String) throws {
-    let keys = try Self.catalogKeys(module)
-    let others = Self.notMessages[module] ?? []
-    let covered = Set(Self.table.map(\.message))
-    #expect(others.isSubset(of: keys), "\(module): \(others.subtracting(keys).sorted())")
-    #expect(others.isDisjoint(with: covered))
-    let missing = keys.subtracting(covered).subtracting(others)
-    #expect(missing.isEmpty, "\(module) messages without Help: \(missing.sorted())")
-  }
-
-  /// Every FerryUI key is Help's own words, a message in the table, or a label listed in
-  /// `FerryUILabels`: a new problem line cannot reach the menu without someone deciding.
-  @Test func everyFerryUIStringIsHelpAMessageOrALabel() throws {
-    let keys = try Self.catalogKeys("FerryUI")
-    let help = Set(Self.help.categories.map(\.title) + Self.help.topics.flatMap(\.strings))
-    let messages = Set(Self.table.map(\.message))
-    let unclassified = keys.subtracting(help).subtracting(messages).subtracting(FerryUILabels.keys)
-    #expect(unclassified.isEmpty, "FerryUI strings to classify: \(unclassified.sorted())")
-    #expect(FerryUILabels.keys.isSubset(of: keys), "\(FerryUILabels.keys.subtracting(keys))")
-    #expect(FerryUILabels.keys.isDisjoint(with: messages.union(help)))
-  }
-
-  /// Help shows each message in its exact words, with "…" for a value shown with it.
-  @Test func eachMessageIsShownInItsExactWords() throws {
-    for message in Self.help.topics.flatMap(\.messages) {
-      let expected = message.message.replacing(/%(?:@|lld|llu)/, with: "…")
-      #expect(HelpText.plain(message.wording) == expected, "\(message.message)")
-      #expect(!message.cause.isEmpty && !message.fix.isEmpty, "\(message.message)")
-    }
-  }
-}
-
-extension HelpMessageCoverageTests {
-  /// Keys in the small catalogs that are not messages: names, notices of success, menu titles.
-  private static let notMessages: [String: Set<String>] = [
-    "FerryText": ["Unknown device"],
-    "FerryAgentCore": ["conflict from Mac", "conflict from Mac %lld"],
-    "FerryProviderCore": [],
-    "FerrySyncCore": [
-      "Download already had a file with that name, so it’s there as “%@”.", "Install on %@",
-      "Installed %lld apps on %@", "Installed “%@” on %@", "It’s in Download.",
-      "Select files to send", "Send selected files to a device", "Send to %@",
-      "Sent %lld files to %@", "Sent “%@” to %@", "They’re in Download.",
-    ],
   ]
 }

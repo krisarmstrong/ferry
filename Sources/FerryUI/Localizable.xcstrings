@@ -1,6 +1,159 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Plug the device straight into the Mac, keep it unlocked, and try again. If it keeps failing, restart the device. A copy in Finder retries by itself once the device is back." : {
+      "extractionState" : "manual"
+    },
+    "Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices: like any download, they see your Mac's IP address, and GitHub sees which versions of Ferry and its updater ask." : {
+      "extractionState" : "manual"
+    },
+    "Help: %@" : {
+
+    },
+    "Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device is not sharing files. Unlock it and choose Transfer files, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device was disconnected. Reconnect it, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device shows no storage. Unlock it, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Unlock the device and choose **Refresh**, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device can't do this. Do it on the device instead." : {
+      "extractionState" : "manual"
+    },
+    "The device doesn't offer what was asked, such as moving a file in one step." : {
+      "extractionState" : "manual"
+    },
+    "Do it on the device itself, or copy the file to its new place and delete the original." : {
+      "extractionState" : "manual"
+    },
+    "Ferry lost contact with the device partway through. Reconnect it, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The connection to the device failed in the middle of the task: a loose cable, a USB hub, or the device going to sleep." : {
+      "extractionState" : "manual"
+    },
+    "That item is no longer on the device. Refresh, then try again." : {
+      "extractionState" : "manual"
+    },
+    "Someone deleted or moved the item on the device, or another app did." : {
+      "extractionState" : "manual"
+    },
+    "Choose **Refresh** for the device, then find the item where it is now." : {
+      "extractionState" : "manual"
+    },
+    "The device already has an item with that name. Rename one, then try again." : {
+      "extractionState" : "manual"
+    },
+    "An item with the same name is already in that folder on the device." : {
+      "extractionState" : "manual"
+    },
+    "Rename the item on the Mac or on the device, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device can't store that name. Choose another name." : {
+      "extractionState" : "manual"
+    },
+    "The name has characters the device's storage does not allow, such as : * ? \" < > | or a trailing dot." : {
+      "extractionState" : "manual"
+    },
+    "Rename the item with letters, digits, spaces, dashes and dots, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device is out of space. Free some space on it, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device's storage does not have room for the file." : {
+      "extractionState" : "manual"
+    },
+    "Delete files you no longer need on the device, or copy to another storage such as its SD card." : {
+      "extractionState" : "manual"
+    },
+    "The file is too large for that storage. Use internal storage, or a smaller file." : {
+      "extractionState" : "manual"
+    },
+    "Cards formatted FAT32 take files up to 4 GB." : {
+      "extractionState" : "manual"
+    },
+    "Copy the file to the device's internal storage, or split it into smaller files." : {
+      "extractionState" : "manual"
+    },
+    "The file didn't arrive complete. Try again." : {
+      "extractionState" : "manual"
+    },
+    "The device stored or sent a different number of bytes than the file has, so the copy is not complete." : {
+      "extractionState" : "manual"
+    },
+    "Try again. If it keeps happening, choose **Refresh** and copy the file once more." : {
+      "extractionState" : "manual"
+    },
+    "The device saved the file under another name. Look for it in the folder." : {
+      "extractionState" : "manual"
+    },
+    "The device changed the name, for example because its storage cannot hold some characters." : {
+      "extractionState" : "manual"
+    },
+    "Find the file in the folder under its new name, and rename it if you like." : {
+      "extractionState" : "manual"
+    },
+    "The folder isn't empty. Delete what it holds first." : {
+      "extractionState" : "manual"
+    },
+    "Something arrived in the folder on the device while it was being deleted." : {
+      "extractionState" : "manual"
+    },
+    "Open the folder, delete what it holds, then delete the folder." : {
+      "extractionState" : "manual"
+    },
+    "The file changed on the device. Refresh, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The device's copy of the file changed since the Mac last read it." : {
+      "extractionState" : "manual"
+    },
+    "Choose **Refresh**, check which copy you want, then try again." : {
+      "extractionState" : "manual"
+    },
+    "This Mac is out of space. Free some space, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The Mac's disk does not have room for a copy of the file." : {
+      "extractionState" : "manual"
+    },
+    "Free space on the Mac (see **Free up space on the Mac**), then try again." : {
+      "extractionState" : "manual"
+    },
+    "That folder is nested too deep to delete from the Mac. Delete it on the device." : {
+      "extractionState" : "manual"
+    },
+    "The folder holds folders more than 64 levels down, which Ferry does not delete." : {
+      "extractionState" : "manual"
+    },
+    "Delete the folder on the device itself." : {
+      "extractionState" : "manual"
+    },
+    "That item is read-only from the Mac. Change it on the device." : {
+      "extractionState" : "manual"
+    },
+    "The item is a folder named like an app or a document package, or lies inside one, which Ferry keeps read-only." : {
+      "extractionState" : "manual"
+    },
+    "The folder's listing went out of date. Try again." : {
+      "extractionState" : "manual"
+    },
+    "Ferry's helper restarted, or many folders were opened, while Finder was still reading a large folder." : {
+      "extractionState" : "manual"
+    },
+    "Open the folder again. Finder reads it from the start." : {
+      "extractionState" : "manual"
+    },
     "%@: changes wait to be sent. Reconnect it to finish." : {
 
     },
@@ -1179,9 +1332,6 @@
     "Unlock the device and choose **Transfer files** on it, then choose **Refresh**. You do not need to replug the cable." : {
       "extractionState" : "manual"
     },
-    "The device is not sharing files." : {
-      "extractionState" : "manual"
-    },
     "The device locked or turned off file transfer during the task." : {
       "extractionState" : "manual"
     },
@@ -1203,46 +1353,13 @@
     "Click **Check Again**, or unplug the device and plug it back in." : {
       "extractionState" : "manual"
     },
-    "The device reported an error." : {
-      "extractionState" : "manual"
-    },
-    "The device refused the request without saying why." : {
-      "extractionState" : "manual"
-    },
-    "Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**." : {
-      "extractionState" : "manual"
-    },
-    "The device was disconnected." : {
-      "extractionState" : "manual"
-    },
     "The device went away during the task: the cable came out, it went to sleep, or it left the network." : {
       "extractionState" : "manual"
     },
     "Reconnect the device and try again." : {
       "extractionState" : "manual"
     },
-    "The device reports no storage." : {
-      "extractionState" : "manual"
-    },
     "The device shares no storage, which happens while it is locked." : {
-      "extractionState" : "manual"
-    },
-    "Unlock the device and choose **Refresh**." : {
-      "extractionState" : "manual"
-    },
-    "The device does not support this: …." : {
-      "extractionState" : "manual"
-    },
-    "The device can't do what was asked. The rest of the message says what." : {
-      "extractionState" : "manual"
-    },
-    "Do it another way, for example on the device itself." : {
-      "extractionState" : "manual"
-    },
-    "Error: …" : {
-      "extractionState" : "manual"
-    },
-    "Something failed on the device, the Mac or the connection. The rest of the message says what." : {
       "extractionState" : "manual"
     },
     "Cancelled." : {
@@ -1480,9 +1597,6 @@
       "extractionState" : "manual"
     },
     "Delete it on the device." : {
-      "extractionState" : "manual"
-    },
-    "Unexpected response from the Ferry agent." : {
       "extractionState" : "manual"
     },
     "Ferry's helper answered in a way the Finder extension does not expect, which can happen right after an update." : {
@@ -2237,9 +2351,6 @@
       "extractionState" : "manual"
     },
     "Free some space on the Mac, or remove that folder if another user owns it, then click **Try Again**." : {
-      "extractionState" : "manual"
-    },
-    "Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices." : {
       "extractionState" : "manual"
     },
     "…: changes wait to be sent. Reconnect it to finish." : {
