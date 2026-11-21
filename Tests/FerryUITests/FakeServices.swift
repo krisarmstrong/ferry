@@ -96,7 +96,7 @@ final class FakeServices: SystemServicing {
     log.record("unregisterAgent")
   }
 
-  func removeAgentData() throws {
+  func removeAgentData() async throws {
     log.record("removeAgentData")
   }
 

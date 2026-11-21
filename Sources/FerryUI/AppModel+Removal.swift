@@ -22,8 +22,8 @@ extension AppModel {
   }
 
   /// Removes Ferry's locations from Finder, unregisters the agent, deletes its folder and the
-  /// login item, and quits. Stops if the locations or the agent remain, so the user can try again rather than
-  /// being left with locations no agent serves. Once the agent is gone a retry could only fail,
+  /// login item, and quits. Stops if the locations or the agent remain, so the user can try
+  /// again rather than being left with locations no agent serves. Once the agent is gone a retry could only fail,
   /// so a login item that will not unregister is logged and Ferry quits anyway. Changes the
   /// locations had not sent to a device are shown in Finder, since the menu goes away.
   public func removeFerry() async {
@@ -49,7 +49,7 @@ extension AppModel {
     }
     // The agent is gone, so nothing writes there now. A failure leaves files, not a broken Ferry.
     do {
-      try services.removeAgentData()
+      try await services.removeAgentData()
     } catch {
       Self.log.error("removing the agent's folder failed: \(error, privacy: .public)")
     }
