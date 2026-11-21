@@ -25,8 +25,10 @@ struct ReportedItem: Codable, Equatable {
 /// Every new or changed item, and every forgotten one, is recorded in the domain's `ChangeLog`,
 /// which feeds FileProvider's working set.
 ///
-/// Each operation that changed the table saves it before it returns, so an identifier is on disk
-/// before the reply that carries it leaves. A save appends only the records that operation
+/// Each operation that changed the table saves it before it returns, so an identifier is written
+/// before the reply that carries it leaves: safe against the agent stopping, not against power
+/// loss for the last appends, which are not flushed to the disk (a fold's snapshot is). A save
+/// appends only the records that operation
 /// changed to the domain's journal; once the journal outgrows the snapshot it is folded into a
 /// new snapshot, written atomically (see `ItemTable+Files`). A change therefore costs about the
 /// same on a 40,000-item table as on an empty one. Both files are named by a hash of the domain
@@ -79,6 +81,9 @@ actor ItemTable {
     var items: [String: Record]
     var deleted: [String]?
     var rootListed: Bool
+    /// Which snapshot a batch follows, or which a snapshot is. A journal left behind by a fold
+    /// that stopped before deleting it carries the previous generation, and is ignored.
+    var generation: Int?
   }
 
   nonisolated let gate = OperationGate()
@@ -92,6 +97,8 @@ actor ItemTable {
   var children: [RemotePath: Set<RemotePath>] = [:]
   /// Every identifier in `records`, in identifier order, for the working set's pages.
   var order: [ItemID] = []
+  /// New identifiers not merged into `order` yet (see `settleOrder`).
+  var unordered: Set<ItemID> = []
   var rootListed = false
   var changeLog: ChangeLog
   /// Changed since the last save.
@@ -100,6 +107,8 @@ actor ItemTable {
   var touched: Set<ItemID> = []
   /// Bytes in the snapshot and in the journal, which decide when the journal is folded in.
   var snapshotBytes = 0
+  /// The current snapshot's generation, which every batch appended after it carries.
+  var generation = 0
   var journalBytes = 0
   /// Set by `discard`: nothing is written any more.
   var discarded = false
@@ -113,6 +122,7 @@ actor ItemTable {
     // A torn batch at the journal's end would swallow the next one appended after it, so the
     // next save writes a snapshot instead.
     (snapshotBytes, journalBytes) = (loaded.torn ? 0 : loaded.snapshotBytes, loaded.journalBytes)
+    generation = loaded.generation
     order = records.keys.sorted { $0.rawValue < $1.rawValue }
     for path in ids.keys { Self.link(path, in: &children) }
   }
@@ -248,6 +258,7 @@ actor ItemTable {
   /// right place after items before it are forgotten, so a page never skips one. Only items the
   /// agent reported are in it, not the root or a folder known only as some item's parent.
   func workingSet(after cursor: ItemID?, size: Int) -> (entries: [ProviderEntry], next: ItemID?) {
+    settleOrder()
     var index = cursor.map { cursor in order.firstIndex(after: cursor) } ?? 0
     var page: [(id: ItemID, item: RemoteItem)] = []
     while index < order.count {

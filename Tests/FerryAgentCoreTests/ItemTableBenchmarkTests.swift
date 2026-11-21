@@ -26,6 +26,11 @@ struct ItemTableBenchmarkTests {
     var relist: Duration
     var workingSetPage: Duration
     var workingSetPass: Duration
+    /// Folding the journal into a snapshot of the whole table, once per about a table's worth
+    /// of appended changes.
+    var fold: Duration
+    /// The first listing of a new folder of 20,000 items: 20,000 new identifiers at once.
+    var bigListing: Duration
   }
 
   /// One operation's cost at both sizes, and its bound at 40,000 items.
@@ -92,9 +97,21 @@ struct ItemTableBenchmarkTests {
         pages += 1
       } while cursor != nil
     }
+    let fold = try await clock.measure {
+      await table.foldOnNextSave()
+      _ = await table.observed(
+        RemoteItem(path: try path("/F0/file0.jpg"), kind: .file, size: 3, modified: Self.stamp))
+    }
+    let big = try (0..<20_000).map {
+      RemoteItem(path: try path("/Big/f\($0).jpg"), kind: .file, size: 1, modified: Self.stamp)
+    }
+    let bigListing = try await clock.measure {
+      _ = await table.listed(try path("/Big"), children: big)
+    }
     return Costs(
       observe: observe / changes, create: create / changes, remove: remove / changes,
-      relist: relist / 5, workingSetPage: pass / pages, workingSetPass: pass)
+      relist: relist / 5, workingSetPage: pass / pages, workingSetPass: pass, fold: fold,
+      bigListing: bigListing)
   }
 
   private func milliseconds(_ duration: Duration) -> Double {
@@ -122,10 +139,19 @@ struct ItemTableBenchmarkTests {
           format: "ItemTable benchmark: %@ %.3f ms at 10,000, %.3f ms at 40,000", row.name,
           milliseconds(row.at10k), milliseconds(row.at40k)))
     }
-    print(
-      String(
-        format: "ItemTable benchmark: working-set pass %.1f ms at 10,000, %.1f ms at 40,000",
-        milliseconds(small.workingSetPass), milliseconds(large.workingSetPass)))
+    for (name, at10k, at40k) in [
+      ("working-set pass", small.workingSetPass, large.workingSetPass),
+      ("journal fold", small.fold, large.fold),
+      ("first listing of 20,000 new items", small.bigListing, large.bigListing),
+    ] {
+      print(
+        String(
+          format: "ItemTable benchmark: %@ %.1f ms at 10,000, %.1f ms at 40,000", name,
+          milliseconds(at10k), milliseconds(at40k)))
+    }
+    // Inserting new identifiers one at a time into the order was O(n) each, so a big new
+    // folder cost O(n²); in a debug build this stays well under a second.
+    #expect(milliseconds(large.bigListing) < 5_000)
     for row in rows {
       #expect(
         milliseconds(row.at40k) < row.bound,

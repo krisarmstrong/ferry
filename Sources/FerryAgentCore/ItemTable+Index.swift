@@ -5,12 +5,36 @@ import Foundation
 // MARK: Records, paths and order
 
 extension ItemTable {
-  /// Stores `record` as `id`'s, keeping `order` in step for an identifier new to the table.
+  /// Stores `record` as `id`'s. An identifier new to the table waits in `unordered` until the
+  /// order is next read, so a listing of many new items sorts them once instead of shifting the
+  /// order for each.
   func put(_ record: Record, for id: ItemID) {
     if records.updateValue(record, forKey: id) == nil {
-      order.insert(id, at: order.firstIndex(after: id))
+      unordered.insert(id)
     }
     touch(id)
+  }
+
+  /// Merges the identifiers waiting in `unordered` into `order`.
+  func settleOrder() {
+    guard !unordered.isEmpty else { return }
+    let new = unordered.sorted { $0.rawValue < $1.rawValue }
+    unordered = []
+    var merged: [ItemID] = []
+    merged.reserveCapacity(order.count + new.count)
+    var (old, added) = (order.startIndex, new.startIndex)
+    while old < order.endIndex, added < new.endIndex {
+      if order[old].rawValue < new[added].rawValue {
+        merged.append(order[old])
+        old += 1
+      } else {
+        merged.append(new[added])
+        added += 1
+      }
+    }
+    merged += order[old...]
+    merged += new[added...]
+    order = merged
   }
 
   func touch(_ id: ItemID) {
@@ -67,14 +91,16 @@ extension ItemTable {
       changeLog.record(.deleted(id))
       touch(id)
     }
-    // A few identifiers are found by search; a large subtree costs one pass over the order.
-    if entries.count <= Self.searchedRemovals {
-      for id in entries.values {
+    // One still waiting to be ordered just leaves the queue. Of the rest, a few are found by
+    // search; a large subtree costs one pass over the order.
+    let ordered = entries.values.filter { unordered.remove($0) == nil }
+    if ordered.count <= Self.searchedRemovals {
+      for id in ordered {
         let index = order.firstIndex(after: id) - 1
         if index >= 0, order[index] == id { order.remove(at: index) }
       }
     } else {
-      let gone = Set(entries.values)
+      let gone = Set(ordered)
       order.removeAll { gone.contains($0) }
     }
   }

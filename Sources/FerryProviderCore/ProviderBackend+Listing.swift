@@ -21,7 +21,18 @@ extension ProviderBackend {
     try await allEntries(in: try Self.itemID(id)).map(ProviderItem.init)
   }
 
+  /// Every page; a listing that expired part-way (the agent restarted, or many folders were
+  /// listed meanwhile) starts again once from the first page, since a caller such as a create
+  /// has no enumeration of its own to restart.
   func allEntries(in folder: ItemID) async throws -> [ProviderEntry] {
+    do {
+      return try await pages(of: folder)
+    } catch let error as NSFileProviderError where error.code == .pageExpired {
+      return try await pages(of: folder)
+    }
+  }
+
+  private func pages(of folder: ItemID) async throws -> [ProviderEntry] {
     var all: [ProviderEntry] = []
     var page: Data?
     repeat {

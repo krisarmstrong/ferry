@@ -8,7 +8,12 @@ import Foundation
 /// The device is listed once, on the first page; the rest of that listing waits here under a
 /// random token until its last page is served. Only the `limit` most recent listings wait: an
 /// older token, or one from before an agent restart, is `.pageExpired`, which makes FileProvider
-/// list the folder again from its first page.
+/// list the folder again from its first page. The last page served drops the listing, so asking
+/// for it again is `.pageExpired` too.
+///
+/// Later pages come from the listing taken for the first, not from the device: an item deleted
+/// or moved meanwhile is still served with its old identifier, and FileProvider applies the
+/// change from the working set's next pass.
 struct FolderPages {
   static let pageSize = 1_000
   static let limit = 16

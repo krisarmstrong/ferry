@@ -26,12 +26,29 @@ extension ItemTable {
     remove(journal(for: domain, in: store))
   }
 
-  /// Writes `value` to `file` atomically; returns the bytes written.
+  /// Writes `value` to `file` atomically and flushes it to the disk before it replaces the old
+  /// file; returns the bytes written.
   static func write(_ value: some Encodable, to file: URL) throws -> Int {
-    try FileManager.default.createDirectory(
-      at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let folder = file.deletingLastPathComponent()
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let data = try JSONEncoder().encode(value)
-    try data.write(to: file, options: .atomic)
+    let staged = folder.appending(path: ".\(UUID().uuidString).tmp")
+    let descriptor = open(staged.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
+    guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    do {
+      try handle.write(contentsOf: data)
+      guard fcntl(descriptor, F_FULLFSYNC) == 0 || fsync(descriptor) == 0 else {
+        throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+      }
+      try handle.close()
+      guard rename(staged.path, file.path) == 0 else {
+        throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+      }
+    } catch {
+      try? FileManager.default.removeItem(at: staged)
+      throw error
+    }
     return data.count
   }
 
@@ -59,7 +76,7 @@ extension ItemTable {
       log.error("listing item tables failed: \(error, privacy: .private)")
       return
     }
-    let names = ["json", "journal"]
+    let names = ["json", "journal", "tmp"]
     for file in files
     where names.contains(file.pathExtension) || file.lastPathComponent == "storage-aliases.plist" {
       remove(file)
@@ -90,7 +107,7 @@ extension ItemTable {
       compact()
       return
     }
-    var batch = Stored(items: [:], deleted: [], rootListed: rootListed)
+    var batch = Stored(items: [:], deleted: [], rootListed: rootListed, generation: generation)
     for id in touched {
       if let record = records[id] {
         batch.items[id.rawValue] = record
@@ -109,18 +126,31 @@ extension ItemTable {
     }
   }
 
+  /// Makes the next save write a snapshot, as a journal past its size would: for tests that
+  /// stop a fold part-way.
+  func foldOnNextSave() {
+    snapshotBytes = 0
+  }
+
   /// Writes the whole table as the snapshot and empties the journal.
+  /// Crash-safe in any order: the snapshot carries a new generation and is flushed to the disk
+  /// before the journal goes, so a journal that outlives it is of the old generation and is
+  /// ignored on load, and a snapshot never loses the changes the deleted journal held.
   private func compact() {
     guard !discarded else { return }
     touched = []
+    let next = generation + 1
     let stored = Stored(
       items: Dictionary(uniqueKeysWithValues: records.map { ($0.key.rawValue, $0.value) }),
-      rootListed: rootListed)
+      rootListed: rootListed, generation: next)
     do {
       snapshotBytes = try Self.write(stored, to: file)
+      generation = next
       Self.remove(journal)
       journalBytes = 0
     } catch {
+      // Nothing safe to append after (a partial line may be there): the next save tries again.
+      snapshotBytes = 0
       log.error("saving item table failed: \(error, privacy: .private)")
     }
   }
@@ -139,6 +169,7 @@ extension ItemTable {
     var rootListed = false
     var snapshotBytes = 0
     var journalBytes = 0
+    var generation = 0
     /// The journal ended in a batch that could not be read.
     var torn = false
   }
@@ -158,6 +189,8 @@ extension ItemTable {
           torn = true
           break
         }
+        // A journal from before the snapshot's fold: everything in it is in the snapshot.
+        guard batch.generation ?? 0 == stored.generation ?? 0 else { continue }
         stored.items.merge(batch.items) { $1 }
         for raw in batch.deleted ?? [] { stored.items[raw] = nil }
         stored.rootListed = batch.rootListed
@@ -173,7 +206,7 @@ extension ItemTable {
       }
       return Loaded(
         records: records, ids: ids, rootListed: stored.rootListed, snapshotBytes: snapshot.count,
-        journalBytes: batches.count, torn: torn)
+        journalBytes: batches.count, generation: stored.generation ?? 0, torn: torn)
     } catch {
       log.error("item table is unreadable, starting empty: \(error, privacy: .private)")
       return Loaded()
