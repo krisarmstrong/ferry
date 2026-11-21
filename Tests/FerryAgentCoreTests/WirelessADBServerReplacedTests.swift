@@ -78,7 +78,8 @@ struct WirelessADBServerReplacedTests {
   }
 
   /// After an upgrade the earlier agent's server lists the device offline: it lost the network
-  /// when that agent exited, and keeps retrying in vain. That is a device to reconnect.
+  /// when that agent exited, and keeps retrying in vain. That is a device to reconnect: adb's
+  /// transport is disconnected first, since `connect` would only say "already connected".
   @Test(.timeLimit(.minutes(1)))
   func aRememberedDeviceListedOfflineIsReconnected() async throws {
     let adb = FakeWirelessADB()
@@ -93,5 +94,6 @@ struct WirelessADBServerReplacedTests {
     #expect(
       try await eventually { await adb.calls.filter { $0 == .connect(Self.address) }.count == 2 })
     #expect(try await eventually { await adb.listed[Self.address] == .device })
+    #expect(await adb.calls.suffix(2) == [.disconnect(Self.address), .connect(Self.address)])
   }
 }

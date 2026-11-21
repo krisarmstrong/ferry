@@ -92,6 +92,10 @@ actor FakeWirelessADB: WirelessADBControl {
     if let delay = connectDelay[endpoint.argument] { try? await Task.sleep(for: delay) }
     inFlight -= 1
     if connectThrows.contains(endpoint.argument) { throw .failed("adb did not finish") }
+    // adb reconnects an offline TCP transport by itself: `connect` finds it there.
+    if listed[endpoint.argument] == .offline {
+      return .failed("already connected to \(endpoint.argument)")
+    }
     if noRouteOnce.remove(endpoint.argument) != nil {
       return .failed("failed to connect to '\(endpoint.argument)': No route to host")
     }

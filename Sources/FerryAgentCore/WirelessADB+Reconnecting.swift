@@ -1,4 +1,5 @@
 import ADBTransport
+import DeviceKit
 import Foundation
 
 /// Reconnecting the remembered devices when the agent starts and when adb's server comes back.
@@ -24,16 +25,29 @@ extension WirelessADB {
 
   private func reconnectPass(_ listed: [ADBDevice]) async {
     let since = forgets
+    let offline = Set(listed.filter { $0.state == .offline }.map(\.serial))
     var due = entries.filter { isMissing($0.key, $0.value, from: listed) }.makeIterator()
     await withTaskGroup(of: Void.self) { group in
       for _ in 0..<Self.reconnectLimit {
         guard let (id, entry) = due.next() else { break }
-        group.addTask { _ = await self.reconnect(id, entry, since: since) }
+        group.addTask { await self.reconnect(id, entry, since: since, offline: offline) }
       }
       while await group.next() != nil {
         guard let (id, entry) = due.next() else { continue }
-        group.addTask { _ = await self.reconnect(id, entry, since: since) }
+        group.addTask { await self.reconnect(id, entry, since: since, offline: offline) }
       }
     }
+  }
+
+  /// An address adb lists offline is disconnected first: `adb connect` would only answer
+  /// "already connected" while adb retries it, and that failure would drop the transport. Then a
+  /// live device reconnects, and a server cut off from the network finds no route.
+  private func reconnect(
+    _ id: DeviceID, _ entry: Entry, since: UInt64, offline: Set<String>
+  ) async {
+    for address in entry.addresses where offline.contains(address.endpoint.argument) {
+      try? await adb.disconnect(address.endpoint)
+    }
+    _ = await reconnect(id, entry, since: since)
   }
 }
