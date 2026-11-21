@@ -91,4 +91,24 @@ struct ChangeWatchIdleTests {
     await fixture.tick()
     #expect(await fixture.signals() > before)
   }
+
+  /// The menu's Refresh starts the relisting again; the working set FileProvider reads after
+  /// Ferry's own signals does not.
+  @Test func refreshResumesAndTheWorkingSetDoesNot() async throws {
+    let fixture = try await Fixture()
+    defer { fixture.finish() }
+    _ = try await fixture.list("/Download")
+    for _ in 0..<ChangeWatch.idlePasses { await fixture.tick() }
+    let download = try path("/Download")
+    _ = await fixture.harness.service.handle(
+      .workingSet(domain: fixture.domain, page: nil), file: nil)
+    var before = await fixture.device.listCalls[download] ?? 0
+    await fixture.tick()
+    #expect(await fixture.device.listCalls[download] ?? 0 == before)
+
+    _ = await fixture.harness.service.handle(.refresh(fixture.device.info.id), file: nil)
+    before = await fixture.device.listCalls[download] ?? 0
+    await fixture.tick()
+    #expect(await fixture.device.listCalls[download] ?? 0 > before)
+  }
 }

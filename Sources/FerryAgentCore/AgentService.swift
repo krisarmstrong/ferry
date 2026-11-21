@@ -147,6 +147,8 @@ public actor AgentService: AgentHandling {
       await hub.recheckADB()
       return .done
     case .refresh(let id):
+      // The menu's Refresh is a use of the device's locations too.
+      await changes?.used(id)
       try await domains.refresh(id)
       return .done
     case .eject(let id):
@@ -199,7 +201,8 @@ public actor AgentService: AgentHandling {
       }
       return id
     }
-    let (entries, next) = try await gated(domain) { route in
+    // FileProvider reads the working set after a signal of Ferry's own, so it is not a use.
+    let (entries, next) = try await gated(domain, marksUse: false) { route in
       await route.items.workingSet(after: cursor, size: Self.workingSetPageSize)
     }
     return .page(entries: entries, next: next.map { Data($0.rawValue.utf8) })
@@ -300,10 +303,11 @@ extension AgentService {
   /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
   /// `body` recorded a change, even one followed by a failure.
   func gated<T: Sendable>(
-    _ domain: String, _ body: (DomainController.Route) async throws(TransportError) -> T
+    _ domain: String, marksUse: Bool = true,
+    _ body: (DomainController.Route) async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
     let route = try await domains.route(domain)
-    await changes?.used(route.storage.device)
+    if marksUse { await changes?.used(route.storage.device) }
     let (result, changed) = await route.items.gate.run {
       () async -> (Result<T, TransportError>, Bool) in
       let before = await route.items.changeCount
