@@ -65,7 +65,9 @@ mkdir -p "$licenses"
 {
   echo "Ferry links these libraries, unmodified, under the GNU Lesser General Public License 2.1"
   echo "(see the COPYING files here). It builds them from these release tarballs with"
-  echo "scripts/build-libmtp.sh in https://github.com/krisarmstrong/ferry."
+  echo "scripts/build-libmtp.sh in https://github.com/krisarmstrong/ferry. The exact tarballs"
+  echo "are attached to each Ferry release on GitHub, beside the app:"
+  echo "https://github.com/krisarmstrong/ferry/releases"
 } > "$licenses/README.txt"
 while read -r name version url sha256; do
   copying="$deps/src/$name-$version/COPYING"
@@ -73,6 +75,10 @@ while read -r name version url sha256; do
   ditto "$copying" "$licenses/$name-$version-COPYING.txt"
   printf '\n%s %s\n%s\nSHA-256: %s\n' "$name" "$version" "$url" "$sha256" >> "$licenses/README.txt"
 done < "$deps/sources"
+# MIT: Sparkle's notice, with the third-party notices its LICENSE lists, in every copy.
+sparkle_license="$derived/SourcePackages/artifacts/sparkle/Sparkle/LICENSE"
+[ -s "$sparkle_license" ] || { echo "error: no Sparkle licence at $sparkle_license" >&2; exit 1; }
+ditto "$sparkle_license" "$licenses/Sparkle-LICENSE.txt"
 sparkle="$frameworks/Sparkle.framework/Versions/B"
 codesign --force --sign "$identity" "${runtime[@]}" "$sparkle/XPCServices/Installer.xpc"
 codesign --force --sign "$identity" "${runtime[@]}" --preserve-metadata=entitlements \

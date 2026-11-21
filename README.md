@@ -130,7 +130,19 @@ Ferry uses [libmtp](https://github.com/libmtp/libmtp) and
 Public License, version 2.1. Ferry links them dynamically. Development builds load the copies
 Homebrew installs; release builds ship the unmodified libraries, built from their release
 tarballs by `scripts/build-libmtp.sh`, in `Ferry.app/Contents/Frameworks`, with their license
-texts in `Contents/Resources/Licenses`. Their source code is available from the links above.
+texts in `Contents/Resources/Licenses`. The exact source tarballs each release was built from
+are attached to each [GitHub release](https://github.com/krisarmstrong/ferry/releases), beside
+the app, and `Licenses/README.txt` names them with their SHA-256.
+
+Ferry updates itself with [Sparkle](https://github.com/sparkle-project/Sparkle), © Andy
+Matuschak and the Sparkle contributors, under the MIT License; its licence, with the
+third-party notices it lists, ships as `Contents/Resources/Licenses/Sparkle-LICENSE.txt`.
+
+Ferry does not ship Google's adb. With your consent it downloads Android SDK Platform-Tools
+from Google under the Android SDK License, which Ferry shows before the download and keeps in
+the app.
+
+Help → About Ferry → Acknowledgements lists all of these.
 
 NetAlly, LinkRunner, EtherScope and AirCheck are trademarks of NetAlly. Ferry is not affiliated
 with or endorsed by NetAlly. Android is a trademark of Google LLC.

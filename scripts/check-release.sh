@@ -1,6 +1,7 @@
 #!/bin/bash
 # Checks what only a release build must have (`make check-app CONFIG=Release`):
-# - libmtp and libusb inside the bundle, their LGPL texts and source offer, nothing from Homebrew;
+# - libmtp and libusb inside the bundle, their LGPL texts and source offer, Sparkle's MIT notice,
+#   nothing from Homebrew;
 # - no executable allowing a debugger to attach (get-task-allow), which notarization refuses;
 # - for a build signed by the team: the real Sparkle key, the HTTPS feed, and on every
 #   executable the hardened runtime, a Developer ID signature and a secure timestamp.
@@ -22,9 +23,13 @@ for lib in libmtp.9.dylib libusb-1.0.0.dylib; do
 done
 licenses="$app/Contents/Resources/Licenses"
 for text in "$licenses"/libusb-*-COPYING.txt "$licenses"/libmtp-*-COPYING.txt \
-  "$licenses/README.txt"; do
+  "$licenses/README.txt" "$licenses/Sparkle-LICENSE.txt"; do
   [ -s "$text" ] || fail "no $text"
 done
+grep -q "Andy Matuschak" "$licenses/Sparkle-LICENSE.txt" \
+  || fail "$licenses/Sparkle-LICENSE.txt is not Sparkle's licence"
+grep -q "attached to each Ferry release" "$licenses/README.txt" \
+  || fail "$licenses/README.txt does not say where the exact tarballs are"
 # The source offer names each exact tarball and its SHA-256.
 for library in libusb libmtp; do
   grep -Eq "^https://github\.com/$library/$library/releases/download/v[0-9.]+/$library-[0-9.]+\.tar\.(bz2|gz)$" \
@@ -32,7 +37,7 @@ for library in libusb libmtp; do
 done
 [ "$(grep -cE '^SHA-256: [0-9a-f]{64}$' "$licenses/README.txt")" = 2 ] \
   || fail "$licenses/README.txt does not give both tarballs' SHA-256"
-echo "release build carries libmtp and libusb, their licences and where their source is"
+echo "release build carries libmtp and libusb, their licences and where their source is, and Sparkle's licence"
 
 # Command output is captured, then tested: `codesign … | grep -q` under pipefail can fail open
 # when grep's early exit kills codesign. Each architecture of a universal binary (Sparkle's

@@ -276,8 +276,11 @@ jobs:
         run: |
           version="${TAG#v}"
           releases="repos/$GITHUB_REPOSITORY/releases"
+          # LGPL-2.1: the exact libusb and libmtp source the bundled libraries were built from,
+          # as scripts/build-libmtp.sh downloaded and checked them.
           for file in ".build/dist/appcast/Ferry-$version.zip" ".build/dist/Ferry-$version.dmg" \
-            .build/dist/appcast/appcast.xml; do
+            .build/dist/appcast/appcast.xml .build/deps/src/libusb-*.tar.bz2 \
+            .build/deps/src/libmtp-*.tar.gz; do
             name="$(basename "$file")"
             # A re-run replaces what an earlier attempt attached.
             for asset in $(gh api "$releases/$RELEASE_ID/assets" \
