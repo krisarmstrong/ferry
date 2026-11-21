@@ -9,6 +9,7 @@ import Testing
 /// The log window's state: what it shows as batches arrive, pause, clear, the filters, how it
 /// ends, and Save.
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct LogcatSessionTests {
   let log = CallLog()
   let id = DeviceID(serial: "0123456789abcdef")
@@ -29,18 +30,10 @@ struct LogcatSessionTests {
     _ session: LogcatSession, _ body: () async throws -> Void
   ) async throws {
     let run = Task { await session.run() }
-    try await wait { log.all.contains("startLogcat \(id.serial)") }
+    await log.waitFor("startLogcat \(id.serial)")
     try await body()
     await session.close()
     await run.value
-  }
-
-  private func wait(_ condition: () -> Bool) async throws {
-    let deadline = ContinuousClock.now + .seconds(5)
-    while !condition(), ContinuousClock.now < deadline {
-      try await Task.sleep(for: .milliseconds(5))
-    }
-    #expect(condition())
   }
 
   /// A stream that ended (the device was lost) can be started again in the same window, as a

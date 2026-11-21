@@ -15,8 +15,15 @@ private let serial = "0123456789abcdef"
 private actor Gate {
   private var isOpen = true
   private var waiting: [CheckedContinuation<Void, Never>] = []
+  private var heldWaiters: [CheckedContinuation<Void, Never>] = []
   /// How many callers the closed gate is holding.
   var held: Int { waiting.count }
+
+  /// Returns once the closed gate holds a caller.
+  func waitUntilHeld() async {
+    guard waiting.isEmpty else { return }
+    await withCheckedContinuation { heldWaiters.append($0) }
+  }
 
   func close() { isOpen = false }
 
@@ -28,7 +35,11 @@ private actor Gate {
 
   func pass() async {
     if isOpen { return }
-    await withCheckedContinuation { waiting.append($0) }
+    await withCheckedContinuation { continuation in
+      waiting.append(continuation)
+      for waiter in heldWaiters { waiter.resume() }
+      heldWaiters = []
+    }
   }
 }
 
@@ -303,9 +314,9 @@ struct ADBToolsLogcatTests {
     let run = start(makeTools(fake, limits: limits), client)
     await log.send(["first"])
     // The first batch is now with the held client; what follows queues up behind it.
-    #expect(try await eventually(timeout: .seconds(5)) { await client.gate.held == 1 })
+    await client.gate.waitUntilHeld()
     await log.send((0..<500).map { "burst \($0)" })
-    #expect(try await eventually(timeout: .seconds(5)) { await log.pendingCount == 0 })
+    await log.waitUntilRead()
     await client.gate.open()
     await log.end()
     #expect(try await run.value == .done)
@@ -327,11 +338,11 @@ struct ADBToolsLogcatTests {
     let run = start(tools, client)
     await log.send(["line 0"])
     // The first batch is with the held client; the backlog queues up behind it.
-    #expect(try await eventually { await client.gate.held == 1 })
+    await client.gate.waitUntilHeld()
     for chunk in 0..<100 {
       await log.send((0..<100).map { "line \(chunk * 100 + $0 + 1)" })
     }
-    #expect(try await eventually { await log.pendingCount == 0 })
+    await log.waitUntilRead()
     await client.gate.open()
     await log.end()
     // Pauses pass at once on this clock; they are counted instead.
