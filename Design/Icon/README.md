@@ -85,3 +85,12 @@ the symbol its extension names in `CFBundleIcons` → `CFBundlePrimaryIcon` →
 `ferry.location`, a custom symbol in its asset catalog. It has one weight (Regular, medium
 scale); the system scales it for the sidebar.
 
+
+## Device tiles
+
+A device row's tile shows what kind of device it is: `smartphone` for a phone, and two glyphs
+drawn in code (`DeviceGlyph` in `Sources/FerryUI`) for a handheld network tester and a tablet,
+which SF Symbols has no non-Apple symbol for. They follow `smartphone`'s style, a solid body
+around a screen at a third of the ink. `DevicePresentation.kind(manufacturer:model:)` decides the
+kind from the names the device reports. `Design/previews/device-tiles.png` shows every tile;
+`MenuSnapshotTests` writes it.
