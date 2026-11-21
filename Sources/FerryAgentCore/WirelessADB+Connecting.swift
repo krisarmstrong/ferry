@@ -354,17 +354,6 @@ extension WirelessADB {
     service.type == ADBMDNSService.connectType && service.name.hasPrefix(instancePrefix(id))
   }
 
-  /// adb's words, unless they are the "No route to host" macOS gives a program it denies the
-  /// local network and the agent's own check confirms the denial: a device the user could
-  /// otherwise reach would look unreachable.
-  func failure(reaching endpoint: WirelessEndpoint, _ detail: String) async -> WirelessFailure {
-    guard detail.contains("No route to host"), await localNetworkDenied(endpoint) else {
-      return .adb(detail)
-    }
-    log.error("macOS denies Ferry the local network: \(endpoint.argument, privacy: .private)")
-    return .localNetworkDenied
-  }
-
   static func failure(_ error: ADBError) -> WirelessOutcome {
     switch error {
     case .serverUnavailable, .adbNotInstalled:

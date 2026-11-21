@@ -62,7 +62,8 @@ let wireless = WirelessADB(
   adb: ADBWireless(keeper: adbServer), store: wirelessStore,
   known: { await hub.shownNames() }, located: { await domains.location(of: $0) },
   vouching: vouching,
-  localNetworkDenied: { await LocalNetworkAccess.isDenied($0) }
+  localNetwork: { await LocalNetworkAccess.reach($0) },
+  replaceCutOffServer: { await adbServer.replaceFerryServer(fetched: ADBLocator().fetchedADB()) }
 )
 Task { await wireless.run() }
 Task {

@@ -41,10 +41,15 @@ public struct ADBLocator: Sendable {
     self.isGoogleSigned = isGoogleSigned
   }
 
+  /// Ferry's fetched `adb`, if Google's signature holds on it.
+  public func fetchedADB() -> URL? {
+    fetched().flatMap { isGoogleSigned($0) ? $0 : nil }
+  }
+
   /// Ferry's fetched `adb` if Google's signature holds on it, else the first executable `adb`
   /// among the fixed locations, in order of preference.
   public func adbURL() -> URL? {
-    if let fetched = fetched(), isGoogleSigned(fetched) { return fetched }
+    if let fetched = fetchedADB() { return fetched }
     var candidates = [
       "/opt/homebrew/bin/adb",
       "/usr/local/bin/adb",
