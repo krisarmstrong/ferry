@@ -107,9 +107,8 @@ public struct MenuContent: View {
     if model.showsADBNotRunning {
       ADBNotRunningRow { Task { await model.recheckADB() } }
     }
-    if model.showsInstallADB {
-      InstallADBRow(
-        copy: { model.copyInstallCommand() }, checkAgain: { Task { await model.recheckADB() } })
+    if let line = model.platformToolsRow {
+      GetADBRow(line: line, model: model)
     }
     ForEach(model.awaitingAuthorization, id: \.self) { address in
       let line = DevicePresentation.waitingLine(for: address)
@@ -133,6 +132,7 @@ public struct MenuContent: View {
         model.revealPreservedChanges()
       }
     }
+    WaitingChangesRow(names: model.waitingToSend)
     if model.agent == .running, model.usbWatchFailed {
       StatusRow(
         symbol: "info.circle", title: Text(MenuStatusText.usbWatchFailed),

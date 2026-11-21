@@ -143,19 +143,19 @@
           }
         },
         {
-          "id": "install-adb",
-          "title": "Install adb",
+          "id": "get-adb",
+          "title": "Get adb",
           "symbol": "shippingbox",
           "paragraphs": [
             "Ferry needs adb, from Google's Android platform tools, for USB debugging and Wi-Fi. File transfer works without it.",
-            "When adb is missing, the menu shows **Install adb for more tools…** with the command to run."
+            "If adb is already on this Mac, from Homebrew or Android Studio, Ferry uses it. If not, the menu shows **adb isn't on this Mac**, and Ferry can download it from Google for you, once. That needs an internet connection."
           ],
           "steps": [
-            "Click **Copy** in that row.",
-            "Paste the command in Terminal and press Return: `brew install --cask android-platform-tools`.",
-            "Click **Check Again**."
+            "Click **Get Android Platform Tools…** in that line.",
+            "Read Google's Android SDK License and click **Accept**.",
+            "Ferry downloads the platform tools from Google, checks that they are the release it expects and that adb is signed by Google, and keeps only adb and its notices."
           ],
-          "note": "Ferry never installs adb itself."
+          "note": "Ferry keeps adb in ~/Library/Application Support/Ferry/platform-tools, and records that you accepted the license, and when. When a Ferry update needs a newer adb, Ferry downloads it the same way; if Google has changed the license, Ferry asks you to accept it again first. An adb you installed yourself works too, and Ferry prefers its own copy when both are present."
         },
         {
           "id": "trust-prompt",
@@ -184,7 +184,7 @@
             "Connect the device to Ethernet or Wi-Fi.",
             "Connect it to the Mac by cable, with USB debugging on.",
             "Click the device in the menu, then **Use over Wi-Fi**.",
-            "Unplug the cable. The device stays in Finder over the network."
+            "Unplug the cable. Ferry still reaches the device over the network, so it stays in Finder."
           ],
           "note": "Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again."
         },
@@ -247,6 +247,7 @@
           "symbol": "externaldrive",
           "paragraphs": [
             "Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs.",
+            "A device appears in Finder only while Ferry can reach it. When it is unplugged and not on the network, locked, or not sharing files, its location leaves the sidebar. It comes back with its files when Ferry can reach it again.",
             "A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number.",
             "Double-click a file to open it. Ferry copies it to the Mac when you open it.",
             "With one device location, macOS labels it with the app's name, so the sidebar says Ferry. This is normal."
@@ -656,6 +657,11 @@
               "message": "Unsent changes were saved to %@",
               "cause": "You ejected the device before some changes reached it. macOS kept those files in a folder on the Mac. Deletes and renames that had not reached the device were dropped.",
               "fix": "Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again."
+            },
+            {
+              "message": "%@: changes wait to be sent. Reconnect it to finish.",
+              "cause": "The device went away, or Ferry can no longer reach it, before some changes reached it. Its location left Finder, so the files that wait are not shown there. They stay on the Mac. An SD card has a location for each way Ferry reaches the device, so changes made on the card over a cable wait for the cable, even while the card shows over the network.",
+              "fix": "Reconnect the device the same way as before, by cable or over the network. Its location comes back to Finder and the changes are sent; the line goes once they are."
             }
           ]
         },
@@ -678,14 +684,34 @@
               "fix": "Unlock the device, tick **Always allow from this computer** and tap **OK** or **Allow**."
             },
             {
-              "message": "Install adb for more tools…",
-              "cause": "adb is not installed, so Ferry can use file transfer only.",
-              "fix": "Click **Copy**, run the command in Terminal, then click **Check Again**."
+              "message": "adb isn't on this Mac",
+              "cause": "Ferry found no adb, so it can use file transfer only.",
+              "fix": "Click **Get Android Platform Tools…** and accept Google's license: Ferry downloads adb once. Installing adb any other way also works, for example Homebrew's android-platform-tools, which downloads the same file from Google, and Ferry picks up an installed adb on its own. If both are present, Ferry prefers its own copy and never disturbs a running adb server."
+            },
+            {
+              "message": "Couldn't download adb. Ferry needs an internet connection once.",
+              "cause": "Ferry could not reach Google's download server, or the server did not send the file.",
+              "fix": "Connect to the internet and click **Try Again**. Without a connection, install adb another way, for example with Homebrew: Ferry picks up an installed adb on its own."
+            },
+            {
+              "message": "The download didn't pass Ferry's checks, so Ferry deleted it.",
+              "cause": "The file was not the release Ferry expects, could not be read, or its adb was not signed by Google. Ferry never runs an adb it has not checked.",
+              "fix": "Click **Try Again**. If it fails again, something on your network may be changing downloads: try another network."
+            },
+            {
+              "message": "Ferry couldn't save adb in its folder.",
+              "cause": "Ferry could not write to ~/Library/Application Support/Ferry/platform-tools: the Mac may be full, or the folder locked or owned by another user.",
+              "fix": "Free some space on the Mac, or remove that folder if another user owns it, then click **Try Again**."
+            },
+            {
+              "message": "Google changed the Android SDK License",
+              "cause": "Ferry shows a newer text of Google's license than the one you accepted. Ferry keeps using the adb it has until you accept it.",
+              "fix": "Click **Review License…** and accept it. If this version of Ferry needs a newer adb, Ferry then downloads it."
             },
             {
               "message": "adb isn't running",
               "cause": "adb is installed but its server is not answering.",
-              "fix": "Click **Check Again**. If that does not help, run `adb start-server` in Terminal."
+              "fix": "Click **Check Again**. If that does not help, quit other apps that use adb, such as Android Studio, then click **Check Again**."
             },
             {
               "message": "This needs USB debugging. Turn it on, then try again.",
@@ -693,9 +719,9 @@
               "fix": "Turn on USB debugging on the device, then try again."
             },
             {
-              "message": "Ferry can't find adb. Install it, then try again.",
+              "message": "Ferry can't find adb. Get it from the Ferry menu, then try again.",
               "cause": "This tool runs adb, and Ferry can't find it on this Mac.",
-              "fix": "In Terminal, run `brew install --cask android-platform-tools`, then try again."
+              "fix": "In the Ferry menu, click **Get Android Platform Tools…**, then try again."
             },
             {
               "message": "Ferry couldn't open Terminal.",
@@ -733,9 +759,9 @@
               "fix": "Connect the device to Ethernet or Wi-Fi, then click **Use over Wi-Fi** again."
             },
             {
-              "message": "adb isn't running. Install it, or choose Check Again.",
-              "cause": "Network connections need adb, and it is missing or not answering.",
-              "fix": "Install adb, then click **Check Again**."
+              "message": "adb isn't available. Use the adb line at the top of the menu.",
+              "cause": "Network connections need adb, and Ferry has none or its server is not answering.",
+              "fix": "Click **Get Android Platform Tools…** or **Check Again** at the top of the menu, then try again."
             },
             {
               "message": "Connect the device with a cable and allow USB debugging first.",
@@ -1257,7 +1283,7 @@
           "symbol": "hand.raised.slash",
           "paragraphs": [
             "Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.",
-            "The one connection Ferry makes to the internet is the daily check for updates, to GitHub, where Ferry's releases are published. It sends nothing about you or your devices."
+            "Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices."
           ]
         },
         {

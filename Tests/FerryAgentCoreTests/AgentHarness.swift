@@ -5,124 +5,6 @@ import Foundation
 
 @testable import FerryAgentCore
 
-/// Records every call, so a test can wait for the controller to act on a hub event.
-actor FakeDomainManager: DomainManaging {
-  enum Call: Equatable, Sendable {
-    case add(DomainSpec)
-    case disconnect(String)
-    case reconnect(String)
-    case remove(String)
-    case removeAll
-    case signal(String)
-  }
-
-  private(set) var calls: [Call] = []
-  private let preexisting: [String]
-  /// Set by `holdExisting()`: `existing()` waits until `releaseExisting()`.
-  private var existingHeld = false
-  private var existingWaiter: CheckedContinuation<Void, Never>?
-  private var provider = ProviderState.disabled
-  /// Where removing each domain saves its unsent changes.
-  private var preserved: [String: URL] = [:]
-  private var waiters: [Int: (count: Int, continuation: CheckedContinuation<Void, Never>)] = [:]
-  private var nextWaiter = 0
-
-  /// `existing` are the domains the system already has, as after an agent restart.
-  /// How many listings of the system's domains fail before one succeeds.
-  private var listingFailures: Int
-
-  /// How many removals fail before one succeeds.
-  private var removalFailures: Int
-
-  init(existing: [String] = [], listingFailures: Int = 0, removalFailures: Int = 0) {
-    preexisting = existing
-    self.listingFailures = listingFailures
-    self.removalFailures = removalFailures
-  }
-
-  func add(_ spec: DomainSpec) async throws { record(.add(spec)) }
-  func disconnect(_ identifier: String) async throws { record(.disconnect(identifier)) }
-  func reconnect(_ identifier: String) async throws { record(.reconnect(identifier)) }
-  func remove(_ identifier: String) async throws -> URL? {
-    record(.remove(identifier))
-    if removalFailures > 0 {
-      removalFailures -= 1
-      throw CocoaError(.featureUnsupported)
-    }
-    return preserved[identifier]
-  }
-  func removeAll() async throws -> [URL] {
-    record(.removeAll)
-    return preserved.keys.sorted().compactMap { preserved[$0] }
-  }
-  func signal(_ identifier: String) async {
-    record(.signal(identifier))
-  }
-  func providerState() async -> ProviderState { provider }
-  func existing() async throws -> [String] {
-    if existingHeld {
-      await withCheckedContinuation { existingWaiter = $0 }
-    }
-    if listingFailures > 0 {
-      listingFailures -= 1
-      throw CocoaError(.featureUnsupported)
-    }
-    return preexisting
-  }
-
-  /// Makes `existing()` wait, as listing the system's domains can take a while after a restart.
-  func holdExisting() {
-    existingHeld = true
-  }
-
-  func releaseExisting() {
-    existingHeld = false
-    existingWaiter?.resume()
-    existingWaiter = nil
-  }
-
-  func setProvider(_ state: ProviderState) {
-    provider = state
-  }
-
-  /// Removing `identifier` saves unsent changes to `location`.
-  func preserve(_ identifier: String, at location: URL) {
-    preserved[identifier] = location
-  }
-
-  /// Returns every call so far, once there are at least `count` or the test is cancelled, as
-  /// its time limit does, so a missing call fails the test instead of hanging it.
-  func waitForCalls(_ count: Int) async -> [Call] {
-    guard calls.count < count, !Task.isCancelled else { return calls }
-    nextWaiter += 1
-    let id = nextWaiter
-    await withTaskCancellationHandler {
-      await withCheckedContinuation { continuation in
-        // Cancelled before registering: the handler's release has nothing to resume.
-        if Task.isCancelled {
-          continuation.resume()
-        } else {
-          waiters[id] = (count, continuation)
-        }
-      }
-    } onCancel: {
-      Task { await self.release(id) }
-    }
-    return calls
-  }
-
-  private func release(_ id: Int) {
-    waiters.removeValue(forKey: id)?.continuation.resume()
-  }
-
-  private func record(_ call: Call) {
-    calls.append(call)
-    for (id, waiter) in waiters where waiter.count <= calls.count {
-      release(id)
-    }
-  }
-}
-
 let internalKey = "Internal|vol0"
 let cardKey = "SD card|vol1"
 
@@ -170,6 +52,8 @@ struct AgentHarness {
   let controller: DomainController
   let service: AgentService
   let clock = ManualClock()
+  /// The controller's own clock, for its retries, apart from the hub's.
+  let retryClock = ManualClock()
   let scratch: URL
   let store: URL
   private let ticks: AsyncStream<Void>.Continuation
@@ -190,7 +74,8 @@ struct AgentHarness {
     let served: any DeviceTransport =
       adb.map { CompositeTransport(mtp: mtp, adb: $0) } ?? mtp
     hub = DeviceHub(transport: served, arrivals: arrivals, clock: clock)
-    controller = DomainController(hub: hub, manager: self.manager, itemStore: store)
+    controller = DomainController(
+      hub: hub, manager: self.manager, itemStore: store, clock: retryClock)
     scratch = TestScratch.root.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)

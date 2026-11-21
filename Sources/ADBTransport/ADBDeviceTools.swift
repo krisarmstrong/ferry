@@ -225,6 +225,12 @@ public struct ADBDeviceTools: Sendable {
   }
 
   /// The `adb` the locator finds, which a shell in Terminal runs.
+  ///
+  /// Open in Terminal, Connect by Address and Pair with Code (`ADBCommand`) run this located adb,
+  /// Ferry's fetched copy first, as a client of whatever server answers. An adb client of a
+  /// different version than that server may restart it, so these can still disturb a server
+  /// another adb started; Ferry itself never starts one over it. Connecting and pairing over the
+  /// host protocol when a server answers is the follow-up (plan, Task 22).
   public func adbPath() -> URL? {
     host.adbURL()
   }

@@ -14,7 +14,9 @@ device over USB; Ferry adds one that uses Finder itself, so you browse, open, co
 delete with the tools you already know, including any app's Open and Save dialogs. With USB
 debugging and `adb`, Ferry also reaches devices over ADB, by cable or over Wi-Fi, which is faster
 and adds tools: installing apps, screenshots, screen recordings, logcat, a shell and port
-forwarding. It is free and open source (MIT), and it sends nothing to any server.
+forwarding. It is free and open source (MIT), and it sends nothing about you or your devices:
+it connects only to GitHub, to check for updates, and to Google, to download adb once you
+accept Google's license and again when a Ferry update needs a newer adb.
 
 <!-- Screenshots: add once captured on macOS 26, as docs/screenshots/{finder,menu,guide}.png.
 
@@ -29,8 +31,11 @@ forwarding. It is free and open source (MIT), and it sends nothing to any server
 - A USB cable that carries data
 - An Android device with file transfer (MTP): LinkRunner 10G, EtherScope nXG,
   LinkRunner 100G, or an Android 8+ phone
-- Optional, for USB debugging, Wi-Fi and the tools: `adb`, from Google's Android platform tools
-  (`brew install --cask android-platform-tools`). Ferry never installs or bundles it.
+- Optional, for USB debugging, Wi-Fi and the tools: `adb`, from Google's Android platform tools.
+  Ferry uses one already on the Mac. Without one, the menu offers **Get Android Platform
+  Tools…**: after you accept Google's Android SDK License, Ferry downloads Google's release once
+  from `dl.google.com`, checks its SHA-256 and Google's code signature, and keeps only `adb`.
+  Ferry never bundles Google's binaries.
 
 ## Install
 

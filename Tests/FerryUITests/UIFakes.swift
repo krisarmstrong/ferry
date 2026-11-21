@@ -31,6 +31,8 @@ final class FakeClient: AgentSending {
   private let installsParked = Mutex(false)
   /// Connect by Address and Pair wait here once `wirelessPark.start()` is called.
   let wirelessPark = RequestPark()
+  /// Check Again waits here once `recheckGate.hold()` is called.
+  let recheckGate = RequestGate()
   /// What the agent writes into the file a capture request carries.
   private let toolBytes = Mutex(Data())
   /// Progress the agent reports on a tool request before it answers.
@@ -56,7 +58,8 @@ final class FakeClient: AgentSending {
     awaitingUSBDebugging: [DeviceID] = [], awaitingAuthorization: [String] = [],
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
-    sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:]
+    sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:],
+    waitingToSend: [String] = []
   ) {
     status.withLock {
       $0 = .status(
@@ -66,7 +69,7 @@ final class FakeClient: AgentSending {
           awaitingUSBDebugging: awaitingUSBDebugging,
           remembered: remembered, unconfirmed: unconfirmed, recordings: recordings,
           usbWatchFailed: usbWatchFailed, sessions: sessions,
-          connectedAddresses: connectedAddresses))
+          connectedAddresses: connectedAddresses, waitingToSend: waitingToSend))
     }
   }
 
@@ -199,6 +202,7 @@ final class FakeClient: AgentSending {
       return .done
     case .recheckADB:
       log.record("recheckADB")
+      await recheckGate.passWhenReleased()
       return .done
     case .removeAllDomains:
       log.record("removeAllDomains")

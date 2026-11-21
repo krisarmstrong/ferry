@@ -59,9 +59,9 @@ jobs:
           }
           [ "$tagged" = "$SHA" ] \
             || { echo "::error::tag $TAG is $tagged, but release-please released $SHA"; exit 1; }
-      # A push by GITHUB_TOKEN starts no pull_request run, so the release PR would never get the
-      # check main requires. A workflow_dispatch is exempt: run CI on the PR's branch, and its
-      # check lands on the PR's head commit.
+      # A PR opened with GITHUB_TOKEN gets a pull_request run only once someone approves it. A
+      # workflow_dispatch is exempt: run CI on the PR's branch. Its check run does not count for
+      # the PR, so ci.yml's report job records the result as `check` on the head commit.
       - name: Run CI on the release PR
         if: steps.release.outputs.prs_created == 'true'
         env:
@@ -188,6 +188,18 @@ jobs:
           security import "$work/import.p12" -k "$keychain" -P "$TRANSPORT" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" > /dev/null
           security list-keychains -d user -s "$keychain" login.keychain
+          # The runner image may lack Apple's Developer ID intermediates, and without them the
+          # identity is untrusted, so `find-identity -v` lists nothing. Add both, pinned.
+          for ca in "DeveloperIDCA.cer 7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f" \
+                    "DeveloperIDG2CA.cer f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a"; do
+            read -r file sum <<< "$ca"
+            curl -fsSL --proto '=https' -o "$work/$file" "https://www.apple.com/certificateauthority/$file"
+            echo "$sum  $work/$file" | shasum -a 256 -c - > /dev/null
+            security import "$work/$file" -k "$keychain" > /dev/null
+          done
+          # Names only: which certificates the .p12 carried, and whether one is a valid signer.
+          security find-identity -p codesigning "$keychain" | sed -n 's/^ *[0-9]*) [0-9A-F]* //p'
+          security find-identity -v -p codesigning "$keychain" | tail -1
       - name: Build and sign
         run: make release
       - name: Notarize and staple the app, then package it

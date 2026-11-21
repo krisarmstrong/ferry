@@ -38,7 +38,7 @@ import os
   /// Transfers the agent is running, as of the last status.
   public private(set) var transfers: [ActiveTransfer] = []
   /// Whether adb can be used; `nil` until the agent has looked.
-  public private(set) var adbStatus: ADBStatus?
+  public internal(set) var adbStatus: ADBStatus?
   /// The agent cannot watch USB, so devices come and go in the menu only every 30 s.
   public private(set) var usbWatchFailed = false
   /// The number of each served device's session, as of the last status.
@@ -62,6 +62,8 @@ import os
   @ObservationIgnored var networkSend: Task<WirelessReply, Never>?
   /// Set once the user opens a network form this run: a Wi-Fi-only user needs adb too.
   var wantsNetwork = false
+  /// Ferry's own copy of adb, from Google's platform tools (see `AppModel+PlatformTools`).
+  var platformTools = PlatformToolsState()
   /// The last failed action, shown until the next one succeeds.
   public internal(set) var actionError: MenuNotice?
   /// Screen recordings running, as of the last status.
@@ -85,6 +87,8 @@ import os
   /// Where the system saved changes an eject removed before they reached the device. Shown until
   /// the next action.
   public internal(set) var preservedChanges: [URL] = []
+  /// Hidden locations, their device away, whose changes wait to be sent (see `StatusReport`).
+  private(set) var waitingToSend: [String] = []
   /// Which row of the menu is expanded (see `MenuExpansion`).
   var expansion = MenuExpansion()
   /// What each device said about itself, for its inline details (see `AppModel+Details`).
@@ -219,21 +223,6 @@ import os
     cancelDetailReads()
   }
 
-  /// An ejected device reports `.ejected`, which never opens the guide.
-  public func eject(_ id: DeviceID) async {
-    await perform(.eject(id))
-  }
-
-  /// Mounts an ejected device again.
-  public func mount(_ id: DeviceID) async {
-    await perform(.recheck(id))
-  }
-
-  /// Asks the agent to open a device again, after the app holding it quits.
-  public func recheck(_ id: DeviceID) async {
-    await perform(.recheck(id))
-  }
-
   public func turnOnInFinder() {
     services.open(Self.loginItemsSettings)
   }
@@ -243,12 +232,14 @@ import os
     services.open(Self.loginItemsSettings)
   }
 
-  /// Starts the agent, reads its status, then whether Ferry opens at login. The system calls
-  /// run off the main actor (see `SystemServices`), so the app opens without waiting on them.
+  /// Starts the agent, reads its status, then whether Ferry opens at login, and updates the adb
+  /// Ferry fetched if this release pins a newer one. The system calls run off the main actor (see
+  /// `SystemServices`), so the app opens without waiting on them.
   public func launch() async {
     await startAgent()
     await refresh()
     loginItem = await services.loginItemStatus()
+    considerPlatformToolsUpdate()
   }
 
   /// Registers the agent, or restarts it when the agent in the bundle is not the one last
@@ -335,13 +326,14 @@ import os
     helper = .allowed
     provider = report.provider
     transfers = report.transfers
-    adbStatus = report.adbStatus
+    noteADBStatus(report.adbStatus)
     usbWatchFailed = report.usbWatchFailed
     sessions = report.sessions
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered
     connectedAddresses = report.connectedAddresses
+    waitingToSend = report.waitingToSend
     unconfirmed = report.unconfirmed
     recordings = report.recordings
     collectFinishedRecordings()
@@ -365,6 +357,21 @@ import os
 }
 
 extension AppModel {
+  /// An ejected device reports `.ejected`, which never opens the guide.
+  public func eject(_ id: DeviceID) async {
+    await perform(.eject(id))
+  }
+
+  /// Mounts an ejected device again.
+  public func mount(_ id: DeviceID) async {
+    await perform(.recheck(id))
+  }
+
+  /// Asks the agent to open a device again, after the app holding it quits.
+  public func recheck(_ id: DeviceID) async {
+    await perform(.recheck(id))
+  }
+
   /// The transfers running on `device`.
   public func transfers(on device: DeviceID) -> [ActiveTransfer] {
     transfers.filter { $0.device == device }

@@ -17,7 +17,7 @@ This guide holds the same help as **Help** in the Ferry menu, plus how to instal
   - [Connect a network tester](#connect-a-network-tester)
   - [Connect an Android phone](#connect-an-android-phone)
   - [Turn on USB debugging](#turn-on-usb-debugging)
-  - [Install adb](#install-adb)
+  - [Get adb](#get-adb)
   - [Allow this Mac on the device](#allow-this-mac-on-the-device)
   - [Use a device over Wi-Fi](#use-a-device-over-wi-fi)
   - [Connect by address](#connect-by-address)
@@ -162,17 +162,17 @@ If the device accepts ADB over the network, use **Connect by Address…**.
 
 If the device accepts ADB over the network, use **Connect by Address…**.
 
-### Install adb
+### Get adb
 
 Ferry needs adb, from Google's Android platform tools, for USB debugging and Wi-Fi. File transfer works without it.
 
-When adb is missing, the menu shows **Install adb for more tools…** with the command to run.
+If adb is already on this Mac, from Homebrew or Android Studio, Ferry uses it. If not, the menu shows **adb isn't on this Mac**, and Ferry can download it from Google for you, once. That needs an internet connection.
 
-1. Click **Copy** in that row.
-2. Paste the command in Terminal and press Return: `brew install --cask android-platform-tools`.
-3. Click **Check Again**.
+1. Click **Get Android Platform Tools…** in that line.
+2. Read Google's Android SDK License and click **Accept**.
+3. Ferry downloads the platform tools from Google, checks that they are the release it expects and that adb is signed by Google, and keeps only adb and its notices.
 
-Ferry never installs adb itself.
+Ferry keeps adb in ~/Library/Application Support/Ferry/platform-tools, and records that you accepted the license, and when. When a Ferry update needs a newer adb, Ferry downloads it the same way; if Google has changed the license, Ferry asks you to accept it again first. An adb you installed yourself works too, and Ferry prefers its own copy when both are present.
 
 ### Allow this Mac on the device
 
@@ -195,7 +195,7 @@ Ferry never searches the network. It connects only to addresses you give it, and
 1. Connect the device to Ethernet or Wi-Fi.
 2. Connect it to the Mac by cable, with USB debugging on.
 3. Click the device in the menu, then **Use over Wi-Fi**.
-4. Unplug the cable. The device stays in Finder over the network.
+4. Unplug the cable. Ferry still reaches the device over the network, so it stays in Finder.
 
 Turning it on restarts ADB on the device, so Ferry refuses while the device has a transfer, a screen recording or a log running: let it finish, then try again.
 
@@ -238,6 +238,8 @@ Anyone on a network can claim a device's serial number. So when a new address an
 ### Find your device in Finder
 
 Each device appears in Finder's sidebar under Locations, and in every app's Open and Save dialogs.
+
+A device appears in Finder only while Ferry can reach it. When it is unplugged and not on the network, locked, or not sharing files, its location leaves the sidebar. It comes back with its files when Ferry can reach it again.
 
 A device with an SD card shows two locations: its internal storage, and the card with “SD card” after the name. If two devices of the same model are connected, each name ends with the last four characters of its serial number.
 
@@ -519,6 +521,12 @@ You ejected the device before some changes reached it. macOS kept those files in
 
 Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again.
 
+**…: changes wait to be sent. Reconnect it to finish.**
+
+The device went away, or Ferry can no longer reach it, before some changes reached it. Its location left Finder, so the files that wait are not shown there. They stay on the Mac. An SD card has a location for each way Ferry reaches the device, so changes made on the card over a cable wait for the cable, even while the card shows over the network.
+
+Reconnect the device the same way as before, by cable or over the network. Its location comes back to Finder and the changes are sent; the line goes once they are.
+
 ### USB debugging messages
 
 Messages about ADB, adb and allowing this Mac.
@@ -535,17 +543,41 @@ The device is asking whether to allow this Mac.
 
 Unlock the device, tick **Always allow from this computer** and tap **OK** or **Allow**.
 
-**Install adb for more tools…**
+**adb isn't on this Mac**
 
-adb is not installed, so Ferry can use file transfer only.
+Ferry found no adb, so it can use file transfer only.
 
-Click **Copy**, run the command in Terminal, then click **Check Again**.
+Click **Get Android Platform Tools…** and accept Google's license: Ferry downloads adb once. Installing adb any other way also works, for example Homebrew's android-platform-tools, which downloads the same file from Google, and Ferry picks up an installed adb on its own. If both are present, Ferry prefers its own copy and never disturbs a running adb server.
+
+**Couldn't download adb. Ferry needs an internet connection once.**
+
+Ferry could not reach Google's download server, or the server did not send the file.
+
+Connect to the internet and click **Try Again**. Without a connection, install adb another way, for example with Homebrew: Ferry picks up an installed adb on its own.
+
+**The download didn't pass Ferry's checks, so Ferry deleted it.**
+
+The file was not the release Ferry expects, could not be read, or its adb was not signed by Google. Ferry never runs an adb it has not checked.
+
+Click **Try Again**. If it fails again, something on your network may be changing downloads: try another network.
+
+**Ferry couldn't save adb in its folder.**
+
+Ferry could not write to ~/Library/Application Support/Ferry/platform-tools: the Mac may be full, or the folder locked or owned by another user.
+
+Free some space on the Mac, or remove that folder if another user owns it, then click **Try Again**.
+
+**Google changed the Android SDK License**
+
+Ferry shows a newer text of Google's license than the one you accepted. Ferry keeps using the adb it has until you accept it.
+
+Click **Review License…** and accept it. If this version of Ferry needs a newer adb, Ferry then downloads it.
 
 **adb isn't running**
 
 adb is installed but its server is not answering.
 
-Click **Check Again**. If that does not help, run `adb start-server` in Terminal.
+Click **Check Again**. If that does not help, quit other apps that use adb, such as Android Studio, then click **Check Again**.
 
 **This needs USB debugging. Turn it on, then try again.**
 
@@ -553,11 +585,11 @@ This tool works only over ADB, and the device is on file transfer.
 
 Turn on USB debugging on the device, then try again.
 
-**Ferry can't find adb. Install it, then try again.**
+**Ferry can't find adb. Get it from the Ferry menu, then try again.**
 
 This tool runs adb, and Ferry can't find it on this Mac.
 
-In Terminal, run `brew install --cask android-platform-tools`, then try again.
+In the Ferry menu, click **Get Android Platform Tools…**, then try again.
 
 **Ferry couldn't open Terminal.**
 
@@ -593,11 +625,11 @@ The device is not on Ethernet or Wi-Fi.
 
 Connect the device to Ethernet or Wi-Fi, then click **Use over Wi-Fi** again.
 
-**adb isn't running. Install it, or choose Check Again.**
+**adb isn't available. Use the adb line at the top of the menu.**
 
-Network connections need adb, and it is missing or not answering.
+Network connections need adb, and Ferry has none or its server is not answering.
 
-Install adb, then click **Check Again**.
+Click **Get Android Platform Tools…** or **Check Again** at the top of the menu, then try again.
 
 **Connect the device with a cable and allow USB debugging first.**
 
@@ -1159,7 +1191,7 @@ Ferry installs an update only when it carries the signature of Ferry's own relea
 
 Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.
 
-The one connection Ferry makes to the internet is the daily check for updates, to GitHub, where Ferry's releases are published. It sends nothing about you or your devices.
+Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices.
 
 ### Uninstall
 

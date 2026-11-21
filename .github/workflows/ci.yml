@@ -10,6 +10,13 @@ on:
 permissions:
   contents: read
 
+# A dispatched run on a release branch replaces the one before it on that branch, so a stale run
+# cannot report over a newer one. Other runs get a group of their own: unchanged.
+concurrency:
+  group: >-
+    ci-${{ github.event_name == 'workflow_dispatch' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 env:
   # The runner image's newest Xcode. It has no Xcode 27 and there is no macos-27 image, so the
   # package declares swift-tools-version 6.3, the newest this Xcode reads.
@@ -55,8 +62,12 @@ jobs:
           installed="$(brew list --versions libmtp | awk '{print $2}')"
           [ "$installed" = "$LIBMTP_VERSION" ] \
             || { echo "::error::libmtp is $installed, CI expects $LIBMTP_VERSION"; exit 1; }
-      # One test at a time: several suites bound real waits (a fake device's 3 s answer limit,
-      # a 1 s backlog), and the runner's three cores miss them when 1,400 tests run at once.
+      # One test at a time: some ADB suites bound real waits, and the runner's three cores miss
+      # them when 1,400 tests run at once (run 44737853314): ADBTransportTimeoutTests and
+      # ADBTransportRetryTests (answer limits), ADBWakeTests (the wake limit), ADBWirelessTests
+      # and ADBToolsLogcatTests (a 1 s backlog) against a fake adb server over real sockets, and
+      # WirelessADBFixRound2Tests (500 ms connects). They need an injected clock, as the hub
+      # suites have, before this can go.
       - name: Lint, format check, test
         run: make lint fmt-check test TEST_FLAGS=--no-parallel
       - name: Build the app, ad hoc signed
@@ -66,3 +77,62 @@ jobs:
       # Homebrew). Signed ad hoc and not notarized: CI holds no secrets.
       - name: Build the release, ad hoc signed, and check it
         run: make release SIGN=adhoc
+
+  # Only runs from push, pull_request and a few other events count for a PR's required checks:
+  # a workflow_dispatch run's `check` job passes on the head commit and still does not. Release
+  # PRs need this, because release-please opens them with GITHUB_TOKEN, and their pull_request
+  # run waits for someone with write access to approve it. So when release.yml dispatches this
+  # workflow on a release branch, `pending` marks the tested commit as under way and `report`
+  # records the result there, as a commit status `check` and as a check run `check` made
+  # through the API. Both come from GitHub Actions, as branch protection requires; GitHub wants
+  # a status and a check run of one name both to pass, so they always carry the same result.
+  # A failed or cancelled run reports failure: re-run it (docs/RELEASING.md).
+  pending:
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && startsWith(github.ref, 'refs/heads/release-please--')
+    runs-on: ubuntu-24.04
+    permissions:
+      statuses: write
+      checks: write
+    outputs:
+      check-run: ${{ steps.mark.outputs.check-run }}
+    steps:
+      - name: Mark the commit as under test
+        id: mark
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state=pending \
+            -f context=check -f description="CI on workflow_dispatch: running" \
+            -f target_url="$url" > /dev/null
+          id="$(gh api -X POST "repos/$GITHUB_REPOSITORY/check-runs" -f name=check \
+            -f head_sha="$GITHUB_SHA" -f status=in_progress -f details_url="$url" --jq .id)"
+          [[ "$id" =~ ^[0-9]+$ ]] || { echo "::error::no check run id: $id"; exit 1; }
+          echo "check-run=$id" >> "$GITHUB_OUTPUT"
+
+  report:
+    needs: [pending, check]
+    if: always() && needs.pending.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      statuses: write
+      checks: write
+    steps:
+      - name: Report the result on the tested commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ needs.check.result }}
+          CHECK_RUN: ${{ needs.pending.outputs.check-run }}
+        run: |
+          state=failure
+          [ "$RESULT" = success ] && state=success
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state="$state" \
+            -f context=check -f description="CI on workflow_dispatch: $RESULT" \
+            -f target_url="$url" > /dev/null
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/check-runs/$CHECK_RUN" -f status=completed \
+            -f conclusion="$state" -f details_url="$url" \
+            -f "output[title]=CI on workflow_dispatch: $RESULT" \
+            -f "output[summary]=The check job of $url: $RESULT." > /dev/null

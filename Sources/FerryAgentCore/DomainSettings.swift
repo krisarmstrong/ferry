@@ -20,13 +20,16 @@ public struct DomainSettings: Equatable, Sendable {
     self.supportsSyncingTrash = supportsSyncingTrash
   }
 
-  /// A domain with Ferry's settings.
-  public static func configured(_ identifier: String, displayName: String)
+  /// A domain with Ferry's settings, hidden from Finder or not. Being hidden is the domain's
+  /// state, not a setting: every add of an existing domain carries the state it should keep,
+  /// since the add sets it (`NSFileProviderManager.h`, `addDomain:`).
+  public static func configured(_ identifier: String, displayName: String, hidden: Bool = false)
     -> NSFileProviderDomain
   {
     let domain = NSFileProviderDomain(
       identifier: NSFileProviderDomainIdentifier(identifier), displayName: displayName)
     domain.supportsSyncingTrash = ferry.supportsSyncingTrash
+    domain.isHidden = hidden
     return domain
   }
 

@@ -65,11 +65,11 @@ extension DomainController {
     return await manager.displayName(of: identifier) ?? id.serial
   }
 
-  /// Records the system's domains as disconnected, so a ready device reconnects its domain
-  /// rather than adding it again. One named by serial, as an earlier Ferry did, is removed first
-  /// (keeping unsent changes) with its item table. Returns whether the domains could be listed
-  /// and every one named by serial removed: false leaves the location set incomplete, and
-  /// `retryListing()` tries again.
+  /// Records the system's domains as disconnected and hides them, so a ready device reconnects
+  /// and shows its domain rather than adding it again. One named by serial, as an earlier Ferry
+  /// did, is removed first (keeping unsent changes) with its item table. Returns whether the
+  /// domains could be listed and every one named by serial removed: false leaves the location
+  /// set incomplete, and `retryListing()` tries again.
   func adoptExisting() async -> Bool {
     let identifiers: [String]
     do {

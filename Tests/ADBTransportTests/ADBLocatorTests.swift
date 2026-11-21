@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import ADBTransport
@@ -43,5 +44,51 @@ struct ADBLocatorTests {
 
   @Test func androidHomeIgnoredWhenUnset() {
     #expect(locator(existing: ["/platform-tools/adb"]).adbURL() == nil)
+  }
+
+  private static let fetched = URL(
+    filePath: "/Users/me/Library/Application Support/Ferry/platform-tools/37.0.3/adb")
+
+  /// The adb Ferry fetched comes before any other; a running server, whichever adb started it,
+  /// is used as it is and never needs the locator.
+  @Test func ferrysFetchedAdbWinsOverEverything() {
+    let locator = ADBLocator(
+      environment: [:], home: "/Users/me", isExecutable: { $0 == "/opt/homebrew/bin/adb" },
+      fetched: { Self.fetched }, isGoogleSigned: { $0 == Self.fetched })
+    #expect(locator.adbURL() == Self.fetched)
+  }
+
+  /// A fetched adb whose signature no longer holds is never run: the Mac's own adb is used.
+  @Test func aFetchedAdbNotSignedByGoogleIsSkipped() {
+    let locator = ADBLocator(
+      environment: [:], home: "/Users/me", isExecutable: { $0 == "/opt/homebrew/bin/adb" },
+      fetched: { Self.fetched }, isGoogleSigned: { _ in false })
+    #expect(locator.adbURL()?.path == "/opt/homebrew/bin/adb")
+  }
+
+  @Test func withoutAFetchedAdbTheMacsOwnIsUsed() {
+    let locator = ADBLocator(
+      environment: [:], home: "/Users/me", isExecutable: { $0 == "/usr/local/bin/adb" },
+      fetched: { nil }, isGoogleSigned: { _ in true })
+    #expect(locator.adbURL()?.path == "/usr/local/bin/adb")
+  }
+
+  /// The real locator looks in Ferry's folder in the home it is given.
+  @Test func theDefaultLookupReadsFerrysFolder() throws {
+    let home = FileManager.default.temporaryDirectory.appending(path: "ferry-home-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: home) }
+    let folder = home.appending(path: "Library/Application Support/Ferry/platform-tools/37.0.3")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let adb = folder.appending(path: "adb")
+    try Data("#!/bin/sh\n".utf8).write(to: adb)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: adb.path)
+    let signed = ADBLocator(
+      environment: [:], home: home.path, isExecutable: { _ in false },
+      isGoogleSigned: { _ in true })
+    #expect(signed.adbURL()?.path == adb.path)
+    let unsigned = ADBLocator(
+      environment: [:], home: home.path, isExecutable: { _ in false },
+      isGoogleSigned: { _ in false })
+    #expect(unsigned.adbURL() == nil)
   }
 }

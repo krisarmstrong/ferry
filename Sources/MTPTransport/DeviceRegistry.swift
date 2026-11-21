@@ -26,9 +26,10 @@ struct BusLocation: Hashable, Sendable {
 /// the next scan happens. Every other candidate is opened
 /// by the scan, to read its serial, and kept open: `open(_:)` hands that handle over rather than
 /// opening again, because libmtp's release resets an Android device, which then enumerates anew
-/// at another registry entry. A kept handle whose device left is closed by the next scan. Scans
-/// and opens take turns through `gate`, so two never race for the same interface; libmtp blocks
-/// on USB, so this actor runs on its own queue.
+/// at another registry entry. A kept handle whose device left is closed by the next scan. Scans,
+/// opens, parks and unparks take turns through `gate`, so two never race for the same interface
+/// and a scan never commits what it read over a later park or unpark; libmtp blocks on USB, so
+/// this actor runs on its own queue.
 actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
   struct Driver: Sendable {
     /// The USB devices attached now, from the IOKit registry.
@@ -79,6 +80,11 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
   private var opened: [BusLocation: Scanned] = [:]
   /// When each enumeration of a `.probe` candidate was first seen.
   private var firstSeen: [BusLocation: ContinuousClock.Instant] = [:]
+
+  /// Scans, opens, parks and unparks waiting for the one running.
+  var queued: Int {
+    get async { await gate.waiting }
+  }
 
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     queue.asUnownedSerialExecutor()
@@ -230,10 +236,14 @@ actor DeviceRegistry<Raw: Sendable, Device: Sendable> {
     }
   }
 
-  /// Lets the next scan open `id` again: a device that was busy or ejected.
-  func unpark(_ id: DeviceID) {
-    busy = busy.filter { $0.value.id != id }
-    ejected = ejected.filter { $0.value.info.id != id }
+  /// Lets the next scan open `id` again: a device that was busy or ejected. It takes its turn
+  /// after a scan under way, which may yet record the device busy from an open it tried before
+  /// this call; otherwise that would undo it.
+  func unpark(_ id: DeviceID) async {
+    await gate.run {
+      busy = busy.filter { $0.value.id != id }
+      ejected = ejected.filter { $0.value.info.id != id }
+    }
   }
 
   /// Notes when an ejected device's port went empty, and forgets an ejected device that has been

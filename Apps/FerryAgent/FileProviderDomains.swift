@@ -15,8 +15,9 @@ struct FileProviderDomains: DomainManaging {
 
   /// Adds every existing domain again whose settings differ from Ferry's (`DomainSettings`),
   /// such as one added by an earlier Ferry. An add with an existing identifier updates the domain in place,
-  /// so its items, enablement and the agent's item table all stay. A domain named by serial is
-  /// left alone: `DomainController` replaces it.
+  /// so its items, enablement and the agent's item table all stay; it also sets whether the
+  /// domain is hidden, so the domain keeps the state it has. A domain named by serial is left
+  /// alone: `DomainController` replaces it.
   func conformExisting() async {
     let domains: [NSFileProviderDomain]
     do {
@@ -28,7 +29,8 @@ struct FileProviderDomains: DomainManaging {
     for domain in domains where DomainSettings.needsUpdate(domain) {
       do {
         try await NSFileProviderManager.add(
-          DomainSettings.configured(domain.identifier.rawValue, displayName: domain.displayName))
+          DomainSettings.configured(
+            domain.identifier.rawValue, displayName: domain.displayName, hidden: domain.isHidden))
         log.info("updated settings of \(domain.identifier.rawValue, privacy: .private)")
       } catch {
         log.error(
@@ -47,6 +49,17 @@ struct FileProviderDomains: DomainManaging {
 
   func reconnect(_ identifier: String) async throws {
     try await manager(identifier).reconnect()
+  }
+
+  /// An add with the domain's identifier and display name: `NSFileProviderManager.h` says an add
+  /// for an existing identifier updates the display name and hidden state and succeeds, so the
+  /// domain is not replaced and its replicated files and unsent changes stay. It is made even when
+  /// the listing already shows the state, which may lag an add just made. A domain the system
+  /// does not list is not added: that would bring back one ejected or removed.
+  func setHidden(_ identifier: String, hidden: Bool) async throws {
+    let domain = try await domain(identifier)
+    try await NSFileProviderManager.add(
+      DomainSettings.configured(identifier, displayName: domain.displayName, hidden: hidden))
   }
 
   /// `.preserveDirtyUserData`: changes not yet uploaded are moved aside rather than discarded.
@@ -88,11 +101,32 @@ struct FileProviderDomains: DomainManaging {
   func providerState() async -> ProviderState {
     do {
       return ProviderState(
-        domainsEnabled: try await NSFileProviderManager.domains().map(\.userEnabled))
+        domains: try await NSFileProviderManager.domains().map {
+          (enabled: $0.userEnabled, hidden: $0.isHidden)
+        })
     } catch {
       log.error("listing domains failed: \(error, privacy: .private)")
       return .noDomains
     }
+  }
+
+  func hiddenDomains() async throws -> Set<String> {
+    Set(try await NSFileProviderManager.domains().filter(\.isHidden).map(\.identifier.rawValue))
+  }
+
+  /// The domain's pending set holds anything (see `PendingProbe`), asked for at most 2 s.
+  func hasUnsentChanges(_ identifier: String) async -> Bool {
+    let manager: NSFileProviderManager
+    do {
+      manager = try await self.manager(identifier)
+    } catch {
+      log.error(
+        "no manager for \(identifier, privacy: .private): \(error, privacy: .private)")
+      return false
+    }
+    let enumerator = manager.enumeratorForPendingItems()
+    defer { enumerator.invalidate() }
+    return await PendingProbe.anyItem(in: enumerator, within: .seconds(2))
   }
 
   func existing() async throws -> [String] {
