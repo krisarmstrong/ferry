@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <path d="M410 236 H566 L654 324 V516 Q654 552 618 552 H410 Q374 552 374 516 V272 Q374 236 410 236 Z" fill="#FFFFFF"/>
-  <path d="M566 236 V296 Q566 324 594 324 H654 Z" fill="#B9E3EA"/>
+  <!-- Two files on deck: the one behind in green, the one in front white with its corner folded. -->
+  <rect x="318" y="232" width="236" height="344" rx="30" fill="#9FE5C2"/>
+  <path d="M458 292 H612 L700 380 V544 Q700 576 668 576 H458 Q426 576 426 544 V324 Q426 292 458 292 Z" fill="#FFFFFF"/>
+  <path d="M612 292 V352 Q612 380 640 380 H700 Z" fill="#B9E3EA"/>
 </svg>

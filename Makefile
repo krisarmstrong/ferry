@@ -70,6 +70,19 @@ check-app:
 	@test -d "$(APP)/Contents/Resources/Ferry_FerryAgentCore.bundle/Contents/Resources/en.lproj" \
 	  || { echo "error: no FerryAgentCore strings in $(APP)/Contents/Resources" >&2; exit 1; }
 	@echo "FileProvider extension and agent carry their strings"
+	@# The Dock and Finder icon, compiled from Design/Icon/Ferry.icon, and the symbol Finder's
+	@# sidebar shows beside each Ferry location.
+	@test -f "$(APP)/Contents/Resources/Ferry.icns" \
+	  || { echo "error: no Ferry.icns in $(APP)/Contents/Resources" >&2; exit 1; }
+	@test "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' '$(APP)/Contents/Info.plist')" = Ferry \
+	  || { echo "error: $(APP) does not name its icon Ferry" >&2; exit 1; }
+	@provider='$(APP)/Contents/PlugIns/FerryProvider.appex/Contents'; \
+	  symbol="$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleSymbolName' "$$provider/Info.plist")"; \
+	  catalog="$$(xcrun assetutil --info "$$provider/Resources/Assets.car" 2>/dev/null)"; \
+	  case "$$catalog" in *"\"Name\" : \"$$symbol\""*) ;; \
+	    *) echo "error: the FileProvider extension does not carry its location symbol $$symbol" >&2; exit 1;; \
+	  esac
+	@echo "app bundle carries its icon, and the FileProvider extension its location symbol"
 	@# It may send files to devices and install apps: no injected library may run in it. Xcode
 	@# leaves the hardened runtime out of an ad hoc signature, so then the setting is checked.
 ifeq ($(SIGN),adhoc)

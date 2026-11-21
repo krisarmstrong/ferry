@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+  <!-- 22 pt grid. -->
+  <path d="M5 5 H6.5 V11 H5 Z" fill="#000000"/>
+  <path d="M8 2 H12.5 L15 4.5 V11 H8 Z" fill="#000000"/>
+  <path d="M1.5 13 H17 Q19 13 20.5 10.5 Q20 18 15 18 H6 Q3 18 1.5 13 Z" fill="#000000"/>
+</svg>
