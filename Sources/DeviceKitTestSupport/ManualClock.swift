@@ -35,7 +35,7 @@ public final class ManualClock: Clock, Sendable {
   }
 
   public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
-    try await sleepers.sleep(until: deadline, now: now)
+    try await sleepers.sleep(until: deadline)
   }
 
   /// Moves time forward and wakes every sleeper whose deadline has passed.
@@ -94,6 +94,10 @@ private actor Sleepers {
   }
 
   private(set) var count = 0
+  /// The time the last `wake` reached. A sleeper is checked against this, not against the time
+  /// read when its sleep began: an `advance` that lands between that read and the registration
+  /// has already woken everyone it will, and would leave the sleeper waiting for good.
+  private var woken = ManualClock.Instant(offset: .zero)
   private var sleeping: [Sleeper] = []
   private var cancelled: Set<Int> = []
   private var watchers: [Int: CheckedContinuation<Void, Never>] = [:]
@@ -101,14 +105,13 @@ private actor Sleepers {
     [:]
   private var nextWatcher = 0
 
-  func sleep(until deadline: ManualClock.Instant, now: ManualClock.Instant) async throws {
+  func sleep(until deadline: ManualClock.Instant) async throws {
     count += 1
     let reached = countWatchers.filter { $0.value.count <= count }
     for (id, watcher) in reached {
       countWatchers[id] = nil
       watcher.continuation.resume()
     }
-    guard deadline > now else { return }
     let id = count
     try await withTaskCancellationHandler {
       try await withCheckedThrowingContinuation { continuation in
@@ -124,12 +127,17 @@ private actor Sleepers {
       sleeper.continuation.resume(throwing: CancellationError())
       return
     }
+    guard sleeper.deadline > woken else {
+      sleeper.continuation.resume()
+      return
+    }
     sleeping.append(sleeper)
     for watcher in watchers.values { watcher.resume() }
     watchers = [:]
   }
 
   func wake(upTo now: ManualClock.Instant) {
+    woken = max(woken, now)
     let due = sleeping.filter { $0.deadline <= now }
     sleeping.removeAll { $0.deadline <= now }
     for sleeper in due { sleeper.continuation.resume() }
