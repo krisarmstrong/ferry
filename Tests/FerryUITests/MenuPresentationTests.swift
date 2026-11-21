@@ -65,16 +65,13 @@ struct MenuPresentationTests {
   // MARK: Tile
 
   @Test(arguments: [
-    (
-      ready, ConnectionMethod.usbADB,
-      DevicePresentation.Tile(symbol: "cable.connector", isActive: true)
-    ),
-    (ready, .usbFileTransfer, .init(symbol: "cable.connector", isActive: true)),
-    (ready, .wifiADB, .init(symbol: "wifi", isActive: true)),
-    (.notSharingFiles, .usbFileTransfer, .init(symbol: "cable.connector", isActive: false)),
-    (.ejected, .usbADB, .init(symbol: "cable.connector", isActive: false)),
-    (.busy, .usbFileTransfer, .init(symbol: "cable.connector", isActive: false)),
-    (.failed(.deviceBusy), .wifiADB, .init(symbol: "wifi", isActive: false)),
+    (ready, ConnectionMethod.usbADB, DevicePresentation.Tile(glyph: .phone, isActive: true)),
+    (ready, .usbFileTransfer, .init(glyph: .phone, isActive: true)),
+    (ready, .wifiADB, .init(glyph: .phone, isActive: true)),
+    (.notSharingFiles, .usbFileTransfer, .init(glyph: .phone, isActive: false)),
+    (.ejected, .usbADB, .init(glyph: .phone, isActive: false)),
+    (.busy, .usbFileTransfer, .init(glyph: .phone, isActive: false)),
+    (.failed(.deviceBusy), .wifiADB, .init(glyph: .phone, isActive: false)),
   ])
   func theTileIsActiveOnlyWhenReady(
     state: DeviceState, method: ConnectionMethod, tile: DevicePresentation.Tile
@@ -82,9 +79,42 @@ struct MenuPresentationTests {
     #expect(DevicePresentation.tile(of: Self.attached(state, method)) == tile)
   }
 
+  /// The tile draws what kind of device it is, read from what the device reports: NetAlly's
+  /// testers by model name, tablets by name or Samsung's tablet model numbers, else a phone.
+  @Test(arguments: [
+    ("", "EtherScope-nXG", DevicePresentation.TileGlyph.tester),
+    ("", "LinkRunner 10G", .tester),
+    ("NetAlly", "LinkRunner 100G", .tester),
+    ("", "NetAlly AirCheck G3", .tester),
+    ("", "CyberScope", .tester),
+    ("NetAlly", "", .tester),
+    ("Google", "Pixel 8", .phone),
+    ("Samsung", "Galaxy S24", .phone),
+    ("samsung", "SM-S921U", .phone),
+    ("", "", .phone),
+    ("Google", "Pixel Tablet", .tablet),
+    ("Samsung", "Galaxy Tab S9", .tablet),
+    ("samsung", "SM-X710", .tablet),
+    ("samsung", "SM-T870", .tablet),
+    ("samsung", "SM-P613", .tablet),
+    ("LENOVO", "Lenovo TB-X606F", .tablet),
+    ("Xiaomi", "Mi Pad 5", .tablet),
+    ("Google", "Pixel Fold", .phone),
+    ("Motorola", "moto g stylus", .phone),
+  ])
+  func theTileShowsTheKindOfDevice(
+    manufacturer: String, model: String, glyph: DevicePresentation.TileGlyph
+  ) {
+    let device = AttachedDevice(
+      info: DeviceInfo(id: DeviceID(serial: "A"), manufacturer: manufacturer, model: model),
+      state: Self.ready, method: .usbADB)
+    #expect(DevicePresentation.tile(of: device) == .init(glyph: glyph, isActive: true))
+  }
+
   @Test func rememberedAndOfferTilesAreNeutral() {
-    #expect(DevicePresentation.rememberedTile == .init(symbol: "wifi.slash", isActive: false))
-    #expect(DevicePresentation.offerTile == .init(symbol: "wifi", isActive: false))
+    #expect(
+      DevicePresentation.rememberedTile == .init(glyph: .symbol("wifi.slash"), isActive: false))
+    #expect(DevicePresentation.offerTile == .init(glyph: .symbol("wifi"), isActive: false))
   }
 
   // MARK: Actions
@@ -183,12 +213,15 @@ struct MenuPresentationTests {
   }
 
   @Test func eachTileSymbolExists() {
-    let tiles =
-      [DevicePresentation.rememberedTile, DevicePresentation.offerTile]
-      + ConnectionMethod.allCases.map { DevicePresentation.tile(of: Self.attached(Self.ready, $0)) }
-    for tile in tiles {
-      #expect(NSImage(systemSymbolName: tile.symbol, accessibilityDescription: nil) != nil)
+    let glyphs: [DevicePresentation.TileGlyph] = [
+      DevicePresentation.rememberedTile.glyph, DevicePresentation.offerTile.glyph, .phone,
+    ]
+    for glyph in glyphs {
+      let name = try? #require(glyph.symbolName)
+      #expect(NSImage(systemSymbolName: name ?? "", accessibilityDescription: nil) != nil)
     }
+    #expect(DevicePresentation.TileGlyph.tester.symbolName == nil)
+    #expect(DevicePresentation.TileGlyph.tablet.symbolName == nil)
   }
 
   @Test(arguments: [

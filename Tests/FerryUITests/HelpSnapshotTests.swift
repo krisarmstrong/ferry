@@ -5,10 +5,11 @@ import Testing
 @testable import FerryUI
 
 /// Draws the Help window offscreen: once searching, and once on the Troubleshooting topic a
-/// Help link opened. Each must show something besides its background. Offscreen, the sidebar's
-/// list and the search text do not draw; the detail and the toolbar do. With
-/// `FERRY_HELP_SNAPSHOTS` naming a folder, the images are also written there as
-/// `help-search.png` and `help-trouble.png`.
+/// Help link opened; and one topic on its own, in light and dark. Each must show something
+/// besides its background. Offscreen, the sidebar's list and the search text do not draw; the
+/// detail and the toolbar do. With `FERRY_HELP_SNAPSHOTS` naming a folder, the images are also
+/// written there as `help-search.png`, `help-trouble.png`, `help-topic-light.png` and
+/// `help-topic-dark.png`.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct HelpSnapshotTests {
@@ -60,5 +61,24 @@ struct HelpSnapshotTests {
     let bitmap = try drawnWindow(query: "", message: "The device was disconnected.")
     #expect(distinctColors(bitmap) > 10)
     try save(bitmap, as: "help-trouble.png")
+  }
+
+  @Test(arguments: [ColorScheme.light, .dark])
+  func aTopicDraws(scheme: ColorScheme) throws {
+    let topic = try #require(HelpContent.bundled?.topics.first { $0.id == "connect-tester" })
+    let view = NSHostingView(
+      rootView: HelpTopicDetail(topic: topic, highlighted: nil, model: AppModel.preview([]))
+        .frame(width: 640, height: 270)
+        .background(Color(nsColor: .windowBackgroundColor)))
+    let appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+    view.appearance = appearance
+    view.frame = CGRect(x: 0, y: 0, width: 640, height: 270)
+    view.layoutSubtreeIfNeeded()
+    let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+    appearance?.performAsCurrentDrawingAppearance {
+      view.cacheDisplay(in: view.bounds, to: bitmap)
+    }
+    #expect(distinctColors(bitmap) > 10)
+    try save(bitmap, as: scheme == .dark ? "help-topic-dark.png" : "help-topic-light.png")
   }
 }

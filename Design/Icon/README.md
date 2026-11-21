@@ -1,23 +1,35 @@
 # Ferry icon
 
-A white ferry hull carrying a document, on a deep blue to teal gradient with a soft band of
-water. It says what the app does: carry files across, between a device and the Mac.
+A white ferry, bow to the right, carrying two files across the water: a green one behind and
+a white one in front with its corner folded. It says what the app does: carry files across,
+between an Android device and the Mac.
 
 ## Files
 
 | Path | What it is |
 | ---- | ---------- |
 | `layers/background.svg` | Full-bleed 1024 gradient, `#1D3E94` → `#0E8597`. Used by the classic render; the `.icon` bundle sets the same gradient as its fill. |
-| `layers/water.svg` | Water band, white at 16 % opacity. |
-| `layers/hull.svg`, `layers/cargo.svg` | Foreground glyph for 128 px and up. |
-| `layers/hull-small.svg`, `layers/cargo-small.svg` | 32 px glyph, drawn on that size's pixel grid (1 px = 1024/26 units). |
-| `layers/hull-16.svg`, `layers/cargo-16.svg` | 16 px glyph on its pixel grid (1 px = 1024/14 units); no fold, no water. |
-| `Ferry.icon/` | Icon Composer bundle (`icon.json` + `Assets/`). Light and dark fills; glyph layers use Liquid Glass. |
+| `layers/water.svg` | The water behind the hull, white at 12 % opacity. |
+| `layers/wave.svg` | The water in front of the hull, over its keel, white at 18 %. |
+| `layers/hull.svg`, `layers/cargo.svg` | Foreground glyph for 128 px and up: the hull with three portholes, and the two files. |
+| `layers/hull-small.svg`, `layers/cargo-small.svg` | 32 px glyph, drawn on that size's pixel grid (1 px = 1024/26 units); no portholes. |
+| `layers/hull-16.svg`, `layers/cargo-16.svg` | 16 px glyph on its pixel grid (1 px = 1024/14 units); no water. |
+| `Ferry.icon/` | Icon Composer bundle (`icon.json` + `Assets/`). Light and dark fills; the hull and files use Liquid Glass. |
 | `AppIcon.appiconset/` | Classic PNGs, 16–512 pt at 1x and 2x, with `Contents.json`. |
-| `MenuBarGlyph.svg`, `MenuBarGlyph-{16,18,32,36}.png` | Black-and-alpha template glyph, drawn on an 18 pt grid (crisp at 18 and 36 px). |
-| `Ferry.png` | 512 px render for the README. |
-| `preview.png` | Review sheet: every size on light and dark, 8x zooms of 16 and 32 px, menu bar glyph. |
-| `actool-render-256.png` | How `actool` renders `Ferry.icon` (the system's glass, not ours). |
+| `MenuBarGlyph-{16,18,22}.svg` | Black-and-alpha template glyph on 16, 18 and 22 pt grids. The app uses the 18 pt one. |
+| `MenuBarGlyph-{16,18,22}{,@2x}.png` | Their renders, for review. |
+| `Ferry.png` | 512 px render of `Ferry.icon` by Icon Composer's renderer, for the README. |
+
+The generated files outside this folder:
+
+| Path | What it is |
+| ---- | ---------- |
+| `Apps/Ferry/Assets.xcassets/MenuBarGlyph.imageset/MenuBarGlyph.svg` | Copy of `MenuBarGlyph-18.svg`, the status item's vector template. |
+| `Apps/FerryProvider/Assets.xcassets/ferry.location.symbolset/` | Finder location symbol, from `MenuBarGlyph-18.svg`. |
+| `Design/previews/icon-appearances.png` | `Ferry.icon` in every macOS 26 appearance: default, dark, tinted and clear, light and dark. |
+| `Design/previews/icon-sizes.png` | Classic sizes on light and dark, with 8x zooms of 16 and 32 px. |
+| `Design/previews/menubar-glyph.png` | The glyph in a menu bar beside system symbols, and each size's pixels at 1x and 2x. |
+| `Design/previews/finder-location-symbol.png` | The location symbol beside Finder's own sidebar symbols. |
 
 The 1024 canvas follows Apple's macOS grid: in the classic render the shape is an 824 px
 continuous-corner square inset 100 px, with a shadow below. At 16 and 32 px the shape snaps to whole
@@ -29,39 +41,56 @@ full-bleed and the system applies the shape, glass and shadow.
 From the repository root:
 
 ```sh
+python3 Design/Icon/scripts/location-symbol.py
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift Design/Icon/scripts/render.swift
 ```
 
-It copies the glyph and water layers into `Ferry.icon/Assets/` and rewrites every PNG listed
-above. It uses only AppKit (`NSImage` reads SVG through CoreSVG), so nothing needs installing.
-Edit the SVGs in `layers/`, never the copies in `Ferry.icon/Assets/`.
+`location-symbol.py` writes the Finder location symbol from the 18 pt glyph. `render.swift`
+copies the layers into `Ferry.icon/Assets/`, rewrites every PNG listed above, and renders the
+previews. It uses AppKit (`NSImage` reads SVG through CoreSVG), `actool`, and Icon Composer's
+`ictool` from inside Xcode, so nothing needs installing. Edit the SVGs in `layers/`, never the
+copies in `Ferry.icon/Assets/`.
 
-To check the `.icon` bundle compiles and to see the system's rendering:
+To export one appearance by hand:
 
 ```sh
-out=$(mktemp -d)
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun actool Design/Icon/Ferry.icon \
-  --compile "$out" --platform macosx --minimum-deployment-target 26.0 --app-icon Ferry \
-  --output-partial-info-plist "$out/partial.plist"
-iconutil -c iconset "$out/Ferry.icns" -o "$out/Ferry.iconset"
+"/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool" \
+  Design/Icon/Ferry.icon --export-image --output-file dark.png --platform macOS \
+  --rendition Dark --width 1024 --height 1024 --scale 1
 ```
 
-Open `Ferry.icon` in Icon Composer
-(`/Applications/Xcode.app/Contents/Applications/Icon Composer.app`) to preview the dark,
-tinted and clear appearances.
+Renditions: `Default`, `Dark`, `TintedLight`, `TintedDark` (with `--tint-color` and
+`--tint-strength`), `ClearLight`, `ClearDark`.
 
 ## Appearances
 
-- **Default:** blue to teal gradient, white glyph with glass.
+- **Default:** blue to teal gradient, white hull and files with glass.
 - **Dark:** a darker gradient (`#0B1A44` → `#07505C`) set in `fill-specializations`; the
   glyph stays light.
-- **Tinted and clear:** the system derives them from layer luminance. The glyph is the only
-  bright shape, so it carries the tint; the water band stays faint.
+- **Tinted and clear:** the system derives them from layer luminance. The hull and files are
+  the bright shapes, so they carry the tint; the water stays faint.
 
 ## Menu bar
 
-Recommendation: use `MenuBarGlyph` (as a template image) instead of the SF Symbol
-`externaldrive.connected.to.line.below`. The symbol is a generic external drive that other
-disk utilities also show; the glyph matches the app icon and reads cleanly at 18 px. The
-trade-off: a template image has no SF Symbol weights or variants (such as a status badge). If
-those are wanted, export the glyph as a custom SF Symbol with the SF Symbols app.
+The status item draws `MenuBarGlyph` (a template image) at 18 pt, its intrinsic size. The 16
+and 22 pt drawings are the same glyph on those grids, for a smaller or larger menu bar if one is
+ever wanted. In all three every vertical and horizontal edge sits on a whole point, so it lands
+on pixels at 1x and 2x; only the curves of the hull and bow are anti-aliased.
+
+## Finder location
+
+A FileProvider domain has no icon of its own in the API. Finder's sidebar shows a domain with
+the symbol its extension names in `CFBundleIcons` → `CFBundlePrimaryIcon` →
+`CFBundleSymbolName`, as other FileProvider apps do. `FerryProvider`'s Info.plist names
+`ferry.location`, a custom symbol in its asset catalog. It has one weight (Regular, medium
+scale); the system scales it for the sidebar.
+
+
+## Device tiles
+
+A device row's tile shows what kind of device it is: `smartphone` for a phone, and two glyphs
+drawn in code (`DeviceGlyph` in `Sources/FerryUI`) for a handheld network tester and a tablet,
+which SF Symbols has no non-Apple symbol for. They follow `smartphone`'s style, a solid body
+around a screen at a third of the ink. `DevicePresentation.kind(manufacturer:model:)` decides the
+kind from the names the device reports. `Design/previews/device-tiles.png` shows every tile;
+`MenuSnapshotTests` writes it.

@@ -1,28 +1,34 @@
-// Renders Ferry's icon assets from the SVG layers in Design/Icon/layers.
+// Renders Ferry's icon assets from the SVG sources in Design/Icon.
 //
 //   swift Design/Icon/scripts/render.swift        (run from the repository root)
 //
 // Writes:
-//   Design/Icon/Ferry.icon/Assets/*.svg        copies of the layers Icon Composer uses
-//   Design/Icon/AppIcon.appiconset/*.png       classic icon, squircle and shadow drawn here
-//   Design/Icon/MenuBarGlyph-{16,18,32,36}.png template images (black + alpha)
-//   Design/Icon/Ferry.png                      512 px icon for the README
-//   Design/Icon/preview.png                    review sheet, light and dark
+//   Design/Icon/Ferry.icon/Assets/*.svg             copies of the layers Icon Composer uses
+//   Design/Icon/AppIcon.appiconset/*.png            classic icon, squircle and shadow drawn here
+//   Design/Icon/MenuBarGlyph-{16,18,22}{,@2x}.png   template images (black + alpha)
+//   Apps/Ferry/Assets.xcassets/MenuBarGlyph.imageset/MenuBarGlyph.svg   the 18 pt glyph
+//   Design/Icon/Ferry.png                           512 px icon for the README, as macOS draws it
+//   Design/previews/icon-appearances.png            Ferry.icon as macOS draws it, every appearance
+//   Design/previews/icon-sizes.png                  classic sizes on light and dark, 8x zooms
+//   Design/previews/menubar-glyph.png               the menu bar glyph at 16, 18 and 22 pt
+//   Design/previews/finder-location-symbol.png      the Finder sidebar symbol beside Finder's own
 //
-// Uses only AppKit: NSImage loads SVG through CoreSVG on macOS 14 and later.
+// The appearances come from Icon Composer's own renderer (ictool, inside Xcode); everything
+// else uses only AppKit (NSImage reads SVG through CoreSVG).
 
 import AppKit
 
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let iconDir = root.appending(path: "Design/Icon")
 let layersDir = iconDir.appending(path: "layers")
+let previewsDir = root.appending(path: "Design/previews")
 guard FileManager.default.fileExists(atPath: layersDir.path) else {
   FileHandle.standardError.write(Data("Run from the repository root.\n".utf8))
   exit(1)
 }
+try! FileManager.default.createDirectory(at: previewsDir, withIntermediateDirectories: true)
 
-func svg(_ name: String) -> NSImage {
-  let url = layersDir.appending(path: "\(name).svg")
+func load(_ url: URL) -> NSImage {
   guard let image = NSImage(contentsOf: url) else {
     FileHandle.standardError.write(Data("Cannot load \(url.path)\n".utf8))
     exit(1)
@@ -30,15 +36,22 @@ func svg(_ name: String) -> NSImage {
   return image
 }
 
+func svg(_ name: String) -> NSImage { load(layersDir.appending(path: "\(name).svg")) }
+
 let background = svg("background")
 let water = svg("water")
+let wave = svg("wave")
 let hull = svg("hull")
 let cargo = svg("cargo")
 let smallHull = svg("hull-small")
 let smallCargo = svg("cargo-small")
 let hull16 = svg("hull-16")
 let cargo16 = svg("cargo-16")
-let menuGlyph = NSImage(contentsOf: iconDir.appending(path: "MenuBarGlyph.svg"))!
+let glyphSizes = [16, 18, 22]
+let glyphs = Dictionary(
+  uniqueKeysWithValues: glyphSizes.map {
+    ($0, load(iconDir.appending(path: "MenuBarGlyph-\($0).svg")))
+  })
 
 /// A bitmap with exactly `width` x `height` pixels, drawn at 1 point per pixel.
 func bitmap(_ width: Int, _ height: Int, _ draw: (CGContext) -> Void) -> NSBitmapImageRep {
@@ -59,6 +72,12 @@ func bitmap(_ width: Int, _ height: Int, _ draw: (CGContext) -> Void) -> NSBitma
 
 func write(_ rep: NSBitmapImageRep, _ url: URL) {
   try! rep.representation(using: .png, properties: [:])!.write(to: url)
+}
+
+/// Composites `rep` into `rect` of the current context, keeping its transparency.
+func composite(_ rep: NSImageRep, in rect: CGRect) {
+  rep.draw(
+    in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: false, hints: nil)
 }
 
 /// Apple's continuous-corner app shape, approximated by a superellipse (n = 5).
@@ -102,10 +121,13 @@ func classicIcon(_ px: Int) -> NSBitmapImageRep {
     cg.addPath(shape)
     cg.clip()
     // At 16 px the water edge only smears behind the hull, so it is left out there.
-    let glyph =
-      px <= 16 ? [background, hull16, cargo16]
-      : px <= 32 ? [background, water, smallHull, smallCargo] : [background, water, hull, cargo]
-    for layer in glyph {
+    let layers =
+      px <= 16
+      ? [background, cargo16, hull16]
+      : px <= 32
+        ? [background, water, smallCargo, smallHull]
+        : [background, water, cargo, hull, wave]
+    for layer in layers {
       layer.draw(in: tile)
     }
     cg.restoreGState()
@@ -113,17 +135,19 @@ func classicIcon(_ px: Int) -> NSBitmapImageRep {
 }
 
 /// Black + alpha only, so macOS can tint it for the menu bar.
-func templateGlyph(_ px: Int) -> NSBitmapImageRep {
-  bitmap(px, px) { _ in menuGlyph.draw(in: CGRect(x: 0, y: 0, width: px, height: px)) }
+func templateGlyph(_ points: Int, scale: Int) -> NSBitmapImageRep {
+  let px = points * scale
+  return bitmap(px, px) { _ in glyphs[points]!.draw(in: CGRect(x: 0, y: 0, width: px, height: px)) }
 }
 
 // Icon Composer bundle: the layers are the source of truth, so copy them in.
-let iconAssets = iconDir.appending(path: "Ferry.icon/Assets")
+let iconBundle = iconDir.appending(path: "Ferry.icon")
+let iconAssets = iconBundle.appending(path: "Assets")
+try? FileManager.default.removeItem(at: iconAssets)
 try! FileManager.default.createDirectory(at: iconAssets, withIntermediateDirectories: true)
-for name in ["water", "hull", "cargo"] {
-  let target = iconAssets.appending(path: "\(name).svg")
-  try? FileManager.default.removeItem(at: target)
-  try! FileManager.default.copyItem(at: layersDir.appending(path: "\(name).svg"), to: target)
+for name in ["water", "wave", "hull", "cargo"] {
+  try! FileManager.default.copyItem(
+    at: layersDir.appending(path: "\(name).svg"), to: iconAssets.appending(path: "\(name).svg"))
 }
 
 // Classic app icon set.
@@ -144,93 +168,246 @@ let contents: [String: Any] = ["images": images, "info": ["author": "xcode", "ve
 try! JSONSerialization.data(withJSONObject: contents, options: [.prettyPrinted, .sortedKeys])
   .write(to: appIconSet.appending(path: "Contents.json"))
 
-for px in [16, 18, 32, 36] {
-  write(templateGlyph(px), iconDir.appending(path: "MenuBarGlyph-\(px).png"))
+for points in glyphSizes {
+  write(templateGlyph(points, scale: 1), iconDir.appending(path: "MenuBarGlyph-\(points).png"))
+  write(templateGlyph(points, scale: 2), iconDir.appending(path: "MenuBarGlyph-\(points)@2x.png"))
 }
-write(classicIcon(512), iconDir.appending(path: "Ferry.png"))
+// The app's status item draws the 18 pt glyph as a vector template.
+let imageset = root.appending(path: "Apps/Ferry/Assets.xcassets/MenuBarGlyph.imageset/MenuBarGlyph.svg")
+try? FileManager.default.removeItem(at: imageset)
+try! FileManager.default.copyItem(at: iconDir.appending(path: "MenuBarGlyph-18.svg"), to: imageset)
 
-// Preview sheet.
+// MARK: - Previews
+
+let ink = NSColor(white: 0.1, alpha: 1)
+let paper = NSColor(white: 0.96, alpha: 1)
+let night = NSColor(white: 0.12, alpha: 1)
+
+func label(_ text: String, _ x: CGFloat, _ y: CGFloat, color: NSColor, size: CGFloat = 28) {
+  let attributes: [NSAttributedString.Key: Any] = [
+    .font: NSFont.systemFont(ofSize: size, weight: .semibold), .foregroundColor: color,
+  ]
+  (text as NSString).draw(at: CGPoint(x: x, y: y), withAttributes: attributes)
+}
+
+/// Ferry.icon drawn by Icon Composer's renderer, in one appearance.
+func rendition(_ name: String, tint: Double? = nil) -> NSBitmapImageRep {
+  let developer = ProcessInfo.processInfo.environment["DEVELOPER_DIR"]
+    ?? "/Applications/Xcode.app/Contents/Developer"
+  let tool = URL(filePath: developer).deletingLastPathComponent()
+    .appending(path: "Applications/Icon Composer.app/Contents/Executables/ictool")
+  let output = FileManager.default.temporaryDirectory.appending(path: "ferry-\(name).png")
+  let process = Process()
+  process.executableURL = tool
+  var arguments = [
+    iconBundle.path, "--export-image", "--output-file", output.path, "--platform", "macOS",
+    "--rendition", name, "--width", "512", "--height", "512", "--scale", "1",
+  ]
+  if let tint { arguments += ["--tint-color", "\(tint)", "--tint-strength", "0.8"] }
+  process.arguments = arguments
+  process.standardOutput = FileHandle.nullDevice
+  try! process.run()
+  process.waitUntilExit()
+  guard process.terminationStatus == 0, let data = try? Data(contentsOf: output),
+    let rep = NSBitmapImageRep(data: data)
+  else {
+    FileHandle.standardError.write(Data("ictool could not render \(name)\n".utf8))
+    exit(1)
+  }
+  return rep
+}
+
+// Every appearance macOS 26 offers, each on the backdrop it is shown against.
+let appearances: [(String, String, Double?, Bool)] = [
+  ("Default", "Default", nil, false), ("Dark", "Dark", nil, true),
+  ("TintedLight", "Tinted (light)", 0.58, false), ("TintedDark", "Tinted (dark)", 0.58, true),
+  ("ClearLight", "Clear (light)", nil, false), ("ClearDark", "Clear (dark)", nil, true),
+]
+let cell = 620
+let appearanceSheet = bitmap(cell * 3, cell * 2) { cg in
+  for (index, (name, title, tint, dark)) in appearances.enumerated() {
+    let x = CGFloat(index / 2 * cell)
+    let y = CGFloat((1 - index % 2) * cell)
+    let backdrop = CGRect(x: x, y: y, width: CGFloat(cell), height: CGFloat(cell))
+    if name.hasPrefix("Clear") {
+      // Clear icons are meant to be seen over a picture: a soft wallpaper-like gradient.
+      let colors =
+        dark
+        ? [NSColor(srgbRed: 0.10, green: 0.12, blue: 0.22, alpha: 1).cgColor,
+          NSColor(srgbRed: 0.28, green: 0.14, blue: 0.30, alpha: 1).cgColor]
+        : [NSColor(srgbRed: 0.98, green: 0.80, blue: 0.62, alpha: 1).cgColor,
+          NSColor(srgbRed: 0.62, green: 0.78, blue: 0.96, alpha: 1).cgColor]
+      let gradient = CGGradient(
+        colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray, locations: nil)!
+      cg.saveGState()
+      cg.clip(to: backdrop)
+      cg.drawLinearGradient(
+        gradient, start: backdrop.origin, end: CGPoint(x: backdrop.maxX, y: backdrop.maxY),
+        options: [])
+      cg.restoreGState()
+    } else {
+      cg.setFillColor((dark ? night : paper).cgColor)
+      cg.fill(backdrop)
+    }
+    composite(rendition(name, tint: tint), in: CGRect(x: x + 54, y: y + 70, width: 512, height: 512))
+    label(title, x + 30, y + 24, color: dark ? paper : ink)
+  }
+}
+write(appearanceSheet, previewsDir.appending(path: "icon-appearances.png"))
+// The README shows the icon as macOS draws it.
+write(rendition("Default"), iconDir.appending(path: "Ferry.png"))
+
 func nearestNeighbour(_ rep: NSBitmapImageRep, _ factor: Int) -> NSImage {
   let image = NSImage(size: NSSize(width: rep.pixelsWide * factor, height: rep.pixelsHigh * factor))
   image.addRepresentation(rep)
   return image
 }
 
+// Classic sizes, bottoms aligned, then 8x nearest-neighbour zooms of the small renders.
 let sheetWidth = 2600
 let panelHeight = 1240
-let sheet = bitmap(sheetWidth, panelHeight * 2) { cg in
-  let panels: [(String, NSColor, NSColor)] = [
-    ("Light", NSColor(white: 0.96, alpha: 1), NSColor(white: 0.1, alpha: 1)),
-    ("Dark", NSColor(white: 0.12, alpha: 1), NSColor(white: 0.92, alpha: 1)),
-  ]
-  for (index, (name, fill, ink)) in panels.enumerated() {
+let sizesSheet = bitmap(sheetWidth, panelHeight * 2) { cg in
+  for (index, (name, fill, text)) in [("Light", paper, ink), ("Dark", night, paper)].enumerated() {
     let originY = CGFloat(panelHeight * (1 - index))
     cg.setFillColor(fill.cgColor)
     cg.fill(CGRect(x: 0, y: originY, width: CGFloat(sheetWidth), height: CGFloat(panelHeight)))
-    let attributes: [NSAttributedString.Key: Any] = [
-      .font: NSFont.systemFont(ofSize: 28, weight: .semibold), .foregroundColor: ink,
-    ]
-    func label(_ text: String, _ x: CGFloat, _ y: CGFloat) {
-      (text as NSString).draw(at: CGPoint(x: x, y: originY + y), withAttributes: attributes)
-    }
-    label(name, 40, CGFloat(panelHeight) - 60)
-
-    // Icons at their real pixel sizes, bottoms aligned.
+    label(name, 40, originY + CGFloat(panelHeight) - 60, color: text)
     var x: CGFloat = 40
     let base: CGFloat = 120
     for px in [1024, 512, 128, 32, 16] {
-      // NSImageRep.draw(in:) copies pixels; composite instead so the transparent corners show.
-      classicIcon(px).draw(
-        in: CGRect(x: x, y: originY + base, width: CGFloat(px), height: CGFloat(px)), from: .zero,
-        operation: .sourceOver, fraction: 1, respectFlipped: false, hints: nil)
-      label("\(px)", x, base - 50)
+      composite(classicIcon(px), in: CGRect(x: x, y: originY + base, width: CGFloat(px), height: CGFloat(px)))
+      label("\(px)", x, originY + base - 50, color: text)
       x += CGFloat(px) + 40
     }
-
-    // 8x nearest-neighbour zooms of the small renders, to judge the pixels.
     var zoomX: CGFloat = 1960
     for px in [16, 32] {
-      let zoomed = nearestNeighbour(classicIcon(px), 8)
       NSGraphicsContext.current?.imageInterpolation = .none
-      zoomed.draw(in: CGRect(x: zoomX, y: originY + base, width: CGFloat(px * 8), height: CGFloat(px * 8)))
+      nearestNeighbour(classicIcon(px), 8).draw(
+        in: CGRect(x: zoomX, y: originY + base, width: CGFloat(px * 8), height: CGFloat(px * 8)))
       NSGraphicsContext.current?.imageInterpolation = .high
-      label("\(px) px x8", zoomX, base - 50)
+      label("\(px) px x8", zoomX, originY + base - 50, color: text)
       zoomX += CGFloat(px * 8) + 40
     }
-
-    // Menu bar glyph: tinted the way macOS tints template images, at 1x and at 8x.
-    let bar = CGRect(x: 1960, y: originY + 560, width: 520, height: 44)
-    cg.setFillColor((index == 0 ? NSColor(white: 0.9, alpha: 1) : NSColor(white: 0.2, alpha: 1)).cgColor)
-    cg.fill(bar)
-    let tint = index == 0 ? NSColor.black : NSColor.white
-    func tinted(_ rep: NSBitmapImageRep) -> NSImage {
-      let image = NSImage(size: NSSize(width: rep.pixelsWide, height: rep.pixelsHigh))
-      image.lockFocus()
-      rep.draw(in: NSRect(origin: .zero, size: image.size))
-      tint.set()
-      NSRect(origin: .zero, size: image.size).fill(using: .sourceAtop)
-      image.unlockFocus()
-      return image
-    }
-    tinted(templateGlyph(18)).draw(in: CGRect(x: bar.minX + 20, y: bar.minY + 13, width: 18, height: 18))
-    let symbol = NSImage(
-      systemSymbolName: "externaldrive.connected.to.line.below", accessibilityDescription: nil)!
-      .withSymbolConfiguration(.init(pointSize: 15, weight: .regular))!
-    let symbolTinted = NSImage(size: symbol.size, flipped: false) { rect in
-      symbol.draw(in: rect)
-      tint.set()
-      rect.fill(using: .sourceAtop)
-      return true
-    }
-    symbolTinted.draw(at: CGPoint(x: bar.minX + 70, y: bar.minY + (44 - symbol.size.height) / 2),
-      from: .zero, operation: .sourceOver, fraction: 1)
-    label("menu bar: glyph | SF Symbol", 1960, 520)
-    NSGraphicsContext.current?.imageInterpolation = .none
-    tinted(templateGlyph(18)).draw(in: CGRect(x: 1960, y: originY + 680, width: 144, height: 144))
-    tinted(templateGlyph(36)).draw(in: CGRect(x: 2140, y: originY + 680, width: 144, height: 144))
-    NSGraphicsContext.current?.imageInterpolation = .high
-    label("glyph 18 px x8 | 36 px x4", 1960, 840)
   }
 }
-write(sheet, iconDir.appending(path: "preview.png"))
-print("Rendered icon assets into \(iconDir.path)")
+write(sizesSheet, previewsDir.appending(path: "icon-sizes.png"))
+
+/// A template image tinted the way macOS tints the menu bar.
+func tinted(_ rep: NSBitmapImageRep, _ tint: NSColor) -> NSImage {
+  let image = NSImage(size: NSSize(width: rep.pixelsWide, height: rep.pixelsHigh))
+  image.lockFocus()
+  rep.draw(in: NSRect(origin: .zero, size: image.size))
+  tint.set()
+  NSRect(origin: .zero, size: image.size).fill(using: .sourceAtop)
+  image.unlockFocus()
+  return image
+}
+
+// The glyph in a menu bar at 2x (as on every current Mac), then each size's pixels at 1x and 2x.
+let glyphSheet = bitmap(1400, 1000) { cg in
+  for (index, (fill, tint)) in [
+    (NSColor(white: 0.93, alpha: 1), NSColor.black), (NSColor(white: 0.16, alpha: 1), NSColor.white),
+  ].enumerated() {
+    let originY = CGFloat(500 * (1 - index))
+    cg.setFillColor(fill.cgColor)
+    cg.fill(CGRect(x: 0, y: originY, width: 1400, height: 500))
+    let bar = CGRect(x: 40, y: originY + 400, width: 1320, height: 48)
+    cg.setFillColor(fill.blended(withFraction: 0.08, of: tint)!.cgColor)
+    cg.fill(bar)
+    // Neighbours for scale: system symbols at the menu bar's size, then Ferry's glyph.
+    var x = bar.minX + 24
+    for name in ["wifi", "battery.75percent", "magnifyingglass"] {
+      let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)!
+        .withSymbolConfiguration(.init(pointSize: 30, weight: .regular))!
+      let image = NSImage(size: symbol.size, flipped: false) { rect in
+        symbol.draw(in: rect)
+        tint.set()
+        rect.fill(using: .sourceAtop)
+        return true
+      }
+      image.draw(at: CGPoint(x: x, y: bar.midY - symbol.size.height / 2), from: .zero,
+        operation: .sourceOver, fraction: 1)
+      x += symbol.size.width + 32
+    }
+    tinted(templateGlyph(18, scale: 2), tint).draw(
+      in: CGRect(x: x, y: bar.midY - 18, width: 36, height: 36))
+    label("menu bar at 2x: Wi-Fi, battery, Spotlight, Ferry", bar.minX, bar.minY - 44, color: tint,
+      size: 22)
+    // Each size: 1x at 8x zoom, 2x at 4x zoom.
+    var zoomX: CGFloat = 40
+    for points in glyphSizes {
+      NSGraphicsContext.current?.imageInterpolation = .none
+      let side = CGFloat(points * 8)
+      tinted(templateGlyph(points, scale: 1), tint).draw(
+        in: CGRect(x: zoomX, y: originY + 70, width: side, height: side))
+      tinted(templateGlyph(points, scale: 2), tint).draw(
+        in: CGRect(x: zoomX + side + 20, y: originY + 70, width: side, height: side))
+      NSGraphicsContext.current?.imageInterpolation = .high
+      label("\(points) pt: 1x | 2x", zoomX, originY + 24, color: tint, size: 22)
+      zoomX += side * 2 + 70
+    }
+  }
+}
+write(glyphSheet, previewsDir.appending(path: "menubar-glyph.png"))
+
+// The Finder location symbol (scripts/location-symbol.py), compiled by actool as the
+// extension's catalog is, beside Finder's own sidebar symbols at the sidebar's sizes.
+let symbolBundle = FileManager.default.temporaryDirectory.appending(path: "ferry-symbol.bundle")
+let symbolResources = symbolBundle.appending(path: "Contents/Resources")
+try? FileManager.default.removeItem(at: symbolBundle)
+try! FileManager.default.createDirectory(at: symbolResources, withIntermediateDirectories: true)
+try! PropertyListSerialization.data(
+  fromPropertyList: ["CFBundleIdentifier": "io.github.krisarmstrong.ferry.symbol-preview"],
+  format: .xml, options: 0
+).write(to: symbolBundle.appending(path: "Contents/Info.plist"))
+let actool = Process()
+actool.executableURL = URL(filePath: "/usr/bin/xcrun")
+actool.arguments = [
+  "actool", root.appending(path: "Apps/FerryProvider/Assets.xcassets").path, "--compile",
+  symbolResources.path, "--platform", "macosx", "--minimum-deployment-target", "26.0",
+  "--output-partial-info-plist", symbolBundle.appending(path: "partial.plist").path,
+]
+actool.standardOutput = FileHandle.nullDevice
+try! actool.run()
+actool.waitUntilExit()
+guard actool.terminationStatus == 0, let compiled = Bundle(url: symbolBundle),
+  let location = NSImage(symbolName: "ferry.location", bundle: compiled, variableValue: 1)
+else {
+  FileHandle.standardError.write(Data("actool did not compile ferry.location\n".utf8))
+  exit(1)
+}
+let symbolSheet = bitmap(1200, 560) { cg in
+  for (index, (fill, tint)) in [
+    (NSColor(white: 0.95, alpha: 1), NSColor(srgbRed: 0.0, green: 0.48, blue: 1, alpha: 1)),
+    (NSColor(white: 0.17, alpha: 1), NSColor(srgbRed: 0.04, green: 0.52, blue: 1, alpha: 1)),
+  ].enumerated() {
+    let originY = CGFloat(280 * (1 - index))
+    cg.setFillColor(fill.cgColor)
+    cg.fill(CGRect(x: 0, y: originY, width: 1200, height: 280))
+    let text = index == 0 ? ink : paper
+    var x: CGFloat = 40
+    // Sidebar rows at 2x: Finder's symbols for iCloud Drive and an external disk, then Ferry.
+    for (image, name) in [
+      (NSImage(systemSymbolName: "icloud", accessibilityDescription: nil)!, "iCloud Drive"),
+      (NSImage(systemSymbolName: "externaldrive", accessibilityDescription: nil)!, "Backup"),
+      (location, "EtherScope-nXG"),
+    ] {
+      for (row, weight) in [(0, NSFont.Weight.regular), (1, .semibold)] {
+        let symbol = image.withSymbolConfiguration(.init(pointSize: 30, weight: weight))!
+        let tintedSymbol = NSImage(size: symbol.size, flipped: false) { rect in
+          symbol.draw(in: rect)
+          tint.set()
+          rect.fill(using: .sourceAtop)
+          return true
+        }
+        let y = originY + 180 - CGFloat(row) * 90
+        tintedSymbol.draw(at: CGPoint(x: x, y: y - symbol.size.height / 2), from: .zero,
+          operation: .sourceOver, fraction: 1)
+        label(name, x + 56, y - 16, color: text, size: 26)
+      }
+      x += 380
+    }
+  }
+}
+write(symbolSheet, previewsDir.appending(path: "finder-location-symbol.png"))
+print("Rendered icon assets into \(iconDir.path) and previews into \(previewsDir.path)")
