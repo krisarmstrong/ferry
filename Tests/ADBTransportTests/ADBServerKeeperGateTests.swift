@@ -129,4 +129,26 @@ struct ADBServerKeeperGateTests {
     #expect(await keeper.replaceFerryServer(fetched: Keeper.adb) == false)
     #expect(fakes { $0.kills } == 0)
   }
+
+  // MARK: The record during a replacement (review I4, M1)
+
+  /// The trackers start the new server while the old one is still exiting: the new server's
+  /// record stays, and the stop ends when the old PID is gone, not when the port falls silent.
+  @Test(.timeLimit(.minutes(1)))
+  func aServerStartedDuringTheStopKeepsItsRecord() async throws {
+    let fakes = Keeper.Fakes()
+    let record = Keeper.recordFile()
+    defer { try? FileManager.default.removeItem(at: record) }
+    try Self.recordedOrphan(fakes, record: record)
+    let restart = Box<ADBServerKeeper?>(nil)
+    let keeper = Keeper.keeper(
+      fakes, record: record, exits: .milliseconds(300),
+      whileStopping: { try? await restart.value?.start(Keeper.adb) })
+    await restart.set(keeper)
+    let began = ContinuousClock.now
+    #expect(await keeper.replaceRecordedOrphan())
+    #expect(fakes { $0.spawned.count } == 1)
+    #expect(began.duration(to: .now) < .seconds(1))
+    #expect(ADBServerRecord.load(record)?.pid == 4242)
+  }
 }

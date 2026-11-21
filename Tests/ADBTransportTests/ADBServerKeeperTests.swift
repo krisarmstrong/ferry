@@ -70,7 +70,12 @@ struct ADBServerKeeperTests {
     FileManager.default.temporaryDirectory.appending(path: "ferry-adb-server-\(UUID()).json")
   }
 
-  static func keeper(_ fakes: Fakes, record: URL) -> ADBServerKeeper {
+  /// `exits` is how long a killed server takes to exit (its PID stops running): at once if nil.
+  /// `whileStopping` runs inside the kill, as a tracker restarting the server would.
+  static func keeper(
+    _ fakes: Fakes, record: URL, exits: Duration? = nil,
+    whileStopping: (@Sendable () async -> Void)? = nil
+  ) -> ADBServerKeeper {
     ADBServerKeeper(
       port: 5037, record: record, spawner: FakeSpawner(fakes: fakes),
       table: FakeTable(fakes: fakes),
@@ -84,9 +89,17 @@ struct ADBServerKeeperTests {
         }
       },
       kill: {
-        fakes { state in
+        let pid = fakes { state -> pid_t? in
           state.kills += 1
           state.answering = false
+          return state.listener
+        }
+        await whileStopping?()
+        guard let pid else { return }
+        guard let exits else { return fakes { $0.started[pid] = nil } }
+        Task {
+          try? await Task.sleep(for: exits)
+          fakes { $0.started[pid] = nil }
         }
       },
       limit: .seconds(2), poll: .milliseconds(10))

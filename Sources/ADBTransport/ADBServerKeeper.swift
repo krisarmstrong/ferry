@@ -164,13 +164,18 @@ public actor ADBServerKeeper {
   /// Stops the server once no command is using it, holding new commands back meanwhile, if
   /// `isTheOne` still holds then: the port may have changed hands during the wait. Returns
   /// whether it stopped it.
-  private func replace(if isTheOne: () -> Bool) async -> Bool {
+  private func replace(_ pid: pid_t, if isTheOne: () -> Bool) async -> Bool {
     replacing = true
     if commands > 0 {
       await withCheckedContinuation { waitingReplacement = $0 }
     }
     let stopping = isTheOne()
-    if stopping { await stop() }
+    if stopping {
+      // Before the stop: the trackers start the next server as this one goes, and its record
+      // must stay.
+      removeRecord(naming: pid)
+      await stop(pid)
+    }
     replacing = false
     let waiting = waitingCommands
     waitingCommands = []
@@ -191,9 +196,7 @@ public actor ADBServerKeeper {
     }
     guard isRecorded() else { return false }
     Self.log.notice("replacing the adb server an earlier agent started (\(recorded.pid))")
-    guard await replace(if: isRecorded) else { return false }
-    try? FileManager.default.removeItem(at: record)
-    return true
+    return await replace(recorded.pid, if: isRecorded)
   }
 
   /// For a server no record names: one Ferry's agent started before it kept records outlives
@@ -214,14 +217,22 @@ public actor ADBServerKeeper {
     guard isFerrys() else { return false }
     replacedFerryServer = true
     Self.log.notice("replacing an adb server cut off from the network (\(pid))")
-    return await replace(if: isFerrys)
+    return await replace(pid, if: isFerrys)
   }
 
-  /// `host:kill`, then waits for the port to fall silent so the next start does not find it.
-  private func stop() async {
+  /// The record, if it names `pid`: a newer server's is left.
+  private func removeRecord(naming pid: pid_t) {
+    guard ADBServerRecord.load(record)?.pid == pid else { return }
+    try? FileManager.default.removeItem(at: record)
+  }
+
+  /// `host:kill`, then waits, bounded, for that process to exit. Not for the port to fall
+  /// silent: the trackers may already have a new server answering on it.
+  private func stop(_ pid: pid_t) async {
+    let started = table.started(pid)
     await kill()
     let deadline = ContinuousClock.now + limit
-    while await answers(), ContinuousClock.now < deadline {
+    while started != nil, table.started(pid) == started, ContinuousClock.now < deadline {
       try? await Task.sleep(for: poll)
     }
   }
