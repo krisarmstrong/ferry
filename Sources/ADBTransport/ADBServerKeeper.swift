@@ -53,6 +53,12 @@ public actor ADBServerKeeper {
   private var replacedFerryServer = false
   /// A start under way: both trackers start the server after an outage, and must share it.
   private var starting: Task<Result<Void, ADBError>, Never>?
+  /// adb client commands running now (`whileServing`), which a replacement waits out.
+  private var commands = 0
+  /// A replacement is stopping the server: no command starts until it is done.
+  private var replacing = false
+  private var waitingCommands: [CheckedContinuation<Void, Never>] = []
+  private var waitingReplacement: CheckedContinuation<Void, Never>?
 
   /// `record` is where the server's start is kept, in the agent's own folder.
   public init(port: UInt16 = 5037, record: URL) {
@@ -131,15 +137,53 @@ public actor ADBServerKeeper {
     throw .failed("the adb server did not answer in time")
   }
 
+  /// Runs an adb client command that checked for a server and then uses it. A client finding no
+  /// server forks a daemon of its own, which outlives the agent and is cut off when it exits, so
+  /// a replacement never stops the server under a command, and no command starts during one.
+  public func whileServing<T: Sendable>(
+    _ body: @Sendable () async throws(ADBError) -> T
+  ) async throws(ADBError) -> T {
+    while replacing {
+      await withCheckedContinuation { waitingCommands.append($0) }
+    }
+    commands += 1
+    let result: Result<T, ADBError>
+    do throws(ADBError) {
+      result = .success(try await body())
+    } catch {
+      result = .failure(error)
+    }
+    commands -= 1
+    if commands == 0, let waiting = waitingReplacement {
+      waitingReplacement = nil
+      waiting.resume()
+    }
+    return try result.get()
+  }
+
+  /// Stops the server once no command is using it, holding new commands back meanwhile.
+  private func replace() async {
+    replacing = true
+    if commands > 0 {
+      await withCheckedContinuation { waitingReplacement = $0 }
+    }
+    await stop()
+    replacing = false
+    let waiting = waitingCommands
+    waitingCommands = []
+    for command in waiting { command.resume() }
+  }
+
   /// At agent start: replaces the server an earlier agent recorded, if it is still the one
   /// answering. Returns whether it did.
+  @discardableResult
   public func replaceRecordedOrphan() async -> Bool {
     guard let recorded = ADBServerRecord.load(record), recorded.pid != child,
       table.started(recorded.pid) == recorded.started, table.path(recorded.pid) == recorded.path,
       await answers()
     else { return false }
     Self.log.notice("replacing the adb server an earlier agent started (\(recorded.pid))")
-    await stop()
+    await replace()
     try? FileManager.default.removeItem(at: record)
     return true
   }
@@ -154,7 +198,7 @@ public actor ADBServerKeeper {
     else { return false }
     replacedFerryServer = true
     Self.log.notice("replacing an adb server cut off from the network (\(pid))")
-    await stop()
+    await replace()
     return true
   }
 

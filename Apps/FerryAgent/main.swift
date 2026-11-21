@@ -42,9 +42,10 @@ let vouching = WirelessVouching()
 // time a session for it opens.
 let toolJournal = ToolJournal(store: toolStore)
 // The adb server this agent starts is its child and ends with it. One an earlier agent left
-// running is cut off from the local network, so it is replaced before anything relies on it.
+// running is cut off from the local network, so it is replaced before anything relies on it:
+// before the trackers and the reconnects below exist.
 let adbServer = ADBServerKeeper(record: adbServerRecord)
-Task { await adbServer.replaceRecordedOrphan() }
+await adbServer.replaceRecordedOrphan()
 let adb = ADBTransport(
   keeper: adbServer,
   serving: { vouching.serves($0, as: $1) },
