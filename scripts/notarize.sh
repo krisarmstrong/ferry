@@ -2,14 +2,19 @@
 # Notarizes a file and waits for Apple's verdict: scripts/notarize.sh <file>
 #
 # Two steps. `submit` without `--wait` returns once the upload has succeeded, with the
-# submission's id; `wait` then polls that submission for at most 30 minutes. The notary service
-# drops a connection now and then (NSURLErrorDomain -1005, the network connection was lost, or
-# -1001, timed out), and one such drop failed a release that had nothing wrong with it. Each step
-# tries a drop again, three attempts in all, 30 s and then 60 s apart: a failed upload is
-# uploaded again (json output names no id until it is done), and a dropped wait waits on the same
-# submission, so a file Apple has is never sent twice. Accepted passes; Invalid or Rejected
-# prints the submission's log and fails, never retried; a wait that ends with no verdict fails
-# as a timeout.
+# submission's id; `wait` then polls that submission for at most 30 minutes per attempt. The
+# notary service drops a connection now and then (NSURLErrorDomain -1005, the network connection
+# was lost, or -1001, timed out), and one such drop failed a release that had nothing wrong with
+# it. Each step tries a drop again, three attempts in all, 30 s and then 60 s apart. A dropped
+# wait waits on the same submission, with a fresh 30 minutes, so the waits can take about 91
+# minutes in all (the release jobs' timeouts allow for that). A failed upload is uploaded again,
+# since json output names no id until it is done. Rarely, the upload reached Apple and only the
+# answer was lost, and Apple then has the file twice: that is harmless, because both submissions
+# get the same verdict on the same bytes, the ticket stapled is looked up by the code's hash and
+# not by submission, and the second id is the one waited on. Preventing it would mean matching
+# `notarytool history` entries by name and time, which a lagging history makes unreliable.
+# Accepted passes; Invalid or Rejected prints the submission's log and fails, never retried; a
+# wait that ends with no verdict fails as a timeout.
 #
 # Takes the API key from NOTARY_KEY (the .p8 file's path), NOTARY_KEY_ID and NOTARY_ISSUER_ID.
 # The two identifiers reach notarytool's argv, where `ps` on the runner can see them: they are

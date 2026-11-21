@@ -81,6 +81,10 @@ jobs:
       # The disk image as the release workflow's dmg job makes it, from that build.
       - name: Build the disk image and check it
         run: scripts/make-dmg.sh .build/release/Build/Products/Release/Ferry.app .build/dist/Ferry.dmg
+      # As the publish job checks the image before it signs it, and that the check refuses an
+      # image whose app differs by one byte, or which holds anything more.
+      - name: Check the disk image holds exactly the app
+        run: scripts/check-dmg-contents-test.sh .build/dist/Ferry.dmg .build/release/Build/Products/Release/Ferry.app
 
   # Only runs from push, pull_request and a few other events count for a PR's required checks:
   # a workflow_dispatch run's `check` job passes on the head commit and still does not. Release
