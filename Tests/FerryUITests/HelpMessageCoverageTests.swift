@@ -79,8 +79,8 @@ struct HelpMessageCoverageTests {
     (
       "trouble-network",
       """
-      Ferry needs Local Network access to reach devices over Wi-Fi. Turn it on in System \
-      Settings › Privacy & Security › Local Network.
+      Ferry needs Local Network access to reach devices over Wi-Fi. Turn on FerryAgent (Ferry) \
+      in System Settings › Privacy & Security › Local Network.
       """
     ),
     (

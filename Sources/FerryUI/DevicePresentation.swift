@@ -160,8 +160,8 @@ enum DevicePresentation {
     case .localNetworkDenied:
       LocalizedStringResource(
         """
-        Ferry needs Local Network access to reach devices over Wi-Fi. Turn it on in System \
-        Settings › Privacy & Security › Local Network.
+        Ferry needs Local Network access to reach devices over Wi-Fi. Turn on FerryAgent (Ferry) \
+        in System Settings › Privacy & Security › Local Network.
         """, bundle: .module)
     case .adb(let detail):
       LocalizedStringResource("adb: \(DisplayText.escaped(detail))", bundle: .module)

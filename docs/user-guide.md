@@ -679,11 +679,11 @@ adb's server was one an earlier copy of Ferry's helper started. When that helper
 
 Nothing to change: Ferry restarts adb by itself and reconnects your devices. If this one isn't back in a few seconds, click **Connect Again**.
 
-**Ferry needs Local Network access to reach devices over Wi-Fi. Turn it on in System Settings › Privacy & Security › Local Network.**
+**Ferry needs Local Network access to reach devices over Wi-Fi. Turn on FerryAgent (Ferry) in System Settings › Privacy & Security › Local Network.**
 
-macOS asks before an app reaches devices on your network. Ferry was not allowed, so macOS blocks it, and adb reports "No route to host" even though the device answers.
+macOS asks before an app reaches devices on your network. FerryAgent, Ferry's helper, was not allowed, so macOS blocks it, and adb reports "No route to host" even though the device answers.
 
-Open System Settings → **Privacy & Security** → **Local Network**, turn on Ferry, then click **Connect Again**. If Ferry isn't listed, connect once more and click **Allow** when macOS asks.
+Open System Settings › **Privacy & Security** › **Local Network**, turn on **FerryAgent**, then click **Connect Again**. If FerryAgent isn't listed, connect once more and click **Allow** when macOS asks.
 
 **Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again.**
 
