@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.5.0](https://github.com/krisarmstrong/ferry/compare/v0.4.0...v0.5.0) (2026-11-21)
+
+
+### Features
+
+* **icon:** ferry with a bow, two files and per-appearance previews ([f890a22](https://github.com/krisarmstrong/ferry/commit/f890a22918abf347d4fc32fdd859ed61dc2701ab))
+* **icon:** ferry with a bow, two files and per-appearance previews ([996bb8b](https://github.com/krisarmstrong/ferry/commit/996bb8b3bb6f6382b0b9d5221f549e111b118436))
+* **menu:** device tiles by kind, pressed and Increase Contrast states ([eb1b6cf](https://github.com/krisarmstrong/ferry/commit/eb1b6cfb6bd5fb0179be98f52a01fc5fc60de2e9))
+* **menu:** device tiles by kind, pressed and Increase Contrast states ([e2002b0](https://github.com/krisarmstrong/ferry/commit/e2002b04410e8af862f1144dfdfd958f9cc27f19))
+
+
+### Bug Fixes
+
+* **adb:** bound every wait on a server, and the agent's start-up wait ([8e5b788](https://github.com/krisarmstrong/ferry/commit/8e5b78833c2e3bdbb8210ce3078f974ac12938fc))
+* **adb:** end the agent's adb server with the agent ([bfb0681](https://github.com/krisarmstrong/ferry/commit/bfb0681f3248daf3f988ec1553053ee3d7c75c1d))
+* **adb:** keep the new server's record through a replacement ([d2f3290](https://github.com/krisarmstrong/ferry/commit/d2f3290d2fc3076eadb423270a810f6896814675))
+* **adb:** let replacements queue instead of sharing one slot ([f92f7ef](https://github.com/krisarmstrong/ferry/commit/f92f7ef58eba4ed0ab7073055d72226773135833))
+* **adb:** replace a stale server only when no adb command can race it ([9ea44ee](https://github.com/krisarmstrong/ferry/commit/9ea44ee11210fd7d3abd75d94dba46f4452727ff))
+* **adb:** start the agent's adb server once when both trackers ask ([202509d](https://github.com/krisarmstrong/ferry/commit/202509d94a9e8d13afd4ef11d217ff9c054d3553))
+* **adb:** stop only the adb server whose identity was checked ([7ce5263](https://github.com/krisarmstrong/ferry/commit/7ce5263f724fbd81e25e3c987b0774fd9416b931))
+* **adb:** write the server record privately, with the resolved program ([c9b14c3](https://github.com/krisarmstrong/ferry/commit/c9b14c32f0ec13375ab9182e4ef128740f16ee8a))
+* **agent:** declare local network use for adb over Wi-Fi ([2e3c4e7](https://github.com/krisarmstrong/ferry/commit/2e3c4e75059783441d501356cafa1e83acd454ee))
+* **agent:** wait for the orphan replacement without an async main ([8abd727](https://github.com/krisarmstrong/ferry/commit/8abd72774d0a08bbd0f397fb8d43ffb40f5b6ac1))
+* **icon:** put the 22 pt menu bar glyph's edges on whole points ([f811bce](https://github.com/krisarmstrong/ferry/commit/f811bce0577ea87ab388177132a01e6d6e4b2006))
+* keep the adb server from outliving the agent, and report Local Network denial ([e386ccd](https://github.com/krisarmstrong/ferry/commit/e386ccd1b2cf6e893c5c17abf96a3621bb617b69))
+* **menu:** keep row symbols readable while pressed with Increase Contrast ([f3a3024](https://github.com/krisarmstrong/ferry/commit/f3a30242c3724697a4b0a9dff588618e8397219d))
+* **ui:** delete the agent folder only once the agent has exited ([4fae521](https://github.com/krisarmstrong/ferry/commit/4fae521747f9683433fa163aa250c729956b8bf5))
+* **ui:** name FerryAgent in the Local Network message ([854a23f](https://github.com/krisarmstrong/ferry/commit/854a23f668c3e3489f274cdb043b660b56c68642))
+* **ui:** remove the agent's folder with Remove Ferry ([7d75b77](https://github.com/krisarmstrong/ferry/commit/7d75b7730869592279c187b98c4eaeab93ea7ba3))
+* V1 final-review fixes (agent spawn recovery, keeper clock, DMG check) ([#38](https://github.com/krisarmstrong/ferry/issues/38)) ([224513b](https://github.com/krisarmstrong/ferry/commit/224513bf033bf5980cf63ddbcf98be898f43f23f))
+* **wireless:** disconnect an offline address before reconnecting it ([5fd2bf5](https://github.com/krisarmstrong/ferry/commit/5fd2bf55dba33b4953ad0017a253ae140aca6aaa))
+* **wireless:** reconnect a remembered device adb lists offline ([aa8fae3](https://github.com/krisarmstrong/ferry/commit/aa8fae3717a54a4f16ac92fc8f5dbf5c6fecdc17))
+* **wireless:** reconnect after an adb server is replaced ([5447aad](https://github.com/krisarmstrong/ferry/commit/5447aad9ae2a6fa5d0a634b4e9cd93db6b6b88ed))
+* **wireless:** replace an adb server cut off from the network ([1e07a6b](https://github.com/krisarmstrong/ferry/commit/1e07a6b29173dbfe2103e83611bb147f58b4b8eb))
+* **wireless:** say when macOS denies Ferry the local network ([d454155](https://github.com/krisarmstrong/ferry/commit/d454155cd8952152115599dc3d7f19a77bd824af))
+
 ## [0.4.0](https://github.com/krisarmstrong/ferry/compare/v0.3.0...v0.4.0) (2026-11-20)
 
 
