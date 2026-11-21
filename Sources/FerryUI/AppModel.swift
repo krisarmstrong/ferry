@@ -45,6 +45,8 @@ import os
   private(set) var sessions: [DeviceID: UInt64] = [:]
   /// Devices with USB debugging on that wait for the user to allow this Mac on them.
   private(set) var awaitingUSBDebugging: Set<DeviceID> = []
+  /// USB devices adb keeps offline even after a reconnect: they need a replug.
+  private(set) var replugNeeded: Set<DeviceID> = []
   /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
   public private(set) var awaitingAuthorization: [String] = []
   /// Devices the agent reconnects over the network.
@@ -334,6 +336,7 @@ import os
     usbWatchFailed = report.usbWatchFailed
     sessions = report.sessions
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
+    replugNeeded = Set(report.needsReplug)
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered
     connectedAddresses = report.connectedAddresses
@@ -355,45 +358,5 @@ import os
       provider: \(report.provider.rawValue, privacy: .public) adb: \(adb, privacy: .public)
       """)
     guideNewDevices()
-  }
-}
-
-extension AppModel {
-  public func turnOnInFinder() {
-    services.open(Self.loginItemsSettings)
-  }
-
-  /// Where the user allows Ferry's helper to run in the background.
-  public func openLoginItems() {
-    services.open(Self.loginItemsSettings)
-  }
-
-  /// An ejected device reports `.ejected`, which never opens the guide.
-  public func eject(_ id: DeviceID) async {
-    await perform(.eject(id))
-  }
-
-  /// Mounts an ejected device again.
-  public func mount(_ id: DeviceID) async {
-    await perform(.recheck(id))
-  }
-
-  /// Asks the agent to open a device again, after the app holding it quits.
-  public func recheck(_ id: DeviceID) async {
-    await perform(.recheck(id))
-  }
-
-  /// The transfers running on `device`.
-  public func transfers(on device: DeviceID) -> [ActiveTransfer] {
-    transfers.filter { $0.device == device }
-  }
-
-  /// No answer from the agent yet, so whether a device is attached is not known.
-  public var isChecking: Bool { agent == .checking }
-
-  /// Ferry's locations exist and are all off in Finder: not an error, but the user must turn
-  /// Ferry on. With no location yet there is nothing to turn on.
-  public var showsTurnOnRow: Bool {
-    agent == .running && provider == .disabled
   }
 }

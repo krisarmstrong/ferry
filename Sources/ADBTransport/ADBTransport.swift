@@ -40,9 +40,9 @@ public actor ADBTransport: DeviceTransport {
   private let beforeStart: @Sendable () async -> Void
   /// Scans take turns, so one never commits what it read over a later one's.
   private let scans = OperationGate()
-  private let answerLimit: Duration
+  let answerLimit: Duration
   /// What `answerLimit` is measured on.
-  private let clock: any Clock<Duration>
+  let clock: any Clock<Duration>
   private let serving: ADBNetworkPolicy
   private let opened: ADBOpenHandler
   /// Each listed connection's device, read from its properties.
@@ -57,13 +57,16 @@ public actor ADBTransport: DeviceTransport {
   var held: [DeviceID: Held] = [:]
   /// Devices left alone after an eject, until `unpark(_:)` or until adb has not listed them, in
   /// any state, for `settleTime`.
-  private var parked: [DeviceID: Parked] = [:]
+  var parked: [DeviceID: Parked] = [:]
+  /// USB devices adb lists offline, by serial: since when, and when Ferry asked adb to reconnect
+  /// them. One listed in any other state, or not at all, is dropped and starts afresh.
+  var offline: [String: Offline] = [:]
   /// What each device was last seen as, so a device parked after its session ended (or never
   /// opened) is still reported by name and recognised under its adb serials.
   private var lastKnown: [DeviceID: Held] = [:]
   /// How many scans in a row each listed connection has stayed unnamed.
   private var unnamedTries: [Listing: Int] = [:]
-  private let now: @Sendable () -> ContinuousClock.Instant
+  let now: @Sendable () -> ContinuousClock.Instant
 
   struct Held {
     let info: DeviceInfo
@@ -76,7 +79,7 @@ public actor ADBTransport: DeviceTransport {
     var transportID: String?
   }
 
-  private struct Parked {
+  struct Parked {
     var info: DeviceInfo
     /// The adb serials it has been reached at.
     var serials: Set<String>
@@ -160,15 +163,7 @@ public actor ADBTransport: DeviceTransport {
       }
       status = .available
       let usable = listed.filter { $0.state == .device }
-      let listings = Set(usable.map(Listing.init))
-      // An address can belong to another device next time: forget what is not listed.
-      named = named.filter { listings.contains($0.key) }
-      let unnamed = listings.filter { named[$0] == nil }
-      named.merge(try await readNames(unnamed)) { _, new in new }
-      let stillUnnamed = listings.filter { named[$0] == nil }
-      unnamedTries = Dictionary(
-        uniqueKeysWithValues: stillUnnamed.map { ($0, (unnamedTries[$0] ?? 0) + 1) })
-      let retry = unnamedTries.values.max().map { Self.unnamedDelay(afterTries: $0) }
+      let retry = try await name(usable)
       // Every serial adb lists on a cable, in any state. A network route never serves one: a
       // serial alone does not prove a network device is the unit on the cable.
       let onUSB = Set(listed.filter { !$0.isWireless }.map { DeviceID(serial: $0.serial) })
@@ -180,23 +175,38 @@ public actor ADBTransport: DeviceTransport {
           info: device.info, serials: Set(device.wireless + [device.usb].compactMap { $0 }))
       }
       let settle = settleParked(found: found, listed: Set(listed.map(\.serial)))
-      let rescanAfter = [settle, retry].compactMap { $0 }.min()
+      let (stuck, offlineCheck) = await noteOffline(listed)
+      let rescanAfter = [settle, retry, offlineCheck].compactMap { $0 }.min()
       let known = Set(found.keys).union(parked.keys)
       let unauthorized = listed.filter { $0.state == .unauthorized }
         .filter { !known.contains(Self.describe($0).id) }
         .sorted { $0.serial < $1.serial }
-      let overNetwork = found.filter { $0.value.usb == nil }.keys
       return DeviceScan(
         devices: found.values.map(\.info).filter { parked[$0.id] == nil }.sorted(by: Self.serial),
         notSharing: unauthorized.filter { !$0.isWireless }.map(Self.describe),
         ejected: parked.values.map(\.info).sorted(by: Self.serial), rescanAfter: rescanAfter,
         method: .usbADB,
-        methods: Dictionary(uniqueKeysWithValues: overNetwork.map { ($0, .wifiADB) }),
+        methods: Dictionary(
+          uniqueKeysWithValues: found.filter { $0.value.usb == nil }.keys.map { ($0, .wifiADB) }),
         awaitingAuthorization: unauthorized.filter(\.isWireless).map(\.serial),
         presentOverUSB: onUSB.union(found.filter { $0.value.usb != nil }.keys),
         adbStatus: .available,
-        awaitingUSBDebugging: Self.waitingForAllow(listed))
+        awaitingUSBDebugging: Self.waitingForAllow(listed), stuckOffline: stuck)
     }
+  }
+
+  /// Reads the names of the listed connections not named yet, and forgets those no longer
+  /// listed: an address can belong to another device next time. Returns when to scan again for
+  /// one still unnamed.
+  private func name(_ usable: [ADBDevice]) async throws(TransportError) -> Duration? {
+    let listings = Set(usable.map(Listing.init))
+    named = named.filter { listings.contains($0.key) }
+    let unnamed = listings.filter { named[$0] == nil }
+    named.merge(try await readNames(unnamed)) { _, new in new }
+    let stillUnnamed = listings.filter { named[$0] == nil }
+    unnamedTries = Dictionary(
+      uniqueKeysWithValues: stillUnnamed.map { ($0, (unnamedTries[$0] ?? 0) + 1) })
+    return unnamedTries.values.max().map { Self.unnamedDelay(afterTries: $0) }
   }
 
   /// The named devices among `usable`, one per `ro.serialno`, USB first for info and route. A
@@ -345,13 +355,6 @@ extension ADBTransport {
     -> [Listing: DeviceInfo]
   {
     try await Self.read(listings, on: host, within: answerLimit, clock: clock)
-  }
-
-  /// How long to wait before scanning again for a device that stayed unnamed `tries` scans.
-  static func unnamedDelay(afterTries tries: Int) -> Duration {
-    var delay = unnamedRetry
-    for _ in 1..<max(tries, 1) where delay < unnamedRetryLimit { delay *= 2 }
-    return min(delay, unnamedRetryLimit)
   }
 
   /// Where the adb server reaches `id`, as of the most recent scan.

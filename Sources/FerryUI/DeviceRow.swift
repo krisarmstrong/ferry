@@ -27,6 +27,7 @@ struct DeviceRow: View {
   let isRemembered: Bool
   let transfers: [ActiveTransfer]
   let awaitingUSBDebugging: Bool
+  let needsReplug: Bool
   let actions: DeviceRowActions
   let tools: ToolActions
 
@@ -45,7 +46,8 @@ struct DeviceRow: View {
         }
         DeviceDetails(
           device: device, transfers: transfers, awaitingUSBDebugging: awaitingUSBDebugging,
-          tools: tools, recording: recording, showUSBDebugging: actions.showUSBDebugging)
+          needsReplug: needsReplug, tools: tools, recording: recording,
+          showUSBDebugging: actions.showUSBDebugging)
         let groups = DevicePresentation.actionGroups(
           for: device, isRemembered: isRemembered, recording: recording)
         ForEach(groups.indices, id: \.self) { index in
@@ -111,12 +113,14 @@ private struct DeviceDetails: View {
   let device: AttachedDevice
   let transfers: [ActiveTransfer]
   let awaitingUSBDebugging: Bool
+  let needsReplug: Bool
   let tools: ToolActions
   let recording: DevicePresentation.RecordingPhase
   let showUSBDebugging: () -> Void
 
   private var hint: DevicePresentation.Hint? {
-    DevicePresentation.hint(for: device, awaitingUSBDebugging: awaitingUSBDebugging)
+    DevicePresentation.hint(
+      for: device, awaitingUSBDebugging: awaitingUSBDebugging, needsReplug: needsReplug)
   }
 
   var body: some View {
@@ -131,6 +135,10 @@ private struct DeviceDetails: View {
       if hint == .allowUSBDebugging {
         HelpLinked(key: MenuStatusText.allowUSBDebugging.key) {
           Text(MenuStatusText.allowUSBDebugging)
+        }
+      } else if hint == .replugCable {
+        HelpLinked(key: MenuStatusText.replugCable.key) {
+          Text(MenuStatusText.replugCable)
         }
       }
     }

@@ -193,6 +193,7 @@ public struct MenuContent: View {
       isRemembered: model.isRemembered(device.id),
       transfers: model.transfers(on: device.id),
       awaitingUSBDebugging: model.isAwaitingUSBDebugging(device.id),
+      needsReplug: model.needsReplug(device.id),
       actions: DeviceRowActions(
         toggle: { model.toggleExpansion(.device(device.id)) },
         eject: { Task { await model.eject(device.id) } },

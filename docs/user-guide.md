@@ -624,6 +624,12 @@ The device is asking whether to allow this Mac.
 
 Unlock the device, tick **Always allow from this computer** and tap **OK** or **Allow**.
 
+**Unplug the cable and plug it in again to use USB debugging**
+
+adb lists the device as offline over USB. This happens when adb's first read from the device fails as its server starts. Ferry asked adb to reconnect the device, and it is still offline.
+
+Unplug the USB cable from the device or the Mac, wait a moment, and plug it in again. File transfer keeps working meanwhile.
+
 **adb isn't on this Mac**
 
 Ferry found no adb, so it can use file transfer only.

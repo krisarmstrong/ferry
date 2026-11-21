@@ -73,6 +73,13 @@ extension ADBTransport {
       .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
   }
 
+  /// How long to wait before scanning again for a device that stayed unnamed `tries` scans.
+  static func unnamedDelay(afterTries tries: Int) -> Duration {
+    var delay = unnamedRetry
+    for _ in 1..<max(tries, 1) where delay < unnamedRetryLimit { delay *= 2 }
+    return min(delay, unnamedRetryLimit)
+  }
+
   /// Names a device adb lists but will not serve, by its adb serial, as MTP names a device it
   /// cannot read by its USB location.
   static func describe(_ device: ADBDevice) -> DeviceInfo {

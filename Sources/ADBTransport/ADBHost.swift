@@ -197,6 +197,13 @@ public actor ADBHost {
     try await launcher(adb)
   }
 
+  /// `adb reconnect offline`: the server drops and reopens every connection it lists offline,
+  /// which brings back a USB device whose first read failed when the server started, as long as
+  /// the device is still answering.
+  func reconnectOffline() async throws(ADBError) {
+    _ = try await query("host:reconnect-offline")
+  }
+
   /// A host service such as `connect:` or `pair:`, whose refusal is an answer, not a failure.
   func service(_ request: String) async throws(ADBError) -> ADBServiceAnswer {
     let framed = try ADBWire.frame(request)

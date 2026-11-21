@@ -31,13 +31,15 @@ enum MenuStatusText {
     "Quit Image Capture or Android File Transfer, then try again.", bundle: .module)
   static let allowUSBDebugging = LocalizedStringResource(
     "Allow USB debugging on the device", bundle: .module)
+  static let replugCable = LocalizedStringResource(
+    "Unplug the cable and plug it in again to use USB debugging", bundle: .module)
   static let recordingUnsaved = LocalizedStringResource(
     "Recording couldn't be saved", bundle: .module)
 
   static let all = [
     helperNotResponding, allowHelper, helperNotFound, updated, turnOnInFinder, noDevice,
     adbNotRunning, adbMissing, licenseChanged, adbNotDownloaded, adbDownloadRejected, adbNotSaved,
-    usbWatchFailed, chooseTransferFiles, busy, allowUSBDebugging, recordingUnsaved,
+    usbWatchFailed, chooseTransferFiles, busy, allowUSBDebugging, replugCable, recordingUnsaved,
   ]
 
   /// The title of the menu's line about getting adb. Every one but the download in progress is a

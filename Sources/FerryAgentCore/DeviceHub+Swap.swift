@@ -53,6 +53,11 @@ extension DeviceHub {
     awaitingDebugging.sorted { $0.serial < $1.serial }
   }
 
+  /// USB devices adb keeps offline even after a reconnect, as of the most recent scan.
+  public func stuckOfflineDevices() -> [DeviceID] {
+    stuckOffline.sorted { $0.serial < $1.serial }
+  }
+
   /// Swaps and ejects waiting for a device's requests to finish.
   var waitingForRequests: Int { drainWaiters.values.map(\.count).reduce(0, +) }
 

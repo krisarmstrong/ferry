@@ -100,6 +100,8 @@ public actor DeviceHub {
   var awaiting: [String] = []
   var adbState: ADBStatus?
   var awaitingDebugging: Set<DeviceID> = []
+  /// USB devices adb keeps offline even after a reconnect, as of the most recent scan.
+  var stuckOffline: Set<DeviceID> = []
   /// Devices whose next swap attempt is held off: their new session was not ready.
   var swapHolds: [DeviceID: Backoff] = [:]
   /// MTP sessions kept open, idle, while ADB serves their device.
@@ -231,6 +233,7 @@ public actor DeviceHub {
     awaiting = scan.awaitingAuthorization
     adbState = scan.adbStatus
     awaitingDebugging = scan.awaitingUSBDebugging
+    stuckOffline = scan.stuckOffline
     let present = Set((scan.devices + scan.busy + scan.notSharing + scan.ejected).map(\.id))
     for (id, entry) in entries where !present.contains(id) {
       guard case .unheld = entry.holding else { continue }

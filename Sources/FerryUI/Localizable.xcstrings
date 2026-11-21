@@ -420,6 +420,15 @@
     "Allow USB debugging on the device" : {
       "extractionState" : "manual"
     },
+    "Unplug the cable and plug it in again to use USB debugging" : {
+      "extractionState" : "manual"
+    },
+    "adb lists the device as offline over USB. This happens when adb's first read from the device fails as its server starts. Ferry asked adb to reconnect the device, and it is still offline." : {
+      "extractionState" : "manual"
+    },
+    "Unplug the USB cable from the device or the Mac, wait a moment, and plug it in again. File transfer keeps working meanwhile." : {
+      "extractionState" : "manual"
+    },
     "An app or script from the device does not open at once" : {
       "extractionState" : "manual"
     },

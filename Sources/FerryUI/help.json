@@ -748,6 +748,11 @@
               "fix": "Unlock the device, tick **Always allow from this computer** and tap **OK** or **Allow**."
             },
             {
+              "message": "Unplug the cable and plug it in again to use USB debugging",
+              "cause": "adb lists the device as offline over USB. This happens when adb's first read from the device fails as its server starts. Ferry asked adb to reconnect the device, and it is still offline.",
+              "fix": "Unplug the USB cable from the device or the Mac, wait a moment, and plug it in again. File transfer keeps working meanwhile."
+            },
+            {
               "message": "adb isn't on this Mac",
               "cause": "Ferry found no adb, so it can use file transfer only.",
               "fix": "Click **Get Android Platform Tools…** and accept Google's license: Ferry downloads adb once. Installing adb any other way also works, for example Homebrew's android-platform-tools, which downloads the same file from Google, and Ferry picks up an installed adb on its own. If both are present, Ferry prefers its own copy and never disturbs a running adb server."
