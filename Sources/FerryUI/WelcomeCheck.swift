@@ -1,5 +1,6 @@
 import DeviceKit
 import FerryIPC
+import Foundation
 
 /// Something Ferry shows the user once, recorded in its defaults.
 public enum OnboardingMark: String, Sendable, CaseIterable {
@@ -8,6 +9,24 @@ public enum OnboardingMark: String, Sendable, CaseIterable {
   /// The menu has said, the first time the user reached for Wi-Fi, that macOS asks before Ferry
   /// uses the local network.
   case localNetworkExplained = "onboarding.localNetworkExplained"
+}
+
+/// The marks live in Ferry's defaults, beside the agent last started.
+extension SystemServices {
+  public func hasMark(_ mark: OnboardingMark) -> Bool {
+    UserDefaults.standard.bool(forKey: mark.rawValue)
+  }
+
+  public func recordMark(_ mark: OnboardingMark) {
+    UserDefaults.standard.set(true, forKey: mark.rawValue)
+  }
+
+  public func forgetFirstRun() {
+    for mark in OnboardingMark.allCases {
+      UserDefaults.standard.removeObject(forKey: mark.rawValue)
+    }
+    UserDefaults.standard.removeObject(forKey: Self.startedAgentKey)
+  }
 }
 
 /// A step of the welcome, in the order the window lists them: a device first, since Finder has a

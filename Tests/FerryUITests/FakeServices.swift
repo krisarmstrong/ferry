@@ -33,6 +33,12 @@ final class FakeServices: SystemServicing {
     marks.insert(mark)
   }
 
+  /// Not logged either: the removal tests compare its log.
+  func forgetFirstRun() {
+    marks = []
+    startedAgent = nil
+  }
+
   func registerAgent() async {
     log.record("registerAgent")
   }

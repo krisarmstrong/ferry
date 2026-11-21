@@ -234,6 +234,37 @@ struct AppModelWelcomeTests {
     #expect(model.guideFamily == nil)
   }
 
+  /// Remove Ferry forgets that Ferry ran here: a reinstall is a first run, and shows the welcome.
+  @Test func removeFerryForgetsTheWelcome() async {
+    let client = FakeClient(log: log)
+    client.setStatus([], provider: .noDomains, adb: .available)
+    let services = FakeServices(log: log)
+    services.marks = Set(OnboardingMark.allCases)
+    let model = AppModel(client: client, services: services)
+    await model.removeFerry()
+    #expect(log.all.contains("quit"))
+    #expect(services.marks.isEmpty)
+    #expect(services.startedAgent == nil)
+
+    // Reinstalled.
+    let next = AppModel(client: client, services: services)
+    await next.launch()
+    #expect(next.isWelcomePresented)
+  }
+
+  /// A removal that stops leaves Ferry installed and set up: nothing is forgotten.
+  @Test func aRemovalThatStopsForgetsNothing() async {
+    let client = FakeClient(log: log)
+    client.failRemoveAll()
+    let services = FakeServices(log: log)
+    services.marks = Set(OnboardingMark.allCases)
+    let model = AppModel(client: client, services: services)
+    await model.removeFerry()
+    #expect(model.removalError != nil)
+    #expect(services.marks == Set(OnboardingMark.allCases))
+    #expect(services.startedAgent == "agent-1")
+  }
+
   @Test func watchingWhileOpenRefreshesUntilCancelled() async {
     let sleeps = Mutex(0)
     let model = AppModel(

@@ -2460,6 +2460,9 @@
     },
     "The first time Ferry reaches a device over the network, macOS asks whether Ferry may find devices on your local network. Click **Allow**: without it, Ferry can't reach devices over Wi-Fi." : {
 
+    },
+    "Ferry also forgets that it ran on this Mac, so if you install it again the welcome opens again." : {
+
     }
   },
   "version" : "1.0"

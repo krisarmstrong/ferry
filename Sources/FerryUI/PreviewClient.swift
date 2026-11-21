@@ -86,6 +86,7 @@ private final class PreviewServices: SystemServicing {
   func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance) {}
   func hasMark(_ mark: OnboardingMark) -> Bool { true }
   func recordMark(_ mark: OnboardingMark) {}
+  func forgetFirstRun() {}
   func fetchedPlatformToolsVersion() -> String? { nil }
   func fetchPlatformTools(accepted: LicenseAcceptance?) async throws(PlatformToolsError) {}
 }

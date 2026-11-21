@@ -1274,6 +1274,8 @@ Removes Ferry's locations from Finder, stops Ferry's helper, deletes what Ferry 
 
 Once the helper has stopped, Ferry deletes ~/Library/Application Support/Ferry (the adb it downloaded, and that you accepted Google's license) and ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (its lists of your devices' files and the devices it reconnects over the network). If Ferry's own adb is still running, Ferry stops it, including a shell you opened from Ferry's menu; an adb you installed yourself is left alone. Changes Finder had not sent to a device are kept, and shown in Finder.
 
+Ferry also forgets that it ran on this Mac, so if you install it again the welcome opens again.
+
 The **Remove Ferry…** button is here in Ferry Help. Ferry asks you to confirm first.
 
 ## About Ferry
