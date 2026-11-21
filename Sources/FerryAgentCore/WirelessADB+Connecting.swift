@@ -93,9 +93,10 @@ extension WirelessADB {
     }
   }
 
-  /// adb lists none of its addresses, and no mDNS connection named for it.
+  /// adb lists none of its addresses, and no mDNS connection named for it, except offline: a
+  /// server cut off from the network (an earlier agent's) keeps the device listed offline.
   func isMissing(_ id: DeviceID, _ entry: Entry, from listed: [ADBDevice]) -> Bool {
-    let serials = Set(listed.map(\.serial))
+    let serials = Set(listed.filter { $0.state != .offline }.map(\.serial))
     return entry.addresses.allSatisfy { !serials.contains($0.endpoint.argument) }
       && !serials.contains { $0.hasPrefix(Self.instancePrefix(id)) }
   }

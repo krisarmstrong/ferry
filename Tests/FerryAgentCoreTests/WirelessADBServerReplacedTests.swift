@@ -76,4 +76,22 @@ struct WirelessADBServerReplacedTests {
       try await eventually { await adb.calls.filter { $0 == .connect(Self.address) }.count == 3 })
     #expect(try await eventually { await adb.listed[Self.address] == .device })
   }
+
+  /// After an upgrade the earlier agent's server lists the device offline: it lost the network
+  /// when that agent exited, and keeps retrying in vain. That is a device to reconnect.
+  @Test(.timeLimit(.minutes(1)))
+  func aRememberedDeviceListedOfflineIsReconnected() async throws {
+    let adb = FakeWirelessADB()
+    let file = Base.storeFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    await WirelessADBRememberedTests.rememberEtherScope(adb, file)
+    await adb.set { $0.listed[Self.address] = .offline }
+    let wireless = WirelessADB(adb: adb, store: file, timing: Base.fast)
+    let running = Task { await wireless.run() }
+    defer { running.cancel() }
+    await adb.publish()
+    #expect(
+      try await eventually { await adb.calls.filter { $0 == .connect(Self.address) }.count == 2 })
+    #expect(try await eventually { await adb.listed[Self.address] == .device })
+  }
 }
