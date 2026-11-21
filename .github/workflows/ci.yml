@@ -78,6 +78,9 @@ jobs:
           [ "$(command -v pkg-config)" = "$RUNNER_TEMP/pkgconf/bin/pkg-config" ] \
             || { echo "::error::pkg-config is $(command -v pkg-config), not the pinned build"; exit 1; }
           make release SIGN=adhoc
+      # The disk image as the release workflow's dmg job makes it, from that build.
+      - name: Build the disk image and check it
+        run: scripts/make-dmg.sh .build/release/Build/Products/Release/Ferry.app .build/dist/Ferry.dmg
 
   # Only runs from push, pull_request and a few other events count for a PR's required checks:
   # a workflow_dispatch run's `check` job passes on the head commit and still does not. Release
