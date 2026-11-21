@@ -1276,6 +1276,8 @@ Ferry checks for a new version once a day. When there is one, it downloads it in
 
 To check now, choose **Check for Updates…** in the Ferry menu. Ferry shows what is new in the release and offers to install it.
 
+To choose yourself, turn off **Install Updates Automatically** in the Ferry menu. Ferry still checks once a day, and asks before it downloads a new version. On a managed Mac, an administrator can set the same choice with `defaults write io.github.krisarmstrong.ferry SUAutomaticallyUpdate -bool false`.
+
 After an update, Ferry restarts its helper the first time it opens. Your devices leave Finder for a moment and come back; a copy that was running then stops, so copy it again.
 
 Ferry installs an update only when it carries the signature of Ferry's own release key and a valid code signature. Releases are signed with the developer's Developer ID and notarized by Apple. Ferry reads the list of releases from GitHub over a secure connection.
