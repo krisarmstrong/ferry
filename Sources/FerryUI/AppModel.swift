@@ -286,7 +286,7 @@ import os
       try await services.setOpensAtLogin(enabled)
       actionError = nil
     } catch {
-      Self.log.error("open at login: \(error, privacy: .public)")
+      Self.log.error("open at login: \(error, privacy: .private)")
       actionError = MenuNotice(
         LocalizedStringResource("Could not change Open at Login.", bundle: .module))
     }

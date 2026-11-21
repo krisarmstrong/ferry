@@ -117,7 +117,7 @@ public final class SystemServices: SystemServicing {
       do {
         try agent.register()
       } catch {
-        Self.log.error("registering the agent failed: \(error, privacy: .public)")
+        Self.log.error("registering the agent failed: \(error, privacy: .private)")
       }
       Self.log.info("agent status: \(Self.describe(agent.status), privacy: .public)")
     }.value
@@ -152,14 +152,14 @@ public final class SystemServices: SystemServicing {
       do {
         try await agent.unregister()
       } catch {
-        Self.log.info("unregistering the agent to restart it: \(error, privacy: .public)")
+        Self.log.info("unregistering the agent to restart it: \(error, privacy: .private)")
       }
       let registered: Bool
       do {
         try agent.register()
         registered = true
       } catch {
-        Self.log.error("registering the agent failed: \(error, privacy: .public)")
+        Self.log.error("registering the agent failed: \(error, privacy: .private)")
         registered = false
       }
       Self.log.info("agent restarted, status: \(Self.describe(agent.status), privacy: .public)")
@@ -192,8 +192,9 @@ public final class SystemServices: SystemServicing {
       for url in [bundle] + extensions {
         let status = LSRegisterURL(url as CFURL, true)
         if status != noErr {
+          let name = url.lastPathComponent
           Self.log.error(
-            "registering \(url.lastPathComponent, privacy: .public) failed: \(status)")
+            "registering \(name, privacy: .public) failed: \(status, privacy: .public)")
         }
       }
     }.value
@@ -296,7 +297,7 @@ public final class SystemServices: SystemServicing {
     NSWorkspace.shared.openApplication(at: bundle, configuration: configuration) { _, error in
       Task { @MainActor in
         if let error {
-          Self.log.error("relaunching failed: \(error, privacy: .public)")
+          Self.log.error("relaunching failed: \(error, privacy: .private)")
         } else {
           NSApplication.shared.terminate(nil)
         }
@@ -367,7 +368,7 @@ public final class SystemServices: SystemServicing {
         [script], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration())
       return true
     } catch {
-      Self.log.error("opening Terminal failed: \(error, privacy: .public)")
+      Self.log.error("opening Terminal failed: \(error, privacy: .private)")
       return false
     }
   }

@@ -154,7 +154,7 @@ final class FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
     do {
       if let url = try manager?.temporaryDirectoryURL() { return url }
     } catch {
-      log.error("no temporary directory for the domain: \(error, privacy: .public)")
+      log.error("no temporary directory for the domain: \(error, privacy: .private)")
     }
     return URL(filePath: NSTemporaryDirectory(), directoryHint: .isDirectory)
   }

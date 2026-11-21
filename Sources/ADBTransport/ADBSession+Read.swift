@@ -81,7 +81,9 @@ extension ADBSession {
           guard attempt < Self.downloadAttempts else {
             throw .downloadSizeMismatch(listed: listed, received: received)
           }
-          Self.log.info("download cut short (\(received) of \(listed) bytes); trying again")
+          Self.log.info(
+            "download cut short (\(received, privacy: .public) of \(listed, privacy: .public) bytes); trying again"
+          )
         }
         attempt += 1
       }

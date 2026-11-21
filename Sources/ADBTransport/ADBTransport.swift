@@ -240,7 +240,8 @@ public actor ADBTransport: DeviceTransport {
       release(id)
       if error == .cancelled { throw .cancelled }
       // Gone since the scan, or the server with it: the next scan says which.
-      Self.log.info("not opening \(serial, privacy: .private): \(String(describing: error))")
+      Self.log.info(
+        "not opening \(serial, privacy: .private): \(String(describing: error), privacy: .private)")
       throw .deviceNotFound(id)
     }
     // Ejected while the device answered: no session for it.
@@ -293,7 +294,7 @@ public actor ADBTransport: DeviceTransport {
       status = locator.adbURL() == nil ? .notInstalled : .serverDown
     } else {
       status = .serverDown
-      Self.log.error("listing adb devices failed: \(String(describing: error), privacy: .public)")
+      Self.log.error("listing adb devices failed: \(String(describing: error), privacy: .private)")
     }
   }
 
@@ -378,7 +379,7 @@ extension ADBTransport {
     } catch {
       Self.log.log(
         level: Self.startFailureLevel(error),
-        "starting adb: \(String(describing: error), privacy: .public)")
+        "starting adb: \(String(describing: error), privacy: .private)")
     }
   }
 

@@ -48,7 +48,7 @@ struct HelpContent: Decodable, Sendable, Equatable {
     do {
       return try JSONDecoder().decode(HelpContent.self, from: Data(contentsOf: url))
     } catch {
-      log.fault("help.json does not load: \(error, privacy: .public)")
+      log.fault("help.json does not load: \(error, privacy: .private)")
       return nil
     }
   }

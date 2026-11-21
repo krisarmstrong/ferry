@@ -1,0 +1,36 @@
+# Reviewed public log interpolations (LogPrivacyTests). Each line: file: source line, trimmed.
+# Add a line only for data that is safe in a sysdiagnose: never a serial, a path, an address,
+# a name or an error.
+
+# Counts, sizes, durations, status codes and kernel return codes.
+Sources/ADBTransport/ADBDeviceTools.swift: "\(what, privacy: .private): status \(output.status, privacy: .public) \(detail, privacy: .private)"
+Sources/ADBTransport/ADBHost.swift: "adb server unavailable; retrying in \(delay.components.seconds, privacy: .public)s")
+Sources/ADBTransport/ADBSession+Names.swift: Self.log.info("listing left out \(skipped, privacy: .public) entries Ferry cannot address")
+Sources/ADBTransport/ADBSession+Read.swift: "download cut short (\(received, privacy: .public) of \(listed, privacy: .public) bytes); trying again"
+Sources/ADBTransport/ADBSync+Listing.swift: log.info("listing skipped \(count, privacy: .public) names that are not valid UTF-8")
+Sources/ADBTransport/ADBSync.swift: "listing kept the 32-bit size of \(unaddressable, privacy: .public) entries with paths too long"
+Sources/FerryAgentCore/DomainController+Visibility.swift: "reconcile: \(systemHidden.count, privacy: .public) hidden domains: \(listed, privacy: .private)"
+Sources/FerryAgentCore/TransferBoard.swift: Self.log.debug("progress \(completed, privacy: .public) of \(total, privacy: .public)")
+Sources/FerryAgentCore/USBWatcher.swift: "USB \(subscription.type, privacy: .public) notification failed: \(result, privacy: .public)"
+Sources/FerryAgentCore/USBWatcher.swift: "USB notifications could not be armed; trying again in \(retryInterval, privacy: .public)"
+Sources/MTPTransport/MTPSession+Download.swift: "download cut short (\(received, privacy: .public) of \(listed, privacy: .public) bytes); trying again"
+Sources/PlatformTools/PlatformToolsFetcher.swift: "platform tools download is \(archive.count, privacy: .public) bytes, not the pinned archive"
+
+# A transport's name (MTP, ADB), or whether a domain was being hidden or shown.
+Sources/FerryAgentCore/CompositeTransport.swift: "scanning over \(name, privacy: .public) failed: \(String(describing: error), privacy: .private)"
+Sources/FerryAgentCore/DeviceHub+Swap.swift: "\(serial, privacy: .private) not opened over \(via, privacy: .public): \(reason, privacy: .private)"
+Sources/FerryAgentCore/DeviceHub+Swap.swift: log.info("device \(id.serial, privacy: .private) moving to \(target.name, privacy: .public)")
+Sources/FerryAgentCore/DeviceHub.swift: "device \(info.id.serial, privacy: .private) opened over \(opened.rawValue, privacy: .public)"
+Sources/FerryAgentCore/DomainController+Visibility.swift: \(change, privacy: .public) domain \(identifier, privacy: .private) failed: \
+
+# Ferry's own bundle names (Ferry.app and its .appex), with Launch Services' status code.
+Sources/FerryUI/SystemServices.swift: "registering \(name, privacy: .public) failed: \(status, privacy: .public)")
+
+# An MTP storage's numeric ID, which the device assigns per session.
+Sources/MTPTransport/MTPDevice.swift: "storage \(id, privacy: .public): \(named, privacy: .private) as \(key, privacy: .private)")
+
+# The agent's state and the menu's summary: device kinds and connection methods, never names, serials or addresses.
+Sources/FerryUI/AppModel.swift: devices: [\(states, privacy: .public)] \
+Sources/FerryUI/AppModel.swift: provider: \(report.provider.rawValue, privacy: .public) adb: \(adb, privacy: .public)
+Sources/FerryUI/SystemServices.swift: Self.log.info("agent restarted, status: \(Self.describe(agent.status), privacy: .public)")
+Sources/FerryUI/SystemServices.swift: Self.log.info("agent status: \(Self.describe(agent.status), privacy: .public)")

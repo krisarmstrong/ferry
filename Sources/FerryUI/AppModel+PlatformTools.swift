@@ -118,7 +118,7 @@ extension AppModel {
         platformTools.fetch = .idle
       } catch {
         Self.log.error(
-          "fetching the platform tools: \(String(describing: error), privacy: .public)")
+          "fetching the platform tools: \(String(describing: error), privacy: .private)")
         platformTools.fetch = platformTools.shown ? .failed(error) : .idle
       }
     }

@@ -132,7 +132,7 @@ public actor ADBServerKeeper {
       do {
         try ADBServerRecord(pid: pid, started: started, path: program).save(to: record)
       } catch {
-        Self.log.error("recording the adb server failed: \(error, privacy: .public)")
+        Self.log.error("recording the adb server failed: \(error, privacy: .private)")
       }
     }
     let deadline = ContinuousClock.now + limit
@@ -217,7 +217,8 @@ public actor ADBServerKeeper {
         && table.path(recorded.pid) == recorded.path
     }
     guard isRecorded() else { return false }
-    Self.log.notice("replacing the adb server an earlier agent started (\(recorded.pid))")
+    Self.log.notice(
+      "replacing the adb server an earlier agent started (\(recorded.pid, privacy: .private))")
     return await replace(recorded.pid, if: isRecorded)
   }
 
@@ -238,7 +239,7 @@ public actor ADBServerKeeper {
     }
     guard isFerrys() else { return false }
     replacedFerryServer = true
-    Self.log.notice("replacing an adb server cut off from the network (\(pid))")
+    Self.log.notice("replacing an adb server cut off from the network (\(pid, privacy: .private))")
     return await replace(pid, if: isFerrys)
   }
 
@@ -250,7 +251,7 @@ public actor ADBServerKeeper {
   /// `kill`, bounded.
   private func killInTime(_ pid: pid_t) async {
     if await Self.race(callLimit, { [kill] in await kill() }) == nil {
-      Self.log.error("the adb server (\(pid)) did not answer host:kill in time")
+      Self.log.error("the adb server (\(pid, privacy: .private)) did not answer host:kill in time")
     }
   }
 

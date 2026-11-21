@@ -255,11 +255,12 @@ public actor ADBHost {
           try await startServer()
           continue
         } catch {
-          Self.log.error("adb server not started: \(String(describing: error), privacy: .public)")
+          Self.log.error("adb server not started: \(String(describing: error), privacy: .private)")
         }
       }
       let delay = backoff.next()
-      Self.log.info("adb server unavailable; retrying in \(delay.components.seconds)s")
+      Self.log.info(
+        "adb server unavailable; retrying in \(delay.components.seconds, privacy: .public)s")
       if (try? await Task.sleep(for: delay)) == nil { break }
     }
   }
@@ -284,7 +285,7 @@ public actor ADBHost {
         }
       } catch {
         if !Task.isCancelled {
-          Self.log.info("device tracking ended: \(String(describing: error), privacy: .public)")
+          Self.log.info("device tracking ended: \(String(describing: error), privacy: .private)")
         }
       }
       return reached

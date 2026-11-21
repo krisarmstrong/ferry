@@ -65,7 +65,7 @@ extension ADBSession {
     rawNames[Array(location.utf8)] = Dictionary(
       uniqueKeysWithValues: kept.map { ($0.key.name ?? "", $0.value.spelling) })
     if skipped > 0 {
-      Self.log.info("listing left out \(skipped) entries Ferry cannot address")
+      Self.log.info("listing left out \(skipped, privacy: .public) entries Ferry cannot address")
     }
     return Children(items: kept.values.map(\.item), skipped: skipped)
   }
