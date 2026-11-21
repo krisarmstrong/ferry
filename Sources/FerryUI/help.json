@@ -730,7 +730,12 @@
             },
             {
               "message": "Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. If its version differs, adb may restart the server.",
-              "cause": "Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs Ferry's own adb instead.",
+              "cause": "Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs the adb Ferry found instead: its own copy, or one already on this Mac, named in the message.",
+              "fix": "Nothing, if the shell opens. If another tool, such as Android Studio, loses its devices, close the shell and run adb shell from that tool's own adb."
+            },
+            {
+              "message": "Ferry couldn't tell which adb started the adb server, so this uses the adb in %@. If its version differs, adb may restart the server.",
+              "cause": "Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs the adb Ferry found instead: its own copy, or one already on this Mac, named in the message.",
               "fix": "Nothing, if the shell opens. If another tool, such as Android Studio, loses its devices, close the shell and run adb shell from that tool's own adb."
             }
           ]

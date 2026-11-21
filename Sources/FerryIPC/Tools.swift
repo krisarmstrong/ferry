@@ -95,7 +95,7 @@ public struct ShellTarget: Codable, Sendable, Equatable {
   /// address since. Digits only.
   public let transportID: String?
   /// Whether `adb` is the program serving the adb server. False when the agent could not tell
-  /// and chose Ferry's own adb: the script then says so before adb runs.
+  /// and chose the adb its locator finds: the script then names it before adb runs.
   public let runsServer: Bool
 
   public init?(

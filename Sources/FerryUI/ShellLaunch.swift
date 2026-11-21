@@ -1,5 +1,6 @@
 import FerryIPC
 import Foundation
+import PlatformTools
 
 /// Open in Terminal: what Terminal is given to run `adb -t <transport_id> shell`, or
 /// `adb -s <serial> shell` where adb names no connection.
@@ -23,17 +24,35 @@ enum ShellLaunch {
     "'" + text.replacing("'", with: "'\\''") + "'"
   }
 
-  /// Printed before adb starts when the agent could not tell which adb serves the server.
-  static let fallbackNote = LocalizedStringResource(
-    """
-    Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. \
-    If its version differs, adb may restart the server.
-    """,
-    bundle: .module)
+  /// Printed before adb starts when the agent could not tell which adb serves the server: it
+  /// names the adb the shell runs instead, Ferry's own copy (in `fetched`) or the folder of one
+  /// found on this Mac.
+  static func fallbackNote(for adb: String, fetched: PlatformToolsFolder = .standard) -> String {
+    guard adb.hasPrefix(fetched.root.path + "/") else {
+      let folder = URL(filePath: adb).deletingLastPathComponent().path
+      return String(
+        localized: LocalizedStringResource(
+          """
+          Ferry couldn't tell which adb started the adb server, so this uses the adb in \(folder). \
+          If its version differs, adb may restart the server.
+          """,
+          bundle: .module))
+    }
+    return String(
+      localized: LocalizedStringResource(
+        """
+        Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. \
+        If its version differs, adb may restart the server.
+        """,
+        bundle: .module))
+  }
 
-  static func script(for target: ShellTarget, file: URL) -> String {
+  static func script(
+    for target: ShellTarget, file: URL, fetched: PlatformToolsFolder = .standard
+  ) -> String {
     let note =
-      target.runsServer ? "" : "print -r -- \(quoted(String(localized: fallbackNote)))\n"
+      target.runsServer
+      ? "" : "print -r -- \(quoted(fallbackNote(for: target.adb, fetched: fetched)))\n"
     return """
       #!/bin/zsh
       rm -f -- \(quoted(file.path))

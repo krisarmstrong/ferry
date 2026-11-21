@@ -599,7 +599,13 @@ Open Terminal once yourself, then try again. If macOS asks whether Ferry may con
 
 **Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. If its version differs, adb may restart the server.**
 
-Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs Ferry's own adb instead.
+Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs the adb Ferry found instead: its own copy, or one already on this Mac, named in the message.
+
+Nothing, if the shell opens. If another tool, such as Android Studio, loses its devices, close the shell and run adb shell from that tool's own adb.
+
+**Ferry couldn't tell which adb started the adb server, so this uses the adb in …. If its version differs, adb may restart the server.**
+
+Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs the adb Ferry found instead: its own copy, or one already on this Mac, named in the message.
 
 Nothing, if the shell opens. If another tool, such as Android Studio, loses its devices, close the shell and run adb shell from that tool's own adb.
 
