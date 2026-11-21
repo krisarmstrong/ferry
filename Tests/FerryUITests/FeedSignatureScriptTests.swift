@@ -26,8 +26,10 @@ struct FeedSignatureScriptTests {
     }
   }
 
-  private static func verify(_ feed: String, key: String, signature: String, length: Int) throws
-    -> Int32
+  /// The script's exit status. Compiling it takes seconds, so the wait is a termination
+  /// callback, which keeps the shared pool's threads free for the other tests.
+  private static func verify(_ feed: String, key: String, signature: String, length: Int)
+    async throws -> Int32
   {
     let file = FileManager.default.temporaryDirectory
       .appending(path: "feed-\(UUID().uuidString).xml")
@@ -40,30 +42,36 @@ struct FeedSignatureScriptTests {
       file.path, String(length),
     ]
     process.standardError = FileHandle.nullDevice
-    try process.run()
-    process.waitUntilExit()
-    return process.terminationStatus
+    return try await withCheckedThrowingContinuation { continuation in
+      process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
+      do {
+        try process.run()
+      } catch {
+        process.terminationHandler = nil
+        continuation.resume(throwing: error)
+      }
+    }
   }
 
-  @Test func aFeedWhoseLengthEndsAtItsSignatureBlockVerifies() throws {
+  @Test func aFeedWhoseLengthEndsAtItsSignatureBlockVerifies() async throws {
     let key = Curve25519.Signing.PrivateKey()
     let signed = try SignedFeed("<rss>one release</rss>", with: key)
     let publicKey = key.publicKey.rawRepresentation.base64EncodedString()
     #expect(
-      try Self.verify(
+      try await Self.verify(
         signed.feed, key: publicKey, signature: signed.signature, length: signed.length) == 0)
   }
 
   /// The signature still covers the first `length` bytes, but Sparkle checks the bytes before
   /// the block and refuses the feed: so must the script.
-  @Test func bytesInsertedBeforeTheSignatureBlockAreRefused() throws {
+  @Test func bytesInsertedBeforeTheSignatureBlockAreRefused() async throws {
     let key = Curve25519.Signing.PrivateKey()
     let signed = try SignedFeed("<rss>one release</rss>", with: key)
     let inserted = signed.feed.replacingOccurrences(
       of: Self.marker, with: "<!-- extra -->\n\(Self.marker)")
     let publicKey = key.publicKey.rawRepresentation.base64EncodedString()
     #expect(
-      try Self.verify(
+      try await Self.verify(
         inserted, key: publicKey, signature: signed.signature, length: signed.length) == 1)
   }
 }

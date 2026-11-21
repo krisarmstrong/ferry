@@ -78,7 +78,7 @@ struct ADBServerKeeperTests {
   /// `exits` is how long a killed server takes to exit (its PID stops running): at once if nil.
   /// `whileStopping` runs inside the kill, as a tracker restarting the server would.
   static func keeper(
-    _ fakes: Fakes, record: URL, exits: Duration? = nil,
+    _ fakes: Fakes, record: URL, exits: Duration? = nil, limit: Duration = .seconds(2),
     whileStopping: (@Sendable () async -> Void)? = nil
   ) -> ADBServerKeeper {
     ADBServerKeeper(
@@ -116,7 +116,7 @@ struct ADBServerKeeperTests {
           exit()
         }
       },
-      limit: .seconds(2), poll: .milliseconds(10), callLimit: .milliseconds(300))
+      limit: limit, poll: .milliseconds(10), callLimit: .milliseconds(300))
   }
 
   /// A keeper for tests of what runs inside its gate: there is never a replacement.

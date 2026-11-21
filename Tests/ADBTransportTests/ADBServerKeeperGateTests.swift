@@ -141,14 +141,14 @@ struct ADBServerKeeperGateTests {
     defer { try? FileManager.default.removeItem(at: record) }
     try Self.recordedOrphan(fakes, record: record)
     let restart = Box<ADBServerKeeper?>(nil)
+    // A limit the stop can never reach in this test: ending when the port falls silent (never,
+    // the new server answers) would run into the time limit, not pass by the clock.
     let keeper = Keeper.keeper(
-      fakes, record: record, exits: .milliseconds(300),
+      fakes, record: record, exits: .milliseconds(300), limit: .seconds(3600),
       whileStopping: { try? await restart.value?.start(Keeper.adb) })
     await restart.set(keeper)
-    let began = ContinuousClock.now
     #expect(await keeper.replaceRecordedOrphan())
     #expect(fakes { $0.spawned.count } == 1)
-    #expect(began.duration(to: .now) < .seconds(1))
     #expect(ADBServerRecord.load(record)?.pid == 4242)
   }
 }

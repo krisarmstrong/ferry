@@ -8,6 +8,7 @@ import Testing
 
 /// The menu's tools: what is sent, what the user sees, and that a saved file is shown in Finder.
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct AppModelToolsTests {
   let log = CallLog()
   let id = DeviceID(serial: "0123456789abcdef")
@@ -220,11 +221,7 @@ struct AppModelToolsTests {
     services.folders = [folder]
     let model = model(client, services: services)
     await model.refresh()
-    let deadline = ContinuousClock.now + .seconds(5)
-    let revealed = { log.all.contains { $0.hasPrefix("reveal") } }
-    while !revealed(), ContinuousClock.now < deadline {
-      try await Task.sleep(for: .milliseconds(10))
-    }
+    for collection in model.backgroundCollections.values { await collection.value }
     #expect(try names(folder).count == 1)
     #expect(log.all.contains("saveRecording \(id.serial) file:true"))
   }

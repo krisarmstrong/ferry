@@ -7,22 +7,31 @@ struct ADBTrackDevicesTests {
   static let noAdb = ADBLocator(
     environment: [:], home: "/nonexistent", isExecutable: { _ in false })
 
-  @Test func eachFrameIsANewListAndCloseReportsNoDevicesOnce() async throws {
+  /// The server sends each frame only once the list before it has been read: a list a slow
+  /// consumer has not taken yet is replaced by the next (see `aSlowConsumerSeesOnlyTheNewestList`).
+  @Test(.timeLimit(.minutes(1))) func eachFrameIsANewListAndCloseReportsNoDevicesOnce()
+    async throws
+  {
+    let (read, reader) = AsyncStream.makeStream(of: Void.self)
     let server = try await FakeADBServer.start { peer in
+      var reads = read.makeAsyncIterator()
       #expect(try await peer.request() == "host:track-devices-l")
       try await peer.okay()
-      try await peer.send("001fabc device usb:1-1 model:Pixel\n0000")
-      try await peer.send(
-        String(
-          data: ADBWire.frame("abc unauthorized usb:1-1\n1.2.3.4:5555 device\n"), encoding: .utf8)!)
+      for frame in [
+        "abc device usb:1-1 model:Pixel\n", "", "abc unauthorized usb:1-1\n1.2.3.4:5555 device\n",
+      ] {
+        try await peer.send(String(data: ADBWire.frame(frame), encoding: .utf8)!)
+        await reads.next()
+      }
     }
     defer { server.stop() }
     var lists: [[ADBDevice]] = []
     for await list in ADBHost(
       port: server.port, locator: Self.noAdb, launcher: { _ in },
-      backoff: Backoff(initial: .milliseconds(500), maximum: .milliseconds(500))
+      backoff: Backoff(initial: .seconds(30), maximum: .seconds(30))
     ).trackDevices() {
       lists.append(list)
+      reader.yield()
       if lists.count == 4 { break }
     }
     #expect(
@@ -135,25 +144,26 @@ struct ADBTrackDevicesTests {
     #expect(await connections.value == 1)
   }
 
-  @Test func aSlowConsumerSeesOnlyTheNewestList() async throws {
-    let sent = Box(false)
+  @Test(.timeLimit(.minutes(1))) func aSlowConsumerSeesOnlyTheNewestList() async throws {
     let server = try await FakeADBServer.start { peer in
       _ = try await peer.request()
       try await peer.okay()
       for serial in ["a", "b", "c", "d"] {
         try await peer.send(String(data: ADBWire.frame("\(serial) device\n"), encoding: .utf8)!)
       }
-      await sent.set(true)
-      try await Task.sleep(for: .seconds(5))
+      _ = try? await peer.stream.read(exactly: 1)
     }
     defer { server.stop() }
-    let host = ADBHost(port: server.port, locator: Self.noAdb)
-    let stream = host.trackDevices()
-    // All four frames are on the wire once `sent` is set; the consumer has not read any. A
-    // second then covers the client taking them off the socket, which is milliseconds even
-    // on a loaded machine.
-    #expect(try await eventually { await sent.value })
-    try await Task.sleep(for: .seconds(1))
+    let (handed, handedOver) = AsyncStream.makeStream(of: Void.self)
+    let stream = ADBHost(port: server.port, locator: Self.noAdb).trackDevices {
+      handedOver.yield()
+    }
+    // All four lists are in the stream before the consumer reads any.
+    var handedCount = 0
+    for await _ in handed {
+      handedCount += 1
+      if handedCount == 4 { break }
+    }
     var received: [String]?
     for await list in stream {
       received = list.map(\.serial)

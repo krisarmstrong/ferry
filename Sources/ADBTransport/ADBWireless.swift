@@ -43,15 +43,26 @@ public struct ADBWireless: Sendable {
   private let answerLimit: Duration
   /// Holds a server replacement off while a command runs (`ADBServerKeeper.whileServing`).
   private let keeper: ADBServerKeeper
+  /// What `answerLimit` is measured on.
+  private let clock: any Clock<Duration>
 
   public init(
     host: ADBHost, run: @escaping ADBCommandRunner,
     answerLimit: Duration = ADBTransport.defaultAnswerLimit, keeper: ADBServerKeeper
   ) {
+    self.init(
+      host: host, run: run, answerLimit: answerLimit, keeper: keeper, clock: ContinuousClock())
+  }
+
+  init(
+    host: ADBHost, run: @escaping ADBCommandRunner, answerLimit: Duration,
+    keeper: ADBServerKeeper, clock: any Clock<Duration>
+  ) {
     self.host = host
     self.run = run
     self.answerLimit = answerLimit
     self.keeper = keeper
+    self.clock = clock
   }
 
   /// The real server and the `adb` the locator finds.
@@ -175,7 +186,7 @@ public struct ADBWireless: Sendable {
   private func bounded<T: Sendable>(
     _ body: @escaping @Sendable () async throws(ADBError) -> T
   ) async throws(ADBError) -> T {
-    try await ADBTransport.within(answerLimit, body)
+    try await ADBTransport.within(answerLimit, on: clock, body)
   }
 
   /// The first line of adb's output, at most 200 characters: enough to say what went wrong.

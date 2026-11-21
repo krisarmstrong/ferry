@@ -1,10 +1,12 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
 @testable import ADBTransport
 
 /// The `ADBError` → `TransportError` table on `ADBSession.failure(_:_:)`.
+@Suite(.timeLimit(.minutes(1)))
 struct ADBSessionErrorTests {
   static let step = ADBSession.Step("delete", .root)
 
@@ -29,7 +31,8 @@ struct ADBSessionErrorTests {
       (.protocolViolation("bad"), .io("delete failed: protocolViolation(\"bad\")")),
     ])
   func errorsMapWhileTheDeviceIsThere(_ error: ADBError, _ expected: TransportError) async throws {
-    let mapped = try await ADBFixture.withSession(FakeAndroid()) { session in
+    // The device stays: its answer to whether it is still served is never cut off by the clock.
+    let mapped = try await ADBFixture.withSession(FakeAndroid(), clock: ManualClock()) { session in
       await session.failure(error, Self.step)
     }
     #expect(mapped == expected)

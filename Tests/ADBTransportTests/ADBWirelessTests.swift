@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -29,6 +30,7 @@ final class FakeADBRunner: Sendable {
   }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct ADBWirelessTests {
   static let etherScope = WirelessEndpoint(parsing: "192.0.2.31")!
   static let code = PairingCode("482913")!
@@ -47,7 +49,8 @@ struct ADBWirelessTests {
   static func wireless(_ server: FakeADBServer, _ runner: FakeADBRunner) -> ADBWireless {
     ADBWireless(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), run: runner.run,
-      keeper: ADBServerKeeperTests.idle())
+      answerLimit: ADBTransport.defaultAnswerLimit,
+      keeper: ADBServerKeeperTests.idle(), clock: ManualClock())
   }
 
   @Test func argumentArraysAreTheOnlyCommandsBuilt() {
@@ -100,7 +103,8 @@ struct ADBWirelessTests {
     let runner = FakeADBRunner(output: "connected\n")
     let wireless = ADBWireless(
       host: ADBHost(port: closed.port, locator: ADBHostTests.noAdb), run: runner.run,
-      keeper: ADBServerKeeperTests.idle())
+      answerLimit: ADBTransport.defaultAnswerLimit,
+      keeper: ADBServerKeeperTests.idle(), clock: ManualClock())
     await #expect(throws: ADBError.serverUnavailable) {
       _ = try await wireless.connect(Self.etherScope)
     }

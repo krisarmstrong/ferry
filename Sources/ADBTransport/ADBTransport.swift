@@ -39,6 +39,8 @@ public actor ADBTransport: DeviceTransport {
   /// Scans take turns, so one never commits what it read over a later one's.
   private let scans = OperationGate()
   private let answerLimit: Duration
+  /// What `answerLimit` is measured on.
+  private let clock: any Clock<Duration>
   private let serving: ADBNetworkPolicy
   private let opened: ADBOpenHandler
   /// Each listed connection's device, read from its properties.
@@ -114,6 +116,7 @@ public actor ADBTransport: DeviceTransport {
 
   init(
     host: ADBHost, locator: ADBLocator, answerLimit: Duration = defaultAnswerLimit,
+    clock: any Clock<Duration> = ContinuousClock(),
     serving: @escaping ADBNetworkPolicy = { _, _ in true },
     opened: @escaping ADBOpenHandler = { _, _, _ in },
     now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
@@ -123,6 +126,7 @@ public actor ADBTransport: DeviceTransport {
     self.opened = opened
     self.locator = locator
     self.answerLimit = answerLimit
+    self.clock = clock
     self.now = now
     let lists = host.trackDevices()
     arrivals = AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
@@ -138,7 +142,7 @@ public actor ADBTransport: DeviceTransport {
     try await scans.run { () async throws(TransportError) -> DeviceScan in
       let listed: [ADBDevice]
       do throws(ADBError) {
-        listed = try await Self.within(answerLimit) { [host] () async throws(ADBError) in
+        listed = try await Self.within(answerLimit, on: clock) { [host] () async throws(ADBError) in
           try await host.devices()
         }
       } catch .cancelled {
@@ -155,7 +159,7 @@ public actor ADBTransport: DeviceTransport {
       // An address can belong to another device next time: forget what is not listed.
       named = named.filter { listings.contains($0.key) }
       let unnamed = listings.filter { named[$0] == nil }
-      named.merge(try await Self.read(unnamed, on: host, within: answerLimit)) { _, new in new }
+      named.merge(try await readNames(unnamed)) { _, new in new }
       let stillUnnamed = listings.filter { named[$0] == nil }
       unnamedTries = Dictionary(
         uniqueKeysWithValues: stillUnnamed.map { ($0, (unnamedTries[$0] ?? 0) + 1) })
@@ -229,7 +233,7 @@ public actor ADBTransport: DeviceTransport {
     held[id] = Held(info: info, serials: routes.serials, transportID: transportID)
     let features: Set<String>
     do throws(ADBError) {
-      features = try await Self.within(answerLimit) { [host] () async throws(ADBError) in
+      features = try await Self.within(answerLimit, on: clock) { [host] () async throws(ADBError) in
         try await host.features(serial, transportID: transportID)
       }
     } catch {
@@ -254,7 +258,7 @@ public actor ADBTransport: DeviceTransport {
     opened(id, ADBRoute(serial: serial, transportID: transportID), deviceTools)
     return ADBSession(
       host: host, serial: serial, transportID: transportID, info: info, features: features,
-      method: routes.usb == nil ? .wifiADB : .usbADB,
+      method: routes.usb == nil ? .wifiADB : .usbADB, clock: clock,
       onRelease: { [weak self] in await self?.release(id) })
   }
 
@@ -330,6 +334,13 @@ public actor ADBTransport: DeviceTransport {
 }
 
 extension ADBTransport {
+  /// Reads the devices behind `listings`, each within the answer limit.
+  private func readNames(_ listings: Set<Listing>) async throws(TransportError)
+    -> [Listing: DeviceInfo]
+  {
+    try await Self.read(listings, on: host, within: answerLimit, clock: clock)
+  }
+
   /// How long to wait before scanning again for a device that stayed unnamed `tries` scans.
   static func unnamedDelay(afterTries tries: Int) -> Duration {
     var delay = unnamedRetry

@@ -16,13 +16,14 @@ enum ADBFixture {
   /// Runs `body` on a session over `device`, then closes both.
   @discardableResult
   static func withSession<T>(
-    _ device: FakeAndroid, _ body: (ADBSession) async throws -> T
+    _ device: FakeAndroid, clock: any Clock<Duration> = ContinuousClock(),
+    _ body: (ADBSession) async throws -> T
   ) async throws -> T {
     let server = try await device.serve(serial: serial)
     let session = ADBSession(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), serial: serial,
       transportID: nil, info: info,
-      features: ["cmd", "shell_v2", "stat_v2"], method: .usbADB)
+      features: ["cmd", "shell_v2", "stat_v2"], method: .usbADB, clock: clock)
     do {
       let result = try await body(session)
       await session.close()

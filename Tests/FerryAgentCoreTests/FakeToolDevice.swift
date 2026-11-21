@@ -136,8 +136,30 @@ actor FakeLogcat: LogcatSource {
   private var ended = false
   private var failure: ADBError?
   private(set) var closed = false
+  /// Who waits for the agent to have read every chunk sent.
+  private var readWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
   /// Chunks sent that the agent has not yet read.
   var pendingCount: Int { pending.count }
+
+  /// Returns once the agent has read every chunk sent so far, or the test is cancelled.
+  func waitUntilRead() async {
+    let id = UUID()
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if pending.isEmpty || Task.isCancelled {
+          continuation.resume()
+        } else {
+          readWaiters[id] = continuation
+        }
+      }
+    } onCancel: {
+      Task { await self.stopWaiting(id) }
+    }
+  }
+
+  private func stopWaiting(_ id: UUID) {
+    readWaiters.removeValue(forKey: id)?.resume()
+  }
 
   func send(_ lines: [String]) {
     pending.append(lines.map { Data($0.utf8) })
@@ -167,7 +189,14 @@ actor FakeLogcat: LogcatSource {
 
   func next() async throws(ADBError) -> [Data]? {
     while true {
-      if !pending.isEmpty { return pending.removeFirst() }
+      if !pending.isEmpty {
+        let chunk = pending.removeFirst()
+        if pending.isEmpty {
+          for waiter in readWaiters.values { waiter.resume() }
+          readWaiters = [:]
+        }
+        return chunk
+      }
       if let failure { throw failure }
       if ended || closed { return nil }
       await withCheckedContinuation { waiter = $0 }

@@ -62,7 +62,7 @@ extension ADBSession {
     }
     guard !disconnected else {
       process.stream.cancel()
-      Self.kill(process.pid, host: host, route: route)
+      Self.kill(process.pid, host: host, route: route, clock: clock)
       return nil
     }
     return events(of: process, watched)
@@ -99,7 +99,7 @@ extension ADBSession {
       route,
       service: "exec:" + (try ADBShell.command("sh", ["-c", Self.watchScript, "sh"] + arguments)))
     do throws(ADBError) {
-      return try await Self.readPID(stream)
+      return try await Self.readPID(stream, clock: clock)
     } catch {
       stream.cancel()
       throw error
@@ -111,8 +111,8 @@ extension ADBSession {
   private func events(of process: WatchProcess, _ watched: [String: FolderHint])
     -> AsyncStream<FolderHint>
   {
-    let (host, route, connections, stream, pid) = (
-      host, route, watches, process.stream, process.pid
+    let (host, route, connections, stream, pid, clock) = (
+      host, route, watches, process.stream, process.pid, clock
     )
     connections.add(stream)
     let (events, continuation) = AsyncStream.makeStream(of: FolderHint.self)
@@ -122,7 +122,7 @@ extension ADBSession {
       reader.cancel()
       stream.cancel()
       connections.remove(stream)
-      Self.kill(pid, host: host, route: route)
+      Self.kill(pid, host: host, route: route, clock: clock)
     }
     for line in process.early {
       if let hint = Self.hint(in: line, watched) { continuation.yield(hint) }
@@ -146,8 +146,10 @@ extension ADBSession {
 
   /// The pid the script prints first, the lines that came with it, and the start of a line
   /// that has not ended yet.
-  private static func readPID(_ stream: ADBStream) async throws(ADBError) -> WatchProcess {
-    try await ADBTransport.within(watchAnswerLimit) { () async throws(ADBError) in
+  private static func readPID(_ stream: ADBStream, clock: any Clock<Duration>)
+    async throws(ADBError) -> WatchProcess
+  {
+    try await ADBTransport.within(watchAnswerLimit, on: clock) { () async throws(ADBError) in
       var lines = ADBLogLines()
       while let chunk = try await stream.readSome(upTo: 4096) {
         var found = lines.append(chunk)
@@ -165,11 +167,14 @@ extension ADBSession {
 
   /// Kills the watch's inotifyd, on a task of its own and bounded; a device that has gone took
   /// the process with it.
-  private static func kill(_ pid: String, host: ADBHost, route: ADBRoute) {
+  private static func kill(
+    _ pid: String, host: ADBHost, route: ADBRoute, clock: any Clock<Duration>
+  ) {
     Task.detached {
       do throws(ADBError) {
         let command = try ADBShell.command("kill", [pid])
-        _ = try await ADBTransport.within(watchAnswerLimit) { () async throws(ADBError) in
+        _ = try await ADBTransport.within(watchAnswerLimit, on: clock) {
+          () async throws(ADBError) in
           try await host.run(route: route, command: command)
         }
       } catch {

@@ -79,10 +79,21 @@ private struct UnreachableAgent: AgentSending {
 /// from the last answer when it is not.
 @Suite(.timeLimit(.minutes(1)))
 struct DeviceListTests {
-  @Test func aQuickAgentGivesTheCurrentDevices() {
+  /// `fresh` blocks its thread, as Finder's synchronous menu call does, while the request it
+  /// starts needs a thread of the shared pool. Called from a dispatch thread, so a test never
+  /// holds a pool thread that the agent's answer is waiting for.
+  static func fresh(_ list: DeviceList, waitingUpTo limit: Duration) async -> [DeviceSummary] {
+    await withCheckedContinuation { continuation in
+      DispatchQueue.global().async {
+        continuation.resume(returning: list.fresh(waitingUpTo: limit))
+      }
+    }
+  }
+
+  @Test func aQuickAgentGivesTheCurrentDevices() async {
     let device = attached("A", model: "LinkRunner")
     let list = DeviceList(agent: ScriptedAgent([([device], .zero)]))
-    #expect(list.fresh(waitingUpTo: .seconds(5)) == [device])
+    #expect(await Self.fresh(list, waitingUpTo: .seconds(5)) == [device])
   }
 
   @Test func aSlowAgentGivesTheLastAnswer() async {
@@ -97,7 +108,7 @@ struct DeviceListTests {
   @Test func anUnreachableAgentHasNoDevices() async {
     let list = DeviceList(agent: UnreachableAgent())
     await list.refresh()
-    #expect(list.fresh(waitingUpTo: .seconds(5)) == [])
+    #expect(await Self.fresh(list, waitingUpTo: .seconds(5)) == [])
   }
 
   /// A late answer to an earlier request never replaces a newer one.

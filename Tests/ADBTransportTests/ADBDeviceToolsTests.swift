@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Synchronization
 import Testing
@@ -25,15 +26,17 @@ struct ADBDeviceToolsTests {
   }
 
   /// Runs `body` with tools on a server for `device`, then stops the server.
+  /// The limits are measured on `clock`, which stands still unless the test moves it.
   private func withTools<T>(
     _ device: FakeAndroid, captureLimit: Int = ADBDeviceTools.defaultCaptureLimit,
-    captureWait: Duration = .seconds(5), _ body: (ADBDeviceTools) async throws -> T
+    captureWait: Duration = .seconds(5), clock: ManualClock = ManualClock(),
+    _ body: (ADBDeviceTools) async throws -> T
   ) async throws -> T {
     let server = try await device.serve(serial: Self.serial)
     defer { server.stop() }
     let tools = ADBDeviceTools(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: .seconds(5),
-      captureLimit: captureLimit, captureWait: captureWait)
+      captureLimit: captureLimit, captureWait: captureWait, clock: clock)
     return try await body(tools)
   }
 
@@ -198,12 +201,18 @@ struct ADBDeviceToolsTests {
   }
 
   /// A device that never finishes the image does not hold the request forever.
-  @Test func aScreenshotThatNeverEndsTimesOut() async throws {
+  @Test(.timeLimit(.minutes(1))) func aScreenshotThatNeverEndsTimesOut() async throws {
     let device = FakeAndroid()
     device.state.withLock { $0.hangingPrograms = ["screencap"] }
-    await #expect(throws: ADBError.self) {
-      try await withTools(device, captureWait: .milliseconds(200)) { tools in
-        try await tools.screenshot(route: ADBRoute(serial: Self.serial))
+    let clock = ManualClock()
+    let wait = Duration.seconds(30)
+    await #expect(throws: ADBError.failed("no answer within \(wait)")) {
+      try await withTools(device, captureWait: wait, clock: clock) { tools in
+        async let shot = tools.screenshot(route: ADBRoute(serial: Self.serial))
+        await device.waitForHangs(1)
+        await clock.waitForSleeper()
+        await clock.advance(by: wait)
+        return try await shot
       }
     }
   }

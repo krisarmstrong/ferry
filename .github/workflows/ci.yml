@@ -32,6 +32,8 @@ env:
 jobs:
   check:
     runs-on: macos-26
+    # A test that hangs fails the job here, not after GitHub's six hours.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -62,14 +64,8 @@ jobs:
           installed="$(brew list --versions libmtp | awk '{print $2}')"
           [ "$installed" = "$LIBMTP_VERSION" ] \
             || { echo "::error::libmtp is $installed, CI expects $LIBMTP_VERSION"; exit 1; }
-      # One test at a time: some ADB suites bound real waits, and the runner's three cores miss
-      # them when 1,400 tests run at once (run 44737853314): ADBTransportTimeoutTests and
-      # ADBTransportRetryTests (answer limits), ADBWakeTests (the wake limit), ADBWirelessTests
-      # and ADBToolsLogcatTests (a 1 s backlog) against a fake adb server over real sockets, and
-      # WirelessADBFixRound2Tests (500 ms connects). They need an injected clock, as the hub
-      # suites have, before this can go.
       - name: Lint, format check, test
-        run: make lint fmt-check test TEST_FLAGS=--no-parallel
+        run: make lint fmt-check test
       - name: Build the app, ad hoc signed
         run: make app SIGN=adhoc
       # The release build as the release workflow makes it, on the same image and Xcode: pinned
@@ -92,6 +88,7 @@ jobs:
       github.event_name == 'workflow_dispatch'
       && startsWith(github.ref, 'refs/heads/release-please--')
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       statuses: write
       checks: write
@@ -116,6 +113,7 @@ jobs:
     needs: [pending, check]
     if: always() && needs.pending.result == 'success'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       statuses: write
       checks: write

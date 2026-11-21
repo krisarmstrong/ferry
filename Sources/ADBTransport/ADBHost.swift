@@ -90,6 +90,13 @@ public actor ADBHost {
   /// A new list for every change the server reports, and `[]` once when the server goes away.
   /// It reconnects on its own and finishes only when the consumer stops iterating.
   public nonisolated func trackDevices() -> AsyncStream<[ADBDevice]> {
+    trackDevices(yielded: {})
+  }
+
+  /// As `trackDevices()`; `yielded` runs after each list is handed to the stream.
+  nonisolated func trackDevices(
+    yielded: @escaping @Sendable () -> Void
+  ) -> AsyncStream<[ADBDevice]> {
     // Each list replaces the last, so a slow consumer needs only the newest.
     AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let task = Task {
@@ -98,6 +105,7 @@ public actor ADBHost {
           case .devices(let devices): continuation.yield(devices)
           case .unavailable: continuation.yield([])
           }
+          yielded()
         }
         continuation.finish()
       }
