@@ -1,0 +1,206 @@
+# Ferry V1 readiness
+
+Where Ferry stands against a 1.0 release, as of v0.4.0 (2026-11-20). For each area: what is
+done, how it is verified, and what is still open. The last section lists the checks only the
+owner can run, on real devices and Macs. Open items name their workstream (W1–W5 of the V1
+plan) where one owns them.
+
+Legend: **Done** is in `main` and verified as stated. **Open** must land before 1.0.
+**Later** may ship after 1.0.
+
+## Summary
+
+| Area | State | Open before 1.0 |
+|---|---|---|
+| Security | Strong | Device data in public log lines; release job supply chain |
+| Concurrency | Not re-audited | Actor review; bound in-flight requests; cancel enumerations |
+| Performance | Needs work | Item table writes and paging on large devices; background relisting |
+| Accessibility | Good in code | Live VoiceOver and keyboard pass; Help link labels |
+| Localization | English only, mostly ready | Plurals, two hard-coded English strings |
+| UX and copy | Good | Raw error text in a few failures; first-run (W4) |
+| Docs and legal | Mostly done | Sparkle licence notice; LGPL source with each release; privacy wording; TESTING.md |
+| Packaging | Done | macOS 26 never tested live |
+
+## Security
+
+**Done**
+- XPC: the app, the FileProvider extension and the Finder extension each connect in their own
+  role, and each role may send only its own requests. Both ends require the other to be signed
+  by Ferry's team with the expected identifier, checked by XPC on every message.
+  *Verified:* `AgentXPC.swift`, `FerryIdentity.swift`, `FinderSyncRoleTests` and
+  `MessagesTests` (what each role may send), `make check-app` (every part records the same
+  team).
+- Files from a device: names are validated as a single path component; packages and links are
+  refused on the way to the device; files from the device are quarantined like downloads.
+  *Verified:* `RemotePath`, `ItemTemplate`, `ProviderItem`, `AgentPackageTests`, and
+  `make check-app` checks the quarantine attribute is declared.
+- Finder's Send to: opens with `O_NOFOLLOW` and sends only regular files; the helper checks the
+  descriptor again.
+- adb download: HTTPS only, Google hosts only (redirects included), size cap while streaming,
+  pinned size and SHA-256 before the archive is read, a strict zip reader, only `adb` and its
+  notice kept, Google's Developer ID signature checked offline before first use, into a private
+  folder. *Verified:* `PlatformToolsFetcherTests`, `ZipArchiveTests`, `HTTPSDownloadTests`,
+  `CodeSignatureTests`;
+  `scripts/adb-fetch-live-check.sh` against the live archive.
+- Updates: Sparkle with a signed feed, EdDSA-signed archives, verification before extraction,
+  no system profiling. The release workflow checks the appcast against the public key built into
+  the app before publishing. *Verified:* `release.yml` "Check the appcast" step; live update
+  from 0.2.1 to 0.3.0 on the owner's Mac.
+- Release workflow: actions and tools pinned by hash; signing only for release-please's own
+  draft, its tag and its commit on `main`; secrets only in the protected `release` environment.
+  Hardened runtime, Developer ID, secure timestamp and no `get-task-allow` on every executable.
+  *Verified:* `scripts/check-release.sh` in CI (`make release SIGN=adhoc`) and in every release.
+- Secrets: none in the repo; history scanned before the repo went public.
+
+**Open**
+- Several log lines print transport errors as public text, and those errors can carry a device
+  serial, a path on the device or a network address. Log the error kind publicly and its details
+  privately, and add a test that keeps it that way. (W5 finding M1)
+- The release job installs an unpinned Homebrew package that later runs while the signing
+  identity is available. Pin it by hash or drop the dependency. (M11)
+- Home-folder paths in a few public error logs. (L4, Later)
+- Secret scanning in CI. (L13, Later)
+
+## Concurrency
+
+**Done**
+- Swift 6 with complete strict concurrency; device work is serialised per device; transfers
+  cancel when their client goes away (except the Finder extension's fire-and-forget sends);
+  logcat and listings are bounded. *Verified:* CI's lint and test run on every PR, and the
+  per-task reviews during development. The V1 audit did not re-read the actors (`DeviceHub`,
+  `DomainController`, `WirelessADB`) for reentrancy.
+
+**Open**
+- A reentrancy and cancellation review of the three main actors.
+- Bound the number of requests a client may have in flight. (L1)
+- Cancel FileProvider enumerations when Finder invalidates them. (L2)
+- Injected clocks for the time-bound ADB suites, so CI can run tests in parallel again. (W3)
+
+## Performance
+
+**Done**
+- Transfers measured on a network tester over USB: about 37 MB/s upload and 36 MB/s download
+  through Finder, roughly 90% of raw adb. The menu polls only while it is open.
+
+**Open**
+- The helper rewrites a device's whole item table on every change, and pages the working set
+  by sorting the whole table each time, so both cost more as a device's file count grows. A
+  debug-build probe put one change on a 10,000-item table at a few tenths of a second; a
+  release-build measurement is still needed. Coalesce the writes and keep a sorted index; add a
+  10,000-item performance test. (H1, M10)
+- Folder listings reach Finder as one batch; page them. (M9)
+- While a device is connected, up to 32 folders are listed again every 30 s even when no Finder
+  window shows them. Relist only what Finder is showing, with back-off. (M3)
+- The Wi-Fi rediscovery poll runs even when no device is remembered. (L3, Later)
+
+## Accessibility
+
+**Done (by code reading)**
+- Menu rows are buttons with text labels; decorative symbols are hidden; expanding rows read
+  "<name>, <summary>" with Expanded or Collapsed; the Open at Login row reads as a switch;
+  form fields and the log window's controls have labels; dialogs have default and cancel keys.
+
+**Open**
+- Help links all read "Help"; name the problem. (L5)
+- A row's warning colour is invisible to VoiceOver; say it. (L6)
+- Arrow-key movement between menu rows. (L7)
+- Text and windows that follow larger text sizes. (L8)
+- Increase Contrast, Reduce Transparency and dark-mode contrast pass. (W1)
+- A live VoiceOver and Full Keyboard Access pass (owner check below).
+
+## Localization
+
+**Done**
+- User-facing text lives in String Catalogs, one per module; sizes use the system byte-count
+  formatter; device-supplied text is escaped before display.
+
+**Open (Later unless a translation ships with 1.0)**
+- Plural variants for counted messages; the " – SD card" suffix of Finder location names and the
+  capture file names are hard-coded English; one message joins two sentences. (L14)
+
+## UX and copy
+
+**Done**
+- Every problem shown in the menu has a Help entry, enforced by `HelpMessageCoverageTests`; Help is
+  searchable and the user guide is generated from it (a test fails if they differ).
+
+**Open**
+- A few failures still show raw technical text ("Error: …") or a generic "The device reported an
+  error." with no next step. Give each one plain words, a next step and a Help link. (M2)
+- Remove Ferry leaves Ferry's data (the fetched adb, remembered devices, file listings) and may
+  leave its adb server running; offer to delete the data and document what stays. (M8)
+- Automatic updates have no off switch; add one to the menu. (M4)
+- One message says "agent" where everything else says "helper". (L9)
+- First-run onboarding and empty states. (W4)
+- A purpose string for the Documents access prompt (L10); Local Network access (W2, PR #14).
+
+## Docs and legal
+
+**Done**
+- README, user guide (generated from in-app Help), RELEASING, privacy section in Help.
+- libmtp and libusb: built unmodified from pinned release tarballs, linked dynamically, their
+  LGPL-2.1 texts and the exact tarball URLs and SHA-256s in `Contents/Resources/Licenses`,
+  checked by `check-release.sh`.
+- Google's Android SDK License: shown and accepted before any download, acceptance recorded,
+  the accepted text bundled; Ferry never redistributes Google's binaries.
+
+**Open**
+- Sparkle's MIT licence (and the notices it carries for its own dependencies) is not in the app
+  or the README. Ship it in `Licenses`, check it in `check-release.sh`, and add an
+  Acknowledgements topic to Help. (M5)
+- Attach the exact libusb and libmtp source tarballs to each GitHub release, so the source is
+  offered from the same place as the binary. (M6)
+- Privacy wording: GitHub and Google see the Mac's IP address and Ferry's version. (L11)
+- TESTING.md predates ADB and lists a Settings window Ferry no longer has; replace its manual
+  checklist with the owner checks below. (L12)
+
+## Packaging
+
+**Done**
+- Signed with Developer ID, hardened runtime, notarized and stapled: the app and the DMG. The
+  Sparkle archive and the appcast are attached to the GitHub release, which is published only
+  after every check passes. Apple silicon only, as the README states.
+  *Verified:* releases 0.2.1 through 0.4.0 built and published by the workflow; 0.4.0 installed
+  from the DMG on the owner's Mac.
+
+**Open**
+- macOS 26 is the stated minimum, but Ferry has only been run on macOS 27. Test on 26 or raise
+  the minimum. (M7)
+- A designed DMG background. (W1)
+
+## Owner-only checks
+
+These need real hardware, a real Mac session or a person at the keyboard. Record the build and
+the result for each.
+
+1. **Clean install on macOS 26.x** from the release DMG: open, turn on in Finder, connect a phone
+   over USB, browse, copy both ways.
+2. **Each supported tester** over USB with file transfer, then with USB debugging, then over
+   Wi-Fi: browse, copy a 1 GB file both ways, compare SHA-256.
+3. **Large folder:** a folder of 10,000 or more files on a real device: time to open in Finder,
+   copy 500 files in, delete a folder, and the helper's CPU and memory meanwhile.
+4. **Unplug mid-copy and replug** (never run so far): the menu shows the waiting changes, and the
+   copy finishes after replugging.
+5. **Battery:** a device attached for an hour with Finder closed; `powermetrics` energy impact of
+   FerryAgent and the adb server.
+6. **Start-up and menu-open time** on a release build (Instruments, Time Profiler), and helper
+   memory after an 8-hour session with a device attached.
+7. **VoiceOver:** every menu row, the setup guide, Help, the licence window, the log and port
+   forwarding windows. **Full Keyboard Access:** reach every control. **Increase Contrast**,
+   **Reduce Transparency** and the largest text size: nothing clipped or unreadable.
+8. **Updates:** from the previous release by Sparkle, on an admin and on a standard account;
+   **Check for Updates…** when up to date and when offline.
+9. **Local Network:** the first Wi-Fi connect shows macOS's prompt, and denying it shows Ferry's
+   explanation (after PR #14).
+10. **Get Android Platform Tools** on a Mac without adb, then offline (clear message), then
+    after an update that pins a newer adb.
+11. **Remove Ferry**, then check what remains: Finder locations, the login item, the helper, an
+    adb server, and files under `~/Library/Application Support/Ferry`.
+12. **Upgrade over a developer build** (signing identity change): the helper restarts without a
+    manual `launchctl` step (W2).
+
+## Audit trail
+
+The W5 audit of v0.4.0 found 0 critical, 1 high, 11 medium, 15 low and 5 informational items;
+the finding IDs above (H1, M1–M11, L1–L15) refer to that audit. The audit changed no code. It
+did not launch Ferry, so start-up, memory and live accessibility are the owner checks above.
