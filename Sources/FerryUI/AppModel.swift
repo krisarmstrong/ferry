@@ -157,7 +157,7 @@ import os
   var emptyGuideShown = false
 
   public convenience init(
-    client: any AgentSending, services: any SystemServicing = SystemServices()
+    client: any AgentSending, services: any SystemServicing
   ) {
     self.init(client: client, services: services, sleep: { try await Task.sleep(for: $0) })
   }
