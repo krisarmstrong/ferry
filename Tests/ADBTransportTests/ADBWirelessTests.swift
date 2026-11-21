@@ -5,142 +5,46 @@ import Testing
 
 @testable import ADBTransport
 
-/// The `adb` invocations Ferry makes, recorded instead of run.
-final class FakeADBRunner: Sendable {
-  private let calls = Box<[[String]]>([])
-  private let reply: @Sendable ([String]) -> ADBCommandResult
-
-  init(reply: @escaping @Sendable ([String]) -> ADBCommandResult) {
-    self.reply = reply
-  }
-
-  convenience init(output: String, status: Int32 = 0) {
-    self.init { _ in ADBCommandResult(status: status, output: output) }
-  }
-
-  var run: ADBCommandRunner {
-    { [calls, reply] (arguments) async throws(ADBError) in
-      await calls.set(await calls.value + [arguments])
-      return reply(arguments)
-    }
-  }
-
-  var invocations: [[String]] {
-    get async { await calls.value }
-  }
-}
-
 @Suite(.timeLimit(.minutes(1)))
 struct ADBWirelessTests {
   static let etherScope = WirelessEndpoint(parsing: "192.0.2.31")!
   static let code = PairingCode("482913")!
 
-  /// A server that answers `host:version` and lists `listing` for `host:devices-l`.
-  static func server(listing: String) async throws -> FakeADBServer {
+  /// A server that answers `host:version`, lists `listing` for `host:devices-l`, answers each
+  /// other request from `services`, and records every request it was sent.
+  static func server(
+    listing: String, services: [String: ServiceReply] = [:], requests: Box<[String]> = Box([])
+  ) async throws -> FakeADBServer {
     try await FakeADBServer.start { peer in
-      switch try await peer.request() {
+      let request = try await peer.request()
+      await requests.set(await requests.value + [request])
+      switch request {
       case "host:version": try await peer.answer("0029")
       case "host:devices-l": try await peer.answer(listing)
-      case let other: try await peer.fail("unexpected \(other)")
+      default:
+        switch services[request] {
+        case .text(let text): try await peer.answer(text)
+        case .failAfterOkay(let reason):
+          try await peer.okay()
+          try await peer.fail(reason)
+        case .plain(let text): try await peer.answer(text)
+        case .plainFail(let reason): try await peer.fail(reason)
+        case nil: try await peer.fail("unknown host service '\(request)'")
+        }
       }
     }
   }
 
-  static func wireless(_ server: FakeADBServer, _ runner: FakeADBRunner) -> ADBWireless {
+  /// On a clock that never moves: every answer here comes, so no limit is reached.
+  static func wireless(port: UInt16) -> ADBWireless {
     ADBWireless(
-      host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), run: runner.run,
-      answerLimit: ADBTransport.defaultAnswerLimit,
+      host: ADBHost(port: port, locator: ADBHostTests.noAdb),
+      answerLimit: ADBTransport.defaultAnswerLimit, commandLimit: ADBWireless.defaultCommandLimit,
       keeper: ADBServerKeeperTests.idle(), clock: ManualClock())
   }
 
-  @Test func argumentArraysAreTheOnlyCommandsBuilt() {
-    #expect(ADBCommand.connect(Self.etherScope) == ["connect", "192.0.2.31:5555"])
-    #expect(ADBCommand.disconnect(Self.etherScope) == ["disconnect", "192.0.2.31:5555"])
-    let pairing = WirelessEndpoint(parsing: "[fe80::1]:37123")!
-    #expect(ADBCommand.pair(pairing, Self.code) == ["pair", "[fe80::1]:37123", "482913"])
-  }
-
-  @Test func aListedDeviceIsConnected() async throws {
-    let server = try await Self.server(
-      listing: "192.0.2.31:5555 device product:etherscope_nxg model:EtherScope_nXG\n")
-    defer { server.stop() }
-    let runner = FakeADBRunner(output: "connected to 192.0.2.31:5555\n")
-    let outcome = try await Self.wireless(server, runner).connect(Self.etherScope)
-    #expect(outcome == .connected(serial: "192.0.2.31:5555"))
-    #expect(await runner.invocations == [["connect", "192.0.2.31:5555"]])
-  }
-
-  /// The spike: the first connect says `failed to authenticate` and adb lists the address as
-  /// unauthorised until the user taps Allow on the unit.
-  @Test(arguments: [
-    ("192.0.2.31:5555 unauthorized\n", "failed to authenticate to 192.0.2.31:5555\n"),
-    ("", "failed to authenticate to 192.0.2.31:5555\n"),
-    ("192.0.2.31:5555 unauthorized\n", "connected to 192.0.2.31:5555\n"),
-  ])
-  func unauthorisedWaitsForAllow(listing: String, output: String) async throws {
-    let server = try await Self.server(listing: listing)
-    defer { server.stop() }
-    let outcome = try await Self.wireless(server, FakeADBRunner(output: output))
-      .connect(Self.etherScope)
-    #expect(outcome == .awaitingAllow)
-  }
-
-  /// adb exits 0 even when it could not connect: the list decides, adb's words are the detail.
-  @Test func aRefusedConnectFailsWithAdbsWords() async throws {
-    let server = try await Self.server(listing: "")
-    defer { server.stop() }
-    let outcome = try await Self.wireless(
-      server,
-      FakeADBRunner(output: "failed to connect to '192.0.2.31:5555': Connection refused\n")
-    ).connect(Self.etherScope)
-    #expect(outcome == .failed("failed to connect to '192.0.2.31:5555': Connection refused"))
-  }
-
-  /// Without a server, `adb connect` would start one that holds its output open: Ferry asks
-  /// the server first and never runs adb when it does not answer.
-  @Test func noServerRunsNothing() async throws {
-    let closed = try ClosedPort()
-    let runner = FakeADBRunner(output: "connected\n")
-    let wireless = ADBWireless(
-      host: ADBHost(port: closed.port, locator: ADBHostTests.noAdb), run: runner.run,
-      answerLimit: ADBTransport.defaultAnswerLimit,
-      keeper: ADBServerKeeperTests.idle(), clock: ManualClock())
-    await #expect(throws: ADBError.serverUnavailable) {
-      _ = try await wireless.connect(Self.etherScope)
-    }
-    await #expect(throws: ADBError.serverUnavailable) {
-      _ = try await wireless.pair(Self.etherScope, code: Self.code)
-    }
-    #expect(await runner.invocations.isEmpty)
-  }
-
-  @Test func pairingReportsTheGuidAdbPrints() async throws {
-    let server = try await Self.server(listing: "")
-    defer { server.stop() }
-    let endpoint = WirelessEndpoint(parsing: "192.0.2.170:37123")!
-    let runner = FakeADBRunner(
-      output: "Successfully paired to 192.0.2.170:37123 [guid=adb-fedcba9876543210-AbCdEf]\n")
-    let outcome = try await Self.wireless(server, runner).pair(endpoint, code: Self.code)
-    #expect(outcome == .paired(guid: "adb-fedcba9876543210-AbCdEf"))
-    #expect(await runner.invocations == [["pair", "192.0.2.170:37123", "482913"]])
-  }
-
-  @Test func aWrongCodeFails() async throws {
-    let server = try await Self.server(listing: "")
-    defer { server.stop() }
-    let outcome = try await Self.wireless(
-      server,
-      FakeADBRunner(output: "Failed: Wrong password or connection was dropped.\n", status: 1)
-    ).pair(Self.etherScope, code: Self.code)
-    #expect(outcome == .failed("Failed: Wrong password or connection was dropped."))
-  }
-
-  @Test func disconnectRunsDisconnect() async throws {
-    let server = try await Self.server(listing: "")
-    defer { server.stop() }
-    let runner = FakeADBRunner(output: "disconnected 192.0.2.31:5555\n")
-    try await Self.wireless(server, runner).disconnect(Self.etherScope)
-    #expect(await runner.invocations == [["disconnect", "192.0.2.31:5555"]])
+  static func wireless(_ server: FakeADBServer) -> ADBWireless {
+    wireless(port: server.port)
   }
 
   /// adb's detail is cut to one bounded line before it goes anywhere.
@@ -165,7 +69,7 @@ struct ADBWirelessTests {
       )
     }
     defer { server.stop() }
-    let services = try await Self.wireless(server, FakeADBRunner(output: "")).mdnsServices()
+    let services = try await Self.wireless(server).mdnsServices()
     #expect(
       services == [
         ADBMDNSService(
@@ -227,7 +131,7 @@ struct ADBWirelessTests {
     }
     let server = try await device.serve(serial: "fedcba9876543210")
     defer { server.stop() }
-    let wireless = Self.wireless(server, FakeADBRunner(output: ""))
+    let wireless = Self.wireless(server)
     #expect(
       try await wireless.networkAddresses(of: "fedcba9876543210").first == "192.0.2.31")
     #expect(try await wireless.tcpPort(of: "fedcba9876543210") == 5555)
@@ -244,7 +148,7 @@ struct ADBWirelessTests {
     device.state.withLock { $0.properties["service.adb.tcp.port"] = value }
     let server = try await device.serve(serial: "S")
     defer { server.stop() }
-    #expect(try await Self.wireless(server, FakeADBRunner(output: "")).tcpPort(of: "S") == port)
+    #expect(try await Self.wireless(server).tcpPort(of: "S") == port)
   }
 
   /// `adb tcpip 5555` as the host protocol carries it, checked against hard-coded bytes.
@@ -257,7 +161,7 @@ struct ADBWirelessTests {
       try await peer.send("OKAYrestarting in TCP mode port: 5555\n")
     }
     defer { server.stop() }
-    try await Self.wireless(server, FakeADBRunner(output: "")).restartInTCPMode(
+    try await Self.wireless(server).restartInTCPMode(
       "0123456789abcdef", port: 5555)
     #expect(
       await received.value == Data("001fhost:transport:0123456789abcdef000atcpip:5555".utf8))
@@ -272,7 +176,7 @@ struct ADBWirelessTests {
     }
     defer { server.stop() }
     await #expect(throws: ADBError.failed("error: device not rooted")) {
-      try await Self.wireless(server, FakeADBRunner(output: "")).restartInTCPMode(
+      try await Self.wireless(server).restartInTCPMode(
         "S", port: 5555)
     }
   }
@@ -287,64 +191,10 @@ struct ADBWirelessTests {
     }
     let server = try await device.serve(serial: "192.0.2.31:5555")
     defer { server.stop() }
-    let info = try await Self.wireless(server, FakeADBRunner(output: "")).device(
+    let info = try await Self.wireless(server).device(
       at: "192.0.2.31:5555")
     #expect(info?.id == DeviceID(serial: "fedcba9876543210"))
     #expect(info?.model == "EtherScope nXG")
-  }
-}
-
-struct ADBCommandRunTests {
-  /// A stand-in executable that prints its arguments one per line, then exits with status 3.
-  static func fakeExecutable(_ body: String) throws -> URL {
-    let folder = FileManager.default.temporaryDirectory.appending(path: "ferry-fake-adb-\(UUID())")
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    let file = folder.appending(path: "adb")
-    try Data("#!/bin/sh\n\(body)\n".utf8).write(to: file)
-    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: file.path)
-    return file
-  }
-
-  @Test(.timeLimit(.minutes(1)))
-  func runsTheExecutableWithItsArgumentsAndCapturesOutput() async throws {
-    let adb = try Self.fakeExecutable(#"printf '%s\n' "$@"; echo err >&2; exit 3"#)
-    defer { try? FileManager.default.removeItem(at: adb.deletingLastPathComponent()) }
-    let result = try await ADBCommand.run(
-      adb, ["connect", "a b;$(x)'"], limit: .seconds(20))
-    #expect(result.status == 3)
-    // One argument, delivered intact: nothing parsed it as shell.
-    #expect(result.output.contains("connect\na b;$(x)'\n"))
-    #expect(result.output.contains("err"))
-  }
-
-  @Test(.timeLimit(.minutes(1)))
-  func aCommandThatDoesNotFinishIsStopped() async throws {
-    let adb = try Self.fakeExecutable("exec sleep 30")
-    defer { try? FileManager.default.removeItem(at: adb.deletingLastPathComponent()) }
-    let started = ContinuousClock.now
-    await #expect(throws: ADBError.self) {
-      _ = try await ADBCommand.run(adb, ["connect"], limit: .milliseconds(300))
-    }
-    #expect(started.duration(to: .now) < .seconds(10))
-  }
-
-  @Test(.timeLimit(.minutes(1)))
-  func outputIsBounded() async throws {
-    let adb = try Self.fakeExecutable("head -c 200000 /dev/zero | tr '\\0' x")
-    defer { try? FileManager.default.removeItem(at: adb.deletingLastPathComponent()) }
-    let result = try await ADBCommand.run(adb, [], limit: .seconds(20))
-    #expect(result.output.utf8.count <= ADBCommand.outputLimit)
-  }
-
-  @Test func noAdbIsNotInstalled() async {
-    let run = ADBCommand.runner(locator: ADBHostTests.noAdb)
-    await #expect(throws: ADBError.adbNotInstalled) { _ = try await run(["connect", "x:1"]) }
-  }
-
-  @Test func aNonDefaultServerPortIsPassedFirst() {
-    #expect(ADBCommand.arguments(["connect", "x:1"], port: 5037) == ["connect", "x:1"])
-    #expect(
-      ADBCommand.arguments(["connect", "x:1"], port: 6000) == ["-P", "6000", "connect", "x:1"])
   }
 }
 

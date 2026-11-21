@@ -24,8 +24,8 @@ public protocol ADBToolDevice: Sendable {
   func forwards(route: ADBRoute) async throws(ADBError) -> [PortForward]
   func addForward(route: ADBRoute, _ forward: PortForward) async throws(ADBError)
   func removeForward(route: ADBRoute, local: UInt16) async throws(ADBError)
-  /// The `adb` program, if it is installed.
-  func adbPath() -> URL?
+  /// The `adb` a shell in Terminal runs, if there is one (see `ADBDeviceTools.shellADB()`).
+  func shellADB() -> ShellADB?
 }
 
 /// A device's log as lines of bytes (see `ADBLogcat`).

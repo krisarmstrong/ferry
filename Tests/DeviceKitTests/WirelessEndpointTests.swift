@@ -94,6 +94,18 @@ struct PairingCodeTests {
     #expect(WirelessEndpoint(parsing: text) == nil)
   }
 
+  /// The adb server reads these as socket specs, not hosts: an emulator, a vsock, a UNIX socket.
+  /// Its checks are case-sensitive, so other spellings are ordinary hostnames.
+  @Test(arguments: ["emu", "emu:5555", "vsock:5555", "localfilesystem", "localfilesystem:5555"])
+  func aSocketSpecPrefixIsNotAHost(text: String) {
+    #expect(WirelessEndpoint(parsing: text) == nil)
+  }
+
+  @Test(arguments: ["EMU:5555", "emulator:5555", "vsock.lan:5555"])
+  func aNameThatOnlyLooksLikeOneIsAHost(text: String) {
+    #expect(WirelessEndpoint(parsing: text) != nil)
+  }
+
   /// A typed IPv4 address with leading zeros is refused, with or without a port: adb may read a
   /// part such as `010` as octal (8), so it would reach a different host than the one typed.
   @Test(arguments: ["192.0.2.01", "010.0.2.1", "192.0.2.010:5555"])

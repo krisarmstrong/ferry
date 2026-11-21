@@ -58,7 +58,7 @@ public actor ADBServerKeeper {
   private var replacedFerryServer = false
   /// A start under way: both trackers start the server after an outage, and must share it.
   private var starting: Task<Result<Void, ADBError>, Never>?
-  /// adb client commands running now (`whileServing`), which a replacement waits out.
+  /// Wireless commands running now (`whileServing`), which a replacement waits out.
   private var commands = 0
   /// Replacements under way: no command starts until none is.
   private var replacing = 0
@@ -149,9 +149,9 @@ public actor ADBServerKeeper {
     throw .failed("the adb server did not answer in time")
   }
 
-  /// Runs an adb client command that checked for a server and then uses it. A client finding no
-  /// server forks a daemon of its own, which outlives the agent and is cut off when it exits, so
-  /// a replacement never stops the server under a command, and no command starts during one.
+  /// Runs a connect, pair or disconnect against the server (`ADBWireless`), so a replacement
+  /// never stops the server under one, which would cut a pairing off midway, and none starts
+  /// during a replacement.
   public func whileServing<T: Sendable>(
     _ body: @Sendable () async throws(ADBError) -> T
   ) async throws(ADBError) -> T {

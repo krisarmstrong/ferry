@@ -115,11 +115,18 @@ public struct WirelessEndpoint: Hashable, Sendable, Codable {
       && inet_pton(AF_INET6, text, &address) == 1
   }
 
+  /// The adb server reads `<prefix>:<port>` as a socket spec, not a host: an emulator, a vsock
+  /// or a UNIX socket path (AOSP packages/modules/adb 1cf2f017, services.cpp:138,
+  /// socket_spec.cpp). It compares them case-sensitively, so only these spellings are refused.
+  static let socketSpecPrefixes: Set<String> = ["emu", "vsock", "localfilesystem"]
+
   /// RFC 1123 labels. A name whose last label is all digits would be a mistyped IPv4 address,
   /// which `isIPv4` already refused.
   private static func isHostname(_ text: String) -> Bool {
     let bytes = Array(text.utf8)
-    guard !bytes.isEmpty, bytes.count <= 253 else { return false }
+    guard !bytes.isEmpty, bytes.count <= 253, !socketSpecPrefixes.contains(text) else {
+      return false
+    }
     let labels = bytes.split(separator: UInt8(ascii: "."), omittingEmptySubsequences: false)
     let hyphen = UInt8(ascii: "-")
     for label in labels {

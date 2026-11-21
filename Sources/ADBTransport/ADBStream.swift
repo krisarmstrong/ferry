@@ -210,6 +210,24 @@ public actor ADBStream {
     }
   }
 
+  /// A host service's answer: one length-prefixed reply after its `OKAY`, or `FAIL` and the
+  /// server's reason, returned as its refusal, so only a lost or wedged connection is thrown. A
+  /// service the server runs on a thread of its own (`connect:`, `pair:`) is acknowledged with
+  /// `OKAY` as soon as it starts, so its own `FAIL` follows that `OKAY` (AOSP
+  /// packages/modules/adb 1cf2f017, sockets.cpp:894, services.cpp:155). `FAIL` is never a
+  /// length: its letters are not all hex digits.
+  func readServiceAnswer() async throws(ADBError) -> ADBServiceAnswer {
+    let fail = Data("FAIL".utf8)
+    let status = try await read(exactly: 4)
+    if status == fail { return .refused(try await readFrame()) }
+    guard status == Data("OKAY".utf8) else {
+      throw .protocolViolation("unexpected status \(try ADBWire.text(status))")
+    }
+    let head = try await read(exactly: 4)
+    if head == fail { return .refused(try await readFrame()) }
+    return .reply(try ADBWire.text(try await read(exactly: ADBWire.length(of: head))))
+  }
+
   /// One length-prefixed payload.
   func readFrame() async throws(ADBError) -> String {
     let length = try ADBWire.length(of: try await read(exactly: 4))

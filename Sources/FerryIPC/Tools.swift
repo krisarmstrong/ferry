@@ -81,7 +81,7 @@ public typealias LogSink = @Sendable (LogBatch) async -> Bool
 public typealias LogBatchHandler = @Sendable (LogBatch) async -> Void
 
 /// What Open in Terminal needs to run `adb -s <serial> shell` in Terminal: the `adb` the agent
-/// found and the serial of the route it serves the device by.
+/// chose and the serial of the route it serves the device by.
 ///
 /// Both end up in a command line, so each is checked: the path must be absolute and free of
 /// control characters, and the serial limited to the characters adb itself gives serials
@@ -94,14 +94,20 @@ public struct ShellTarget: Codable, Sendable, Equatable {
   /// then selects the unit by it (`adb -t`), so it never reaches another unit that took the
   /// address since. Digits only.
   public let transportID: String?
+  /// Whether `adb` is the program serving the adb server. False when the agent could not tell
+  /// and chose the adb its locator finds: the script then names it before adb runs.
+  public let runsServer: Bool
 
-  public init?(adb: String, serial: String, transportID: String? = nil) {
+  public init?(
+    adb: String, serial: String, transportID: String? = nil, runsServer: Bool = true
+  ) {
     guard Self.isValid(adb: adb), Self.isValid(serial: serial),
       transportID.map(Self.isValid(transportID:)) != false
     else { return nil }
     self.adb = adb
     self.serial = serial
     self.transportID = transportID
+    self.runsServer = runsServer
   }
 
   public init(from decoder: any Decoder) throws {
@@ -109,7 +115,11 @@ public struct ShellTarget: Codable, Sendable, Equatable {
     let adb = try container.decode(String.self, forKey: .adb)
     let serial = try container.decode(String.self, forKey: .serial)
     let transportID = try container.decodeIfPresent(String.self, forKey: .transportID)
-    guard let target = ShellTarget(adb: adb, serial: serial, transportID: transportID) else {
+    let runsServer = try container.decode(Bool.self, forKey: .runsServer)
+    guard
+      let target = ShellTarget(
+        adb: adb, serial: serial, transportID: transportID, runsServer: runsServer)
+    else {
       throw DecodingError.dataCorrupted(
         .init(codingPath: decoder.codingPath, debugDescription: "invalid shell target"))
     }

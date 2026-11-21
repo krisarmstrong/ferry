@@ -41,10 +41,9 @@ func developerRequests() -> [AgentRequest] {
 ])
 func shellTargetsAreValidated(adb: String, serial: String, valid: Bool) throws {
   #expect((ShellTarget(adb: adb, serial: serial) != nil) == valid)
-  let json = try #require(
-    String(
-      data: JSONEncoder().encode(["adb": adb, "serial": serial]), encoding: .utf8))
-  let decoded = try? JSONDecoder().decode(ShellTarget.self, from: Data(json.utf8))
+  let json = try JSONSerialization.data(
+    withJSONObject: ["adb": adb, "serial": serial, "runsServer": true])
+  let decoded = try? JSONDecoder().decode(ShellTarget.self, from: json)
   #expect((decoded != nil) == valid)
 }
 
@@ -52,4 +51,15 @@ func shellTargetsAreValidated(adb: String, serial: String, valid: Bool) throws {
 @Test(arguments: [("7", true), ("12345", true), ("", false), ("-1", false), ("7; rm", false)])
 func shellTransportIDsAreDigits(_ id: String, _ valid: Bool) {
   #expect((ShellTarget(adb: "/opt/homebrew/bin/adb", serial: "S", transportID: id) != nil) == valid)
+}
+
+/// Whether the adb is the one serving the adb server travels with the target, so the script can
+/// say when Ferry could not tell.
+@Test(arguments: [true, false])
+func whetherTheAdbRunsTheServerTravels(_ runsServer: Bool) throws {
+  let target = try #require(
+    ShellTarget(adb: "/opt/homebrew/bin/adb", serial: "S", runsServer: runsServer))
+  let decoded = try JSONDecoder().decode(ShellTarget.self, from: JSONEncoder().encode(target))
+  #expect(decoded == target)
+  #expect(decoded.runsServer == runsServer)
 }

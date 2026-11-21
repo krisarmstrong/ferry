@@ -403,7 +403,7 @@ The remove button beside a forward ends it.
 
 ### Open a shell in Terminal
 
-Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it.
+Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry needs adb for this, and says so if it can't find it. The shell uses the adb that started the running adb server when Ferry can tell which one it is, so it does not restart another tool's server. Nothing on the device changes unless you type a command that changes it.
 
 ## Troubleshooting
 
@@ -596,6 +596,18 @@ In the Ferry menu, click **Get Android Platform Tools…**, then try again.
 macOS did not let Ferry open Terminal, or Terminal is missing.
 
 Open Terminal once yourself, then try again. If macOS asks whether Ferry may control Terminal, allow it.
+
+**Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. If its version differs, adb may restart the server.**
+
+Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs the adb Ferry found instead: its own copy, or one already on this Mac, named in the message.
+
+Nothing, if the shell opens. If another tool, such as Android Studio, loses its devices, close the shell and run adb shell from that tool's own adb.
+
+**Ferry couldn't tell which adb started the adb server, so this uses the adb in …. If its version differs, adb may restart the server.**
+
+Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs the adb Ferry found instead: its own copy, or one already on this Mac, named in the message.
+
+Nothing, if the shell opens. If another tool, such as Android Studio, loses its devices, close the shell and run adb shell from that tool's own adb.
 
 ### Wi-Fi and network messages
 

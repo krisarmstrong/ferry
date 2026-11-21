@@ -197,6 +197,21 @@ public actor ADBHost {
     try await launcher(adb)
   }
 
+  /// A host service such as `connect:` or `pair:`, whose refusal is an answer, not a failure.
+  func service(_ request: String) async throws(ADBError) -> ADBServiceAnswer {
+    let framed = try ADBWire.frame(request)
+    let stream = try await ADBStream.open(port: port)
+    do throws(ADBError) {
+      try await stream.write(framed)
+      let answer = try await stream.readServiceAnswer()
+      await stream.close()
+      return answer
+    } catch {
+      await stream.close()
+      throw error
+    }
+  }
+
   func query(_ request: String) async throws(ADBError) -> String {
     let framed = try ADBWire.frame(request)
     let stream = try await ADBStream.open(port: port)
