@@ -26,7 +26,8 @@ public actor ADBStream {
     guard let port = NWEndpoint.Port(rawValue: port) else {
       throw .protocolViolation("port 0 is not connectable")
     }
-    let connection = try await connect(until: .now + timeout) {
+    let clock = ContinuousClock()
+    let connection = try await connect(until: clock.now + timeout, on: clock) {
       let connection = NWConnection(host: .ipv4(.loopback), port: port, using: .tcp)
       let states = AsyncStream<NWConnection.State> { continuation in
         connection.stateUpdateHandler = { continuation.yield($0) }
@@ -48,24 +49,24 @@ public actor ADBStream {
   }
 
   /// Makes attempts until one is ready (its value is returned), one fails, or `deadline`
-  /// passes. A stalled attempt is cancelled and replaced: a new connection gets a new local
-  /// port, where retrying the stalled one would not.
-  static func connect<Value: Sendable>(
-    until deadline: ContinuousClock.Instant, _ attempt: () -> Attempt<Value>
+  /// passes on `clock`. A stalled attempt is cancelled and replaced: a new connection gets a new
+  /// local port, where retrying the stalled one would not.
+  static func connect<Value: Sendable, C: Clock<Duration>>(
+    until deadline: C.Instant, on clock: C, _ attempt: () -> Attempt<Value>
   ) async throws(ADBError) -> Value {
     while true {
       let next = attempt()
       let outcome = await withTaskCancellationHandler {
         next.start()
-        return await settle(next.states, until: deadline)
+        return await settle(next.states, until: deadline, on: clock)
       } onCancel: {
         next.cancel()
       }
       if outcome == .ready { return next.value }
       next.cancel()
       if case .failed(let error) = outcome { throw error }
-      guard ContinuousClock.now + retryDelay < deadline else { throw timedOut }
-      guard (try? await Task.sleep(for: retryDelay)) != nil else { throw .cancelled }
+      guard clock.now.advanced(by: retryDelay) < deadline else { throw timedOut }
+      guard (try? await clock.sleep(for: retryDelay)) != nil else { throw .cancelled }
     }
   }
 
@@ -84,11 +85,9 @@ public actor ADBStream {
   /// connection only when the network path changes, which loopback never does, and with the
   /// same local port: a clash there (EADDRINUSE, a loaded machine's many short connections)
   /// would wait forever. So the caller starts over with a new connection.
-  static func settle(
-    _ states: AsyncStream<NWConnection.State>, until deadline: ContinuousClock.Instant
-  )
-    async -> Settled
-  {
+  static func settle<C: Clock<Duration>>(
+    _ states: AsyncStream<NWConnection.State>, until deadline: C.Instant, on clock: C
+  ) async -> Settled {
     await withTaskGroup(of: Settled.self) { group in
       group.addTask {
         for await state in states {
@@ -111,7 +110,9 @@ public actor ADBStream {
         return .failed(.cancelled)
       }
       group.addTask {
-        guard (try? await Task.sleep(until: deadline)) != nil else { return .failed(.cancelled) }
+        guard (try? await clock.sleep(until: deadline, tolerance: nil)) != nil else {
+          return .failed(.cancelled)
+        }
         return .failed(timedOut)
       }
       let first = await group.next() ?? .failed(.cancelled)

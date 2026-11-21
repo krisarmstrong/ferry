@@ -33,8 +33,6 @@ actor FakeWirelessADB: WirelessADBControl {
   var mdns: [ADBMDNSService] = []
   var pairOutcome = ADBPairOutcome.failed("not scripted")
   var serverUp = true
-  /// How long `connect` takes for an address, as an unreachable host does.
-  var connectDelay: [String: Duration] = [:]
   /// What adb says when a connect to an address with no unit fails, by address; otherwise
   /// "Connection refused".
   var connectFailure: [String: String] = [:]
@@ -49,9 +47,11 @@ actor FakeWirelessADB: WirelessADBControl {
   var nameless: Set<String> = []
   /// Runs while the identity of an adb serial is read: what a scan would see then.
   var whileIdentifying: (@Sendable (String) -> Void)?
-  /// Set by `holdConnects()`: each connect waits, once recorded, for `releaseConnects()`.
+  /// Set by `holdConnects(to:)`: each connect to one of these addresses (any, when `nil`)
+  /// waits, once recorded, for `releaseConnects()`.
   private var connectsHeld = false
-  private var heldConnects: [CheckedContinuation<Void, Never>] = []
+  private var heldAddresses: Set<String>?
+  private var heldConnects: [UUID: CheckedContinuation<Void, Never>] = [:]
   /// Set by `holdDisconnects()`: each disconnect waits, once recorded, for `releaseDisconnects()`.
   private var disconnectsHeld = false
   private var heldDisconnects: [CheckedContinuation<Void, Never>] = []
@@ -92,9 +92,20 @@ actor FakeWirelessADB: WirelessADBControl {
     calls.append(.connect(endpoint.argument))
     inFlight += 1
     maxInFlight = max(maxInFlight, inFlight)
-    if let delay = connectDelay[endpoint.argument] { try? await Task.sleep(for: delay) }
-    if connectsHeld {
-      await withCheckedContinuation { heldConnects.append($0) }
+    if connectsHeld, heldAddresses?.contains(endpoint.argument) ?? true {
+      // A cancelled caller (a test's time limit) is let go, so a hold never hangs a run.
+      let id = UUID()
+      await withTaskCancellationHandler {
+        await withCheckedContinuation { continuation in
+          if Task.isCancelled {
+            continuation.resume()
+          } else {
+            heldConnects[id] = continuation
+          }
+        }
+      } onCancel: {
+        Task { await self.letGo(id) }
+      }
     }
     inFlight -= 1
     if connectThrows.contains(endpoint.argument) { throw .failed("adb did not finish") }
@@ -122,14 +133,25 @@ actor FakeWirelessADB: WirelessADBControl {
     listed[endpoint.argument] = nil
   }
 
-  func holdConnects() {
+  func holdConnects(to addresses: Set<String>? = nil) {
     connectsHeld = true
+    heldAddresses = addresses
   }
 
+  /// Ends the hold: the held connects go on, and later ones are not held.
   func releaseConnects() {
     connectsHeld = false
-    for held in heldConnects { held.resume() }
-    heldConnects = []
+    resumeHeldConnects()
+  }
+
+  /// Lets the connects held now go on; later ones are still held.
+  func resumeHeldConnects() {
+    for held in heldConnects.values { held.resume() }
+    heldConnects = [:]
+  }
+
+  private func letGo(_ id: UUID) {
+    heldConnects.removeValue(forKey: id)?.resume()
   }
 
   func holdDisconnects() {
