@@ -41,6 +41,8 @@ actor FakeAgent: AgentSending {
   /// The next `.replaceContents` keeps the device's file, as the agent does when the device
   /// changed it since the save's base.
   var keepDeviceVersion = false
+  /// The next `.list` answers `.pageExpired`, as for a listing the agent dropped.
+  var expireNextList = false
   /// Answered to the next `.delete` instead of performing it.
   var deleteFailure: TransportError?
   /// Written into the fetch target before failing, as a download cut short would.
@@ -90,6 +92,10 @@ actor FakeAgent: AgentSending {
     requests.append(request)
     if let thrown { throw thrown }
     if let failure { return .failure(failure) }
+    if case .list = request, expireNextList {
+      expireNextList = false
+      return .failure(.pageExpired)
+    }
     if case .fetch = request, parkFetches {
       try? file?.write(contentsOf: Data("par".utf8))
       fetchStartedContinuation.yield()
@@ -113,8 +119,8 @@ actor FakeAgent: AgentSending {
     switch request {
     case .item(_, let id):
       return .entry(try entry(existing(try path(id)), id: id))
-    case .list(_, let folder):
-      return .entries(try listing(folder))
+    case .list(_, let folder, _):
+      return .page(entries: try listing(folder), next: nil)
     case .fetch(_, let id):
       return .entry(try fetched(id, into: file))
     case .create(_, let parent, let name, let isFolder):
@@ -354,4 +360,8 @@ extension FakeAgent {
   func park(until count: Int) {
     parkCreatesUntil = count
   }
+}
+
+extension FakeAgent {
+  func expireTheNextList() { expireNextList = true }
 }

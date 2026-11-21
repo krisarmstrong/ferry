@@ -262,7 +262,7 @@ actor Counter {
 
 extension AgentResponse {
   fileprivate var identities: [String] {
-    guard case .entries(let entries) = self else { return [] }
+    guard case .page(let entries, _) = self else { return [] }
     return entries.map { "\($0.id) \($0.item.path)" }
   }
 }

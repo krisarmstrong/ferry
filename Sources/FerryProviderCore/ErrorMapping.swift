@@ -24,6 +24,9 @@ public enum ErrorMapping {
     // again later rather than holding the request until its own watchdog.
     case .agentNotResponding:
       return NSFileProviderError(.serverUnreachable)
+    // FileProvider lists the folder again from its first page.
+    case .pageExpired:
+      return NSFileProviderError(.pageExpired)
     // The phone is locked or not set to share files, which the user fixes on the phone.
     case .deviceLocked:
       return NSFileProviderError(.notAuthenticated)

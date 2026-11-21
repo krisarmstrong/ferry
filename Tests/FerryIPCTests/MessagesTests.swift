@@ -61,6 +61,7 @@ func requests() -> [AgentRequest] {
   ]
   all.append(.removeAllDomains)
   all += [.item(domain: domain, id: photo), .list(domain: domain, folder: .root)]
+  all.append(.list(domain: domain, folder: camera, page: Data("next".utf8)))
   all.append(.fetch(domain: domain, id: photo))
   all.append(.create(domain: domain, parent: camera, name: "photo.jpg", isFolder: false))
   all.append(.create(domain: domain, parent: .root, name: "Camera", isFolder: true))
@@ -117,6 +118,7 @@ private func tag(_ error: TransportError) -> Int {
   case .folderTooDeep: 22
   case .readOnly: 23
   case .agentNotResponding: 24
+  case .pageExpired: 25
   }
 }
 
@@ -133,7 +135,7 @@ private func errors() throws -> [TransportError] {
   all.append(.nameChangedByDevice(requested: "Ä.txt", actual: "A.txt"))
   all.append(.downloadSizeMismatch(listed: 10, received: 9))
   all += [.directoryNotEmpty(photo), .changedOnDevice(photo), .macDiskFull(needed: 9, free: 1)]
-  all += [.folderTooDeep(photo), .readOnly(photo), .agentNotResponding]
+  all += [.folderTooDeep(photo), .readOnly(photo), .agentNotResponding, .pageExpired]
   return all
 }
 
@@ -141,19 +143,18 @@ private func tag(_ response: AgentResponse) -> Int {
   switch response {
   case .status: 0
   case .entry: 1
-  case .entries: 2
   case .done: 3
   case .failure: 4
   case .changes: 5
-  case .page: 6
-  case .removed: 7
-  case .keptOnDevice: 8
-  case .wireless: 9
-  case .toolFailed: 10
-  case .forwards: 11
-  case .deviceInfo: 12
-  case .shellTarget: 13
-  case .devices: 14
+  case .page: 2
+  case .removed: 6
+  case .keptOnDevice: 7
+  case .wireless: 8
+  case .toolFailed: 9
+  case .forwards: 10
+  case .deviceInfo: 11
+  case .shellTarget: 12
+  case .devices: 13
   }
 }
 
@@ -189,7 +190,10 @@ private func responses() throws -> [AgentResponse] {
           devices: [ready], provider: .enabled, adbStatus: adb,
           awaitingUSBDebugging: [device])))
   }
-  all += [.entry(item), .entry(root), .entries([item, root]), .entries([])]
+  all += [
+    .entry(item), .entry(root), .page(entries: [item, root], next: nil),
+    .page(entries: [], next: nil),
+  ]
   all.append(.keptOnDevice(item))
   all += [.done, .failure(.deviceDisconnected)]
   all.append(.changes(anchor: Data([9]), updated: [item], deleted: [.random()], expired: false))
@@ -281,14 +285,14 @@ private func roundTrip<T: Codable>(_ value: T) throws -> T {
 }
 
 @Test func everyErrorRoundTripsJSON() throws {
-  #expect(Set(try errors().map(tag)) == Set(0...24))
+  #expect(Set(try errors().map(tag)) == Set(0...25))
   for error in try errors() {
     #expect(try roundTrip(AgentResponse.failure(error)) == .failure(error))
   }
 }
 
 @Test func everyResponseRoundTripsJSON() throws {
-  #expect(Set(try responses().map(tag)) == Set(0...14))
+  #expect(Set(try responses().map(tag)) == Set(0...13))
   for response in try responses() {
     #expect(try roundTrip(response) == response)
   }

@@ -38,6 +38,8 @@ public actor AgentService: AgentHandling {
   let usbWatch: USBWatchState?
   /// Follows the folders clients list for changes made on the device; `nil` where nothing does.
   let changes: ChangeWatch?
+  /// The rest of each recent folder listing, served a page at a time.
+  var folderPages = FolderPages()
 
   public init(
     hub: DeviceHub, domains: DomainController,
@@ -92,8 +94,8 @@ public actor AgentService: AgentHandling {
     switch (request, file) {
     case (.item(let domain, let id), _):
       return .entry(try await item(id, in: domain))
-    case (.list(let domain, let folder), _):
-      return .entries(try await list(folder, in: domain))
+    case (.list(let domain, let folder, let page), _):
+      return try await list(folder, in: domain, page: page)
     case (.fetch(let domain, let id), let file?):
       return .entry(try await fetch(id, in: domain, into: file, progress: progress))
     case (.create(let domain, let parent, let name, _), let file?):
@@ -174,35 +176,6 @@ public actor AgentService: AgentHandling {
       guard entry.id == id else { throw .unknownItem }
       return entry
     }
-  }
-
-  private func list(_ folder: ItemID, in domain: String) async throws(TransportError)
-    -> [ProviderEntry]
-  {
-    let (path, entries) = try await gated(domain) { route throws(TransportError) in
-      let path = try await route.path(of: folder)
-      let items = try await route.writer.visibleList(path, in: route.storage)
-      return (path, await route.items.listed(path, children: items))
-    }
-    // Outside the gate: the watch reads the domain's table.
-    await changes?.listed(path, in: domain)
-    return entries
-  }
-
-  /// One page of the working set. The page token is the last identifier served, as UTF-8.
-  private func workingSet(_ page: Data?, in domain: String) async throws(TransportError)
-    -> AgentResponse
-  {
-    let cursor = try page.map { data throws(TransportError) in
-      guard let id = String(data: data, encoding: .utf8).flatMap(ItemID.init(rawValue:)) else {
-        throw .io(String(localized: AgentText.badRequest))
-      }
-      return id
-    }
-    let (entries, next) = try await gated(domain) { route in
-      await route.items.workingSet(after: cursor, size: Self.workingSetPageSize)
-    }
-    return .page(entries: entries, next: next.map { Data($0.rawValue.utf8) })
   }
 
   // MARK: Changing

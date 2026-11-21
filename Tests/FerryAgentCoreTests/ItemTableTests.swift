@@ -214,18 +214,21 @@ struct ItemTableTests {
     let table = ItemTable(domain: tableDomain, store: folder)
     let children = [try file("/a"), try file("/b")]
     _ = await table.listed(.root, children: children)
-    let saved = ItemTable.file(for: tableDomain, in: folder)
-    try FileManager.default.removeItem(at: saved)
+    let saved = [
+      ItemTable.file(for: tableDomain, in: folder), ItemTable.journal(for: tableDomain, in: folder),
+    ]
+    for file in saved { try? FileManager.default.removeItem(at: file) }
+    let written = { saved.contains { FileManager.default.fileExists(atPath: $0.path) } }
 
     // Nothing new: the same listing, a move to where the item is, an unknown removal.
     _ = await table.listed(.root, children: children)
     await table.moved(try path("/a"), to: try path("/a"))
     await table.removed(try path("/zzz"))
     _ = await table.id(for: try path("/a"))
-    #expect(!FileManager.default.fileExists(atPath: saved.path))
+    #expect(!written())
 
     _ = await table.listed(.root, children: [try file("/a")])
-    #expect(FileManager.default.fileExists(atPath: saved.path))
+    #expect(written())
   }
 
   @Test func workingSetPagesReportedItemsOnly() async throws {

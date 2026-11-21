@@ -35,13 +35,6 @@ public actor ProviderBackend {
     ProviderItem(try await entry(.item(domain: domain, id: try Self.itemID(id))))
   }
 
-  /// The items in a folder. The working set is not a folder: enumerate it with `workingSet(from:)`.
-  public func children(of id: NSFileProviderItemIdentifier) async throws -> [ProviderItem] {
-    let response = try await send(.list(domain: domain, folder: try Self.itemID(id)))
-    guard case .entries(let entries) = response else { throw Self.unexpected(response) }
-    return entries.map(ProviderItem.init)
-  }
-
   /// Downloads into a new file in `dir`, and returns the item as the agent received it: its
   /// version describes exactly these bytes, including a size larger than the device's stale
   /// listing. Anything but an item removes the file, which may hold a truncated prefix.
@@ -110,8 +103,7 @@ public actor ProviderBackend {
   }
 
   private func existing(matching template: ItemTemplate) async throws -> SyncedItem? {
-    let response = try await send(.list(domain: domain, folder: template.parent))
-    guard case .entries(let entries) = response else { throw Self.unexpected(response) }
+    let entries = try await allEntries(in: template.parent)
     let name = template.filename.precomposedStringWithCanonicalMapping
     guard let entry = entries.first(where: { $0.item.path.name == name }) else { return nil }
     switch (template.kind, entry.item.kind) {
@@ -298,18 +290,14 @@ public actor ProviderBackend {
   /// A page after the first carries the agent's cursor: the last identifier it served, as
   /// UTF-8. Anything from FileProvider other than an initial page or such a cursor is expired.
   private static func cursor(of page: NSFileProviderPage) throws -> Data? {
-    let initial = [
-      NSFileProviderPage.initialPageSortedByName as Data,
-      NSFileProviderPage.initialPageSortedByDate as Data,
-    ]
-    if initial.contains(page.rawValue) { return nil }
+    if isInitial(page) { return nil }
     guard let text = String(data: page.rawValue, encoding: .utf8), ItemID(rawValue: text) != nil
     else { throw NSFileProviderError(.pageExpired) }
     return page.rawValue
   }
 
   /// The trash, the working set and anything else the agent did not assign name no item.
-  private static func itemID(_ id: NSFileProviderItemIdentifier) throws -> ItemID {
+  static func itemID(_ id: NSFileProviderItemIdentifier) throws -> ItemID {
     guard let itemID = ItemID(id) else { throw NSFileProviderError(.noSuchItem) }
     return itemID
   }

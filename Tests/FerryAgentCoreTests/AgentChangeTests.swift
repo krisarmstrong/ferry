@@ -29,7 +29,7 @@ private struct Domain {
   }
 
   func list(_ folder: ItemID = .root) async throws -> [ProviderEntry] {
-    guard case .entries(let entries) = await send(.list(domain: name, folder: folder)) else {
+    guard case .page(let entries, _) = await send(.list(domain: name, folder: folder)) else {
       throw TransportError.io("listing failed")
     }
     return entries
@@ -180,5 +180,51 @@ struct AgentChangeTests {
     #expect(
       await domain.send(.workingSet(domain: domain.name, page: Data("/Docs".utf8)))
         == .failure(.io(String(localized: AgentText.badRequest))))
+  }
+}
+
+struct AgentFolderPagingTests {
+  /// A folder larger than a page reaches the client in pages that together hold every item once,
+  /// and the device is listed only for the first.
+  @Test func aLargeFolderIsListedInPages() async throws {
+    let count = FolderPages.pageSize * 2 + 3
+    let device = await makeDevice("A")
+    for index in 0..<count {
+      try await device.seed(path("/DCIM/f\(index)"), in: storageID(device), contents: Data())
+    }
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    let domain = domainID(device)
+    let folder = try await harness.id(path("/DCIM"), in: domain)
+
+    var served: [ProviderEntry] = []
+    var page: Data?
+    var pages = 0
+    repeat {
+      guard
+        case .page(let entries, let next) = await harness.service.handle(
+          .list(domain: domain, folder: folder, page: page), file: nil)
+      else { throw TransportError.io("no page") }
+      #expect(entries.count <= FolderPages.pageSize)
+      served += entries
+      page = next
+      pages += 1
+    } while page != nil
+
+    #expect(pages == 3)
+    #expect(Set(served.map(\.id)).count == count)
+    #expect(served.allSatisfy { $0.parent == folder })
+  }
+
+  @Test func anUnknownPageIsExpired() async throws {
+    let device = await makeDevice("A")
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    let reply = await harness.service.handle(
+      .list(domain: domainID(device), folder: .root, page: Data("\(UUID()) 1000".utf8)),
+      file: nil)
+    #expect(reply == .failure(.pageExpired))
   }
 }

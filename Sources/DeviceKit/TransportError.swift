@@ -39,6 +39,9 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   /// The agent did not answer a request that should take moments (see
   /// `AgentRequest.mayTakeLong`): it is wedged on a device, or stopped.
   case agentNotResponding
+  /// A folder listing's page token the agent no longer holds (too many listings since, or the
+  /// agent restarted): the listing must start again from its first page.
+  case pageExpired
   case io(String)
 }
 

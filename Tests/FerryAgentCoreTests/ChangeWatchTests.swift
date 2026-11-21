@@ -54,7 +54,7 @@ private struct Watched {
   /// a folder listed before this agent process started.
   func list(_ folder: String, quietly: Bool = false) async throws {
     let id = try await harness.id(try path(folder), in: domain)
-    guard case .entries = await harness.service.handle(.list(domain: domain, folder: id), file: nil)
+    guard case .page = await harness.service.handle(.list(domain: domain, folder: id), file: nil)
     else { throw TransportError.io("listing failed") }
     if !quietly { await changes.listed(try path(folder), in: domain) }
   }
