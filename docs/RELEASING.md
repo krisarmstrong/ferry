@@ -29,6 +29,11 @@ the tag's commit is on `main`.
 3. The build job signs, notarizes and staples Ferry, attaches `Ferry-X.Y.Z.zip`,
    `Ferry-X.Y.Z.dmg` and `appcast.xml`, then publishes the release as the latest. Installed
    copies read `releases/latest/download/appcast.xml` and update within a day.
+   The DMG opens on a designed window (`Design/DMG`) with the app and a link to Applications;
+   `scripts/make-dmg.sh` builds it with dmgbuild (pinned by hash in
+   `scripts/dmg-requirements.txt`) and `scripts/check-dmg.sh` checks it, once as built and
+   again once it is signed and stapled. Every CI run builds and checks it too, in
+   `make release SIGN=adhoc`.
 
 ## When the release PR shows no passing `check`
 

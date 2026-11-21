@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <!-- The DMG window's background, 640 x 400 pt. Finder draws the icon labels black in light
+       mode and white in dark mode, on no backing: the blue behind them has a relative
+       luminance near 0.18, which gives both at least 4.5:1. -->
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3E7BB5"/>
+      <stop offset="1" stop-color="#3778A8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="400" fill="url(#sea)"/>
+  <path d="M0 352 C107 334 213 334 320 352 S533 370 640 352 V400 H0 Z" fill="#FFFFFF" fill-opacity="0.08"/>
+  <path d="M0 372 C107 358 213 358 320 372 S533 386 640 372 V400 H0 Z" fill="#FFFFFF" fill-opacity="0.10"/>
+  <!-- From Ferry to Applications. -->
+  <path d="M258 186 Q320 146 382 186" fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="7" stroke-linecap="round"/>
+  <path d="M366 170 L386 189 L360 194" fill="none" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

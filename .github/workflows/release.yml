@@ -230,16 +230,15 @@ jobs:
           mkdir -p .build/dist/appcast
           ditto -c -k --keepParent "$APP" ".build/dist/appcast/Ferry-$version.zip"
 
-          staging="$RUNNER_TEMP/dmg"
-          mkdir -p "$staging"
-          ditto "$APP" "$staging/Ferry.app"
-          ln -s /Applications "$staging/Applications"
+          # The designed window and the Applications link (scripts/make-dmg.sh), around the
+          # stapled app.
           dmg=".build/dist/Ferry-$version.dmg"
-          hdiutil create -volname Ferry -srcfolder "$staging" -format UDZO -ov "$dmg"
+          scripts/make-dmg.sh "$APP" "$dmg"
           identity="$(codesign -dv --verbose=2 "$APP" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
           codesign --sign "$identity" --timestamp "$dmg"
           notarize "$dmg"
           xcrun stapler staple "$dmg"
+          scripts/check-dmg.sh "$dmg" --release
           rm -f "$key"
       - name: Sign the appcast
         env:
