@@ -195,9 +195,51 @@ the result for each.
 10. **Get Android Platform Tools** on a Mac without adb, then offline (clear message), then
     after an update that pins a newer adb.
 11. **Remove Ferry**, then check what remains: Finder locations, the login item, the helper, an
-    adb server, and files under `~/Library/Application Support/Ferry`.
+    adb server, and files under `~/Library/Application Support/Ferry` and
+    `~/Library/Application Support/io.github.krisarmstrong.ferry.agent` (both deleted after #33).
 12. **Upgrade over a developer build** (signing identity change): the helper restarts without a
     manual `launchctl` step (W2).
+
+## W5 fixes (2026-11-20)
+
+The W5 findings were fixed in one PR per group. All are open against `main` and not yet
+merged; verify each against `main` once it lands.
+
+| Findings | PR |
+|---|---|
+| H1, M10, M9, L2 (item table journal and index, paged listings, enumerator cancel) | #25 |
+| M1, L4 (private error logs; default-deny `LogPrivacyTests`) | #26 |
+| M2, L5, L9 (helper wording), L10, L11 (stacked on #25) | #29 |
+| M3 (relist only while in use) | #30 |
+| M5, M6 (Sparkle licence, Acknowledgements, LGPL tarballs on each release) | #31 |
+| M4 (Install Updates Automatically) | #32 |
+| M8 (Remove Ferry deletes data, stops only Ferry's adb) | #33 |
+
+**Left, with the reason**
+- M7, macOS 26 never run live: owner check 1; no macOS 26 Mac or VM here.
+- M11, pkgconf in the release job: W3 owns `release.yml` hardening.
+- L1, no in-flight cap per XPC connection: needs back-pressure design in `AgentXPC` that
+  FileProvider's own retry tolerates; device work is already serialised (`DeviceTurns`), so the
+  cost is descriptors and tasks, not device load. Later.
+- L3, `adb devices` every 30 s with nothing remembered: `WirelessADB+Connecting` is W2's and
+  `ferry-localnet`'s area, both with open PRs there (#19, #14); a one-line early return to add
+  after they land.
+- L6, L7, L8 (severity only in a tinted symbol, no arrow keys in the menu, fixed sizes): menu
+  and window layout are W1's (#22); owner check 7 covers them live.
+- L9, "unit", "tester" and "device" mixed in steps: the guide steps name NetAlly models on
+  purpose (`UserGuideMirrorTests` limits where); a copy pass with W4's first-run work.
+- L12: done here (TESTING.md points to the V1 checklist above).
+- L13, secret scanning in CI: `ci.yml` is being changed by W3 (#24); add a pinned gitleaks step
+  after it lands, to avoid two PRs editing the same jobs.
+- L14, plurals: the counted strings ("Couldn’t send %lld files to %@" and the like) are only
+  shown for two or more items, so English needs no singular; a translation adds its own plural
+  forms in the String Catalog. The SD card suffix (`DomainNaming.swift`), capture file names
+  (`CaptureFiles.swift`) and the sentence join in `FinderSender.swift` stay until a translation
+  is planned.
+- L15, Sparkle gentle reminders: needs a user-driver delegate and an "Update ready" menu row,
+  testable only with a live update; owner check 8 first.
+- I1–I5: informational, no action. I5: the new item-table journal is created 0600; the snapshot
+  keeps the default mode under `~/Library` (0700).
 
 ## Audit trail
 
