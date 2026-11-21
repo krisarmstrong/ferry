@@ -2,8 +2,8 @@ import AppKit
 import FerryUI
 import Sparkle
 
-/// Sparkle's updater. Info.plist sets the rest: a check each day, the download in the
-/// background, the install when Ferry quits, and only an update signed with Ferry's key from a
+/// Sparkle's updater: a check each day, the download in the background and the install when
+/// Ferry quits, always (owner, 2026-11-21), and only an update signed with Ferry's key from a
 /// signed feed.
 @MainActor
 final class SparkleUpdates: UpdateChecking {
@@ -15,15 +15,13 @@ final class SparkleUpdates: UpdateChecking {
     guard UpdateFeed(info: bundle.infoDictionary ?? [:]) != nil else { return nil }
     controller = SPUStandardUpdaterController(
       startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    // Ferry has no switch for this: a choice an earlier version saved does not turn it off.
+    controller.updater.automaticallyChecksForUpdates = true
+    controller.updater.automaticallyDownloadsUpdates = true
   }
 
   func checkForUpdates() {
     NSApp.activate()
     controller.checkForUpdates(nil)
-  }
-
-  var installsAutomatically: Bool {
-    get { controller.updater.automaticallyDownloadsUpdates }
-    set { controller.updater.automaticallyDownloadsUpdates = newValue }
   }
 }

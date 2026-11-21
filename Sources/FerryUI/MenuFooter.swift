@@ -1,15 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// The rows at the foot of the menu: Open at Login, Install Updates Automatically and Check for
-/// Updates… (in a build that can update itself), Help and Quit Ferry. Ferry has no Settings
+/// The rows at the foot of the menu: Open at Login, Check for Updates… (in a build that can
+/// update itself), Help and Quit Ferry. Updates always install by themselves. Ferry has no Settings
 /// window; Remove Ferry… is in Help, under Troubleshooting.
 struct MenuFooter: View {
   static let openAtLoginResource = LocalizedStringResource("Open at Login", bundle: .module)
   static let checkForUpdatesResource = LocalizedStringResource(
     "Check for Updates…", bundle: .module)
-  static let installUpdatesResource = LocalizedStringResource(
-    "Install Updates Automatically", bundle: .module)
 
   /// The line under Open at Login while macOS waits for the user to allow it.
   static func loginItemDetail(_ status: LoginItemStatus) -> LocalizedStringResource? {
@@ -38,14 +36,6 @@ struct MenuFooter: View {
       }
       .toggleStyle(MenuToggleStyle())
       if model.updater != nil {
-        Toggle(
-          isOn: Binding(
-            get: { model.installsUpdatesAutomatically },
-            set: { model.setInstallsUpdatesAutomatically($0) })
-        ) {
-          Text(Self.installUpdatesResource)
-        }
-        .toggleStyle(MenuToggleStyle())
         MenuRow(title: Text(Self.checkForUpdatesResource)) {
           model.checkForUpdates()
         }
