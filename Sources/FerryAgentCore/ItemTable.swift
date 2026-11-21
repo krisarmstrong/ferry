@@ -7,7 +7,7 @@ import os
 private let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "ItemTable")
 
 /// An item's kind, size and date as the device last reported them.
-private struct ReportedItem: Codable, Equatable {
+struct ReportedItem: Codable, Equatable {
   let kind: ItemKind
   let size: UInt64
   let modified: Date
@@ -25,10 +25,15 @@ private struct ReportedItem: Codable, Equatable {
 /// Every new or changed item, and every forgotten one, is recorded in the domain's `ChangeLog`,
 /// which feeds FileProvider's working set.
 ///
-/// The table is saved atomically after each operation that changed it, to one file per domain in
-/// `store`, named by a hash of the domain so the device's serial is not in it. A missing file is
-/// an empty table; an unreadable or inconsistent one is logged and replaced by an empty one,
-/// which costs Finder its cached items for the domain but nothing on the device.
+/// Each operation that changed the table saves it before it returns, so an identifier is on disk
+/// before the reply that carries it leaves. A save appends only the records that operation
+/// changed to the domain's journal; once the journal outgrows the snapshot it is folded into a
+/// new snapshot, written atomically (see `ItemTable+Files`). A change therefore costs about the
+/// same on a 40,000-item table as on an empty one. Both files are named by a hash of the domain
+/// so the device's serial is not in them. A missing snapshot is an empty table; an unreadable or
+/// inconsistent one is logged and replaced by an empty one, which costs Finder its cached items
+/// for the domain but nothing on the device. A journal's torn last batch (the agent stopped while
+/// writing it) is dropped.
 ///
 /// `gate` orders the operations that resolve an identifier, change the device and then update
 /// the table, so none of them sees the table and the device disagree (see `AgentService`).
@@ -36,7 +41,7 @@ actor ItemTable {
   /// What the table knows about one item. `reported` is `nil` for an item known only as the
   /// parent of one the agent reported. `listed` marks a folder the agent has listed for a client,
   /// which a refresh lists again.
-  fileprivate struct Record: Codable, Equatable {
+  struct Record: Codable, Equatable {
     var path: RemotePath
     var reported: ReportedItem?
     var listed: Bool
@@ -62,34 +67,54 @@ actor ItemTable {
     }
   }
 
-  fileprivate struct ReceivedSize: Codable, Equatable {
+  struct ReceivedSize: Codable, Equatable {
     let listed: UInt64
     let modified: Date
     let actual: UInt64
   }
 
-  fileprivate struct Stored: Codable {
+  /// A snapshot, or one journal batch: the records written (all of them, in a snapshot), the
+  /// identifiers forgotten, and whether the root was listed.
+  struct Stored: Codable {
     var items: [String: Record]
+    var deleted: [String]?
     var rootListed: Bool
   }
 
   nonisolated let gate = OperationGate()
 
-  private let file: URL
-  private var records: [ItemID: Record] = [:]
-  private var ids: [RemotePath: ItemID] = [:]
-  private var rootListed = false
-  private var changeLog: ChangeLog
+  let file: URL
+  let journal: URL
+  var records: [ItemID: Record] = [:]
+  var ids: [RemotePath: ItemID] = [:]
+  /// Every path in `ids`, and every ancestor of one, under its parent: a folder's children and a
+  /// subtree are found without a walk over the whole table.
+  var children: [RemotePath: Set<RemotePath>] = [:]
+  /// Every identifier in `records`, in identifier order, for the working set's pages.
+  var order: [ItemID] = []
+  var rootListed = false
+  var changeLog: ChangeLog
   /// Changed since the last save.
-  private var dirty = false
+  var dirty = false
+  /// The records written or forgotten since the last save.
+  var touched: Set<ItemID> = []
+  /// Bytes in the snapshot and in the journal, which decide when the journal is folded in.
+  var snapshotBytes = 0
+  var journalBytes = 0
   /// Set by `discard`: nothing is written any more.
-  private var discarded = false
+  var discarded = false
 
   init(domain: String, store: URL, changes: ChangeLog = ChangeLog()) {
     file = Self.file(for: domain, in: store)
+    journal = Self.journal(for: domain, in: store)
     changeLog = changes
-    let loaded = Self.load(file)
+    let loaded = Self.load(file, journal: journal)
     (records, ids, rootListed) = (loaded.records, loaded.ids, loaded.rootListed)
+    // A torn batch at the journal's end would swallow the next one appended after it, so the
+    // next save writes a snapshot instead.
+    (snapshotBytes, journalBytes) = (loaded.torn ? 0 : loaded.snapshotBytes, loaded.journalBytes)
+    order = records.keys.sorted { $0.rawValue < $1.rawValue }
+    for path in ids.keys { Self.link(path, in: &children) }
   }
 
   /// The number of changes recorded so far.
@@ -154,7 +179,7 @@ actor ItemTable {
         download.received == listed.size
         ? nil
         : ReceivedSize(listed: listed.size, modified: listed.modified, actual: download.received)
-      dirty = true
+      touch(id)
     }
     return observe(download.item)
   }
@@ -173,9 +198,8 @@ actor ItemTable {
   /// replaced its contents, after `moved` for the first two). Recorded as a change.
   func changed(_ item: RemoteItem, id: ItemID) -> ProviderEntry {
     defer { save() }
-    records[id] = Record(path: item.path, item: item, listed: records[id]?.listed ?? false)
-    ids[item.path] = id
-    dirty = true
+    put(Record(path: item.path, item: item, listed: records[id]?.listed ?? false), for: id)
+    bind(item.path, to: id)
     let entry = entry(item, id: id)
     changeLog.record(.updated(entry))
     return entry
@@ -189,13 +213,13 @@ actor ItemTable {
     let moving = subtree(of: from)
     forget(subtree(of: to).filter { moving[$0.key] == nil })
     for path in moving.keys {
-      ids[path] = nil
+      unbind(path)
     }
     for (path, id) in moving {
       guard let moved = path.rebased(from: from, to: to) else { continue }
       records[id]?.path = moved
-      ids[moved] = id
-      dirty = true
+      bind(moved, to: id)
+      touch(id)
     }
   }
 
@@ -213,7 +237,7 @@ actor ItemTable {
     defer { save() }
     markListed(folder)
     let shown = Set(children.map(\.path))
-    for path in ids.keys where path.parent == folder && !shown.contains(path) {
+    for path in self.children[folder] ?? [] where ids[path] != nil && !shown.contains(path) {
       forget(subtree(of: path))
     }
     return children.map(observe)
@@ -224,14 +248,18 @@ actor ItemTable {
   /// right place after items before it are forgotten, so a page never skips one. Only items the
   /// agent reported are in it, not the root or a folder known only as some item's parent.
   func workingSet(after cursor: ItemID?, size: Int) -> (entries: [ProviderEntry], next: ItemID?) {
-    let remaining = records.compactMap { id, record -> (id: ItemID, item: RemoteItem)? in
-      guard let item = record.item, cursor.map({ id.rawValue > $0.rawValue }) ?? true else {
-        return nil
+    var index = cursor.map { cursor in order.firstIndex(after: cursor) } ?? 0
+    var page: [(id: ItemID, item: RemoteItem)] = []
+    while index < order.count {
+      let id = order[index]
+      index += 1
+      guard let item = records[id]?.item else { continue }
+      guard page.count < size else {
+        return (page.map { entry($0.item, id: $0.id) }, page.last?.id)
       }
-      return (id, item)
-    }.sorted { $0.id.rawValue < $1.id.rawValue }
-    let page = remaining.prefix(size)
-    return (page.map { entry($0.item, id: $0.id) }, remaining.count > size ? page.last?.id : nil)
+      page.append((id, item))
+    }
+    return (page.map { entry($0.item, id: $0.id) }, nil)
   }
 
   /// The changes recorded after `anchor`; see `ChangeLog`.
@@ -244,6 +272,7 @@ actor ItemTable {
   func discard() {
     discarded = true
     Self.remove(file)
+    Self.remove(journal)
   }
 
   // MARK: Private
@@ -263,8 +292,7 @@ actor ItemTable {
         var updated = Record(path: item.path, item: item, listed: record.listed)
         // Still the same stale listing: keep reading it as the size that arrived.
         updated.received = record.received.flatMap { $0.modified == item.modified ? $0 : nil }
-        records[id] = updated
-        dirty = true
+        put(updated, for: id)
       }
     } else {
       id = assign(Record(path: item.path, item: item))
@@ -290,6 +318,7 @@ actor ItemTable {
     } else {
       guard let id = ids[folder], records[id]?.listed == false else { return }
       records[id]?.listed = true
+      touch(id)
     }
     dirty = true
   }
@@ -307,79 +336,10 @@ actor ItemTable {
     return ProviderEntry(id: id, parent: parentID, item: item)
   }
 
-  private func assign(_ record: Record) -> ItemID {
+  func assign(_ record: Record) -> ItemID {
     let id = ItemID.random()
-    records[id] = record
-    ids[record.path] = id
-    dirty = true
+    put(record, for: id)
+    bind(record.path, to: id)
     return id
-  }
-
-  /// The entries for `path` and every path inside it.
-  private func subtree(of path: RemotePath) -> [RemotePath: ItemID] {
-    ids.filter { $0.key.isWithin(path) }
-  }
-
-  /// Forgets `entries`, recording each as deleted.
-  private func forget(_ entries: [RemotePath: ItemID]) {
-    for (path, id) in entries {
-      ids[path] = nil
-      records[id] = nil
-      changeLog.record(.deleted(id))
-      dirty = true
-    }
-  }
-
-  private func save() {
-    guard dirty, !discarded else { return }
-    dirty = false
-    let stored = Stored(
-      items: Dictionary(uniqueKeysWithValues: records.map { ($0.key.rawValue, $0.value) }),
-      rootListed: rootListed)
-    do {
-      try FileManager.default.createDirectory(
-        at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-      try JSONEncoder().encode(stored).write(to: file, options: .atomic)
-    } catch {
-      log.error("saving item table failed: \(error, privacy: .private)")
-    }
-  }
-
-}
-
-extension ItemTable {
-  /// A table as read from its file.
-  fileprivate struct Loaded {
-    var records: [ItemID: Record] = [:]
-    var ids: [RemotePath: ItemID] = [:]
-    var rootListed = false
-  }
-
-  fileprivate static func load(_ file: URL) -> Loaded {
-    let data: Data
-    do {
-      data = try Data(contentsOf: file)
-    } catch CocoaError.fileReadNoSuchFile {
-      return Loaded()
-    } catch {
-      log.error("reading item table failed: \(error, privacy: .private)")
-      return Loaded()
-    }
-    do {
-      let stored = try JSONDecoder().decode(Stored.self, from: data)
-      var records: [ItemID: Record] = [:]
-      var ids: [RemotePath: ItemID] = [:]
-      for (raw, record) in stored.items {
-        guard let id = ItemID(rawValue: raw), id != .root, record.path != .root,
-          ids[record.path] == nil
-        else { throw CocoaError(.fileReadCorruptFile) }
-        records[id] = record
-        ids[record.path] = id
-      }
-      return Loaded(records: records, ids: ids, rootListed: stored.rootListed)
-    } catch {
-      log.error("item table is unreadable, starting empty: \(error, privacy: .private)")
-      return Loaded()
-    }
   }
 }

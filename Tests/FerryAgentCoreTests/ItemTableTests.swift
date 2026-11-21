@@ -214,18 +214,21 @@ struct ItemTableTests {
     let table = ItemTable(domain: tableDomain, store: folder)
     let children = [try file("/a"), try file("/b")]
     _ = await table.listed(.root, children: children)
-    let saved = ItemTable.file(for: tableDomain, in: folder)
-    try FileManager.default.removeItem(at: saved)
+    let saved = [
+      ItemTable.file(for: tableDomain, in: folder), ItemTable.journal(for: tableDomain, in: folder),
+    ]
+    for file in saved { try? FileManager.default.removeItem(at: file) }
+    let written = { saved.contains { FileManager.default.fileExists(atPath: $0.path) } }
 
     // Nothing new: the same listing, a move to where the item is, an unknown removal.
     _ = await table.listed(.root, children: children)
     await table.moved(try path("/a"), to: try path("/a"))
     await table.removed(try path("/zzz"))
     _ = await table.id(for: try path("/a"))
-    #expect(!FileManager.default.fileExists(atPath: saved.path))
+    #expect(!written())
 
     _ = await table.listed(.root, children: [try file("/a")])
-    #expect(FileManager.default.fileExists(atPath: saved.path))
+    #expect(written())
   }
 
   @Test func workingSetPagesReportedItemsOnly() async throws {
@@ -267,5 +270,72 @@ struct ItemTableTests {
     }
 
     #expect(Set(all.map(\.id)).subtracting(delivered).isEmpty)
+  }
+}
+
+/// The journal a save appends to, and the snapshot it is folded into.
+struct ItemTableJournalTests {
+  /// A save appends the changed records to the journal; the journal is folded into the snapshot
+  /// once it outgrows it, and a reload sees every change either way.
+  @Test func changesAreJournalledThenFolded() async throws {
+    let folder = store()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let table = ItemTable(domain: tableDomain, store: folder)
+    let snapshot = ItemTable.file(for: tableDomain, in: folder)
+    let journal = ItemTable.journal(for: tableDomain, in: folder)
+    let first = await table.observed(try file("/first"))
+    #expect(FileManager.default.fileExists(atPath: snapshot.path))
+    let second = await table.observed(try file("/second"))
+    #expect(FileManager.default.fileExists(atPath: journal.path))
+    await table.removed(try path("/first"))
+
+    var reloaded = ItemTable(domain: tableDomain, store: folder)
+    #expect(await reloaded.path(for: first.id) == nil)
+    #expect(await reloaded.path(for: second.id) == (try path("/second")))
+
+    var last = second
+    var size = UInt64(1)
+    while FileManager.default.fileExists(atPath: journal.path) {
+      size += 1
+      last = await table.observed(try file("/second", size: size))
+      try #require(size < 10_000, "the journal was never folded in")
+    }
+    reloaded = ItemTable(domain: tableDomain, store: folder)
+    #expect(await reloaded.path(for: last.id) == (try path("/second")))
+    #expect(await reloaded.reportedAsIs(try file("/second", size: size)))
+  }
+
+  /// The agent stopped while appending: the torn batch is dropped, the ones before it kept, and
+  /// the next save writes a snapshot rather than appending after the torn line.
+  @Test func aTornJournalBatchIsDropped() async throws {
+    let folder = store()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let table = ItemTable(domain: tableDomain, store: folder)
+    let kept = await table.observed(try file("/a"))
+    let journalled = await table.observed(try file("/b"))
+    let journal = ItemTable.journal(for: tableDomain, in: folder)
+    let handle = try FileHandle(forWritingTo: journal)
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data(#"{"items":{"#.utf8))
+    try handle.close()
+
+    let reloaded = ItemTable(domain: tableDomain, store: folder)
+    #expect(await reloaded.path(for: kept.id) == (try path("/a")))
+    #expect(await reloaded.path(for: journalled.id) == (try path("/b")))
+    let after = await reloaded.observed(try file("/c"))
+    #expect(!FileManager.default.fileExists(atPath: journal.path))
+    #expect(await ItemTable(domain: tableDomain, store: folder).path(for: after.id) != nil)
+  }
+
+  @Test func discardRemovesTheJournal() async throws {
+    let folder = store()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let table = ItemTable(domain: tableDomain, store: folder)
+    _ = await table.observed(try file("/a"))
+    _ = await table.observed(try file("/b"))
+    let journal = ItemTable.journal(for: tableDomain, in: folder)
+    #expect(FileManager.default.fileExists(atPath: journal.path))
+    ItemTable.discardAll(in: folder)
+    #expect(!FileManager.default.fileExists(atPath: journal.path))
   }
 }
