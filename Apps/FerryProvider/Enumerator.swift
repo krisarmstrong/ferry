@@ -14,13 +14,34 @@ final class Enumerator: NSObject, NSFileProviderEnumerator {
 
   private let container: Container
   private let backend: ProviderBackend
+  /// The calls still running, cancelled when FileProvider is done with the enumerator (a Finder
+  /// window closed), so a listing nobody waits for stops.
+  private let running = OSAllocatedUnfairLock(initialState: [UUID: Task<Void, Never>]())
 
   init(container: Container, backend: ProviderBackend) {
     self.container = container
     self.backend = backend
   }
 
-  func invalidate() {}
+  func invalidate() {
+    let tasks = running.withLock { tasks in
+      defer { tasks.removeAll() }
+      return Array(tasks.values)
+    }
+    for task in tasks { task.cancel() }
+  }
+
+  /// Runs `body` as a task `invalidate` cancels. The task is registered before it can finish
+  /// and remove itself, since it waits on the same lock.
+  private func track(_ body: @escaping @Sendable () async -> Void) {
+    let token = UUID()
+    running.withLock { [running] tasks in
+      tasks[token] = Task {
+        await body()
+        running.withLock { _ = $0.removeValue(forKey: token) }
+      }
+    }
+  }
 
   func enumerateItems(
     for observer: NSFileProviderEnumerationObserver, startingAt page: NSFileProviderPage
@@ -29,7 +50,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator {
     let backend = backend
     switch container {
     case .workingSet:
-      Task {
+      track {
         do {
           let result = try await backend.workingSet(from: page)
           observer.value.didEnumerate(result.items)
@@ -39,10 +60,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator {
         }
       }
     case .folder(let folder):
-      Task {
+      track {
         do {
-          observer.value.didEnumerate(try await backend.children(of: folder))
-          observer.value.finishEnumerating(upTo: nil)
+          let result = try await backend.children(of: folder, from: page)
+          observer.value.didEnumerate(result.items)
+          observer.value.finishEnumerating(upTo: result.next)
         } catch {
           observer.value.finishEnumeratingWithError(ErrorMapping.forFileProvider(error))
         }
@@ -55,7 +77,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator {
   ) {
     let observer = Handoff(observer)
     let backend = backend
-    Task {
+    track {
       do {
         let changes = try await backend.changes(since: anchor)
         observer.value.didUpdate(changes.updated)

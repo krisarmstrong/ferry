@@ -66,7 +66,7 @@ struct AgentIdentityTests {
     let service = harness.service
 
     guard
-      case .entries(let top) = await service.handle(.list(domain: domain, folder: .root), file: nil),
+      case .page(let top, _) = await service.handle(.list(domain: domain, folder: .root), file: nil),
       let docs = top.first
     else {
       Issue.record("expected a listing")
@@ -75,7 +75,7 @@ struct AgentIdentityTests {
     #expect(docs.parent == .root)
     #expect(docs.item.path == (try path("/Docs")))
     guard
-      case .entries(let inner) = await service.handle(
+      case .page(let inner, _) = await service.handle(
         .list(domain: domain, folder: docs.id), file: nil)
     else {
       Issue.record("expected a listing")

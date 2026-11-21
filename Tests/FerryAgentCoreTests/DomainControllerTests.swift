@@ -68,11 +68,11 @@ struct DomainControllerTests {
     #expect(await harness.manager.waitForCalls(2) == [.add(primary), .add(card)])
     #expect(
       await harness.service.handle(.list(domain: domainID(device), folder: .root), file: nil)
-        == .entries([]))
+        == .page(entries: [], next: nil))
     #expect(
       await harness.service.handle(
         .list(domain: domainID(device, cardKey), folder: .root), file: nil)
-        == .entries([]))
+        == .page(entries: [], next: nil))
   }
 
   @Test func lockedDeviceGetsNoDomainAndReportsState() async throws {
@@ -175,7 +175,7 @@ struct DomainControllerTests {
       await harness.barrier(after: 4)
         == [added, .disconnect(domain), .reconnect(domain), .signal(domain), barrier])
     guard
-      case .entries(let entries) = await harness.service.handle(
+      case .page(let entries, _) = await harness.service.handle(
         .list(domain: domainID(device), folder: .root), file: nil)
     else {
       Issue.record("expected a listing")
@@ -209,7 +209,7 @@ struct DomainControllerTests {
         == .failure(.deviceDisconnected))
     #expect(
       await harness.service.handle(.list(domain: domainID(second), folder: .root), file: nil)
-        == .entries([]))
+        == .page(entries: [], next: nil))
   }
 
   @Test func removeAllDomainsForgetsEveryDomain() async throws {
@@ -241,7 +241,8 @@ struct DomainControllerTests {
       await harness.barrier(after: 4)
         == disconnects + [.reconnect(domain), .signal(domain), barrier])
     #expect(
-      await harness.service.handle(.list(domain: domain, folder: .root), file: nil) == .entries([]))
+      await harness.service.handle(.list(domain: domain, folder: .root), file: nil)
+        == .page(entries: [], next: nil))
     #expect(
       await harness.service.handle(.list(domain: gone, folder: .root), file: nil)
         == .failure(.deviceDisconnected))

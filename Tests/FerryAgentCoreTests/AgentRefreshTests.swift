@@ -14,7 +14,7 @@ struct AgentRefreshTests {
     async throws -> [ProviderEntry]
   {
     guard
-      case .entries(let entries) = await harness.service.handle(
+      case .page(let entries, _) = await harness.service.handle(
         .list(domain: domainID(device), folder: folder), file: nil)
     else { throw TransportError.io("listing failed") }
     return entries

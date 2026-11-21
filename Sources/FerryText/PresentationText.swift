@@ -47,7 +47,7 @@ public enum PresentationText {
         "Ferry's helper didn't answer in time. Try again in a moment.", bundle: .module)
     case .notFound, .unknownItem, .alreadyExists, .invalidName, .insufficientSpace,
       .fileTooLargeForStorage, .sizeMismatch, .downloadSizeMismatch, .nameChangedByDevice,
-      .directoryNotEmpty, .changedOnDevice, .macDiskFull, .folderTooDeep, .readOnly:
+      .directoryNotEmpty, .changedOnDevice, .macDiskFull, .folderTooDeep, .readOnly, .pageExpired:
       LocalizedStringResource("The device reported an error.", bundle: .module)
     }
   }

@@ -113,8 +113,8 @@ actor FakeAgent: AgentSending {
     switch request {
     case .item(_, let id):
       return .entry(try entry(existing(try path(id)), id: id))
-    case .list(_, let folder):
-      return .entries(try listing(folder))
+    case .list(_, let folder, _):
+      return .page(entries: try listing(folder), next: nil)
     case .fetch(_, let id):
       return .entry(try fetched(id, into: file))
     case .create(_, let parent, let name, let isFolder):
