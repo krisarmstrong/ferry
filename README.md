@@ -5,6 +5,10 @@
   </picture>
 </p>
 
+<h1 align="center">Ferry</h1>
+
+<p align="center">Android devices in Finder, over USB and Wi-Fi.</p>
+
 Ferry is a small menu-bar app that shows Android devices as locations in Finder. It was built
 for field engineers who carry network testers (LinkRunner 10G, EtherScope nXG,
 LinkRunner 100G) and need to move test results, captures and files between the tester and a
