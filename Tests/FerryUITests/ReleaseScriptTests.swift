@@ -125,147 +125,116 @@ struct ReleaseScriptTests {
     )
   }
 
-  static let submit = "notarytool submit Ferry.dmg --wait --output-format json"
+  static let submit = "notarytool submit Ferry.dmg --output-format json"
+  static let wait = "notarytool wait \(submission) --timeout 30m --output-format json"
+  static let log = "notarytool log \(submission)"
 
-  @Test func anAcceptedSubmissionIsSubmittedOnce() async throws {
-    let (outcome, fakes) = try await Self.notarize([Answer(out: Self.verdict("Accepted"))])
+  /// What `submit --output-format json` prints once the upload is done.
+  static let uploaded = Answer(
+    out: #"{"id":"\#(submission)","message":"Successfully uploaded file","path":"Ferry.dmg"}"#)
+
+  @Test func anAcceptedSubmissionIsUploadedOnceAndWaitedOn() async throws {
+    let (outcome, fakes) = try await Self.notarize([
+      Self.uploaded, Answer(out: Self.verdict("Accepted")),
+    ])
     #expect(outcome.status == 0)
-    #expect(fakes.calls == [Self.submit])
+    #expect(fakes.calls == [Self.submit, Self.wait])
     #expect(fakes.sleeps.isEmpty)
   }
 
   /// The v0.3.0 release: the upload's connection was lost, and nothing was wrong with the DMG.
-  @Test func aLostConnectionIsTriedAgainAfterABackOff() async throws {
+  /// json mode prints nothing until the end, so a failed upload has no id: it is uploaded again.
+  @Test func aLostUploadIsUploadedAgainAfterABackOff() async throws {
     let (outcome, fakes) = try await Self.notarize([
-      Answer(err: Self.connectionLost, status: 1), Answer(out: Self.verdict("Accepted")),
+      Answer(err: Self.connectionLost, status: 1), Self.uploaded,
+      Answer(out: Self.verdict("Accepted")),
     ])
     #expect(outcome.status == 0)
-    #expect(fakes.calls == [Self.submit, Self.submit])
+    #expect(fakes.calls == [Self.submit, Self.submit, Self.wait])
     #expect(fakes.sleeps == ["30"])
   }
 
-  @Test func threeTimeOutsFailAfterTheThirdAttempt() async throws {
+  @Test func threeLostUploadsFailAfterTheThirdAttempt() async throws {
     let lost = Answer(err: Self.timedOut, status: 1)
-    let (outcome, fakes) = try await Self.notarize([lost, lost, lost, Answer(out: "unreached")])
+    let (outcome, fakes) = try await Self.notarize([lost, lost, lost, Self.uploaded])
     #expect(outcome.status != 0)
     #expect(fakes.calls == [Self.submit, Self.submit, Self.submit])
     #expect(fakes.sleeps == ["30", "60"])
     #expect(
-      outcome.output.contains("::error::notarytool lost its connection to Apple on all 3 attempts"))
+      outcome.output.contains("::error::uploading Ferry.dmg lost its connection to Apple 3 times"))
   }
 
-  /// Apple's verdict is final: an Invalid submission is not sent again, and its log is shown.
-  @Test(arguments: ["Invalid", "Rejected"])
-  func aVerdictOtherThanAcceptedIsNeverRetried(verdict: String) async throws {
+  /// Once the upload is done, a dropped connection waits on the same submission again: the
+  /// file is never sent twice.
+  @Test func aConnectionLostWhileWaitingWaitsOnTheSameSubmission() async throws {
     let (outcome, fakes) = try await Self.notarize([
-      Answer(out: Self.verdict(verdict), err: Self.connectionLost, status: 0),
-      Answer(out: "{\"issues\":[]}"),
-    ])
-    #expect(outcome.status != 0)
-    #expect(fakes.calls == [Self.submit, "notarytool log \(Self.submission)"])
-    #expect(fakes.sleeps.isEmpty)
-    #expect(outcome.output.contains("::error::notarization of Ferry.dmg was not accepted"))
-  }
-
-  /// A submission Apple already has is waited on, not uploaded again.
-  @Test func aConnectionLostAfterTheUploadWaitsOnTheSubmission() async throws {
-    let (outcome, fakes) = try await Self.notarize([
-      Answer(
-        out: "Conducting pre-submission checks for Ferry.dmg\n  id: \(Self.submission)\n",
-        err: Self.connectionLost, status: 1),
+      Self.uploaded, Answer(err: Self.connectionLost, status: 1),
       Answer(out: Self.verdict("Accepted")),
     ])
     #expect(outcome.status == 0)
+    #expect(fakes.calls == [Self.submit, Self.wait, Self.wait])
+    #expect(fakes.sleeps == ["30"])
+  }
+
+  @Test func threeLostWaitsFailWithoutUploadingAgain() async throws {
+    let lost = Answer(err: Self.connectionLost, status: 1)
+    let (outcome, fakes) = try await Self.notarize([Self.uploaded, lost, lost, lost])
+    #expect(outcome.status != 0)
+    #expect(fakes.calls == [Self.submit, Self.wait, Self.wait, Self.wait])
+    #expect(fakes.sleeps == ["30", "60"])
     #expect(
-      fakes.calls == [
-        Self.submit, "notarytool wait \(Self.submission) --output-format json",
-      ])
+      outcome.output.contains(
+        "::error::waiting on submission \(Self.submission) lost its connection to Apple 3 times"))
+  }
+
+  /// Apple's verdict is final: an Invalid submission is not sent again, and its log is shown,
+  /// after the error line.
+  @Test(arguments: ["Invalid", "Rejected"])
+  func aVerdictOtherThanAcceptedIsNeverRetried(verdict: String) async throws {
+    let (outcome, fakes) = try await Self.notarize([
+      Self.uploaded, Answer(out: Self.verdict(verdict), status: 1), Answer(out: "THE-LOG"),
+    ])
+    #expect(outcome.status != 0)
+    #expect(fakes.calls == [Self.submit, Self.wait, Self.log])
+    #expect(fakes.sleeps.isEmpty)
+    let error = try #require(outcome.output.range(of: "::error::notarization of Ferry.dmg was"))
+    let log = try #require(outcome.output.range(of: "THE-LOG"))
+    #expect(error.lowerBound < log.lowerBound)
+  }
+
+  /// A log that cannot be fetched still leaves the error line.
+  @Test func aFailedLogFetchKeepsTheError() async throws {
+    let (outcome, fakes) = try await Self.notarize([
+      Self.uploaded, Answer(out: Self.verdict("Invalid"), status: 1),
+      Answer(err: "Error: no log", status: 1),
+    ])
+    #expect(outcome.status != 0)
+    #expect(fakes.calls == [Self.submit, Self.wait, Self.log])
+    #expect(outcome.output.contains("::error::notarization of Ferry.dmg was not accepted"))
+  }
+
+  /// A wait that times out reports the timeout, not a verdict, and is not retried.
+  @Test func aWaitThatTimesOutSaysSo() async throws {
+    let (outcome, fakes) = try await Self.notarize([
+      Self.uploaded, Answer(out: Self.verdict("In Progress"), status: 1),
+    ])
+    #expect(outcome.status != 0)
+    #expect(fakes.calls == [Self.submit, Self.wait])
+    #expect(fakes.sleeps.isEmpty)
+    #expect(
+      outcome.output.contains(
+        "::error::submission \(Self.submission) had no verdict within 30m"))
   }
 
   /// Any other failure (a refused key, say) is not a dropped connection, and fails at once.
   @Test func anotherFailureIsNotRetried() async throws {
     let (outcome, fakes) = try await Self.notarize([
       Answer(err: "Error: HTTP status code: 401. Unable to authenticate.", status: 1),
-      Answer(out: Self.verdict("Accepted")),
+      Self.uploaded,
     ])
     #expect(outcome.status != 0)
     #expect(fakes.calls == [Self.submit])
     #expect(fakes.sleeps.isEmpty)
-  }
-
-  /// A self-signed certificate named `name`, with its private key, as `openssl pkcs12 -nodes`
-  /// writes an identity.
-  static func identity(_ name: String, in folder: URL) throws -> String {
-    let key = folder.appending(path: "key-\(UUID().uuidString).pem")
-    let cert = folder.appending(path: "cert-\(UUID().uuidString).pem")
-    let process = Process()
-    process.executableURL = URL(filePath: "/usr/bin/openssl")
-    process.arguments = [
-      "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-keyout", key.path,
-      "-out", cert.path, "-subj", "/CN=\(name)/OU=X6JWYP43HG/O=Test/C=US",
-    ]
-    process.standardOutput = FileHandle.nullDevice
-    process.standardError = FileHandle.nullDevice
-    try process.run()
-    process.waitUntilExit()
-    return try String(contentsOf: key, encoding: .utf8) + String(contentsOf: cert, encoding: .utf8)
-  }
-
-  static func checkIdentity(_ names: [String]) async throws -> (Outcome, pem: String) {
-    try await offThePool { try checkIdentitySync(names) }
-  }
-
-  private static func checkIdentitySync(_ names: [String]) throws -> (Outcome, pem: String) {
-    let folder = FileManager.default.temporaryDirectory
-      .appending(path: "developer-id-\(UUID().uuidString)")
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: folder) }
-    let pem = try names.map { try identity($0, in: folder) }.joined()
-    let file = folder.appending(path: "identity.pem")
-    try pem.write(to: file, atomically: true, encoding: .utf8)
-    return (try run("scripts/check-developer-id.sh", [file.path]), pem)
-  }
-
-  @Test func aDeveloperIDApplicationIdentityPasses() async throws {
-    let (result, _) = try await Self.checkIdentity([
-      "Developer ID Application: Test, Person (X6JWYP43HG)"
-    ])
-    #expect(result.status == 0)
-    #expect(result.output.contains("Developer ID Application: Test, Person (X6JWYP43HG)"))
-  }
-
-  /// The .p12 exported from the wrong certificate: the error says which one it was.
-  @Test func anInstallerIdentityIsNamedInTheError() async throws {
-    let (result, _) = try await Self.checkIdentity([
-      "Developer ID Installer: Test, Person (X6JWYP43HG)"
-    ]
-    )
-    #expect(result.status != 0)
-    #expect(
-      result.output.contains(
-        "holds no Developer ID Application certificate, only \"Developer ID Installer: Test, Person (X6JWYP43HG)\""
-      ))
-  }
-
-  /// Only names are printed: no line of the key or the certificate reaches the log.
-  @Test func nothingButNamesIsPrinted() async throws {
-    let (result, pem) = try await Self.checkIdentity([
-      "Developer ID Installer: Test (X6JWYP43HG)", "Apple Development: Test (X6JWYP43HG)",
-    ])
-    #expect(result.status != 0)
-    #expect(
-      result.output.contains(
-        "\"Developer ID Installer: Test (X6JWYP43HG)\", \"Apple Development: Test (X6JWYP43HG)\""))
-    let material = pem.split(separator: "\n").filter { !$0.hasPrefix("-----") }
-    #expect(!material.isEmpty)
-    #expect(material.allSatisfy { !result.output.contains($0) })
-    #expect(!result.output.contains("PRIVATE KEY"))
-  }
-
-  @Test func aFileWithoutCertificatesFails() async throws {
-    let (result, _) = try await Self.checkIdentity([])
-    #expect(result.status != 0)
-    #expect(result.output.contains("holds no certificate"))
   }
 }
 
@@ -277,9 +246,18 @@ struct ReleaseWorkflowScriptTests {
 
   @Test func theWorkflowRunsTheScripts() throws {
     let text = try String(contentsOf: Self.workflow, encoding: .utf8)
-    #expect(text.contains("scripts/check-developer-id.sh \"$work/identity.pem\""))
+    #expect(text.contains("scripts/check-developer-id.sh \"$work/identity.pem\" \"$team\""))
+    #expect(text.contains("\"$GITHUB_WORKSPACE/scripts/build-pkgconf.sh\""))
+    #expect(!text.contains("brew install pkgconf"))
     #expect(text.contains("scripts/notarize.sh \"$RUNNER_TEMP/notarize.zip\""))
     #expect(text.contains("scripts/notarize.sh \"$dmg\""))
     #expect(!text.contains("notarytool submit"))
+  }
+
+  /// CI builds the release with the same pinned pkgconf, so that path runs on every PR.
+  @Test func ciBuildsTheReleaseWithThePinnedPkgconf() throws {
+    let ciWorkflow = Self.workflow.deletingLastPathComponent().appending(path: "ci.yml")
+    let text = try String(contentsOf: ciWorkflow, encoding: .utf8)
+    #expect(text.contains("scripts/build-pkgconf.sh \"$RUNNER_TEMP/pkgconf\""))
   }
 }

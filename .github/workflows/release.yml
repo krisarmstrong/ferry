@@ -24,6 +24,7 @@ jobs:
   release-please:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
       pull-requests: write
@@ -77,6 +78,8 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
     runs-on: macos-26
+    # Two notarizations of at most 30 minutes each, plus the build.
+    timeout-minutes: 120
     environment: release
     permissions:
       contents: write
@@ -92,8 +95,6 @@ jobs:
       XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
       SPARKLE_VERSION: 2.10.1
       SPARKLE_SHA256: 1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27
-      PKGCONF_VERSION: 3.0.11
-      PKGCONF_SHA256: d0cd841bc8e55b9da888106c00dc256d05b7d1d8e5a46f4be4eb4c5125bd2dc4
       APP: .build/release/Build/Products/Release/Ferry.app
     steps:
       - name: Check the tag and the secrets
@@ -161,20 +162,9 @@ jobs:
           echo "$SPARKLE_SHA256  sparkle.tar.xz" | shasum -a 256 -c
           mkdir sparkle
           tar -xJf sparkle.tar.xz -C sparkle
-          # pkg-config runs inside `make release`, while the Developer ID identity is unlocked:
-          # built here from a pinned, checked source, never an unpinned `brew install`. Its default
-          # search path is its own prefix, so only release-build.sh's PKG_CONFIG_PATH is read.
-          curl -fsSL --proto '=https' -o pkgconf.tar.xz \
-            "https://distfiles.ariadne.space/pkgconf/pkgconf-$PKGCONF_VERSION.tar.xz"
-          echo "$PKGCONF_SHA256  pkgconf.tar.xz" | shasum -a 256 -c
-          mkdir pkgconf-src
-          tar -xJf pkgconf.tar.xz -C pkgconf-src --strip-components 1
-          (cd pkgconf-src && ./configure --quiet --prefix="$RUNNER_TEMP/tools/pkgconf" \
-            --disable-shared --with-system-libdir=/usr/lib --with-system-includedir=/usr/include \
-            && make -s && make -s install)
-          ln -s pkgconf "$RUNNER_TEMP/tools/pkgconf/bin/pkg-config"
-          [ "$("$RUNNER_TEMP/tools/pkgconf/bin/pkg-config" --version)" = "$PKGCONF_VERSION" ] \
-            || { echo "::error::the pkgconf built is not $PKGCONF_VERSION"; exit 1; }
+          # pkg-config runs inside `make release`, with the identity unlocked: pinned and checked
+          # (scripts/build-pkgconf.sh), the same build CI's release check uses.
+          "$GITHUB_WORKSPACE/scripts/build-pkgconf.sh" "$RUNNER_TEMP/tools/pkgconf"
           echo "$RUNNER_TEMP/tools/pkgconf/bin" >> "$GITHUB_PATH"
       - name: Import the Developer ID certificate
         env:
@@ -199,7 +189,8 @@ jobs:
             || { echo "::error::DEVELOPER_ID_P12_PASSWORD does not open DEVELOPER_ID_P12_BASE64"; exit 1; }
           # A Developer ID Installer .p12 imports as well as the right one, and the build fails
           # much later. Stop here, naming the certificates it holds.
-          scripts/check-developer-id.sh "$work/identity.pem"
+          team="$(sed -n 's/^ *FERRY_TEAM_ID: *//p' project.yml)"
+          scripts/check-developer-id.sh "$work/identity.pem" "$team"
           TRANSPORT="$(uuidgen)"
           export TRANSPORT
           /usr/bin/openssl pkcs12 -export -in "$work/identity.pem" -out "$work/import.p12" \

@@ -76,7 +76,12 @@ jobs:
       # libmtp and libusb, Release config, check-release (no get-task-allow, nothing from
       # Homebrew). Signed ad hoc and not notarized: CI holds no secrets.
       - name: Build the release, ad hoc signed, and check it
-        run: make release SIGN=adhoc
+        run: |
+          scripts/build-pkgconf.sh "$RUNNER_TEMP/pkgconf"
+          export PATH="$RUNNER_TEMP/pkgconf/bin:$PATH"
+          [ "$(command -v pkg-config)" = "$RUNNER_TEMP/pkgconf/bin/pkg-config" ] \
+            || { echo "::error::pkg-config is $(command -v pkg-config), not the pinned build"; exit 1; }
+          make release SIGN=adhoc
 
   # Only runs from push, pull_request and a few other events count for a PR's required checks:
   # a workflow_dispatch run's `check` job passes on the head commit and still does not. Release
