@@ -68,7 +68,7 @@ struct ADBServerKeeperBoundTests {
     try await Task.sleep(for: .milliseconds(100))
     release.yield()
     try await command.value
-    let ended = await ADBServerKeeper.race(.seconds(5)) {
+    let ended = await ADBServerKeeper.race(.seconds(5), on: ContinuousClock()) {
       _ = await orphan.value
       _ = await cutOff.value
       return true

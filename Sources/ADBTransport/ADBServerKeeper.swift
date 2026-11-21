@@ -54,6 +54,9 @@ public actor ADBServerKeeper {
   /// How long one question to a server (`answers`, `kill`) may take: a wedged one accepts the
   /// connection and never answers.
   private let callLimit: Duration
+  /// What `limit`, `poll` and `callLimit` are measured on, and the time passed on it.
+  private let clock: any Clock<Duration>
+  private let elapsed: @Sendable () -> Duration
   /// The server this agent started, while it may be running.
   private var child: pid_t?
   private var replacedFerryServer = false
@@ -80,11 +83,11 @@ public actor ADBServerKeeper {
       kill: { try? await host.kill() })
   }
 
-  init(
+  init<C: Clock<Duration>>(
     port: UInt16, record: URL, spawner: any ADBServerSpawner, table: any ProcessTable,
     answers: @escaping @Sendable () async -> Bool, kill: @escaping @Sendable () async -> Void,
     limit: Duration = .seconds(10), poll: Duration = .milliseconds(100),
-    callLimit: Duration = .seconds(5)
+    callLimit: Duration = .seconds(5), clock: C = ContinuousClock()
   ) {
     self.port = port
     self.record = record
@@ -95,6 +98,9 @@ public actor ADBServerKeeper {
     self.limit = limit
     self.poll = poll
     self.callLimit = callLimit
+    self.clock = clock
+    let origin = clock.now
+    elapsed = { origin.duration(to: clock.now) }
   }
 
   /// `adb-server.json` beside the agent's other state.
@@ -136,8 +142,8 @@ public actor ADBServerKeeper {
         Self.log.error("recording the adb server failed: \(error, privacy: .private)")
       }
     }
-    let deadline = ContinuousClock.now + limit
-    while ContinuousClock.now < deadline {
+    let deadline = elapsed() + limit
+    while elapsed() < deadline {
       if await answersInTime() { return }
       // Another server took the port first: it answers, and this one has nothing to serve.
       if spawner.hasExited(pid) {
@@ -145,7 +151,7 @@ public actor ADBServerKeeper {
         if await answersInTime() { return }
         throw .failed("the adb server exited at start")
       }
-      try? await Task.sleep(for: poll)
+      try? await clock.sleep(for: poll)
     }
     throw .failed("the adb server did not answer in time")
   }
@@ -246,12 +252,12 @@ public actor ADBServerKeeper {
 
   /// `answers`, bounded: a server that does not answer in time is not answering.
   private func answersInTime() async -> Bool {
-    await Self.race(callLimit, answers) ?? false
+    await Self.race(callLimit, on: clock, answers) ?? false
   }
 
   /// `kill`, bounded.
   private func killInTime(_ pid: pid_t) async {
-    if await Self.race(callLimit, { [kill] in await kill() }) == nil {
+    if await Self.race(callLimit, on: clock, { [kill] in await kill() }) == nil {
       Self.log.error("the adb server (\(pid, privacy: .private)) did not answer host:kill in time")
     }
   }
@@ -260,14 +266,14 @@ public actor ADBServerKeeper {
   /// `body` to end: a body that ignores cancellation is left behind, cancelled, rather than
   /// holding the caller.
   static func race<T: Sendable>(
-    _ limit: Duration, _ body: @escaping @Sendable () async -> T
+    _ limit: Duration, on clock: any Clock<Duration>, _ body: @escaping @Sendable () async -> T
   ) async -> T? {
     let first = FirstOf<T>()
     return await withCheckedContinuation { continuation in
       first.wait(continuation)
       let work = Task { first.give(await body()) }
       Task {
-        try? await Task.sleep(for: limit)
+        try? await clock.sleep(for: limit)
         first.give(nil)
         work.cancel()
       }
@@ -285,9 +291,9 @@ public actor ADBServerKeeper {
   private func stop(_ pid: pid_t) async {
     let started = table.started(pid)
     await killInTime(pid)
-    let deadline = ContinuousClock.now + limit
-    while started != nil, table.started(pid) == started, ContinuousClock.now < deadline {
-      try? await Task.sleep(for: poll)
+    let deadline = elapsed() + limit
+    while started != nil, table.started(pid) == started, elapsed() < deadline {
+      try? await clock.sleep(for: poll)
     }
   }
 }

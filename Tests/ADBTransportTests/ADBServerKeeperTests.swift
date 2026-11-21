@@ -1,4 +1,5 @@
 import Darwin
+import DeviceKitTestSupport
 import Foundation
 import PlatformTools
 import Synchronization
@@ -77,10 +78,11 @@ struct ADBServerKeeperTests {
     FileManager.default.temporaryDirectory.appending(path: "ferry-adb-server-\(UUID()).json")
   }
 
-  /// `exits` is how long a killed server takes to exit (its PID stops running): at once if nil.
-  /// `whileStopping` runs inside the kill, as a tracker restarting the server would.
+  /// `exits` is how long a killed server takes to exit (its PID stops running), on `clock`: at
+  /// once if nil. `whileStopping` runs inside the kill, as a tracker restarting the server would.
   static func keeper(
     _ fakes: Fakes, record: URL, exits: Duration? = nil, limit: Duration = .seconds(2),
+    callLimit: Duration = .milliseconds(300), clock: any Clock<Duration> = ContinuousClock(),
     whileStopping: (@Sendable () async -> Void)? = nil
   ) -> ADBServerKeeper {
     ADBServerKeeper(
@@ -114,11 +116,11 @@ struct ADBServerKeeperTests {
         }
         guard let exits else { return exit() }
         Task {
-          try? await Task.sleep(for: exits)
+          try? await clock.sleep(for: exits)
           exit()
         }
       },
-      limit: limit, poll: .milliseconds(10), callLimit: .milliseconds(300))
+      limit: limit, poll: .milliseconds(10), callLimit: callLimit, clock: clock)
   }
 
   /// A keeper for tests of what runs inside its gate: there is never a replacement.
@@ -160,16 +162,23 @@ struct ADBServerKeeperTests {
   }
 
   /// The transport's and the wireless side's trackers both start the server after an outage:
-  /// one server is started, and the record names it.
-  @Test func startsAtOnceRunOneServer() async throws {
+  /// one server is started, and the record names it. Time moves only by the test's hand, in poll
+  /// steps, and the limits are far beyond the polls a slow start takes, so only the count is
+  /// tested: a loaded machine cannot run past a limit.
+  @Test(.timeLimit(.minutes(1)))
+  func startsAtOnceRunOneServer() async throws {
     let fakes = Fakes()
     fakes { $0.slowStart = 5 }
     let record = Self.recordFile()
     defer { try? FileManager.default.removeItem(at: record) }
-    let keeper = Self.keeper(fakes, record: record)
-    async let first: Void = keeper.start(Self.adb)
-    async let second: Void = keeper.start(Self.adb)
-    _ = try await (first, second)
+    let clock = ManualClock()
+    let keeper = Self.keeper(
+      fakes, record: record, limit: .seconds(3600), callLimit: .seconds(3600), clock: clock)
+    try await clock.advancing(by: .milliseconds(10)) {
+      async let first: Void = keeper.start(Self.adb)
+      async let second: Void = keeper.start(Self.adb)
+      _ = try await (first, second)
+    }
     #expect(fakes { $0.spawned.count } == 1)
     #expect(ADBServerRecord.load(record)?.pid == 4242)
   }
