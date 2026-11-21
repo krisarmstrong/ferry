@@ -467,11 +467,11 @@ The device doesn't offer what was asked, such as moving a file in one step.
 
 Do it on the device itself, or copy the file to its new place and delete the original.
 
-**Ferry lost contact with the device partway through. Reconnect it, then try again.**
+**Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry.**
 
-The connection to the device failed in the middle of the task: a loose cable, a USB hub, or the device going to sleep.
+The connection to the device, a file on this Mac, or Ferry's helper failed in the middle of the task. Ferry's log has the details.
 
-Plug the device straight into the Mac, keep it unlocked, and try again. If it keeps failing, restart the device. A copy in Finder retries by itself once the device is back.
+Try again. If it keeps failing, plug the device straight into the Mac and keep it unlocked, check that the Mac has free space, or quit and reopen Ferry. A copy in Finder retries by itself once the device is back.
 
 **That item is no longer on the device. Refresh, then try again.**
 

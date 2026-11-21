@@ -56,7 +56,8 @@ struct ErrorMappingTests {
     #expect(mapped.code == CocoaError.Code.xpcConnectionReplyInvalid.rawValue)
     #expect(
       mapped.localizedDescription
-        == "Ferry lost contact with the device partway through. Reconnect it, then try again.")
+        == "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry."
+    )
     #expect(!mapped.localizedDescription.contains("pipe broke"))
     #expect(mapped.userInfo[NSUnderlyingErrorKey] as? TransportError == failure)
   }
@@ -108,7 +109,7 @@ struct ErrorMappingTests {
     case .unsupported(let what): .cocoa(.featureUnsupported, [what])
     case .sizeMismatch: .cocoa(.fileWriteUnknown, ["2", "1"])
     case .downloadSizeMismatch: .cocoa(.fileReadCorruptFile, ["7", "3"])
-    case .io: .cocoa(.xpcConnectionReplyInvalid, ["lost contact"])
+    case .io: .cocoa(.xpcConnectionReplyInvalid, ["couldn't finish"])
     case .folderTooDeep: .cocoa(.featureUnsupported, ["Deep", "64"])
     case .readOnly: .fileProvider(.cannotSynchronize)
     // T3: a metadata call the agent did not answer in time is retried later.

@@ -38,7 +38,7 @@ enum ProviderText {
     bundle: .module)
 
   static let lostContact = LocalizedStringResource(
-    "Ferry lost contact with the device partway through. Reconnect it, then try again.",
+    "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry.",
     bundle: .module)
 
   static let package = LocalizedStringResource(

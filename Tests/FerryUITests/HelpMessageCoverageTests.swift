@@ -120,7 +120,7 @@ extension HelpMessageCoverageTests {
     ("trouble-device", "The device can't do this. Do it on the device instead."),
     (
       "trouble-device",
-      "Ferry lost contact with the device partway through. Reconnect it, then try again."
+      "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry."
     ),
     ("trouble-device", "That item is no longer on the device. Refresh, then try again."),
     (
