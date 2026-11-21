@@ -10,7 +10,9 @@ files = [app]
 symlinks = {"Applications": "/Applications"}
 
 background = defines["background"]  # noqa: F821
-window_rect = ((200, 120), (640, 400))
+# Finder's window bounds are its frame, title bar included: 28 pt above the 640 x 400 background
+# (Design/DMG/background.svg). Not yet checked on screen in Finder.
+window_rect = ((200, 120), (640, 428))
 default_view = "icon-view"
 show_status_bar = False
 show_tab_view = False
