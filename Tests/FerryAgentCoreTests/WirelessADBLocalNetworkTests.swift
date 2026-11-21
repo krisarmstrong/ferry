@@ -31,9 +31,12 @@ struct WirelessADBLocalNetworkTests {
       return answer
     }
 
+    /// Replaces once, as the keeper does.
     func replace() -> Bool {
-      replacements.withLock { $0 += 1 }
-      return true
+      replacements.withLock { count in
+        count += 1
+        return count == 1
+      }
     }
   }
 
@@ -68,7 +71,8 @@ struct WirelessADBLocalNetworkTests {
         == .failed(.adb("failed to connect to '192.0.2.31:5555': No route to host")))
   }
 
-  /// The agent reaches the address but adb's server does not: the server is replaced.
+  /// The agent reaches the address but adb's server does not: the server is replaced, and the
+  /// connect tried once more, here finding no route again.
   @Test(.timeLimit(.minutes(1)))
   func noRouteWhileTheAgentReachesTheAddressReplacesTheServer() async {
     let adb = FakeWirelessADB()
@@ -79,7 +83,8 @@ struct WirelessADBLocalNetworkTests {
     #expect(
       await wireless.connect(Self.address)
         == .failed(.adb("failed to connect to '192.0.2.31:5555': No route to host")))
-    #expect(check.replacements.withLock { $0 } == 1)
+    #expect(check.replacements.withLock { $0 } == 2)
+    #expect(await adb.calls.filter { $0 == .connect(Self.address.argument) }.count == 2)
   }
 
   @Test(.timeLimit(.minutes(1)))

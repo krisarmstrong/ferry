@@ -153,6 +153,10 @@ enum DevicePresentation {
         Ferry is using this device. Wait for its transfers, screen recording and log to \
         finish, then try again.
         """, bundle: .module)
+    case .serverRestarted:
+      LocalizedStringResource(
+        "adb had lost network access, so Ferry restarted it. Try again in a moment.",
+        bundle: .module)
     case .localNetworkDenied:
       LocalizedStringResource(
         """

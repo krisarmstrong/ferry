@@ -2253,6 +2253,15 @@
     },
     "Open System Settings → **Privacy & Security** → **Local Network**, turn on Ferry, then click **Connect Again**. If Ferry isn't listed, connect once more and click **Allow** when macOS asks." : {
       "extractionState" : "manual"
+    },
+    "adb had lost network access, so Ferry restarted it. Try again in a moment." : {
+
+    },
+    "adb's server was one an earlier copy of Ferry's helper started. When that helper quit, macOS cut the server off from your network, so adb said \"No route to host\"." : {
+      "extractionState" : "manual"
+    },
+    "Nothing to change: Ferry restarts adb by itself and reconnects your devices. If this one isn't back in a few seconds, click **Connect Again**." : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.0"

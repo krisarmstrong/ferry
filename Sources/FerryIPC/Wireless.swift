@@ -66,6 +66,9 @@ public enum WirelessFailure: Codable, Sendable, Equatable {
   case deviceInUse
   /// adb found no route to the device, and macOS denies Ferry the local network (TN3179).
   case localNetworkDenied
+  /// adb's server had lost the network (an earlier agent's, left running), so Ferry replaced it,
+  /// and the new one was not up in time to try again.
+  case serverRestarted
   /// adb's own words, one line.
   case adb(String)
 }

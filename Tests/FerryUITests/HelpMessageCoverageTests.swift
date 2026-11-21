@@ -74,6 +74,10 @@ struct HelpMessageCoverageTests {
     ("trouble-network", "That address changed. Check the menu and try again."),
     (
       "trouble-network",
+      "adb had lost network access, so Ferry restarted it. Try again in a moment."
+    ),
+    (
+      "trouble-network",
       """
       Ferry needs Local Network access to reach devices over Wi-Fi. Turn it on in System \
       Settings › Privacy & Security › Local Network.
