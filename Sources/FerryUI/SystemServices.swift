@@ -83,6 +83,9 @@ public protocol SystemServicing {
   /// The Android SDK License acceptance recorded in Ferry's defaults.
   func platformToolsAcceptance() -> LicenseAcceptance?
   func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance)
+  /// Whether Ferry's defaults record that the user was shown `mark`'s thing.
+  func hasMark(_ mark: OnboardingMark) -> Bool
+  func recordMark(_ mark: OnboardingMark)
   /// The version of the platform tools Ferry fetched and would use, if any.
   func fetchedPlatformToolsVersion() -> String?
   /// Fetches the pinned platform tools (see `PlatformToolsFetcher`).
@@ -351,6 +354,14 @@ public final class SystemServices: SystemServicing {
 
   public func captureFolders() -> [URL] {
     [CaptureFiles.documentsRoot()]
+  }
+
+  public func hasMark(_ mark: OnboardingMark) -> Bool {
+    UserDefaults.standard.bool(forKey: mark.rawValue)
+  }
+
+  public func recordMark(_ mark: OnboardingMark) {
+    UserDefaults.standard.set(true, forKey: mark.rawValue)
   }
 
   public func platformToolsAcceptance() -> LicenseAcceptance? {

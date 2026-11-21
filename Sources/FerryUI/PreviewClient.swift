@@ -84,6 +84,8 @@ private final class PreviewServices: SystemServicing {
   func openInTerminal(_ script: URL) async -> Bool { false }
   func platformToolsAcceptance() -> LicenseAcceptance? { nil }
   func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance) {}
+  func hasMark(_ mark: OnboardingMark) -> Bool { true }
+  func recordMark(_ mark: OnboardingMark) {}
   func fetchedPlatformToolsVersion() -> String? { nil }
   func fetchPlatformTools(accepted: LicenseAcceptance?) async throws(PlatformToolsError) {}
 }

@@ -15,8 +15,10 @@ extension AppModel {
 
   /// Opens the guide, with the model picker, once per app run when the agent is running but
   /// has had no device for 10 s of the menu being open, counted from the agent's first answer.
+  /// Not while the welcome is up: its Connect a device step offers the guide.
   func considerEmptyGuide(openFor: Duration) {
-    guard showsNoDevice, openFor >= Self.emptyGuideDelay, !emptyGuideShown else { return }
+    guard showsNoDevice, openFor >= Self.emptyGuideDelay, !emptyGuideShown, !welcomeHoldsGuide
+    else { return }
     emptyGuideShown = true
     showGuide(for: nil)
   }

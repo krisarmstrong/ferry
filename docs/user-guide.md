@@ -75,6 +75,10 @@ The first time Ferry opens, it starts a small helper that talks to your devices.
 
 Over a cable, Ferry uses the device's file transfer mode. With USB debugging on, or over Wi-Fi, it uses ADB, which is faster and adds tools such as screenshots and app installs.
 
+The first time Ferry opens, a welcome window lists what is left to set up: connecting a device, turning on Ferry in Finder and, for USB debugging or Wi-Fi, getting adb. Each step is ticked once it is done.
+
+In Ferry Help, **Show Welcome Window** opens the welcome again.
+
 ### Turn on Ferry in Finder
 
 macOS asks you to allow Ferry's locations in Finder. Until you do, the menu shows **Turn on Ferry in Finder** once a device has been connected.
@@ -192,6 +196,8 @@ If the prompt never appears, unplug the cable and plug it back in. On a tester, 
 Use over Wi-Fi suits a device already on USB debugging, such as a network tester or a phone with Android 8 to 10.
 
 Ferry never searches the network. It connects only to addresses you give it, and to the addresses a device on USB debugging reports for itself. A device that is also on a cable is always served by the cable.
+
+The first time Ferry reaches a device over the network, macOS asks whether Ferry may find devices on your local network. Click **Allow**: without it, Ferry can't reach devices over Wi-Fi.
 
 1. Connect the device to Ethernet or Wi-Fi.
 2. Connect it to the Mac by cable, with USB debugging on.

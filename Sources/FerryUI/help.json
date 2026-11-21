@@ -11,8 +11,10 @@
           "paragraphs": [
             "Ferry shows Android devices as locations in Finder. It runs in the menu bar and has no Dock icon.",
             "The first time Ferry opens, it starts a small helper that talks to your devices. The helper keeps running after you quit the menu, so devices stay in Finder.",
-            "Over a cable, Ferry uses the device's file transfer mode. With USB debugging on, or over Wi-Fi, it uses ADB, which is faster and adds tools such as screenshots and app installs."
-          ]
+            "Over a cable, Ferry uses the device's file transfer mode. With USB debugging on, or over Wi-Fi, it uses ADB, which is faster and adds tools such as screenshots and app installs.",
+            "The first time Ferry opens, a welcome window lists what is left to set up: connecting a device, turning on Ferry in Finder and, for USB debugging or Wi-Fi, getting adb. Each step is ticked once it is done."
+          ],
+          "action": "showWelcome"
         },
         {
           "id": "turn-on-finder",
@@ -178,7 +180,8 @@
           "symbol": "wifi",
           "paragraphs": [
             "Use over Wi-Fi suits a device already on USB debugging, such as a network tester or a phone with Android 8 to 10.",
-            "Ferry never searches the network. It connects only to addresses you give it, and to the addresses a device on USB debugging reports for itself. A device that is also on a cable is always served by the cable."
+            "Ferry never searches the network. It connects only to addresses you give it, and to the addresses a device on USB debugging reports for itself. A device that is also on a cable is always served by the cable.",
+            "The first time Ferry reaches a device over the network, macOS asks whether Ferry may find devices on your local network. Click **Allow**: without it, Ferry can't reach devices over Wi-Fi."
           ],
           "steps": [
             "Connect the device to Ethernet or Wi-Fi.",

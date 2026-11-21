@@ -129,6 +129,8 @@ struct StatusRow<Detail: View, Actions: View>: View {
   let title: Text
   /// The catalog key of the problem the row reports, whose Help entry its link opens.
   var help: String?
+  /// For a row that reports no problem: the Help topic its link opens.
+  var helpTopic: String?
   @ViewBuilder var detail: Detail
   @ViewBuilder var actions: Actions
 
@@ -147,7 +149,10 @@ struct StatusRow<Detail: View, Actions: View>: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        if help != nil {
+        if let helpTopic {
+          Spacer(minLength: 4)
+          HelpLinkButton(topic: helpTopic)
+        } else if help != nil {
           Spacer(minLength: 4)
           HelpLinkButton(key: help)
         }

@@ -26,7 +26,7 @@ import os
     string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!
 
   static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "AppModel")
-  private static let pollInterval = Duration.seconds(2)
+  static let pollInterval = Duration.seconds(2)
   static let emptyGuideDelay = Duration.seconds(10)
   /// After restarting an agent it could not reach, how many times the app asks it for its status,
   /// `recoveryPause` apart, before leaving it until the next outage.
@@ -140,15 +140,20 @@ import os
   /// Set with `isGuidePresented`, and cleared by the one view that brings the guide window
   /// forward, so reopening the menu does not pull the guide in front of it again.
   var guideOpenPending = false
-  /// The message whose Help topic the Help window should open, until it takes it.
-  var helpRequest: String?
+  /// What the Help window should open, until it takes it.
+  var helpRequest: HelpRequest?
+  /// The welcome window (see `AppModel+Welcome`).
+  var welcome = WelcomeState()
+  /// The menu says macOS asks before Ferry uses the local network: once, the first time the user
+  /// reaches for Wi-Fi.
+  public internal(set) var showsLocalNetworkNote = false
 
   let client: any AgentSending
   let services: any SystemServicing
   let sleep: @Sendable (Duration) async throws -> Void
   let now: @Sendable () -> ContinuousClock.Instant
   /// Devices the guide has opened for this app run.
-  private var guidedDevices: Set<DeviceID> = []
+  var guidedDevices: Set<DeviceID> = []
   var emptyGuideShown = false
 
   public convenience init(
@@ -345,6 +350,7 @@ import os
     forgetDetailsOfGoneDevices()
     forgetForwardsOfGoneDevices()
     agent = .running
+    considerWelcome()
     let states = devices.map { "\(DevicePresentation.kind(of: $0.state))/\($0.method.rawValue)" }
       .joined(separator: ",")
     let adb = report.adbStatus.map { String(describing: $0) } ?? "unknown"
@@ -353,10 +359,7 @@ import os
       devices: [\(states, privacy: .public)] \
       provider: \(report.provider.rawValue, privacy: .public) adb: \(adb, privacy: .public)
       """)
-    for device in devices where DevicePresentation.needsFileTransferSteps(device) {
-      guard guidedDevices.insert(device.id).inserted, !isGuidePresented else { continue }
-      showGuide(for: device)
-    }
+    guideNewDevices()
   }
 }
 

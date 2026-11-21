@@ -77,6 +77,8 @@ def body(block, out):
             "The **Remove Ferry…** button is here in Ferry Help. Ferry asks you to confirm first.",
             "",
         ]
+    if block.get("action") == "showWelcome":
+        out += ["In Ferry Help, **Show Welcome Window** opens the welcome again.", ""]
     for message in block.get("messages", []):
         out += [f"**{wording(message['message'])}**", "", message["cause"], "", message["fix"], ""]
 

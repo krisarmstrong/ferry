@@ -17,6 +17,17 @@ extension AppModel {
     guideOpenPending = true
   }
 
+  /// Opens the guide for a device that needs file transfer turned on, once per device and app
+  /// run: not over a guide already open, nor while the welcome, which offers it, is up. A
+  /// device seen meanwhile gets its guide once the welcome closes.
+  func guideNewDevices() {
+    guard !welcomeHoldsGuide else { return }
+    for device in devices where DevicePresentation.needsFileTransferSteps(device) {
+      guard guidedDevices.insert(device.id).inserted, !isGuidePresented else { continue }
+      showGuide(for: device)
+    }
+  }
+
   /// Whether the guide window should be brought forward now. True once per `showGuide`.
   func takeGuideOpenRequest() -> Bool {
     defer { guideOpenPending = false }
