@@ -163,14 +163,19 @@ struct MenuSnapshotTests {
     try save(bitmap, as: "menu-pair.png")
   }
 
-  /// Every tile, active and not, in light and dark: the kinds of device, then a remembered
-  /// device and an offered address. Written as `device-tiles.png`.
+  /// Every tile, active and not, in light and dark, each with and without Increase Contrast:
+  /// each kind of device, a phone of no known family, then a remembered device and an offered
+  /// address. Drawn at 2x, as a Retina menu shows it, and at 6x above it to judge the shapes.
+  /// Written as `device-glyphs.png`.
   @Test func theDeviceTilesDraw() throws {
-    let glyphs: [DevicePresentation.TileGlyph] = [
-      .tester, .phone, .tablet, .symbol("wifi.slash"), .symbol("wifi"),
+    let glyphs =
+      DeviceGlyph.Kind.allCases.map(DevicePresentation.TileGlyph.device)
+      + [.phone, .symbol("wifi.slash"), .symbol("wifi")]
+    let looks: [(ColorScheme, ColorSchemeContrast)] = [
+      (.light, .standard), (.light, .increased), (.dark, .standard), (.dark, .increased),
     ]
-    let tiles = VStack(spacing: 0) {
-      ForEach([ColorScheme.light, .dark], id: \.self) { scheme in
+    let sheet = VStack(spacing: 0) {
+      ForEach(looks.indices, id: \.self) { look in
         VStack(spacing: 10) {
           ForEach([true, false], id: \.self) { active in
             HStack(spacing: 14) {
@@ -182,14 +187,34 @@ struct MenuSnapshotTests {
         }
         .padding(16)
         .background(Color(nsColor: .windowBackgroundColor))
-        .environment(\.colorScheme, scheme)
+        .environment(\.colorScheme, looks[look].0)
+        .environment(\._colorSchemeContrast, looks[look].1)
       }
     }
-    let renderer = ImageRenderer(content: tiles)
-    renderer.scale = 4
-    let image = try #require(renderer.cgImage)
-    let bitmap = NSBitmapImageRep(cgImage: image)
+    var images: [CGImage] = []
+    for scale in [6.0, 2.0] {
+      let renderer = ImageRenderer(content: sheet)
+      renderer.scale = scale
+      images.append(try #require(renderer.cgImage))
+    }
+    let width = images.map(\.width).max() ?? 0
+    let height = images.map(\.height).reduce(0, +)
+    let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+    let context = try #require(
+      CGContext(
+        data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+        space: space,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+    context.setFillColor(gray: 0.5, alpha: 1)
+    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    // Core Graphics counts up from the bottom: the 2x sheet goes under the 6x one.
+    context.draw(
+      images[1], in: CGRect(x: 0, y: 0, width: images[1].width, height: images[1].height))
+    context.draw(
+      images[0],
+      in: CGRect(x: 0, y: images[1].height, width: images[0].width, height: images[0].height))
+    let bitmap = NSBitmapImageRep(cgImage: try #require(context.makeImage()))
     #expect(drawnPixels(bitmap) > 1_000)
-    try save(bitmap, as: "device-tiles.png")
+    try save(bitmap, as: "device-glyphs.png")
   }
 }
