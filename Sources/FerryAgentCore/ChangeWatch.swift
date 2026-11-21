@@ -232,6 +232,12 @@ public actor ChangeWatch {
     var stream: AsyncStream<FolderHint>?
     do throws(TransportError) {
       let lease = try await domains.leaseSession(of: device)
+      // Replaced while the session was being leased: opening this watch now would put the
+      // older folder set back over the newer watch's.
+      guard watches[device]?.token == token, !Task.isCancelled else {
+        await domains.hub.release(lease)
+        return
+      }
       stream = await lease.session.watch(folders)
       await domains.hub.release(lease)
     } catch {
