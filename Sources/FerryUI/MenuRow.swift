@@ -34,13 +34,14 @@ struct MenuRowStyle: ButtonStyle {
         .onHover { hovering = $0 }
     }
 
-    /// Under the pointer or keyboard focus a light fill, darker while pressed; one step darker
-    /// each with Increase Contrast.
+    /// Under the pointer or keyboard focus a light fill, darker while pressed. Increase Contrast
+    /// already darkens every level, so it takes the next lighter one each: one more would bury
+    /// the secondary symbols and hints the row draws on it.
     private var highlight: HierarchicalShapeStyle? {
       guard isEnabled else { return nil }
       let increased = contrast == .increased
-      if configuration.isPressed { return increased ? .secondary : .tertiary }
-      if hovering || isFocused { return increased ? .tertiary : .quaternary }
+      if configuration.isPressed { return increased ? .quaternary : .tertiary }
+      if hovering || isFocused { return increased ? .quinary : .quaternary }
       return nil
     }
   }
@@ -190,7 +191,6 @@ struct StatusAction: View {
 /// The round tile at the start of a device row.
 struct DeviceTile: View {
   let tile: DevicePresentation.Tile
-  @Environment(\.colorSchemeContrast) private var contrast
 
   var body: some View {
     glyph
@@ -200,8 +200,7 @@ struct DeviceTile: View {
         if tile.isActive {
           Circle().fill(Color.accentColor)
         } else {
-          Circle().fill(
-            contrast == .increased ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.quaternary))
+          Circle().fill(.quaternary)
         }
       }
       .accessibilityHidden(true)
