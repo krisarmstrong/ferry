@@ -102,9 +102,14 @@ struct AppModelWirelessTests {
     ),
     (
       .failed(.adb("failed to connect to '192.0.2.99:5555': Connection refused")),
-      "adb: failed to connect to '192.0.2.99:5555': Connection refused"
+      "adb refused the request. Check the address and that the device is on the network, then "
+        + "try again. (failed to connect to '192.0.2.99:5555': Connection refused)"
     ),
-    (.failed(.adb("bad\u{202E}text")), "adb: bad\\u{202E}text"),
+    (
+      .failed(.adb("bad\u{202E}text")),
+      "adb refused the request. Check the address and that the device is on the network, then "
+        + "try again. (bad\\u{202E}text)"
+    ),
     (.failed(.otherDevice), "That address belongs to another device."),
   ])
   func failuresKeepTheFormOpenWithAReason(outcome: WirelessOutcome, message: String) async {

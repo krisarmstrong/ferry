@@ -282,7 +282,7 @@ public actor ProviderBackend {
 
   static func unexpected(_ response: AgentResponse) -> any Error {
     log.error("unexpected response from agent: \(String(describing: response), privacy: .private)")
-    return ErrorMapping.fileProviderError(.io(String(localized: ProviderText.unexpectedResponse)))
+    return ErrorMapping.described(.xpcConnectionReplyInvalid, ProviderText.unexpectedResponse)
   }
 
   // MARK: Local mapping

@@ -27,6 +27,15 @@ struct HelpLinkButton: View {
   @Environment(\.openWindow) private var openWindow
   let key: String?
 
+  /// What VoiceOver reads for the link: "Help:" and the problem's words, each value as "…". A
+  /// key is the problem's English text, whichever module's catalog holds it.
+  static func label(forMessage key: String) -> String {
+    let problem = Bundle.module.localizedString(forKey: key, value: key, table: nil)
+    return String(
+      localized: LocalizedStringResource(
+        "Help: \(HelpMessage.wording(of: problem))", bundle: .module))
+  }
+
   var body: some View {
     if let key, let model {
       Button {
@@ -39,7 +48,8 @@ struct HelpLinkButton: View {
       }
       .buttonStyle(.borderless)
       .help(Text("Help", bundle: .module))
-      .accessibilityLabel(Text("Help", bundle: .module))
+      // Several problems can show at once: each link names its own (audit L5).
+      .accessibilityLabel(Self.label(forMessage: key))
     }
   }
 }

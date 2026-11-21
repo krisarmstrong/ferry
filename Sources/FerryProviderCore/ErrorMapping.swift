@@ -55,8 +55,9 @@ public enum ErrorMapping {
     case .nameChangedByDevice(let requested, let actual):
       return described(
         .fileWriteInvalidFileName, ProviderText.nameChanged(requested: requested, actual: actual))
-    case .unsupported(let what):
-      return described(.featureUnsupported, ProviderText.unsupported(what))
+    // The detail is developer text, in the agent's log; Finder shows the menu's words.
+    case .unsupported:
+      return described(.featureUnsupported, ProviderText.unsupported)
     case .sizeMismatch(let expected, let actual):
       return described(
         .fileWriteUnknown, ProviderText.sizeMismatch(expected: expected, actual: actual))
@@ -71,11 +72,15 @@ public enum ErrorMapping {
       return described(
         .featureUnsupported, ProviderText.folderTooDeep(path.name ?? path.description))
     // No Cocoa code describes it: the one the FileProvider headers name for such errors, with
-    // the error itself underneath, as they ask.
-    case .io(let message):
+    // the error itself underneath, as they ask. Its detail is developer text, logged by the
+    // agent and the extension, so Finder shows plain words.
+    case .io:
       return CocoaError(
         .xpcConnectionReplyInvalid,
-        userInfo: [NSLocalizedDescriptionKey: message, NSUnderlyingErrorKey: error])
+        userInfo: [
+          NSLocalizedDescriptionKey: String(localized: ProviderText.lostContact),
+          NSUnderlyingErrorKey: error,
+        ])
     }
   }
 
@@ -101,7 +106,7 @@ public enum ErrorMapping {
     .cannotSynchronize,
     userInfo: [NSLocalizedDescriptionKey: String(localized: ProviderText.readOnly)])
 
-  private static func described(_ code: CocoaError.Code, _ description: LocalizedStringResource)
+  static func described(_ code: CocoaError.Code, _ description: LocalizedStringResource)
     -> CocoaError
   {
     CocoaError(code, userInfo: [NSLocalizedDescriptionKey: String(localized: description)])

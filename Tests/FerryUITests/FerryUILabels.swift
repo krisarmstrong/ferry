@@ -60,6 +60,7 @@ enum FerryUILabels {
     "Filter",
     "Forget This Device",
     "Get Android Platform Tools…",
+    "Help: %@",
     "IP address and port",
     "IP addresses",
     "Ignore",

@@ -159,9 +159,11 @@ struct HelpMessage: Decodable, Sendable, Hashable {
 
   /// The message as the reader sees it, each value it is shown with as "…": a key in FerryUI's
   /// catalog.
-  var wording: String {
-    message.replacing(/%(?:\d+\$)?(?:@|lld|llu|ld|lu|d|u)/, with: "…")
-      .replacing("%%", with: "%")
+  var wording: String { Self.wording(of: message) }
+
+  /// A message key as the reader sees it, each value as "…".
+  static func wording(of key: String) -> String {
+    key.replacing(/%(?:\d+\$)?(?:@|lld|llu|ld|lu|d|u)/, with: "…").replacing("%%", with: "%")
   }
 
   var strings: [String] { [wording, cause, fix] }

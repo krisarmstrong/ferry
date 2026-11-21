@@ -58,7 +58,8 @@ struct HelpSnapshotTests {
   }
 
   @Test func aTroubleshootingTopicDraws() throws {
-    let bitmap = try drawnWindow(query: "", message: "The device was disconnected.")
+    let bitmap = try drawnWindow(
+      query: "", message: "The device was disconnected. Reconnect it, then try again.")
     #expect(distinctColors(bitmap) > 10)
     try save(bitmap, as: "help-trouble.png")
   }

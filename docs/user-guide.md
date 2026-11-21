@@ -443,11 +443,113 @@ File transfer is off or the device is locked.
 
 Unlock the device and choose **Transfer files** on it, then choose **Refresh**. You do not need to replug the cable.
 
-**The device is not sharing files.**
+**The device is not sharing files. Unlock it and choose Transfer files, then try again.**
 
 The device locked or turned off file transfer during the task.
 
 Unlock the device and choose **Transfer files** on it, then try again.
+
+**The device was disconnected. Reconnect it, then try again.**
+
+The device went away during the task: the cable came out, it went to sleep, or it left the network.
+
+Reconnect the device and try again.
+
+**The device shows no storage. Unlock it, then try again.**
+
+The device shares no storage, which happens while it is locked.
+
+Unlock the device and choose **Refresh**, then try again.
+
+**Ferry can't do this from the Mac on this device. Do it on the device instead.**
+
+The device doesn't offer what was asked, such as moving a file in one step, or Ferry can't do it from the Mac.
+
+Do it on the device itself, or copy the file to its new place and delete the original.
+
+**Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry.**
+
+The connection to the device, a file on this Mac, or Ferry's helper failed in the middle of the task.
+
+Try again. If it keeps failing, plug the device straight into the Mac and keep it unlocked, check that the Mac has free space, or quit and reopen Ferry. A copy in Finder retries by itself once the device is back.
+
+**That item is no longer on the device. Refresh, then try again.**
+
+Someone deleted or moved the item on the device, or another app did.
+
+Choose **Refresh** for the device, then find the item where it is now.
+
+**The device already has an item with that name. Rename one, then try again.**
+
+An item with the same name is already in that folder on the device.
+
+Rename the item on the Mac or on the device, then try again.
+
+**The device can't store that name. Choose another name.**
+
+The name has characters the device's storage does not allow, such as : * ? " < > | or a trailing dot.
+
+Rename the item with letters, digits, spaces, dashes and dots, then try again.
+
+**The device is out of space. Free some space on it, then try again.**
+
+The device's storage does not have room for the file.
+
+Delete files you no longer need on the device, or copy to another storage such as its SD card.
+
+**The file is too large for that storage. Use internal storage, or a smaller file.**
+
+Cards formatted FAT32 take files up to 4 GB.
+
+Copy the file to the device's internal storage, or split it into smaller files.
+
+**The file didn't arrive complete. Try again.**
+
+The device stored or sent a different number of bytes than the file has, so the copy is not complete.
+
+Try again. If it keeps happening, choose **Refresh** and copy the file once more.
+
+**The device saved the file under another name. Look for it in the folder.**
+
+The device changed the name, for example because its storage cannot hold some characters.
+
+Find the file in the folder under its new name, and rename it if you like.
+
+**The folder isn't empty. Delete what it holds first.**
+
+Something arrived in the folder on the device while it was being deleted.
+
+Open the folder, delete what it holds, then delete the folder.
+
+**The file changed on the device. Refresh, then try again.**
+
+The device's copy of the file changed since the Mac last read it.
+
+Choose **Refresh**, check which copy you want, then try again.
+
+**This Mac is out of space. Free some space, then try again.**
+
+The Mac's disk does not have room for a copy of the file.
+
+Free space on the Mac (see **Free up space on the Mac**), then try again.
+
+**That folder is nested too deep to delete from the Mac. Delete it on the device.**
+
+The folder holds folders more than 64 levels down, which Ferry does not delete.
+
+Delete the folder on the device itself.
+
+**That item is read-only from the Mac. Change it on the device.**
+
+The item is a folder named like an app or a document package, or lies inside one, which Ferry keeps read-only.
+
+Change it on the device, or copy it to the Mac.
+
+**The folder's listing went out of date. Try again.**
+
+Ferry's helper restarted, or many folders were opened, while Finder was still reading a large folder.
+
+Open the folder again. Finder reads it from the start.
 
 **In use by another app**
 
@@ -472,36 +574,6 @@ Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then cl
 The device reported an error when Ferry opened it.
 
 Click **Check Again**, or unplug the device and plug it back in.
-
-**The device reported an error.**
-
-The device refused the request without saying why.
-
-Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**.
-
-**The device was disconnected.**
-
-The device went away during the task: the cable came out, it went to sleep, or it left the network.
-
-Reconnect the device and try again.
-
-**The device reports no storage.**
-
-The device shares no storage, which happens while it is locked.
-
-Unlock the device and choose **Refresh**.
-
-**The device does not support this: ….**
-
-The device can't do what was asked. The rest of the message says what.
-
-Do it another way, for example on the device itself.
-
-**Error: …**
-
-Something failed on the device, the Mac or the connection. The rest of the message says what.
-
-Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**.
 
 **Cancelled.**
 
@@ -703,7 +775,7 @@ Turning on ADB over Wi-Fi restarts ADB on the device, which would stop a transfe
 
 Let them finish, then try again.
 
-**adb: …**
+**adb refused the request. Check the address and that the device is on the network, then try again. (…)**
 
 adb refused the request. The rest of the message is adb's reason.
 
@@ -749,12 +821,6 @@ macOS shows such a folder as an app or a document, so Ferry keeps it read-only.
 
 Change it on the device, or copy it to the Mac.
 
-**The device does not support ….**
-
-The device can't do what Finder asked, such as moving a file in one step.
-
-Copy the file to its new place, then delete the original.
-
 **The device saved “…” as “…”.**
 
 The device changed the name, for example because it cannot store some characters.
@@ -779,7 +845,7 @@ Ferry does not delete a folder nested more than 64 levels deep.
 
 Delete it on the device.
 
-**Unexpected response from the Ferry agent.**
+**Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again.**
 
 Ferry's helper answered in a way the Finder extension does not expect, which can happen right after an update.
 
@@ -997,7 +1063,7 @@ The device's internal storage is too full to install the app.
 
 Free up space on the device, then try again.
 
-**Couldn't install the app: …**
+**The device didn't install the app. Check that it suits this device, then try again. (…)**
 
 The device refused the app for a reason Ferry has no plain words for. The rest of the message is the device's own reason.
 
@@ -1111,7 +1177,7 @@ The log came faster than Ferry could show it, so some lines were left out.
 
 Set **Level** or **Filter** to show fewer lines.
 
-**Couldn't save the log: …**
+**Ferry couldn't save the log. Choose another folder or free some space, then try again. (…)**
 
 Ferry could not write the file. The rest of the message says why.
 
@@ -1215,7 +1281,7 @@ Ferry installs an update only when it carries the signature of Ferry's own relea
 
 Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.
 
-Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices.
+Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices: like any download, they see your Mac's IP address, and GitHub sees which versions of Ferry and its updater ask.
 
 ### Uninstall
 
