@@ -245,7 +245,7 @@ final class AgentService: NSObject, AgentXPC, Sendable {
     } catch {
       // Only a non-finite date could fail here. The client reads an empty reply as a bad
       // response rather than waiting for one that never comes.
-      log.fault("cannot encode response: \(error, privacy: .public)")
+      log.fault("cannot encode response: \(error, privacy: .private)")
       return Data()
     }
   }

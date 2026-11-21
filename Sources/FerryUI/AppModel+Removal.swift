@@ -60,7 +60,7 @@ extension AppModel {
       do {
         try await services.setOpensAtLogin(false)
       } catch {
-        Self.log.error("removing the login item failed: \(error, privacy: .public)")
+        Self.log.error("removing the login item failed: \(error, privacy: .private)")
       }
     }
     services.quit()

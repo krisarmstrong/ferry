@@ -100,7 +100,7 @@ public actor ADBStream {
             if case .failed = state {
               return .failed(.failed("connecting to the adb server: \(error)"))
             }
-            log.debug("waiting for the adb server: \(String(describing: error), privacy: .public)")
+            log.debug("waiting for the adb server: \(String(describing: error), privacy: .private)")
             return .stalled
           case .cancelled:
             return .failed(.cancelled)

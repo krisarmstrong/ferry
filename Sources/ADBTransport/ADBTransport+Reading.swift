@@ -133,7 +133,7 @@ extension ADBTransport {
         Self.log.info("\(serial, privacy: .private) reports no ro.serialno; leaving it out")
       case .failure(let error):
         Self.log.info(
-          "reading \(serial, privacy: .private) failed: \(String(describing: error), privacy: .public)"
+          "reading \(serial, privacy: .private) failed: \(String(describing: error), privacy: .private)"
         )
       }
     }

@@ -289,7 +289,7 @@ public actor ADBTransport: DeviceTransport {
       status = locator.adbURL() == nil ? .notInstalled : .serverDown
     } else {
       status = .serverDown
-      Self.log.error("listing adb devices failed: \(String(describing: error), privacy: .public)")
+      Self.log.error("listing adb devices failed: \(String(describing: error), privacy: .private)")
     }
   }
 
@@ -367,7 +367,7 @@ extension ADBTransport {
     } catch {
       Self.log.log(
         level: Self.startFailureLevel(error),
-        "starting adb: \(String(describing: error), privacy: .public)")
+        "starting adb: \(String(describing: error), privacy: .private)")
     }
   }
 

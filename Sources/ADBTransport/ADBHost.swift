@@ -232,7 +232,7 @@ public actor ADBHost {
           try await startServer()
           continue
         } catch {
-          Self.log.error("adb server not started: \(String(describing: error), privacy: .public)")
+          Self.log.error("adb server not started: \(String(describing: error), privacy: .private)")
         }
       }
       let delay = backoff.next()
@@ -261,7 +261,7 @@ public actor ADBHost {
         }
       } catch {
         if !Task.isCancelled {
-          Self.log.info("device tracking ended: \(String(describing: error), privacy: .public)")
+          Self.log.info("device tracking ended: \(String(describing: error), privacy: .private)")
         }
       }
       return reached

@@ -75,7 +75,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator {
         completion.value(try await backend.currentAnchor())
       } catch {
         // No anchor makes FileProvider enumerate again once the agent answers.
-        log.error("no sync anchor: \(error, privacy: .public)")
+        log.error("no sync anchor: \(error, privacy: .private)")
         completion.value(nil)
       }
     }

@@ -88,7 +88,7 @@ public struct PlatformToolsFetcher: Sendable {
         at: staging, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
       return staging
     } catch {
-      Self.log.error("platform tools folder: \(error, privacy: .public)")
+      Self.log.error("platform tools folder: \(error, privacy: .private)")
       throw .storage
     }
   }
@@ -125,7 +125,7 @@ public struct PlatformToolsFetcher: Sendable {
         try files.moveItem(at: staging, to: target)
       }
     } catch {
-      Self.log.error("platform tools install: \(error, privacy: .public)")
+      Self.log.error("platform tools install: \(error, privacy: .private)")
       throw .storage
     }
     for version in folder.versions() where version != release.version {
