@@ -181,6 +181,10 @@ public actor ADBServerKeeper {
     return try result.get()
   }
 
+  /// Replacements under way, and commands waiting for them: a test waits on these.
+  var replacementsUnderWay: Int { replacing }
+  var commandsWaiting: Int { waitingCommands.count }
+
   /// Stops the server once no command is using it, holding new commands back meanwhile, if
   /// `isTheOne` still holds then: the port may have changed hands during the wait. Returns
   /// whether it stopped it.

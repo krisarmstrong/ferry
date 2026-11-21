@@ -61,11 +61,11 @@ struct ADBServerKeeperGateTests {
     }
     for await _ in commandHeld { break }
     let replacing = Task { await keeper.replaceFerryServer(fetched: Keeper.adb) }
-    try await Task.sleep(for: .milliseconds(50))
+    while await keeper.replacementsUnderWay == 0, !Task.isCancelled { await Task.yield() }
     let second = Task {
       try await keeper.whileServing { () async throws(ADBError) -> Int in fakes { $0.kills } }
     }
-    try await Task.sleep(for: .milliseconds(50))
+    while await keeper.commandsWaiting == 0, !Task.isCancelled { await Task.yield() }
     release.yield()
     try await first.value
     #expect(await replacing.value)
