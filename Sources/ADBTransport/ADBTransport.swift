@@ -83,12 +83,13 @@ public actor ADBTransport: DeviceTransport {
   /// `serving` decides which network routes serve their device; USB routes always do. `opened`
   /// hears of each session as it opens.
   public init(
-    port: UInt16 = 5037, locator: ADBLocator = ADBLocator(),
+    port: UInt16 = 5037, locator: ADBLocator = ADBLocator(), keeper: ADBServerKeeper,
     serving: @escaping ADBNetworkPolicy = { _, _ in true },
     opened: @escaping ADBOpenHandler = { _, _, _ in }
   ) {
     self.init(
-      host: ADBHost(port: port, locator: locator), locator: locator, serving: serving,
+      host: ADBHost(port: port, locator: locator, keeper: keeper), locator: locator,
+      serving: serving,
       opened: opened)
   }
 

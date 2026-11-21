@@ -19,10 +19,12 @@ guard let identity = FerryIdentity() else {
 let itemStore: URL
 let wirelessStore: URL
 let toolStore: URL
+let adbServerRecord: URL
 do {
   itemStore = try DomainController.defaultItemStore()
   wirelessStore = try WirelessADB.defaultStore()
   toolStore = try ToolJournal.defaultStore()
+  adbServerRecord = try ADBServerKeeper.defaultRecord()
 } catch {
   log.fault("no item store: \(error, privacy: .public)")
   exit(EXIT_FAILURE)
@@ -39,7 +41,16 @@ let vouching = WirelessVouching()
 // Files the tools left on a device (it went away, or the agent stopped) are removed the next
 // time a session for it opens.
 let toolJournal = ToolJournal(store: toolStore)
+// The adb server this agent starts is its child and ends with it. One an earlier agent left
+// running is cut off from the local network, so it is replaced before anything relies on it:
+// before the trackers and the reconnects below exist. Bounded: a wedged server must not keep
+// the agent from serving. A replacement still running then is held off by the keeper's gate.
+let adbServer = ADBServerKeeper(record: adbServerRecord)
+if !AgentStartup.wait(upTo: .seconds(10), for: { await adbServer.replaceRecordedOrphan() }) {
+  log.error("replacing an earlier agent's adb server took too long; starting anyway")
+}
 let adb = ADBTransport(
+  keeper: adbServer,
   serving: { vouching.serves($0, as: $1) },
   opened: { id, route, tools in Task { await toolJournal.sweep(id, route: route, using: tools) }
   })
@@ -52,8 +63,11 @@ let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 // Devices on the network: connected when the user asks, remembered, and reconnected. A host
 // claiming the serial of a device the hub serves is not believed without the user.
 let wireless = WirelessADB(
-  adb: ADBWireless(), store: wirelessStore,
-  known: { await hub.shownNames() }, located: { await domains.location(of: $0) }, vouching: vouching
+  adb: ADBWireless(keeper: adbServer), store: wirelessStore,
+  known: { await hub.shownNames() }, located: { await domains.location(of: $0) },
+  vouching: vouching,
+  localNetwork: { await LocalNetworkAccess.reach($0) },
+  replaceCutOffServer: { await adbServer.replaceFerryServer(fetched: ADBLocator().fetchedADB()) }
 )
 Task { await wireless.run() }
 Task {

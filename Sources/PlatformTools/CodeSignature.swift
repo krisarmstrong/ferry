@@ -35,6 +35,20 @@ public enum CodeSignature {
     (try? googleSigned.check(file)) != nil
   }
 
+  /// Whether the code process `pid` runs is valid and Google's `adb`, as the kernel loaded it
+  /// (not the file now at its path).
+  public static func isRunningGoogleSigned(pid: pid_t) -> Bool {
+    var code: SecCode?
+    var requirement: SecRequirement?
+    let attributes = [kSecGuestAttributePid: pid] as CFDictionary
+    guard SecCodeCopyGuestWithAttributes(nil, attributes, [], &code) == errSecSuccess, let code,
+      SecRequirementCreateWithString(googleRequirement as CFString, [], &requirement)
+        == errSecSuccess,
+      let requirement
+    else { return false }
+    return SecCodeCheckValidity(code, [], requirement) == errSecSuccess
+  }
+
   /// What `codesign --verify --strict -R=<requirement>` checks, without running a process.
   static func check(_ file: URL, requirement text: String) throws(PlatformToolsError) {
     var code: SecStaticCode?

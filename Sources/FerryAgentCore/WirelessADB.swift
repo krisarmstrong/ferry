@@ -147,8 +147,14 @@ public actor WirelessADB {
   let located: @Sendable (DeviceID) async -> String?
   /// What the hub may serve over the network, kept in step with `entries`.
   let vouching: WirelessVouching
+  /// What the agent's own connection to an address finds (`LocalNetworkAccess`).
+  let localNetwork: LocalNetworkAccess.Check
+  /// Replaces an adb server cut off from the network; whether it did.
+  let replaceCutOffServer: @Sendable () async -> Bool
   /// The reconnects started at agent start or when adb's server came back, if still running.
   var reconnecting: Task<Void, Never>?
+  /// adb listed devices while a reconnect pass ran: another pass runs once it ends.
+  var reconnectAgain = false
   /// How many startup reconnects run at once.
   static let reconnectLimit = 4
 
@@ -157,11 +163,15 @@ public actor WirelessADB {
   /// it by the name Ferry has, not the one the host reports. `located` extends that to devices
   /// that are unplugged but have a Finder location, which such a host would otherwise take over.
   /// `vouching` is shared with the `ADBTransport` that serves network routes.
+  /// `localNetwork` is asked only when adb finds no route to an address; when the agent reaches
+  /// it anyway, `replaceCutOffServer` replaces the server (`ADBServerKeeper.replaceFerryServer`).
   public init(
     adb: any WirelessADBControl, store: URL, timing: Timing = Timing(),
     known: @escaping @Sendable () async -> [DeviceID: String] = { [:] },
     located: @escaping @Sendable (DeviceID) async -> String? = { _ in nil },
-    vouching: WirelessVouching = WirelessVouching()
+    vouching: WirelessVouching = WirelessVouching(),
+    localNetwork: @escaping LocalNetworkAccess.Check = { _ in .unknown },
+    replaceCutOffServer: @escaping @Sendable () async -> Bool = { false }
   ) {
     self.adb = adb
     file = store
@@ -169,6 +179,8 @@ public actor WirelessADB {
     self.known = known
     self.located = located
     self.vouching = vouching
+    self.localNetwork = localNetwork
+    self.replaceCutOffServer = replaceCutOffServer
     let loaded = WirelessStore.load(store)
     entries = loaded.entries
     if !loaded.intact { vouching.storeUnreadable() }
@@ -209,7 +221,7 @@ public actor WirelessADB {
       do throws(ADBError) {
         switch try await adb.pair(endpoint, code: code) {
         case .failed(let detail):
-          return .failed(.adb(detail))
+          return .failed(await failure(reaching: endpoint, detail))
         case .paired(let guid):
           guard let service = await connectService(guid: guid, pairedAt: endpoint) else {
             return .failed(.noConnectService)

@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import PlatformTools
 import ServiceManagement
 import UniformTypeIdentifiers
@@ -43,6 +44,9 @@ public protocol SystemServicing {
   func loginItemStatus() async -> LoginItemStatus
   func setOpensAtLogin(_ enabled: Bool) async throws
   func unregisterAgent() async throws
+  /// Deletes the agent's own folder (remembered devices, item tables, the adb server record),
+  /// once it is unregistered and has exited, so no last save re-creates it.
+  func removeAgentData() async throws
   func open(_ url: URL)
   /// Shows the items in Finder.
   func reveal(_ urls: [URL])
@@ -197,6 +201,35 @@ public final class SystemServices: SystemServicing {
     try await Task.detached(priority: .utility) {
       try await SMAppService.agent(plistName: Self.agentPlist).unregister()
     }.value
+  }
+
+  public func removeAgentData() async throws {
+    // Unregistering stops the agent, but it may still be saving: up to 5 s for it to exit.
+    let agent = Bundle.main.bundleURL.appending(path: "Contents/MacOS/FerryAgent")
+      .resolvingSymlinksInPath().path
+    let deadline = ContinuousClock.now + .seconds(5)
+    while Self.isRunning(agent), ContinuousClock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(100))
+    }
+    let support = try FileManager.default.url(
+      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
+    let folder = support.appending(path: "io.github.krisarmstrong.ferry.agent")
+    guard FileManager.default.fileExists(atPath: folder.path) else { return }
+    try FileManager.default.removeItem(at: folder)
+  }
+
+  /// Whether a process of this user runs the program at `path`.
+  private static func isRunning(_ path: String) -> Bool {
+    let count = proc_listallpids(nil, 0)
+    guard count > 0 else { return false }
+    var pids = [pid_t](repeating: 0, count: Int(count) * 2)
+    let listed = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+    guard listed > 0 else { return false }
+    var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) * 4)
+    return pids.prefix(Int(listed)).contains { pid in
+      let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+      return length > 0 && String(bytes: buffer.prefix(Int(length)), encoding: .utf8) == path
+    }
   }
 
   public func open(_ url: URL) {

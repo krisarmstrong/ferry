@@ -35,6 +35,12 @@ actor FakeWirelessADB: WirelessADBControl {
   var serverUp = true
   /// How long `connect` takes for an address, as an unreachable host does.
   var connectDelay: [String: Duration] = [:]
+  /// What adb says when a connect to an address with no unit fails, by address; otherwise
+  /// "Connection refused".
+  var connectFailure: [String: String] = [:]
+  /// Addresses whose next connect fails with "No route to host" whatever answers there, as
+  /// through a server cut off from the network.
+  var noRouteOnce: Set<String> = []
   /// Connects that throw (adb timed out), by address.
   var connectThrows: Set<String> = []
   /// Identity reads that fail, by adb serial.
@@ -86,8 +92,16 @@ actor FakeWirelessADB: WirelessADBControl {
     if let delay = connectDelay[endpoint.argument] { try? await Task.sleep(for: delay) }
     inFlight -= 1
     if connectThrows.contains(endpoint.argument) { throw .failed("adb did not finish") }
+    // adb reconnects an offline TCP transport by itself: `connect` finds it there.
+    if listed[endpoint.argument] == .offline {
+      return .failed("already connected to \(endpoint.argument)")
+    }
+    if noRouteOnce.remove(endpoint.argument) != nil {
+      return .failed("failed to connect to '\(endpoint.argument)': No route to host")
+    }
     guard let unit = units[endpoint.argument] else {
-      return .failed("failed to connect to '\(endpoint.argument)': Connection refused")
+      let reason = connectFailure[endpoint.argument] ?? "Connection refused"
+      return .failed("failed to connect to '\(endpoint.argument)': \(reason)")
     }
     listed[endpoint.argument] = unit.authorized ? .device : .unauthorized
     return unit.authorized ? .connected(serial: endpoint.argument) : .awaitingAllow

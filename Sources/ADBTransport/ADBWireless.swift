@@ -41,24 +41,37 @@ public struct ADBWireless: Sendable {
   private let host: ADBHost
   private let run: ADBCommandRunner
   private let answerLimit: Duration
+  /// Holds a server replacement off while a command runs (`ADBServerKeeper.whileServing`).
+  private let keeper: ADBServerKeeper
 
   public init(
     host: ADBHost, run: @escaping ADBCommandRunner,
-    answerLimit: Duration = ADBTransport.defaultAnswerLimit
+    answerLimit: Duration = ADBTransport.defaultAnswerLimit, keeper: ADBServerKeeper
   ) {
     self.host = host
     self.run = run
     self.answerLimit = answerLimit
+    self.keeper = keeper
   }
 
   /// The real server and the `adb` the locator finds.
-  public init(locator: ADBLocator = ADBLocator()) {
-    self.init(host: ADBHost(locator: locator), run: ADBCommand.runner(locator: locator))
+  public init(locator: ADBLocator = ADBLocator(), keeper: ADBServerKeeper) {
+    self.init(
+      host: ADBHost(locator: locator, keeper: keeper), run: ADBCommand.runner(locator: locator),
+      keeper: keeper)
+  }
+
+  /// Checks for the server and runs an adb command against it, with no replacement between.
+  private func command(_ arguments: [String]) async throws(ADBError) -> ADBCommandResult {
+    let body = { @Sendable [self] () async throws(ADBError) -> ADBCommandResult in
+      try await requireServer()
+      return try await run(arguments)
+    }
+    return try await keeper.whileServing(body)
   }
 
   public func connect(_ endpoint: WirelessEndpoint) async throws(ADBError) -> ADBConnectOutcome {
-    try await requireServer()
-    let result = try await run(ADBCommand.connect(endpoint))
+    let result = try await command(ADBCommand.connect(endpoint))
     let listed = try await devices().first { $0.serial == endpoint.argument }
     switch listed?.state {
     case .device: return .connected(serial: endpoint.argument)
@@ -70,16 +83,14 @@ public struct ADBWireless: Sendable {
   }
 
   public func disconnect(_ endpoint: WirelessEndpoint) async throws(ADBError) {
-    try await requireServer()
-    _ = try await run(ADBCommand.disconnect(endpoint))
+    _ = try await command(ADBCommand.disconnect(endpoint))
   }
 
   /// adb prints `Successfully paired to <address> [guid=<name>]`, or `Failed: <reason>`.
   public func pair(_ endpoint: WirelessEndpoint, code: PairingCode) async throws(ADBError)
     -> ADBPairOutcome
   {
-    try await requireServer()
-    let output = try await run(ADBCommand.pair(endpoint, code)).output
+    let output = try await command(ADBCommand.pair(endpoint, code)).output
     guard output.contains("Successfully paired") else { return .failed(Self.detail(output)) }
     let guid = output.firstRange(of: "[guid=").flatMap { start in
       output[start.upperBound...].firstIndex(of: "]").map {

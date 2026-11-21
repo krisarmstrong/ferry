@@ -45,7 +45,9 @@ struct ADBWirelessTests {
   }
 
   static func wireless(_ server: FakeADBServer, _ runner: FakeADBRunner) -> ADBWireless {
-    ADBWireless(host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), run: runner.run)
+    ADBWireless(
+      host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), run: runner.run,
+      keeper: ADBServerKeeperTests.idle())
   }
 
   @Test func argumentArraysAreTheOnlyCommandsBuilt() {
@@ -97,7 +99,8 @@ struct ADBWirelessTests {
     let closed = try ClosedPort()
     let runner = FakeADBRunner(output: "connected\n")
     let wireless = ADBWireless(
-      host: ADBHost(port: closed.port, locator: ADBHostTests.noAdb), run: runner.run)
+      host: ADBHost(port: closed.port, locator: ADBHostTests.noAdb), run: runner.run,
+      keeper: ADBServerKeeperTests.idle())
     await #expect(throws: ADBError.serverUnavailable) {
       _ = try await wireless.connect(Self.etherScope)
     }

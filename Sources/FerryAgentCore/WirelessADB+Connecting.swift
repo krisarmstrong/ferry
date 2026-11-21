@@ -26,8 +26,14 @@ extension WirelessADB {
         reconnectDue = true
       case .devices(let listed):
         await gate.run { await resolvePending(listed) }
-        guard reconnectDue, reconnecting == nil else { continue }
+        guard reconnectDue else { continue }
         reconnectDue = false
+        // The server came back during a pass (one the pass replaced, say): its list may be the
+        // only one it sends, so it is not dropped but followed by another pass.
+        guard reconnecting == nil else {
+          reconnectAgain = true
+          continue
+        }
         reconnecting = Task { await self.reconnectMissing(listed) }
       }
     }
@@ -74,25 +80,6 @@ extension WirelessADB {
     }
   }
 
-  /// Reconnects the remembered devices adb does not list, a few at a time and outside the gate,
-  /// so a user's request never waits behind addresses that do not answer.
-  /// A device forgotten after the list was taken is skipped, and is not adopted if it answers.
-  func reconnectMissing(_ listed: [ADBDevice]) async {
-    let since = forgets
-    var due = entries.filter { isMissing($0.key, $0.value, from: listed) }.makeIterator()
-    await withTaskGroup(of: Void.self) { group in
-      for _ in 0..<Self.reconnectLimit {
-        guard let (id, entry) = due.next() else { break }
-        group.addTask { _ = await self.reconnect(id, entry, since: since) }
-      }
-      while await group.next() != nil {
-        guard let (id, entry) = due.next() else { continue }
-        group.addTask { _ = await self.reconnect(id, entry, since: since) }
-      }
-    }
-    reconnecting = nil
-  }
-
   /// Reads adb's mDNS only while a remembered device is missing, and offers a connect service
   /// named for its serial to the user; it is never connected to here.
   func offerFromMDNS() async {
@@ -106,9 +93,10 @@ extension WirelessADB {
     }
   }
 
-  /// adb lists none of its addresses, and no mDNS connection named for it.
+  /// adb lists none of its addresses, and no mDNS connection named for it, except offline: a
+  /// server cut off from the network (an earlier agent's) keeps the device listed offline.
   func isMissing(_ id: DeviceID, _ entry: Entry, from listed: [ADBDevice]) -> Bool {
-    let serials = Set(listed.map(\.serial))
+    let serials = Set(listed.filter { $0.state != .offline }.map(\.serial))
     return entry.addresses.allSatisfy { !serials.contains($0.endpoint.argument) }
       && !serials.contains { $0.hasPrefix(Self.instancePrefix(id)) }
   }
@@ -170,7 +158,8 @@ extension WirelessADB {
   /// waits for Allow). What Ferry knows, and the count of forgets, are read first, so neither the
   /// device the connect itself brings up nor a forget meanwhile is missed.
   func attempt(
-    _ endpoint: WirelessEndpoint, for purpose: Purpose, all: [WirelessEndpoint]
+    _ endpoint: WirelessEndpoint, for purpose: Purpose, all: [WirelessEndpoint],
+    retried: Bool = false
   ) async -> WirelessOutcome {
     vouching.unsettle(endpoint.argument)
     var holding = false
@@ -196,7 +185,12 @@ extension WirelessADB {
           "connecting \(endpoint.argument, privacy: .private) failed: \(detail, privacy: .private)")
         // adb can keep a connection it could not use (offline, or listed in another form).
         await drop(endpoint)
-        return .failed(.adb(detail))
+        let failure = await failure(reaching: endpoint, detail)
+        // The server was replaced under it: once on the new one.
+        if failure == .serverRestarted, !retried, await serverAnswers() {
+          return await attempt(endpoint, for: purpose, all: all, retried: true)
+        }
+        return .failed(failure)
       }
     } catch {
       // adb may finish the connect after its client gave up (a timeout): nothing is kept.

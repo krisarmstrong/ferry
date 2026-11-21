@@ -673,6 +673,18 @@ The address changed after the menu showed it.
 
 Open the menu again and choose from what it shows now.
 
+**adb had lost network access, so Ferry restarted it. Try again in a moment.**
+
+adb's server was one an earlier copy of Ferry's helper started. When that helper quit, macOS cut the server off from your network, so adb said "No route to host".
+
+Nothing to change: Ferry restarts adb by itself and reconnects your devices. If this one isn't back in a few seconds, click **Connect Again**.
+
+**Ferry needs Local Network access to reach devices over Wi-Fi. Turn on FerryAgent (Ferry) in System Settings › Privacy & Security › Local Network.**
+
+macOS asks before an app reaches devices on your network. FerryAgent, Ferry's helper, was not allowed, so macOS blocks it, and adb reports "No route to host" even though the device answers.
+
+Open System Settings › **Privacy & Security** › **Local Network**, turn on **FerryAgent**, then click **Connect Again**. If FerryAgent isn't listed, connect once more and click **Allow** when macOS asks.
+
 **Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again.**
 
 Turning on ADB over Wi-Fi restarts ADB on the device, which would stop a transfer, a screen recording or a log.

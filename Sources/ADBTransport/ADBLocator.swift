@@ -2,7 +2,8 @@ import Foundation
 import PlatformTools
 
 /// Finds the `adb` that starts the server and pairs and connects. A server already answering is
-/// used as it is, whichever adb started it, and never needs one; Ferry never stops a server.
+/// used as it is, whichever adb started it, and never needs one; Ferry stops only a server its
+/// own agent started (see `ADBServerKeeper`).
 ///
 /// In order: the `adb` Ferry fetched from Google (see `PlatformToolsFetcher`), checked against
 /// Google's signature again whenever the file changed since it last passed, then one already on
@@ -40,10 +41,15 @@ public struct ADBLocator: Sendable {
     self.isGoogleSigned = isGoogleSigned
   }
 
+  /// Ferry's fetched `adb`, if Google's signature holds on it.
+  public func fetchedADB() -> URL? {
+    fetched().flatMap { isGoogleSigned($0) ? $0 : nil }
+  }
+
   /// Ferry's fetched `adb` if Google's signature holds on it, else the first executable `adb`
   /// among the fixed locations, in order of preference.
   public func adbURL() -> URL? {
-    if let fetched = fetched(), isGoogleSigned(fetched) { return fetched }
+    if let fetched = fetchedADB() { return fetched }
     var candidates = [
       "/opt/homebrew/bin/adb",
       "/usr/local/bin/adb",

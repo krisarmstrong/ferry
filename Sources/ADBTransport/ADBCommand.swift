@@ -18,7 +18,7 @@ public struct ADBCommandResult: Sendable, Equatable {
 public typealias ADBCommandRunner =
   @Sendable (_ arguments: [String]) async throws(ADBError) -> ADBCommandResult
 
-/// The `adb` commands Ferry runs besides `start-server`, each an argument array built here from
+/// The `adb` client commands Ferry runs (the server is `ADBServerKeeper`'s), each an argument array built here from
 /// validated values, and the one way they are run: `Process` on the located `adb`, never a shell
 /// and never a `PATH` lookup.
 public enum ADBCommand {
