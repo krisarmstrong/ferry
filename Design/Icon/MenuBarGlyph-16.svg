@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 16 pt grid. -->
+  <path d="M4 4 H5 V8 H4 Z" fill="#000000"/>
+  <path d="M6 2 H9 L11 4 V8 H6 Z" fill="#000000"/>
+  <path d="M1 10 H12.5 Q14 10 15 8.5 Q14.5 14 11 14 H4.5 Q2.5 14 1 10 Z" fill="#000000"/>
+</svg>

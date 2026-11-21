@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <!-- Drawn on the 16 px grid: 1 px = 1024/14 units. -->
-  <path d="M146.3 585.1 H877.7 Q840 804.6 731.4 804.6 H292.6 Q184 804.6 146.3 585.1 Z" fill="#FFFFFF"/>
+  <path d="M146.3 585.1 H841.1 L914.3 512 Q877.7 804.6 731.4 804.6 H292.6 Q182.9 804.6 146.3 585.1 Z" fill="#FFFFFF"/>
 </svg>
