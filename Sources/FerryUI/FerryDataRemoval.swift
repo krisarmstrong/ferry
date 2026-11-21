@@ -14,7 +14,8 @@ import os
 /// its resolved path, and by its start time again just before the signal, so a recycled PID is
 /// never hit), which would otherwise outlive its deleted program. A server from any other adb
 /// (Homebrew's, the Android SDK's) is never touched; nor is one the agent started from such an
-/// adb. Last it deletes both folders, except one holding changes the system saved.
+/// adb. Last it moves both folders to the Trash, except one holding changes the system saved, so
+/// a Remove Ferry clicked by mistake can be undone from Finder.
 struct FerryDataRemoval {
   private static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "Removal")
   static let agentWait = Duration.seconds(5)
@@ -27,11 +28,17 @@ struct FerryDataRemoval {
   let terminate: @Sendable (pid_t) -> Void
   /// Waits one poll; tests pass one that returns at once.
   let pause: @Sendable () async -> Void
+  /// Takes a folder out of Application Support: the system Trash; tests pass a folder of their
+  /// own so nothing reaches the user's Trash.
+  let discard: @Sendable (URL) throws -> Void
 
   init(
     home: URL, agent: URL, table: any ProcessTable,
     terminate: @escaping @Sendable (pid_t) -> Void,
-    pause: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: agentPoll) }
+    pause: @escaping @Sendable () async -> Void = { try? await Task.sleep(for: agentPoll) },
+    discard: @escaping @Sendable (URL) throws -> Void = {
+      try FileManager.default.trashItem(at: $0, resultingItemURL: nil)
+    }
   ) {
     let tools = PlatformToolsFolder(home: home.path).root
     let ferry = tools.deletingLastPathComponent()
@@ -45,6 +52,7 @@ struct FerryDataRemoval {
     self.table = table
     self.terminate = terminate
     self.pause = pause
+    self.discard = discard
   }
 
   static var standard: FerryDataRemoval {
@@ -54,8 +62,8 @@ struct FerryDataRemoval {
       table: SystemProcessTable(), terminate: { _ = kill($0, SIGTERM) })
   }
 
-  /// Waits for the agent to exit, stops Ferry's adb servers, then deletes each folder that holds
-  /// none of `preserved`.
+  /// Waits for the agent to exit, stops Ferry's adb servers, then moves each folder that holds
+  /// none of `preserved` to the Trash.
   func run(keeping preserved: [URL]) async {
     await waitForTheAgent()
     stopFerrysADB()
@@ -70,11 +78,11 @@ struct FerryDataRemoval {
         continue
       }
       do {
-        try FileManager.default.removeItem(at: folder)
+        try discard(folder)
       } catch CocoaError.fileNoSuchFile {
         continue
       } catch {
-        Self.log.error("deleting Ferry's data failed: \(error, privacy: .private)")
+        Self.log.error("moving Ferry's data to the Trash failed: \(error, privacy: .private)")
       }
     }
   }

@@ -21,7 +21,7 @@ extension AppModel {
     removalError = nil
   }
 
-  /// Removes Ferry's locations from Finder, unregisters the agent, deletes Ferry's data and stops
+  /// Removes Ferry's locations from Finder, unregisters the agent, moves Ferry's data to the Trash and stops
   /// its own adb server once the agent has exited, forgets that Ferry ran here (so a reinstall
   /// shows the welcome), unregisters the login item, and quits. Stops
   /// if the locations or the agent remain, so the user can try again rather than being left
