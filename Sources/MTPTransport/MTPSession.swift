@@ -300,7 +300,8 @@ extension MTPSession {
       for entry in entries {
         guard let path = try? folder.appending(entry.name) else {
           Self.log.error(
-            "skipping object \(entry.objectID) with unusable name \(entry.name, privacy: .private)")
+            "skipping object \(entry.objectID, privacy: .private) with unusable name \(entry.name, privacy: .private)"
+          )
           continue
         }
         if let kept = byPath[path], kept.objectID < entry.objectID { continue }

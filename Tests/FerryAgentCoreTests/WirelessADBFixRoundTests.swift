@@ -204,17 +204,18 @@ struct WirelessADBFixRoundTests {
     let adb = FakeWirelessADB()
     let address = Self.endpoint("192.0.2.50")
     await adb.set {
-      for index in 1...6 { $0.connectDelay["203.0.113.\(index):5555"] = .seconds(2) }
       $0.units[address.argument] = .init(info: Self.stranger)
     }
+    await adb.holdConnects(to: Set((1...6).map { "203.0.113.\($0):5555" }))
     let wireless = WirelessADB(adb: adb, store: file, timing: Self.fast)
     let running = Task { await wireless.run() }
     defer { running.cancel() }
     await adb.publish()
     #expect(try await eventually { await adb.inFlight >= 4 })
-    let started = ContinuousClock.now
+    // The reconnects stay held until released: the user's connect finishing at all shows it
+    // did not wait for them.
     #expect(await wireless.connect(address) == .connected)
-    #expect(started.duration(to: .now) < .seconds(1))
+    await adb.releaseConnects()
     #expect(
       try await eventually {
         await adb.calls.filter { if case .connect = $0 { true } else { false } }.count == 7

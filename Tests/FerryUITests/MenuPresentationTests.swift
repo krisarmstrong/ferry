@@ -98,7 +98,14 @@ struct MenuPresentationTests {
     ("samsung", "SM-T870", .tablet),
     ("samsung", "SM-P613", .tablet),
     ("LENOVO", "Lenovo TB-X606F", .tablet),
+    ("LENOVO", "TB3-850F", .tablet),
+    ("Generic", "STB-100", .phone),
+    ("Generic", "TB-200", .phone),
     ("Xiaomi", "Mi Pad 5", .tablet),
+    ("HUAWEI", "MatePad 11", .tablet),
+    ("HUAWEI", "MediaPad M5", .tablet),
+    ("Amazon", "KFTRWI", .tablet),
+    ("Amazon", "Fire HD 10", .tablet),
     ("Google", "Pixel Fold", .phone),
     ("Motorola", "moto g stylus", .phone),
   ])
@@ -213,15 +220,16 @@ struct MenuPresentationTests {
   }
 
   @Test func eachTileSymbolExists() {
-    let glyphs: [DevicePresentation.TileGlyph] = [
-      DevicePresentation.rememberedTile.glyph, DevicePresentation.offerTile.glyph, .phone,
-    ]
-    for glyph in glyphs {
-      let name = try? #require(glyph.symbolName)
-      #expect(NSImage(systemSymbolName: name ?? "", accessibilityDescription: nil) != nil)
+    var names = [DevicePresentation.TileGlyph.phoneSymbol]
+    for case .symbol(let name) in [
+      DevicePresentation.rememberedTile.glyph, DevicePresentation.offerTile.glyph,
+    ] {
+      names.append(name)
     }
-    #expect(DevicePresentation.TileGlyph.tester.symbolName == nil)
-    #expect(DevicePresentation.TileGlyph.tablet.symbolName == nil)
+    #expect(names.count == 3)
+    for name in names {
+      #expect(NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil, "\(name)")
+    }
   }
 
   @Test(arguments: [

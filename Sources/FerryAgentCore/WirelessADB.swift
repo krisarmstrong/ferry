@@ -25,10 +25,11 @@ extension ADBWireless: WirelessADBControl {}
 
 /// The three ways onto the network, and the devices reached that way, remembered.
 ///
-/// - **Connect by address:** `adb connect` to what the user typed, for devices that accept ADB
-///   over the network.
-/// - **Pair with code** (Android 11+): `adb pair` with the address and code the device shows,
-///   then `adb connect` to the `_adb-tls-connect` service adb's mDNS lists for that device.
+/// - **Connect by address:** the server's connect (`host:connect:`, what `adb connect` sends) to
+///   what the user typed, for devices that accept ADB over the network.
+/// - **Pair with code** (Android 11+): the server's pair (`host:pair:`) with the address and code
+///   the device shows, then its connect to the `_adb-tls-connect` service adb's mDNS lists for
+///   that device.
 /// - **Use over Wi-Fi** (Android 8–10, from USB): the device's own Ethernet and Wi-Fi
 ///   addresses, after `tcpip 5555` unless adbd already listens on a port.
 ///

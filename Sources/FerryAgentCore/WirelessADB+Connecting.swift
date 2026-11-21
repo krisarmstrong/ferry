@@ -211,7 +211,9 @@ extension WirelessADB {
     do throws(ADBError) {
       read = try await adb.device(at: adbSerial)
     } catch {
-      log.info("reading \(adbSerial, privacy: .private) failed: \(String(describing: error))")
+      log.info(
+        "reading \(adbSerial, privacy: .private) failed: \(String(describing: error), privacy: .private)"
+      )
       read = nil
     }
     guard let info = read else {

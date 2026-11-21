@@ -115,7 +115,7 @@ struct StaleSizeFetchTests {
     #expect(try Data(contentsOf: target).count == 40)
     let settings = try await harness.id(try path("/.settings"), in: domain)
     guard
-      case .entries(let listed) = await harness.service.handle(
+      case .page(let listed, _) = await harness.service.handle(
         .list(domain: domain, folder: settings), file: nil)
     else {
       Issue.record("expected a listing")

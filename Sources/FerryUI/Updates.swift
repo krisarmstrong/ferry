@@ -6,6 +6,10 @@ import Network
 public protocol UpdateChecking: AnyObject {
   /// Shows Sparkle's window: the newer release with its notes, or that Ferry is up to date.
   func checkForUpdates()
+  /// Whether a newer release is downloaded in the background and installed when Ferry quits
+  /// (Sparkle's `automaticallyDownloadsUpdates`, kept in Ferry's preferences). Off, Sparkle
+  /// still checks daily and asks before it downloads anything.
+  var installsAutomatically: Bool { get set }
 }
 
 /// Where Sparkle finds releases, from the app's Info.plist. A build without a feed, or still
@@ -35,5 +39,18 @@ extension AppModel {
   /// The menu's Check for Updates….
   public func checkForUpdates() {
     updater?.checkForUpdates()
+  }
+
+  /// The menu's Install Updates Automatically: on by default (Info.plist), and off when the user
+  /// turned it off. Off in a build that cannot update itself, which shows no toggle.
+  public var installsUpdatesAutomatically: Bool {
+    _ = updateSettingChanges
+    return updater?.installsAutomatically ?? false
+  }
+
+  public func setInstallsUpdatesAutomatically(_ enabled: Bool) {
+    guard let updater else { return }
+    updater.installsAutomatically = enabled
+    updateSettingChanges += 1
   }
 }

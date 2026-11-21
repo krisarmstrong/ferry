@@ -12,8 +12,8 @@ public enum PresentationText {
     toolMethods.contains(method)
   }
 
-  /// A short explanation of an agent error. Device-supplied detail is escaped, and the result
-  /// is shown verbatim so the detail is never parsed as Markdown.
+  /// A short explanation of an agent error, with what to do about it. The result is shown
+  /// verbatim, never parsed as Markdown.
   public static func message(for error: TransportError) -> String {
     String(localized: resource(for: error))
   }
@@ -23,32 +23,32 @@ public enum PresentationText {
     resource(for: error).key
   }
 
+  /// No `default`: every case says what happened and what to do, in plain words, and has its
+  /// own entry in Help. Detail the agent attached (`.io`, `.unsupported`) is developer text, so
+  /// it goes to the log, never to the user.
   private static func resource(for error: TransportError) -> LocalizedStringResource {
     switch error {
-    case .deviceBusy:
-      LocalizedStringResource(
-        "Another app is using the device. Quit Image Capture or Android File Transfer.",
-        bundle: .module)
-    case .deviceLocked:
-      LocalizedStringResource("The device is not sharing files.", bundle: .module)
-    case .deviceDisconnected, .deviceNotFound, .noDeviceConnected:
-      LocalizedStringResource("The device was disconnected.", bundle: .module)
-    case .noStorage, .storageNotFound:
-      LocalizedStringResource("The device reports no storage.", bundle: .module)
-    case .unsupported(let what):
-      LocalizedStringResource(
-        "The device does not support this: \(DisplayText.escaped(what)).", bundle: .module)
-    case .io(let detail):
-      LocalizedStringResource("Error: \(DisplayText.escaped(detail))", bundle: .module)
-    case .cancelled:
-      LocalizedStringResource("Cancelled.", bundle: .module)
-    case .agentNotResponding:
-      LocalizedStringResource(
-        "Ferry's helper didn't answer in time. Try again in a moment.", bundle: .module)
-    case .notFound, .unknownItem, .alreadyExists, .invalidName, .insufficientSpace,
-      .fileTooLargeForStorage, .sizeMismatch, .downloadSizeMismatch, .nameChangedByDevice,
-      .directoryNotEmpty, .changedOnDevice, .macDiskFull, .folderTooDeep, .readOnly:
-      LocalizedStringResource("The device reported an error.", bundle: .module)
+    case .deviceBusy: TransportText.busy
+    case .deviceLocked: TransportText.notSharing
+    case .deviceDisconnected, .deviceNotFound, .noDeviceConnected: TransportText.disconnected
+    case .noStorage, .storageNotFound: TransportText.noStorage
+    case .unsupported: TransportText.unsupported
+    case .io: TransportText.lostContact
+    case .cancelled: TransportText.cancelled
+    case .agentNotResponding: TransportText.helperSilent
+    case .notFound, .unknownItem: TransportText.itemGone
+    case .alreadyExists: TransportText.nameTaken
+    case .invalidName: TransportText.badName
+    case .insufficientSpace: TransportText.deviceFull
+    case .fileTooLargeForStorage: TransportText.fileTooLarge
+    case .sizeMismatch, .downloadSizeMismatch: TransportText.incomplete
+    case .nameChangedByDevice: TransportText.renamedByDevice
+    case .directoryNotEmpty: TransportText.folderNotEmpty
+    case .changedOnDevice: TransportText.changedOnDevice
+    case .macDiskFull: TransportText.macFull
+    case .folderTooDeep: TransportText.tooDeep
+    case .readOnly: TransportText.readOnly
+    case .pageExpired: TransportText.listingExpired
     }
   }
 
@@ -133,7 +133,9 @@ public enum PresentationText {
         "The app couldn't be read by the device. It may be damaged or unsigned.", bundle: .module)
     }
     let shown = DisplayText.escaped(reason)
-    return LocalizedStringResource("Couldn't install the app: \(shown)", bundle: .module)
+    return LocalizedStringResource(
+      "The device didn't install the app. Check that it suits this device, then try again. (\(shown))",
+      bundle: .module)
   }
 
   private static let installReasons: [String: LocalizedStringResource] = [
@@ -194,4 +196,77 @@ public enum PresentationText {
       ? String(localized: LocalizedStringResource("Unknown device", bundle: .module))
       : DisplayText.escaped(name)
   }
+}
+
+/// What the menu and the Finder Sync extension say for each `TransportError`.
+private enum TransportText {
+  static let busy = LocalizedStringResource(
+    "Another app is using the device. Quit Image Capture or Android File Transfer.",
+    bundle: .module)
+
+  static let notSharing = LocalizedStringResource(
+    "The device is not sharing files. Unlock it and choose Transfer files, then try again.",
+    bundle: .module)
+
+  static let disconnected = LocalizedStringResource(
+    "The device was disconnected. Reconnect it, then try again.", bundle: .module)
+
+  static let noStorage = LocalizedStringResource(
+    "The device shows no storage. Unlock it, then try again.", bundle: .module)
+
+  static let unsupported = LocalizedStringResource(
+    "Ferry can't do this from the Mac on this device. Do it on the device instead.", bundle: .module
+  )
+
+  static let lostContact = LocalizedStringResource(
+    "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry.",
+    bundle: .module)
+
+  static let cancelled = LocalizedStringResource("Cancelled.", bundle: .module)
+
+  static let helperSilent = LocalizedStringResource(
+    "Ferry's helper didn't answer in time. Try again in a moment.", bundle: .module)
+
+  static let itemGone = LocalizedStringResource(
+    "That item is no longer on the device. Refresh, then try again.", bundle: .module)
+
+  static let nameTaken = LocalizedStringResource(
+    "The device already has an item with that name. Rename one, then try again.",
+    bundle: .module)
+
+  static let badName = LocalizedStringResource(
+    "The device can't store that name. Choose another name.", bundle: .module)
+
+  static let deviceFull = LocalizedStringResource(
+    "The device is out of space. Free some space on it, then try again.", bundle: .module)
+
+  static let fileTooLarge = LocalizedStringResource(
+    "The file is too large for that storage. Use internal storage, or a smaller file.",
+    bundle: .module)
+
+  static let incomplete = LocalizedStringResource(
+    "The file didn't arrive complete. Try again.", bundle: .module)
+
+  static let renamedByDevice = LocalizedStringResource(
+    "The device saved the file under another name. Look for it in the folder.",
+    bundle: .module)
+
+  static let folderNotEmpty = LocalizedStringResource(
+    "The folder isn't empty. Delete what it holds first.", bundle: .module)
+
+  static let changedOnDevice = LocalizedStringResource(
+    "The file changed on the device. Refresh, then try again.", bundle: .module)
+
+  static let macFull = LocalizedStringResource(
+    "This Mac is out of space. Free some space, then try again.", bundle: .module)
+
+  static let tooDeep = LocalizedStringResource(
+    "That folder is nested too deep to delete from the Mac. Delete it on the device.",
+    bundle: .module)
+
+  static let readOnly = LocalizedStringResource(
+    "That item is read-only from the Mac. Change it on the device.", bundle: .module)
+
+  static let listingExpired = LocalizedStringResource(
+    "The folder's listing went out of date. Try again.", bundle: .module)
 }

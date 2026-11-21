@@ -143,11 +143,12 @@ struct HelpNavigatorTests {
   /// message there.
   @Test func aMessageOpensItsTopic() {
     var navigator = Self.navigator()
-    let opened = navigator.open(message: "The device was disconnected.")
+    let opened = navigator.open(
+      message: "The device was disconnected. Reconnect it, then try again.")
     #expect(opened)
     #expect(navigator.selection == "trouble-device")
     #expect(navigator.shownTopic?.id == "trouble-device")
-    #expect(navigator.highlighted == "The device was disconnected.")
+    #expect(navigator.highlighted == "The device was disconnected. Reconnect it, then try again.")
   }
 
   /// A search that hides the topic would otherwise show its first match instead: the link
@@ -155,7 +156,10 @@ struct HelpNavigatorTests {
   @Test func aMessageOpensItsTopicDuringASearch() {
     var navigator = Self.navigator()
     navigator.query = "telemetry"
-    let opened = navigator.open(message: "adb: %@")
+    let opened = navigator.open(
+      message:
+        "adb refused the request. Check the address and that the device is on the network, then try again. (%@)"
+    )
     #expect(opened)
     #expect(navigator.query.isEmpty)
     #expect(navigator.shownTopic?.id == "trouble-network")
@@ -174,21 +178,39 @@ struct HelpNavigatorTests {
   /// Each Help link is a new request, so the same `?` clicked again scrolls to its entry again.
   @Test func theSameLinkTwiceIsTwoRequests() {
     var navigator = Self.navigator()
-    _ = navigator.open(message: "The device was disconnected.")
+    _ = navigator.open(message: "The device was disconnected. Reconnect it, then try again.")
     let first = navigator.linkRequests
-    _ = navigator.open(message: "The device was disconnected.")
+    _ = navigator.open(message: "The device was disconnected. Reconnect it, then try again.")
     #expect(navigator.linkRequests == first + 1)
   }
 
   /// Choosing another topic drops the mark.
   @Test func choosingATopicClearsTheMark() {
     var navigator = Self.navigator()
-    _ = navigator.open(message: "The device was disconnected.")
+    _ = navigator.open(message: "The device was disconnected. Reconnect it, then try again.")
     navigator.select("privacy")
     #expect(navigator.highlighted == nil)
-    _ = navigator.open(message: "The device was disconnected.")
+    _ = navigator.open(message: "The device was disconnected. Reconnect it, then try again.")
     navigator.move(by: 1)
     #expect(navigator.highlighted == nil)
+  }
+
+  /// A link to a topic clears the search, which could hide it, and opens it with nothing marked.
+  @Test func aTopicLinkOpensItsTopic() {
+    var navigator = Self.navigator(at: "menu")
+    navigator.query = "recording"
+    let opened = navigator.open(topic: "get-adb")
+    #expect(opened)
+    #expect(navigator.query.isEmpty)
+    #expect(navigator.shownTopic?.id == "get-adb")
+    #expect(navigator.highlighted == nil)
+  }
+
+  @Test func anUnknownTopicChangesNothing() {
+    var navigator = Self.navigator(at: "menu")
+    let opened = navigator.open(topic: "no-such-topic")
+    #expect(!opened)
+    #expect(navigator.selection == "menu")
   }
 
   /// The sidebar clears its selection while a search is typed: that keeps the topic chosen.
@@ -206,8 +228,24 @@ struct HelpRequestTests {
     let log = CallLog()
     let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
     #expect(model.takeHelpRequest() == nil)
-    model.showHelp(forMessage: "The device was disconnected.")
-    #expect(model.takeHelpRequest() == "The device was disconnected.")
+    model.showHelp(forMessage: "The device was disconnected. Reconnect it, then try again.")
+    #expect(
+      model.takeHelpRequest()
+        == .message("The device was disconnected. Reconnect it, then try again."))
+    #expect(model.takeHelpRequest() == nil)
+  }
+
+  /// VoiceOver reads a topic's link as "Help:" and the topic's title.
+  @Test func aTopicLinkIsReadByItsTitle() {
+    #expect(HelpLinkButton.label(forTopic: "turn-on-finder") == "Help: Turn on Ferry in Finder")
+  }
+
+  /// A step of the welcome names its topic, not a message.
+  @Test func aTopicLinkIsTakenOnce() {
+    let log = CallLog()
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    model.showHelp(topic: "turn-on-finder")
+    #expect(model.takeHelpRequest() == .topic("turn-on-finder"))
     #expect(model.takeHelpRequest() == nil)
   }
 }

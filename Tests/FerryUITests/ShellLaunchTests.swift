@@ -2,6 +2,7 @@ import DeviceKit
 import DeviceKitTestSupport
 import FerryIPC
 import Foundation
+import PlatformTools
 import Testing
 
 @testable import FerryUI
@@ -24,6 +25,43 @@ struct ShellLaunchTests {
       for: try target(), file: URL(filePath: "/var/folders/ab/ferry-shell-X/shell.command"))
     #expect(script.hasPrefix("#!/bin/zsh\n"))
     #expect(script.contains("'/opt/homebrew/bin/adb' -s '0123456789abcdef' shell\n"))
+  }
+
+  static let fetched = PlatformToolsFolder(home: "/Users/me")
+
+  /// The adb serving the server runs the shell with nothing said; a fallback, used when Ferry
+  /// could not tell which adb that is, is named before adb starts.
+  @Test func aFallbackAdbIsNamedBeforeItRuns() throws {
+    let file = URL(filePath: "/tmp/ferry-shell-X/shell.command")
+    let matched = ShellLaunch.script(for: try target(), file: file, fetched: Self.fetched)
+    #expect(!matched.contains("print -r --"))
+    let fallback = try #require(
+      ShellTarget(adb: "/opt/homebrew/bin/adb", serial: "S", runsServer: false))
+    let script = ShellLaunch.script(for: fallback, file: file, fetched: Self.fetched)
+    let note = ShellLaunch.quoted(
+      ShellLaunch.fallbackNote(for: "/opt/homebrew/bin/adb", fetched: Self.fetched))
+    let lines = script.split(separator: "\n").map(String.init)
+    let noteLine = try #require(lines.firstIndex(of: "print -r -- \(note)"))
+    let adbLine = try #require(lines.firstIndex { $0.hasPrefix("'/opt/homebrew/bin/adb'") })
+    #expect(noteLine < adbLine)
+  }
+
+  /// The note names the adb the shell runs: Ferry's own copy only when it is the one Ferry
+  /// fetched, otherwise the folder of the adb found on this Mac.
+  @Test func theNoteNamesTheAdbUsed() {
+    let own = Self.fetched.adb(version: "37.0.3").path
+    #expect(
+      ShellLaunch.fallbackNote(for: own, fetched: Self.fetched)
+        == "Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. "
+        + "If its version differs, adb may restart the server.")
+    #expect(
+      ShellLaunch.fallbackNote(for: "/opt/homebrew/bin/adb", fetched: Self.fetched)
+        == "Ferry couldn't tell which adb started the adb server, so this uses the adb in "
+        + "/opt/homebrew/bin. If its version differs, adb may restart the server.")
+    // A folder beside Ferry's that merely starts with its name is not Ferry's.
+    let lookalike = Self.fetched.root.path + "-old/adb"
+    #expect(
+      ShellLaunch.fallbackNote(for: lookalike, fetched: Self.fetched).contains("the adb in "))
   }
 
   /// A route adb gave a connection id selects the unit by it; one without uses the serial.

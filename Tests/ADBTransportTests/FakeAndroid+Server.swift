@@ -63,8 +63,7 @@ extension FakeAndroid {
       }
       let program = command.split(separator: " ").first.map(String.init) ?? ""
       if state.withLock({ $0.hangingPrograms.contains(program) }) {
-        // Answers nothing until the client gives up and closes.
-        _ = try? await peer.stream.read(exactly: 1)
+        await hang(peer)
         return
       }
       let result = shell(command)

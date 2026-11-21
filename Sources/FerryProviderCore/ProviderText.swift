@@ -7,9 +7,9 @@ enum ProviderText {
     LocalizedStringResource("The device saved “\(requested)” as “\(actual)”.", bundle: .module)
   }
 
-  static func unsupported(_ what: String) -> LocalizedStringResource {
-    LocalizedStringResource("The device does not support \(what).", bundle: .module)
-  }
+  static let unsupported = LocalizedStringResource(
+    "Ferry can't do this from the Mac on this device. Do it on the device instead.",
+    bundle: .module)
 
   static func sizeMismatch(expected: UInt64, actual: UInt64) -> LocalizedStringResource {
     LocalizedStringResource(
@@ -34,7 +34,12 @@ enum ProviderText {
     """, bundle: .module)
 
   static let unexpectedResponse = LocalizedStringResource(
-    "Unexpected response from the Ferry agent.", bundle: .module)
+    "Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again.",
+    bundle: .module)
+
+  static let lostContact = LocalizedStringResource(
+    "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry.",
+    bundle: .module)
 
   static let package = LocalizedStringResource(
     "Packages and app bundles can’t be copied to the device. Compress it into a .zip first.",
@@ -51,8 +56,8 @@ enum ProviderText {
 
   /// Every string, with sample values, so a test can check each has its catalog entry.
   static let all: [LocalizedStringResource] = [
-    nameChanged(requested: "a", actual: "b"), unsupported("copy"),
+    nameChanged(requested: "a", actual: "b"), unsupported,
     sizeMismatch(expected: 2, actual: 1), downloadSizeMismatch(listed: 2, received: 1),
-    folderTooDeep("Deep"), readOnly, unexpectedResponse, package, packageName, link,
+    folderTooDeep("Deep"), readOnly, unexpectedResponse, lostContact, package, packageName, link,
   ]
 }

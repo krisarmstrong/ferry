@@ -55,7 +55,9 @@ public struct PlatformToolsFetcher: Sendable {
     }
     guard archive.count == release.size, Self.hex(SHA256.hash(data: archive)) == release.sha256
     else {
-      Self.log.error("platform tools download is \(archive.count) bytes, not the pinned archive")
+      Self.log.error(
+        "platform tools download is \(archive.count, privacy: .public) bytes, not the pinned archive"
+      )
       throw .mismatch
     }
     let zip = try ZipArchive(archive)
@@ -88,7 +90,7 @@ public struct PlatformToolsFetcher: Sendable {
         at: staging, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
       return staging
     } catch {
-      Self.log.error("platform tools folder: \(error, privacy: .public)")
+      Self.log.error("platform tools folder: \(error, privacy: .private)")
       throw .storage
     }
   }
@@ -125,7 +127,7 @@ public struct PlatformToolsFetcher: Sendable {
         try files.moveItem(at: staging, to: target)
       }
     } catch {
-      Self.log.error("platform tools install: \(error, privacy: .public)")
+      Self.log.error("platform tools install: \(error, privacy: .private)")
       throw .storage
     }
     for version in folder.versions() where version != release.version {

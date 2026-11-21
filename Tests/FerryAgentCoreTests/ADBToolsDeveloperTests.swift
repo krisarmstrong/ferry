@@ -135,6 +135,16 @@ struct ADBToolsDeveloperTests {
         == .success(ShellTarget(adb: "/opt/homebrew/bin/adb", serial: serial)!))
   }
 
+  /// When Ferry could not tell which adb serves the server, the target says so.
+  @Test func aFallbackAdbIsMarked() async throws {
+    let fake = FakeToolDevice()
+    fake.adbLocation.set(URL(fileURLWithPath: "/opt/homebrew/bin/adb"), runsServer: false)
+    #expect(
+      try await makeTools(fake).shellTarget(device)
+        == .success(
+          ShellTarget(adb: "/opt/homebrew/bin/adb", serial: serial, runsServer: false)!))
+  }
+
   @Test func withoutAdbThereIsNoShell() async throws {
     let fake = FakeToolDevice()
     fake.adbLocation.set(nil)

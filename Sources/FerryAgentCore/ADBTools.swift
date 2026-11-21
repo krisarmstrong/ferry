@@ -24,8 +24,8 @@ public protocol ADBToolDevice: Sendable {
   func forwards(route: ADBRoute) async throws(ADBError) -> [PortForward]
   func addForward(route: ADBRoute, _ forward: PortForward) async throws(ADBError)
   func removeForward(route: ADBRoute, local: UInt16) async throws(ADBError)
-  /// The `adb` program, if it is installed.
-  func adbPath() -> URL?
+  /// The `adb` a shell in Terminal runs, if there is one (see `ADBDeviceTools.shellADB()`).
+  func shellADB() -> ShellADB?
 }
 
 /// A device's log as lines of bytes (see `ADBLogcat`).
@@ -169,6 +169,8 @@ public actor ADBTools {
   let scratch: URL
   let now: @Sendable () -> Date
   let limits: Limits
+  /// What the pause between log batches is measured on.
+  let clock: any Clock<Duration>
   var recordings: [DeviceID: Recording] = [:]
   var logcats: [DeviceID: LogcatRun] = [:]
   /// Streams a stop came for before they were up.
@@ -179,6 +181,17 @@ public actor ADBTools {
     journal: ToolJournal, scratch: URL = FileManager.default.temporaryDirectory,
     now: @escaping @Sendable () -> Date = Date.init, limits: Limits = Limits()
   ) {
+    self.init(
+      device: device, target: target, journal: journal, scratch: scratch, now: now,
+      limits: limits, clock: ContinuousClock())
+  }
+
+  init(
+    device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> ADBRoute?,
+    journal: ToolJournal, scratch: URL, now: @escaping @Sendable () -> Date, limits: Limits,
+    clock: any Clock<Duration>
+  ) {
+    self.clock = clock
     self.device = device
     self.target = target
     self.journal = journal

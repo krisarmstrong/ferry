@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import PlatformTools
 import Synchronization
 import Testing
 
@@ -62,6 +63,7 @@ struct ADBServerKeeperTests {
   struct FakeTable: ProcessTable {
     let fakes: Fakes
 
+    func processes() -> [pid_t] { fakes { Array($0.paths.keys) } }
     func started(_ pid: pid_t) -> UInt64? { fakes { $0.started[pid] } }
     func path(_ pid: pid_t) -> String? { fakes { $0.paths[pid] } }
     func listener(onTCPPort port: UInt16) -> pid_t? { fakes { $0.listener } }
@@ -78,7 +80,7 @@ struct ADBServerKeeperTests {
   /// `exits` is how long a killed server takes to exit (its PID stops running): at once if nil.
   /// `whileStopping` runs inside the kill, as a tracker restarting the server would.
   static func keeper(
-    _ fakes: Fakes, record: URL, exits: Duration? = nil,
+    _ fakes: Fakes, record: URL, exits: Duration? = nil, limit: Duration = .seconds(2),
     whileStopping: (@Sendable () async -> Void)? = nil
   ) -> ADBServerKeeper {
     ADBServerKeeper(
@@ -116,7 +118,7 @@ struct ADBServerKeeperTests {
           exit()
         }
       },
-      limit: .seconds(2), poll: .milliseconds(10), callLimit: .milliseconds(300))
+      limit: limit, poll: .milliseconds(10), callLimit: .milliseconds(300))
   }
 
   /// A keeper for tests of what runs inside its gate: there is never a replacement.

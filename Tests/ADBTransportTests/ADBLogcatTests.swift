@@ -1,3 +1,4 @@
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -68,7 +69,7 @@ struct ADBLogcatTests {
     defer { server.stop() }
     let tools = ADBDeviceTools(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: .seconds(5),
-      captureLimit: 1024, captureWait: .seconds(5))
+      captureLimit: 1024, captureWait: .seconds(5), clock: ManualClock())
     return try await body(try await tools.logcat(route: ADBRoute(serial: Self.serial)))
   }
 

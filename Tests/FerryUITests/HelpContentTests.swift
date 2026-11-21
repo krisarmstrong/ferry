@@ -169,13 +169,20 @@ struct HelpContentTests {
     let topic = try #require(troubleshooting.topics.first { $0.body.action == .removeFerry })
     #expect(topic.title == "Remove Ferry")
     let others = Self.help.topics.flatMap { [$0.body] + $0.groups.map(\.body) }
-      .filter { $0.action != nil }
+      .filter { $0.action == .removeFerry }
     #expect(others.count == 1)
     // Nothing in Help sends the reader to a Settings window that no longer exists.
     #expect(
       !Self.help.topics.contains { topic in
         topic.strings.contains { $0.contains("Settings…") || $0.contains("Ferry's Settings") }
       })
+  }
+
+  /// Show Welcome Window is on What Ferry does, the first topic, and nowhere else.
+  @Test func showWelcomeIsOnTheFirstTopic() throws {
+    let bodies = Self.help.topics.flatMap { [$0.body] + $0.groups.map(\.body) }
+    #expect(bodies.filter { $0.action == .showWelcome }.count == 1)
+    #expect(Self.help.topics.first?.body.action == .showWelcome)
   }
 
   @Test func anUnknownActionIsRejected() {

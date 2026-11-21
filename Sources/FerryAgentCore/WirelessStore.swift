@@ -70,7 +70,7 @@ enum WirelessStore {
       path: file.lastPathComponent + ".unreadable-" + stamp.string(from: now))
     do {
       try FileManager.default.moveItem(at: file, to: aside)
-      log.error("moved the unreadable file aside as \(aside.lastPathComponent, privacy: .public)")
+      log.error("moved the unreadable file aside as \(aside.lastPathComponent, privacy: .private)")
     } catch {
       log.error("moving the unreadable file aside failed: \(error, privacy: .private)")
     }

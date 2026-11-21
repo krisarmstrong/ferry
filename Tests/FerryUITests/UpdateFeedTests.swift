@@ -114,6 +114,7 @@ struct UpdateFeedTests {
 @MainActor
 final class FakeUpdater: UpdateChecking {
   let log: CallLog
+  var installsAutomatically = true
   init(log: CallLog) { self.log = log }
   func checkForUpdates() { log.record("checkForUpdates") }
 }

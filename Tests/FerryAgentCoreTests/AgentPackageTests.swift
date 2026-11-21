@@ -48,7 +48,7 @@ struct AgentPackageTests {
     let reply = await setup.send(
       .list(domain: setup.domain, folder: try await setup.id("/Docs/\(name)")))
 
-    guard case .entries(let entries) = reply else {
+    guard case .page(let entries, _) = reply else {
       Issue.record("expected a listing, got \(reply)")
       return
     }

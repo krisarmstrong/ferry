@@ -84,3 +84,15 @@ struct HelpLinkTests {
     Self.expectExplained(model.actionError, "open at login")
   }
 }
+
+/// Several problems can show at once, so VoiceOver must tell their Help links apart (audit L5).
+struct HelpLinkLabelTests {
+  @Test func eachLinkNamesItsProblem() {
+    #expect(
+      HelpLinkButton.label(forMessage: "The device was disconnected. Reconnect it, then try again.")
+        == "Help: The device was disconnected. Reconnect it, then try again.")
+    #expect(
+      HelpLinkButton.label(forMessage: "Unsent changes were saved to %@")
+        == "Help: Unsent changes were saved to …")
+  }
+}

@@ -45,7 +45,7 @@ private struct StubHandler: AgentHandling {
       }
     case .list:
       do {
-        return .entries(try listing())
+        return .page(entries: try listing(), next: nil)
       } catch {
         return .failure(error)
       }
@@ -136,7 +136,7 @@ func clientServerOverAnonymousListener() async throws {
   let harness = Harness()
   defer { harness.finish() }
   let response = try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
-  #expect(response == .entries(try listing()))
+  #expect(response == .page(entries: try listing(), next: nil))
 }
 
 @Test(.timeLimit(.minutes(1)))
@@ -163,7 +163,7 @@ func cancelledCallReturnsPromptlyAndConnectionStaysUsable() async throws {
   // The agent is still holding `.status`; the call does not wait for it.
   await #expect(throws: TransportError.cancelled) { try await call.value }
   let response = try await client.send(.list(domain: "d", folder: .root), file: nil)
-  #expect(response == .entries(try listing()))
+  #expect(response == .page(entries: try listing(), next: nil))
 }
 
 @Test(.timeLimit(.minutes(1)))
@@ -174,7 +174,7 @@ func reconnectsAfterConnectionIsInvalidated() async throws {
     try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
   }
   let response = try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
-  #expect(response == .entries(try listing()))
+  #expect(response == .page(entries: try listing(), next: nil))
 }
 
 @Test(.timeLimit(.minutes(1)))
@@ -229,7 +229,7 @@ func theProviderMaySendOnlyItemRequests() async throws {
   defer { harness.finish() }
   #expect(
     try await harness.client.send(.list(domain: "d", folder: .root), file: nil)
-      == .entries(try listing()))
+      == .page(entries: try listing(), next: nil))
   for request: AgentRequest in [
     .status, .eject(DeviceID(serial: "A")), .removeAllDomains, .recheck(DeviceID(serial: "A")),
     .refresh(DeviceID(serial: "A")), .recheckADB,

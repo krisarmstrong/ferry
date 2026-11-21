@@ -129,6 +129,8 @@ struct StatusRow<Detail: View, Actions: View>: View {
   let title: Text
   /// The catalog key of the problem the row reports, whose Help entry its link opens.
   var help: String?
+  /// For a row that reports no problem: the Help topic its link opens.
+  var helpTopic: String?
   @ViewBuilder var detail: Detail
   @ViewBuilder var actions: Actions
 
@@ -147,7 +149,10 @@ struct StatusRow<Detail: View, Actions: View>: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        if help != nil {
+        if let helpTopic {
+          Spacer(minLength: 4)
+          HelpLinkButton(topic: helpTopic)
+        } else if help != nil {
           Spacer(minLength: 4)
           HelpLinkButton(key: help)
         }
@@ -207,13 +212,20 @@ struct DeviceTile: View {
   }
 
   @ViewBuilder private var glyph: some View {
-    if let symbol = tile.glyph.symbolName {
-      Image(systemName: symbol)
-        .font(.system(size: 12, weight: .semibold))
-    } else {
-      DeviceGlyph(kind: tile.glyph == .tester ? .tester : .tablet)
-        .frame(width: 15, height: 15)
+    switch tile.glyph {
+    case .tester:
+      DeviceGlyph(kind: .tester).frame(width: 15, height: 15)
+    case .tablet:
+      DeviceGlyph(kind: .tablet).frame(width: 15, height: 15)
+    case .phone:
+      symbol(DevicePresentation.TileGlyph.phoneSymbol)
+    case .symbol(let name):
+      symbol(name)
     }
+  }
+
+  private func symbol(_ name: String) -> some View {
+    Image(systemName: name).font(.system(size: 12, weight: .semibold))
   }
 }
 

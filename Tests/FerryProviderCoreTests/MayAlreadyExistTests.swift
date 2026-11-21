@@ -31,6 +31,21 @@ struct MayAlreadyExistTests {
     #expect(await agent.requests == [.list(domain: domain, folder: .root)])
   }
 
+  /// A listing that expired part-way starts again from its first page, so the create does not
+  /// fail with an enumeration error (W5 review M5).
+  @Test func anExpiredListingIsListedAgain() async throws {
+    let agent = FakeAgent([try file("/a.txt", size: 5, modified: modified)])
+    await agent.expireTheNextList()
+    let template = ItemTemplate(
+      parent: .root, filename: "a.txt", kind: .file, size: 5, modified: modified)
+
+    #expect(try await importing(template, from: agent) != nil)
+    #expect(
+      await agent.requests == [
+        .list(domain: domain, folder: .root), .list(domain: domain, folder: .root),
+      ])
+  }
+
   @Test(arguments: [(UInt64?(6), 0.0), (5, 1.0), (nil, 0.0)])
   func aFileThatDiffersIsMatchedAndFetched(size: UInt64?, shift: Double) async throws {
     let agent = FakeAgent([try file("/a.txt", size: 5, modified: modified)])

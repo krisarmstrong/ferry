@@ -80,7 +80,7 @@ actor MTPDevice {
       let detail =
         entries.isEmpty
         ? "empty error stack" : entries.map { "\($0.code): \($0.text)" }.joined(separator: "; ")
-      Self.log.error("reading storages failed: \(detail, privacy: .public)")
+      Self.log.error("reading storages failed: \(detail, privacy: .private)")
       throw closingIfGone(
         .classify(
           entries, during: "reading storages", generalMeansLocked: true,

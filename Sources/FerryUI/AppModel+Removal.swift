@@ -21,10 +21,12 @@ extension AppModel {
     removalError = nil
   }
 
-  /// Removes Ferry's locations from Finder, unregisters the agent, deletes its folder and the
-  /// login item, and quits. Stops if the locations or the agent remain, so the user can try
-  /// again rather than being left with locations no agent serves. Once the agent is gone a retry could only fail,
-  /// so a login item that will not unregister is logged and Ferry quits anyway. Changes the
+  /// Removes Ferry's locations from Finder, unregisters the agent, deletes Ferry's data and stops
+  /// its own adb server once the agent has exited, forgets that Ferry ran here (so a reinstall
+  /// shows the welcome), unregisters the login item, and quits. Stops
+  /// if the locations or the agent remain, so the user can try again rather than being left
+  /// with locations no agent serves. Once the agent is gone a retry could only fail, so a login
+  /// item that will not unregister is logged and Ferry quits anyway. Changes the
   /// locations had not sent to a device are shown in Finder, since the menu goes away.
   public func removeFerry() async {
     removalError = nil
@@ -34,6 +36,10 @@ extension AppModel {
         throw TransportError.io("agent kept its locations")
       }
       try await services.unregisterAgent()
+      // Once the agent has exited, so it cannot write its tables or devices back.
+      await services.removeFerryData(keeping: saved)
+      // So a reinstall is a first run, with the welcome.
+      services.forgetFirstRun()
       preserved = saved.filter(Self.holdsSomething)
     } catch {
       Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .private)")
@@ -47,12 +53,6 @@ extension AppModel {
       }
       return
     }
-    // The agent is gone, so nothing writes there now. A failure leaves files, not a broken Ferry.
-    do {
-      try await services.removeAgentData()
-    } catch {
-      Self.log.error("removing the agent's folder failed: \(error, privacy: .public)")
-    }
     if !preserved.isEmpty {
       services.reveal(preserved)
     }
@@ -60,7 +60,7 @@ extension AppModel {
       do {
         try await services.setOpensAtLogin(false)
       } catch {
-        Self.log.error("removing the login item failed: \(error, privacy: .public)")
+        Self.log.error("removing the login item failed: \(error, privacy: .private)")
       }
     }
     services.quit()

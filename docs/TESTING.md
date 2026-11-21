@@ -2,6 +2,14 @@
 
 `make test lint fmt-check` runs the unit tests (no device needed), SwiftLint and swift-format.
 
+The V1 manual checklist (ADB, Wi-Fi, the device tools, updates, the adb download, Remove Ferry,
+accessibility, a large folder, battery) is **Owner-only checks** in
+[V1-READINESS.md](V1-READINESS.md). The results below are earlier records: the MTP checks from
+before ADB support, and Plan 2's Finder checks on a build that still had a Settings window.
+
+`ItemTableBenchmarkTests` measures the item table on 10,000 and 40,000 items. For release
+numbers run `swift test -c release -Xswiftc -enable-testing --filter ItemTableBenchmarkTests`.
+
 ## Device tests
 
 The MTP integration suites write to the attached phone, so they are off by default. Use a phone
@@ -89,7 +97,7 @@ with a note.
 
 - Unplug and replug. Storage keys and paths are the same as before.
 
-## Finder (Plan 2)
+## Finder (Plan 2, historical)
 
 ### Results — LinkRunner-100G, Ferry.app (f5ddc04), macOS 27.2, 2026-11-17
 
@@ -103,7 +111,7 @@ with a note.
 | Copy a folder of 50 files to the device | pass (50/50) |
 | New folder, rename, case-only rename (`c.txt` → `C.txt` via rename(2)), move between folders | pass |
 | Delete folders with contents | pass |
-| Menu, Settings, setup guide window | pass (owner) |
+| Menu, Settings (since removed), setup guide window | pass (owner) |
 | Menu polling stops when the menu closes | pass |
 | No "Move to Trash" (Ferry has no trash); stale pre-fix domain re-added in place | pass |
 | Unplug mid-copy; replug returns the same location | not run (needs the cable pulled by hand) |

@@ -13,7 +13,7 @@ enum HelpLinkCases {
     case deviceDisconnected, notFound, unknownItem, alreadyExists, invalidName, unsupported
     case insufficientSpace, fileTooLargeForStorage, sizeMismatch, downloadSizeMismatch
     case nameChangedByDevice, directoryNotEmpty, changedOnDevice, macDiskFull, folderTooDeep
-    case readOnly, cancelled, agentNotResponding, io
+    case readOnly, cancelled, agentNotResponding, pageExpired, io
   }
 
   static func kind(of error: TransportError) -> Transport {
@@ -42,6 +42,7 @@ enum HelpLinkCases {
     case .readOnly: .readOnly
     case .cancelled: .cancelled
     case .agentNotResponding: .agentNotResponding
+    case .pageExpired: .pageExpired
     case .io: .io
     }
   }
@@ -72,6 +73,7 @@ enum HelpLinkCases {
     case .readOnly: .readOnly(path)
     case .cancelled: .cancelled
     case .agentNotResponding: .agentNotResponding
+    case .pageExpired: .pageExpired
     case .io: .io("broken pipe")
     }
   }

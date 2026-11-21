@@ -19,8 +19,24 @@ final class FakeServices: SystemServicing {
   /// Whether the app's executable was replaced since launch.
   var replaced = false
 
+  /// What the user has been shown once (see `OnboardingMark`).
+  var marks: Set<OnboardingMark> = []
+
   init(log: CallLog) {
     self.log = log
+  }
+
+  func hasMark(_ mark: OnboardingMark) -> Bool { marks.contains(mark) }
+
+  /// Not logged: every first status records one, which would crowd the logs tests compare.
+  func recordMark(_ mark: OnboardingMark) {
+    marks.insert(mark)
+  }
+
+  /// Not logged either: the removal tests compare its log.
+  func forgetFirstRun() {
+    marks = []
+    startedAgent = nil
   }
 
   func registerAgent() async {
@@ -49,6 +65,15 @@ final class FakeServices: SystemServicing {
 
   func helperStatus() async -> HelperStatus {
     helper
+  }
+
+  /// Whether macOS reports the agent enabled (`SMAppService.Status.enabled`).
+  var agentEnabled = false
+
+  func agentIsEnabled() async -> Bool { agentEnabled }
+
+  func registerExtensions() async {
+    log.record("registerExtensions")
   }
 
   /// Set: the next read answers what it found once `releaseLoginItemRead()` is called, and is
@@ -96,8 +121,8 @@ final class FakeServices: SystemServicing {
     log.record("unregisterAgent")
   }
 
-  func removeAgentData() async throws {
-    log.record("removeAgentData")
+  func removeFerryData(keeping preserved: [URL]) async {
+    log.record("removeData")
   }
 
   func open(_ url: URL) {

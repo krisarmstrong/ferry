@@ -270,7 +270,9 @@ public enum AgentRequest: Codable, Sendable, Equatable {
   case eject(DeviceID)
   case removeAllDomains
   case item(domain: String, id: ItemID)
-  case list(domain: String, folder: ItemID)
+  /// One page of the folder's items, answered with `.page`. `page` is the `next` of the previous
+  /// page, or `nil` to list the folder afresh; an expired one is `.pageExpired`.
+  case list(domain: String, folder: ItemID, page: Data? = nil)
   /// Downloads the file into the writable file sent with the request. Answered with the item as
   /// received.
   case fetch(domain: String, id: ItemID)
@@ -303,12 +305,11 @@ public enum AgentResponse: Codable, Sendable, Equatable {
   /// the device's item, kept as it is, with the Mac's contents beside it as a conflict copy. Its
   /// contents are not the ones sent, so the client must fetch them.
   case keptOnDevice(ProviderEntry)
-  case entries([ProviderEntry])
   /// Answers `.changes`: each changed item's latest state, the items gone, and the anchor to ask
   /// from next. `expired` means `since` cannot be answered (it predates the agent process or the
   /// agent's window), so the lists are empty and the client must enumerate everything again.
   case changes(anchor: Data, updated: [ProviderEntry], deleted: [ItemID], expired: Bool)
-  /// Answers `.workingSet`. `next` is `nil` on the last page.
+  /// Answers `.list` and `.workingSet`. `next` is `nil` on the last page.
   case page(entries: [ProviderEntry], next: Data?)
   /// Answers `.eject` and `.removeAllDomains`: where the system saved changes the removed
   /// domains had not sent to the device yet, if any.

@@ -51,26 +51,45 @@ struct DomainControllerCardTests {
   static let oldCardDomain = DomainNaming.identifier(for: mtpCard)
   static let cardDomain = DomainNaming.identifier(for: adbCard)
 
+  /// Waits for what a test expects next while the hub's and the controller's clocks move on, as
+  /// time does: a retry or back-off the run happens to take (a busy machine orders events
+  /// differently) passes instead of waiting forever on a clock nothing moves.
+  func passing<T>(_ harness: AgentHarness, _ wait: () async throws -> T) async rethrows -> T {
+    try await harness.retryClock.advancing(by: .seconds(1)) {
+      try await harness.clock.advancing(by: .seconds(1)) { try await wait() }
+    }
+  }
+
+  /// Between two looks at what the agent did: a millisecond, so that a waiting test does not keep
+  /// a thread of the shared pool busy. No outcome depends on it.
+  static func pause() async { try? await Task.sleep(for: .milliseconds(1)) }
+
   func until(_ harness: AgentHarness, _ condition: ([FakeDomainManager.Call]) -> Bool) async {
-    while await !condition(harness.manager.calls), !Task.isCancelled { await Task.yield() }
+    await passing(harness) {
+      while await !condition(harness.manager.calls), !Task.isCancelled { await Self.pause() }
+    }
   }
 
   func served(_ harness: AgentHarness, by method: ConnectionMethod) async {
-    while await harness.hub.devices().first?.method != method, !Task.isCancelled {
-      await Task.yield()
+    await passing(harness) {
+      while await harness.hub.devices().first?.method != method, !Task.isCancelled {
+        await Self.pause()
+      }
     }
   }
 
   func cardID(_ harness: AgentHarness, in domain: String) async throws -> ItemID? {
     let item = try path(Self.photo)
-    while !Task.isCancelled {
-      do throws(TransportError) {
-        return try await harness.controller.items(of: domain).id(for: item)
-      } catch .deviceDisconnected {
-        await Task.yield()
+    return try await passing(harness) { () async throws -> ItemID? in
+      while !Task.isCancelled {
+        do throws(TransportError) {
+          return try await harness.controller.items(of: domain).id(for: item)
+        } catch .deviceDisconnected {
+          await Self.pause()
+        }
       }
+      return nil
     }
-    return nil
   }
 
   /// MTP knows the card only by its description, ADB by its volume ID: the card has a location

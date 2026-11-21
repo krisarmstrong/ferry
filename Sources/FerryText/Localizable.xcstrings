@@ -51,22 +51,22 @@
         }
       }
     },
-    "Couldn't install the app: %@" : {
+    "Ferry can't do this from the Mac on this device. Do it on the device instead." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn't install the app: %@"
+            "value" : "Ferry can't do this from the Mac on this device. Do it on the device instead."
           }
         }
       }
     },
-    "Error: %@" : {
+    "Ferry can't find adb. Get it from the Ferry menu, then try again." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Error: %@"
+            "value" : "Ferry can't find adb. Get it from the Ferry menu, then try again."
           }
         }
       }
@@ -77,6 +77,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ferry can't save to its folder in Documents. Allow Ferry in Privacy & Security."
+          }
+        }
+      }
+    },
+    "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry."
           }
         }
       }
@@ -111,12 +121,42 @@
         }
       }
     },
+    "That folder is nested too deep to delete from the Mac. Delete it on the device." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That folder is nested too deep to delete from the Mac. Delete it on the device."
+          }
+        }
+      }
+    },
     "That forward is already gone." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "That forward is already gone."
+          }
+        }
+      }
+    },
+    "That item is no longer on the device. Refresh, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That item is no longer on the device. Refresh, then try again."
+          }
+        }
+      }
+    },
+    "That item is read-only from the Mac. Change it on the device." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That item is read-only from the Mac. Change it on the device."
           }
         }
       }
@@ -181,6 +221,36 @@
         }
       }
     },
+    "The device already has an item with that name. Rename one, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device already has an item with that name. Rename one, then try again."
+          }
+        }
+      }
+    },
+    "The device can't store that name. Choose another name." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device can't store that name. Choose another name."
+          }
+        }
+      }
+    },
+    "The device didn't install the app. Check that it suits this device, then try again. (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device didn't install the app. Check that it suits this device, then try again. (%@)"
+          }
+        }
+      }
+    },
     "The device didn't record its screen." : {
       "localizations" : {
         "en" : {
@@ -207,16 +277,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device didn't send a screenshot. Unlock it and try again."
-          }
-        }
-      }
-    },
-    "The device does not support this: %@." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The device does not support this: %@."
           }
         }
       }
@@ -251,12 +311,22 @@
         }
       }
     },
-    "The device is not sharing files." : {
+    "The device is not sharing files. Unlock it and choose Transfer files, then try again." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The device is not sharing files."
+            "value" : "The device is not sharing files. Unlock it and choose Transfer files, then try again."
+          }
+        }
+      }
+    },
+    "The device is out of space. Free some space on it, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device is out of space. Free some space on it, then try again."
           }
         }
       }
@@ -271,22 +341,12 @@
         }
       }
     },
-    "The device reported an error." : {
+    "The device saved the file under another name. Look for it in the folder." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The device reported an error."
-          }
-        }
-      }
-    },
-    "The device reports no storage." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The device reports no storage."
+            "value" : "The device saved the file under another name. Look for it in the folder."
           }
         }
       }
@@ -301,12 +361,22 @@
         }
       }
     },
-    "The device was disconnected." : {
+    "The device shows no storage. Unlock it, then try again." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The device was disconnected."
+            "value" : "The device shows no storage. Unlock it, then try again."
+          }
+        }
+      }
+    },
+    "The device was disconnected. Reconnect it, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device was disconnected. Reconnect it, then try again."
           }
         }
       }
@@ -317,6 +387,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device's app verification refused the app."
+          }
+        }
+      }
+    },
+    "The file changed on the device. Refresh, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file changed on the device. Refresh, then try again."
+          }
+        }
+      }
+    },
+    "The file didn't arrive complete. Try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file didn't arrive complete. Try again."
+          }
+        }
+      }
+    },
+    "The file is too large for that storage. Use internal storage, or a smaller file." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file is too large for that storage. Use internal storage, or a smaller file."
+          }
+        }
+      }
+    },
+    "The folder isn't empty. Delete what it holds first." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder isn't empty. Delete what it holds first."
+          }
+        }
+      }
+    },
+    "The folder's listing went out of date. Try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder's listing went out of date. Try again."
           }
         }
       }
@@ -361,6 +481,16 @@
         }
       }
     },
+    "This Mac is out of space. Free some space, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac is out of space. Free some space, then try again."
+          }
+        }
+      }
+    },
     "This needs USB debugging. Turn it on, then try again." : {
       "localizations" : {
         "en" : {
@@ -397,16 +527,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "adb couldn't forward the port: %@"
-          }
-        }
-      }
-    },
-    "Ferry can't find adb. Get it from the Ferry menu, then try again." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ferry can't find adb. Get it from the Ferry menu, then try again."
           }
         }
       }

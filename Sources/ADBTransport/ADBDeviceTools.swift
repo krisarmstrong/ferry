@@ -1,5 +1,6 @@
 import DeviceKit
 import Foundation
+import PlatformTools
 import Synchronization
 import os
 
@@ -43,6 +44,10 @@ public struct ADBDeviceTools: Sendable {
   /// wait between two reads of the display's state, on the injected clock.
   let wakeLimit: Duration
   let pause: @Sendable (Duration) async throws -> Void
+  /// What the answer, capture and wake limits are measured on.
+  let clock: any Clock<Duration>
+  /// The executable serving the adb server's port, if it can be read (see `ProcessTable`).
+  private let serverExecutable: @Sendable () -> URL?
 
   public init(host: ADBHost) {
     self.init(
@@ -55,14 +60,23 @@ public struct ADBDeviceTools: Sendable {
     wakeLimit: Duration = .seconds(2),
     pause: @escaping @Sendable (Duration) async throws -> Void = {
       try await ContinuousClock().sleep(for: $0)
-    }
+    },
+    clock: any Clock<Duration> = ContinuousClock(),
+    serverExecutable: (@Sendable () -> URL?)? = nil
   ) {
     self.host = host
+    self.serverExecutable =
+      serverExecutable ?? {
+        let table = SystemProcessTable()
+        return table.listener(onTCPPort: host.port).flatMap(table.path).map(
+          URL.init(fileURLWithPath:))
+      }
     self.answerLimit = answerLimit
     self.captureLimit = captureLimit
     self.captureWait = captureWait
     self.wakeLimit = wakeLimit
     self.pause = pause
+    self.clock = clock
   }
 
   /// A new path for an APK on its way to pm.
@@ -163,7 +177,7 @@ public struct ADBDeviceTools: Sendable {
   public func screenshot(route: ADBRoute) async throws(ADBError) -> Data {
     let service = "exec:" + (try ADBShell.command("screencap", ["-p"]))
     let (host, limit) = (host, captureLimit)
-    return try await ADBTransport.within(captureWait) { () async throws(ADBError) in
+    return try await ADBTransport.within(captureWait, on: clock) { () async throws(ADBError) in
       let stream = try await host.connect(route, service: service)
       defer { stream.cancel() }
       var image = Data()
@@ -205,34 +219,37 @@ public struct ADBDeviceTools: Sendable {
 
   public func forwards(route: ADBRoute) async throws(ADBError) -> [PortForward] {
     let host = host
-    return try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
+    return try await ADBTransport.within(answerLimit, on: clock) { () async throws(ADBError) in
       try await host.forwards(route: route)
     }
   }
 
   public func addForward(route: ADBRoute, _ forward: PortForward) async throws(ADBError) {
     let host = host
-    try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
+    try await ADBTransport.within(answerLimit, on: clock) { () async throws(ADBError) in
       try await host.addForward(route: route, forward)
     }
   }
 
   public func removeForward(route: ADBRoute, local: UInt16) async throws(ADBError) {
     let host = host
-    try await ADBTransport.within(answerLimit) { () async throws(ADBError) in
+    try await ADBTransport.within(answerLimit, on: clock) { () async throws(ADBError) in
       try await host.removeForward(route: route, local: local)
     }
   }
 
-  /// The `adb` the locator finds, which a shell in Terminal runs.
+  /// The `adb` a shell in Terminal runs: the one serving the adb server when Ferry can tell,
+  /// else the one the locator finds, marked as a fallback.
   ///
-  /// Open in Terminal, Connect by Address and Pair with Code (`ADBCommand`) run this located adb,
-  /// Ferry's fetched copy first, as a client of whatever server answers. An adb client of a
-  /// different version than that server may restart it, so these can still disturb a server
-  /// another adb started; Ferry itself never starts one over it. Connecting and pairing over the
-  /// host protocol when a server answers is the follow-up (plan, Task 22).
-  public func adbPath() -> URL? {
-    host.adbURL()
+  /// An adb client of another version than the server may restart it, and that server may be
+  /// another tool's. The server is the process listening on its port; it counts only when that
+  /// program is named `adb` and is still executable. Connecting and pairing never run an adb:
+  /// they ask the server (see `ADBWireless`).
+  public func shellADB() -> ShellADB? {
+    guard let server = serverExecutable(), server.lastPathComponent == "adb",
+      FileManager.default.isExecutableFile(atPath: server.path)
+    else { return host.adbURL().map { ShellADB(url: $0, runsServer: false) } }
+    return ShellADB(url: server, runsServer: true)
   }
 
   // MARK: Plumbing
@@ -248,13 +265,12 @@ public struct ADBDeviceTools: Sendable {
   func runDetached(on route: ADBRoute, _ program: String, _ args: [String], what: String) async
     -> Bool
   {
-    let host = host
-    let limit = answerLimit
+    let (host, limit, clock) = (host, answerLimit, clock)
     let result = await Task {
       do throws(ADBError) {
         let command = try ADBShell.command(program, args)
         return Result<ADBShellResult, ADBError>.success(
-          try await ADBTransport.within(limit) { () async throws(ADBError) in
+          try await ADBTransport.within(limit, on: clock) { () async throws(ADBError) in
             try await host.run(route: route, command: command)
           })
       } catch {
@@ -267,10 +283,11 @@ public struct ADBDeviceTools: Sendable {
     case .success(let output):
       let detail = Self.text(output.stdout + output.stderr)
       Self.log.error(
-        "\(what, privacy: .private): status \(output.status) \(detail, privacy: .private)")
+        "\(what, privacy: .private): status \(output.status, privacy: .public) \(detail, privacy: .private)"
+      )
     case .failure(let error):
       Self.log.error(
-        "\(what, privacy: .private) failed: \(String(describing: error), privacy: .public)")
+        "\(what, privacy: .private) failed: \(String(describing: error), privacy: .private)")
     }
     return false
   }
@@ -308,7 +325,7 @@ public actor ADBScreenRecording {
   /// Reads the pid the script prints first: digits only, or the recording is refused.
   func readPID(within limit: Duration) async throws(ADBError) {
     let output = output
-    let line = try await ADBTransport.within(limit) { () async throws(ADBError) in
+    let line = try await ADBTransport.within(limit, on: tools.clock) { () async throws(ADBError) in
       try await output.firstLine()
     }
     // Digits only, and never 0 or 1: `kill` would read them as the process group or init.
@@ -342,7 +359,8 @@ public actor ADBScreenRecording {
     guard end == nil, let pid else { return }
     let command = try ADBShell.command("kill", ["-2", pid])
     let (host, route) = (tools.host, route)
-    let result = try await ADBTransport.within(tools.answerLimit) { () async throws(ADBError) in
+    let result = try await ADBTransport.within(tools.answerLimit, on: tools.clock) {
+      () async throws(ADBError) in
       try await host.run(route: route, command: command)
     }
     guard result.status == 0 || end != nil else {

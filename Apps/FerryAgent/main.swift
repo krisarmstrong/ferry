@@ -26,7 +26,7 @@ do {
   toolStore = try ToolJournal.defaultStore()
   adbServerRecord = try ADBServerKeeper.defaultRecord()
 } catch {
-  log.fault("no item store: \(error, privacy: .public)")
+  log.fault("no item store: \(error, privacy: .private)")
   exit(EXIT_FAILURE)
 }
 

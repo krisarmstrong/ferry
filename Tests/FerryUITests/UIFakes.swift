@@ -5,17 +5,6 @@ import Synchronization
 
 @testable import FerryUI
 
-/// The calls the fakes saw, in order, shared between the client and the services.
-final class CallLog: Sendable {
-  private let calls = Mutex<[String]>([])
-
-  func record(_ call: String) {
-    calls.withLock { $0.append(call) }
-  }
-
-  var all: [String] { calls.withLock { $0 } }
-}
-
 /// Answers `.status` with whatever the test last set, and records every request.
 final class FakeClient: AgentSending {
   let log: CallLog

@@ -18,7 +18,7 @@ struct ErrorMappingTests {
       .io("pipe broke"), .downloadSizeMismatch(listed: 7, received: 3),
       .directoryNotEmpty(try RemotePath("/a")), .changedOnDevice(try RemotePath("/a")),
       .macDiskFull(needed: 2, free: 1), .folderTooDeep(try RemotePath("/Deep")),
-      .readOnly(try RemotePath("/Notes.rtfd/TXT.rtf")), .agentNotResponding,
+      .readOnly(try RemotePath("/Notes.rtfd/TXT.rtf")), .agentNotResponding, .pageExpired,
     ]
   }
 
@@ -47,13 +47,18 @@ struct ErrorMappingTests {
   }
 
   /// The FileProvider headers ask for the error no code represents as the underlying error of
-  /// the `NSXPCConnectionReplyInvalid` Cocoa error.
+  /// the `NSXPCConnectionReplyInvalid` Cocoa error. Finder shows plain words, never the
+  /// developer text the failure carries (audit M2).
   @Test func anIOFailureCarriesItselfAsTheUnderlyingError() {
     let failure = TransportError.io("pipe broke")
     let mapped = ErrorMapping.fileProviderError(failure) as NSError
 
     #expect(mapped.code == CocoaError.Code.xpcConnectionReplyInvalid.rawValue)
-    #expect(mapped.localizedDescription == "pipe broke")
+    #expect(
+      mapped.localizedDescription
+        == "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry."
+    )
+    #expect(!mapped.localizedDescription.contains("pipe broke"))
     #expect(mapped.userInfo[NSUnderlyingErrorKey] as? TransportError == failure)
   }
 
@@ -101,14 +106,16 @@ struct ErrorMappingTests {
     case .macDiskFull: .cocoa(.fileWriteOutOfSpace, [])
     case .nameChangedByDevice(let requested, let actual):
       .cocoa(.fileWriteInvalidFileName, [requested, actual])
-    case .unsupported(let what): .cocoa(.featureUnsupported, [what])
+    case .unsupported: .cocoa(.featureUnsupported, ["on the device instead"])
     case .sizeMismatch: .cocoa(.fileWriteUnknown, ["2", "1"])
     case .downloadSizeMismatch: .cocoa(.fileReadCorruptFile, ["7", "3"])
-    case .io(let message): .cocoa(.xpcConnectionReplyInvalid, [message])
+    case .io: .cocoa(.xpcConnectionReplyInvalid, ["couldn't finish"])
     case .folderTooDeep: .cocoa(.featureUnsupported, ["Deep", "64"])
     case .readOnly: .fileProvider(.cannotSynchronize)
     // T3: a metadata call the agent did not answer in time is retried later.
     case .agentNotResponding: .fileProvider(.serverUnreachable)
+    // M9: an expired folder page makes FileProvider list the folder again.
+    case .pageExpired: .fileProvider(.pageExpired)
     }
   }
 }

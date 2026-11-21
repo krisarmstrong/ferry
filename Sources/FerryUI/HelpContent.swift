@@ -48,7 +48,7 @@ struct HelpContent: Decodable, Sendable, Equatable {
     do {
       return try JSONDecoder().decode(HelpContent.self, from: Data(contentsOf: url))
     } catch {
-      log.fault("help.json does not load: \(error, privacy: .public)")
+      log.fault("help.json does not load: \(error, privacy: .private)")
       return nil
     }
   }
@@ -159,9 +159,11 @@ struct HelpMessage: Decodable, Sendable, Hashable {
 
   /// The message as the reader sees it, each value it is shown with as "…": a key in FerryUI's
   /// catalog.
-  var wording: String {
-    message.replacing(/%(?:\d+\$)?(?:@|lld|llu|ld|lu|d|u)/, with: "…")
-      .replacing("%%", with: "%")
+  var wording: String { Self.wording(of: message) }
+
+  /// A message key as the reader sees it, each value as "…".
+  static func wording(of key: String) -> String {
+    key.replacing(/%(?:\d+\$)?(?:@|lld|llu|ld|lu|d|u)/, with: "…").replacing("%%", with: "%")
   }
 
   var strings: [String] { [wording, cause, fix] }
@@ -206,6 +208,8 @@ struct HelpDefinition: Decodable, Sendable, Hashable {
 enum HelpAction: String, Decodable, Sendable {
   /// Remove Ferry…, after a confirmation.
   case removeFerry
+  /// Show Welcome Window: the first-run welcome, again.
+  case showWelcome
 }
 
 /// A button that opens the setup guide: with the model picker, or with one family's steps, on

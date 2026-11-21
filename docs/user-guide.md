@@ -57,6 +57,7 @@ This guide holds the same help as **Help** in the Ferry menu, plus how to instal
   - [Updates](#updates)
   - [Privacy](#privacy)
   - [Uninstall](#uninstall)
+  - [Acknowledgements](#acknowledgements)
 
 ## Install
 
@@ -73,6 +74,10 @@ Ferry shows Android devices as locations in Finder. It runs in the menu bar and 
 The first time Ferry opens, it starts a small helper that talks to your devices. The helper keeps running after you quit the menu, so devices stay in Finder.
 
 Over a cable, Ferry uses the device's file transfer mode. With USB debugging on, or over Wi-Fi, it uses ADB, which is faster and adds tools such as screenshots and app installs.
+
+The first time Ferry opens, a welcome window lists what is left to set up: connecting a device, turning on Ferry in Finder and, for USB debugging or Wi-Fi, getting adb. Each step is ticked once it is done.
+
+In Ferry Help, **Show Welcome Window** opens the welcome again.
 
 ### Turn on Ferry in Finder
 
@@ -192,6 +197,8 @@ Use over Wi-Fi suits a device already on USB debugging, such as a network tester
 
 Ferry never searches the network. It connects only to addresses you give it, and to the addresses a device on USB debugging reports for itself. A device that is also on a cable is always served by the cable.
 
+The first time Ferry reaches a device over the network, macOS asks whether Ferry may find devices on your local network. Click **Allow**: without it, Ferry can't reach devices over Wi-Fi.
+
 1. Connect the device to Ethernet or Wi-Fi.
 2. Connect it to the Mac by cable, with USB debugging on.
 3. Click the device in the menu, then **Use over Wi-Fi**.
@@ -285,8 +292,10 @@ How quickly Finder shows a change made on the device depends on how Ferry reache
 
 Ferry watches the 32 folders Finder showed most recently on each device. A change in a folder you have not opened shows up when you open it. While a copy to or from the device runs, Ferry checks for changes again once it ends.
 
-- **USB debugging or Wi-Fi**: Changes show up in Finder within a few seconds, and within about 30 seconds at most.
-- **File transfer**: New and deleted files show up within about 30 seconds. A file changed in place or renamed on the device needs **Refresh**.
+To save battery, Ferry stops checking every 30 seconds when nothing has used the device for about 10 minutes, even if a Finder window still shows it. From then on, a change made on the device can wait until you open a folder on it or click **Refresh** in the Ferry menu. Over USB debugging or Wi-Fi, the device still reports most changes by itself.
+
+- **USB debugging or Wi-Fi**: Changes show up in Finder within a few seconds. While you are using the device in Finder, Ferry also checks every 30 seconds for any it missed.
+- **File transfer**: While you are using the device in Finder, new and deleted files show up within about 30 seconds. After about 10 minutes without use they wait until you open a folder or click **Refresh**. A file changed in place or renamed on the device needs **Refresh**.
 
 **Refresh** in the Ferry menu (⌘R while the menu is open) shows every change at once.
 
@@ -403,7 +412,7 @@ The remove button beside a forward ends it.
 
 ### Open a shell in Terminal
 
-Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry needs adb for this, and says so if it can't find it. Nothing on the device changes unless you type a command that changes it.
+Click Open in Terminal for a shell on the device (adb shell) in Terminal. Ferry needs adb for this, and says so if it can't find it. The shell uses the adb that started the running adb server when Ferry can tell which one it is, so it does not restart another tool's server. Nothing on the device changes unless you type a command that changes it.
 
 ## Troubleshooting
 
@@ -443,11 +452,113 @@ File transfer is off or the device is locked.
 
 Unlock the device and choose **Transfer files** on it, then choose **Refresh**. You do not need to replug the cable.
 
-**The device is not sharing files.**
+**The device is not sharing files. Unlock it and choose Transfer files, then try again.**
 
 The device locked or turned off file transfer during the task.
 
 Unlock the device and choose **Transfer files** on it, then try again.
+
+**The device was disconnected. Reconnect it, then try again.**
+
+The device went away during the task: the cable came out, it went to sleep, or it left the network.
+
+Reconnect the device and try again.
+
+**The device shows no storage. Unlock it, then try again.**
+
+The device shares no storage, which happens while it is locked.
+
+Unlock the device and choose **Refresh**, then try again.
+
+**Ferry can't do this from the Mac on this device. Do it on the device instead.**
+
+The device doesn't offer what was asked, such as moving a file in one step, or Ferry can't do it from the Mac.
+
+Do it on the device itself, or copy the file to its new place and delete the original.
+
+**Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry.**
+
+The connection to the device, a file on this Mac, or Ferry's helper failed in the middle of the task.
+
+Try again. If it keeps failing, plug the device straight into the Mac and keep it unlocked, check that the Mac has free space, or quit and reopen Ferry. A copy in Finder retries by itself once the device is back.
+
+**That item is no longer on the device. Refresh, then try again.**
+
+Someone deleted or moved the item on the device, or another app did.
+
+Choose **Refresh** for the device, then find the item where it is now.
+
+**The device already has an item with that name. Rename one, then try again.**
+
+An item with the same name is already in that folder on the device.
+
+Rename the item on the Mac or on the device, then try again.
+
+**The device can't store that name. Choose another name.**
+
+The name has characters the device's storage does not allow, such as : * ? " < > | or a trailing dot.
+
+Rename the item with letters, digits, spaces, dashes and dots, then try again.
+
+**The device is out of space. Free some space on it, then try again.**
+
+The device's storage does not have room for the file.
+
+Delete files you no longer need on the device, or copy to another storage such as its SD card.
+
+**The file is too large for that storage. Use internal storage, or a smaller file.**
+
+Cards formatted FAT32 take files up to 4 GB.
+
+Copy the file to the device's internal storage, or split it into smaller files.
+
+**The file didn't arrive complete. Try again.**
+
+The device stored or sent a different number of bytes than the file has, so the copy is not complete.
+
+Try again. If it keeps happening, choose **Refresh** and copy the file once more.
+
+**The device saved the file under another name. Look for it in the folder.**
+
+The device changed the name, for example because its storage cannot hold some characters.
+
+Find the file in the folder under its new name, and rename it if you like.
+
+**The folder isn't empty. Delete what it holds first.**
+
+Something arrived in the folder on the device while it was being deleted.
+
+Open the folder, delete what it holds, then delete the folder.
+
+**The file changed on the device. Refresh, then try again.**
+
+The device's copy of the file changed since the Mac last read it.
+
+Choose **Refresh**, check which copy you want, then try again.
+
+**This Mac is out of space. Free some space, then try again.**
+
+The Mac's disk does not have room for a copy of the file.
+
+Free space on the Mac (see **Free up space on the Mac**), then try again.
+
+**That folder is nested too deep to delete from the Mac. Delete it on the device.**
+
+The folder holds folders more than 64 levels down, which Ferry does not delete.
+
+Delete the folder on the device itself.
+
+**That item is read-only from the Mac. Change it on the device.**
+
+The item is a folder named like an app or a document package, or lies inside one, which Ferry keeps read-only.
+
+Change it on the device, or copy it to the Mac.
+
+**The folder's listing went out of date. Try again.**
+
+Ferry's helper restarted, or many folders were opened, while Finder was still reading a large folder.
+
+Open the folder again. Finder reads it from the start.
 
 **In use by another app**
 
@@ -472,36 +583,6 @@ Quit Image Capture, Preview, Android File Transfer, MacDroid or OpenMTP, then cl
 The device reported an error when Ferry opened it.
 
 Click **Check Again**, or unplug the device and plug it back in.
-
-**The device reported an error.**
-
-The device refused the request without saying why.
-
-Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**.
-
-**The device was disconnected.**
-
-The device went away during the task: the cable came out, it went to sleep, or it left the network.
-
-Reconnect the device and try again.
-
-**The device reports no storage.**
-
-The device shares no storage, which happens while it is locked.
-
-Unlock the device and choose **Refresh**.
-
-**The device does not support this: ….**
-
-The device can't do what was asked. The rest of the message says what.
-
-Do it another way, for example on the device itself.
-
-**Error: …**
-
-Something failed on the device, the Mac or the connection. The rest of the message says what.
-
-Try again. If it keeps failing, unplug the device, plug it back in and click **Check Again**.
 
 **Cancelled.**
 
@@ -597,6 +678,18 @@ macOS did not let Ferry open Terminal, or Terminal is missing.
 
 Open Terminal once yourself, then try again. If macOS asks whether Ferry may control Terminal, allow it.
 
+**Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. If its version differs, adb may restart the server.**
+
+Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs the adb Ferry found instead: its own copy, or one already on this Mac, named in the message.
+
+Nothing, if the shell opens. If another tool, such as Android Studio, loses its devices, close the shell and run adb shell from that tool's own adb.
+
+**Ferry couldn't tell which adb started the adb server, so this uses the adb in …. If its version differs, adb may restart the server.**
+
+Open in Terminal runs the adb that started the running adb server, so the two always match. Ferry could not read which program that is, so the shell runs the adb Ferry found instead: its own copy, or one already on this Mac, named in the message.
+
+Nothing, if the shell opens. If another tool, such as Android Studio, loses its devices, close the shell and run adb shell from that tool's own adb.
+
 ### Wi-Fi and network messages
 
 Messages from Use over Wi-Fi, Connect by Address, Pair with Code and remembered devices.
@@ -691,7 +784,7 @@ Turning on ADB over Wi-Fi restarts ADB on the device, which would stop a transfe
 
 Let them finish, then try again.
 
-**adb: …**
+**adb refused the request. Check the address and that the device is on the network, then try again. (…)**
 
 adb refused the request. The rest of the message is adb's reason.
 
@@ -737,12 +830,6 @@ macOS shows such a folder as an app or a document, so Ferry keeps it read-only.
 
 Change it on the device, or copy it to the Mac.
 
-**The device does not support ….**
-
-The device can't do what Finder asked, such as moving a file in one step.
-
-Copy the file to its new place, then delete the original.
-
 **The device saved “…” as “…”.**
 
 The device changed the name, for example because it cannot store some characters.
@@ -767,7 +854,7 @@ Ferry does not delete a folder nested more than 64 levels deep.
 
 Delete it on the device.
 
-**Unexpected response from the Ferry agent.**
+**Ferry's helper sent an answer Ferry didn't expect. Quit and reopen Ferry, then try again.**
 
 Ferry's helper answered in a way the Finder extension does not expect, which can happen right after an update.
 
@@ -985,7 +1072,7 @@ The device's internal storage is too full to install the app.
 
 Free up space on the device, then try again.
 
-**Couldn't install the app: …**
+**The device didn't install the app. Check that it suits this device, then try again. (…)**
 
 The device refused the app for a reason Ferry has no plain words for. The rest of the message is the device's own reason.
 
@@ -1099,7 +1186,7 @@ The log came faster than Ferry could show it, so some lines were left out.
 
 Set **Level** or **Filter** to show fewer lines.
 
-**Couldn't save the log: …**
+**Ferry couldn't save the log. Choose another folder or free some space, then try again. (…)**
 
 Ferry could not write the file. The rest of the message says why.
 
@@ -1183,7 +1270,11 @@ Install Ferry again.
 
 ### Remove Ferry
 
-Removes Ferry's locations from Finder, stops Ferry's helper and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state.
+Removes Ferry's locations from Finder, stops Ferry's helper, deletes what Ferry keeps on this Mac and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state; starting again then downloads adb from Google again.
+
+Once the helper has stopped, Ferry deletes ~/Library/Application Support/Ferry (the adb it downloaded, and that you accepted Google's license) and ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (its lists of your devices' files and the devices it reconnects over the network). If Ferry's own adb is still running, Ferry stops it, including a shell you opened from Ferry's menu; an adb you installed yourself is left alone. Changes Finder had not sent to a device are kept, and shown in Finder.
+
+Ferry also forgets that it ran on this Mac, so if you install it again the welcome opens again.
 
 The **Remove Ferry…** button is here in Ferry Help. Ferry asks you to confirm first.
 
@@ -1195,6 +1286,8 @@ Ferry checks for a new version once a day. When there is one, it downloads it in
 
 To check now, choose **Check for Updates…** in the Ferry menu. Ferry shows what is new in the release and offers to install it.
 
+To choose yourself, turn off **Install Updates Automatically** in the Ferry menu. Ferry still checks once a day, and asks before it downloads a new version. On a managed Mac, an administrator can set the same choice with `defaults write io.github.krisarmstrong.ferry SUAutomaticallyUpdate -bool false`.
+
 After an update, Ferry restarts its helper the first time it opens. Your devices leave Finder for a moment and come back; a copy that was running then stops, so copy it again.
 
 Ferry installs an update only when it carries the signature of Ferry's own release key and a valid code signature. Releases are signed with the developer's Developer ID and notarized by Apple. Ferry reads the list of releases from GitHub over a secure connection.
@@ -1203,9 +1296,22 @@ Ferry installs an update only when it carries the signature of Ferry's own relea
 
 Ferry has no telemetry, no analytics and no account. Your files go only between the device and your Mac. If you use ADB over Wi-Fi, Ferry talks to that device on your network and nowhere else.
 
-Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices.
+Ferry connects to the internet for two things. It checks daily for updates at GitHub, where Ferry's releases are published. And it downloads adb from Google: once, when you accept Google's license, and again without asking when a Ferry update needs a newer adb under the license you accepted. Neither sends anything about you or your devices: like any download, they see your Mac's IP address, and GitHub sees which versions of Ferry and its updater ask.
 
 ### Uninstall
 
-1. In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched.
+1. In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, Ferry deletes its data in ~/Library/Application Support, and Ferry quits. Files on your devices are not touched.
 2. Drag Ferry from Applications to the Trash.
+3. To remove Ferry's preferences too, delete ~/Library/Preferences/io.github.krisarmstrong.ferry.plist and Ferry's folder in ~/Library/Group Containers.
+
+### Acknowledgements
+
+Ferry is released under the MIT License. It is built on the work of others:
+
+**Sparkle**, which keeps Ferry up to date, is © Andy Matuschak and the Sparkle contributors, under the MIT License. Its licence, with the third-party notices it lists, is in Ferry.app/Contents/Resources/Licenses/Sparkle-LICENSE.txt.
+
+**libmtp** and **libusb**, which let Ferry talk to devices over MTP, are under the GNU Lesser General Public License, version 2.1. Ferry ships them unmodified in Ferry.app/Contents/Frameworks, with their licence texts in Ferry.app/Contents/Resources/Licenses. The exact source code each release was built from is attached to that release on GitHub, at github.com/krisarmstrong/ferry/releases; Licenses/README.txt names each tarball with its SHA-256.
+
+**adb**, from Google's Android SDK Platform-Tools, is not part of Ferry. Ferry downloads it from Google only after you accept the Android SDK License, which Ferry shows first and keeps with the app.
+
+Android is a trademark of Google LLC.

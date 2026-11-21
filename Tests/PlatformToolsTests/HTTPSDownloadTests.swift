@@ -126,11 +126,20 @@ final class HTTPSDownloadTests: Sendable {
   @Test func cancellingStopsTheDownloadAndLeavesNothing() async throws {
     let (started, signal) = AsyncStream<Void>.makeStream()
     StubServer.started.withLock { $0["/stall"] = signal }
-    let task = Task { () async throws(PlatformToolsError) -> URL in try await download("/stall") }
+    // The error leaves the Task as a Result on purpose: a typed-throws closure in a Task whose
+    // failure is `any Error` now and then handed back `.licenseNotAccepted`, the enum's first
+    // case, which nothing throws (suspected compiler issue; w3-red.txt has the repro). Keep it.
+    let task = Task { () async -> Result<URL, PlatformToolsError> in
+      do throws(PlatformToolsError) {
+        return .success(try await download("/stall"))
+      } catch {
+        return .failure(error)
+      }
+    }
     var iterator = started.makeAsyncIterator()
     await iterator.next()
     task.cancel()
-    await #expect(throws: PlatformToolsError.cancelled) { _ = try await task.value }
+    #expect(await task.value == .failure(.cancelled))
     #expect(leftovers() == [])
   }
 

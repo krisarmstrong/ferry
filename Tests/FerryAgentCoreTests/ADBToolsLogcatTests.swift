@@ -15,8 +15,29 @@ private let serial = "0123456789abcdef"
 private actor Gate {
   private var isOpen = true
   private var waiting: [CheckedContinuation<Void, Never>] = []
+  private var heldWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
   /// How many callers the closed gate is holding.
   var held: Int { waiting.count }
+
+  /// Returns once the closed gate holds a caller, or the test is cancelled.
+  func waitUntilHeld() async {
+    let id = UUID()
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if !waiting.isEmpty || Task.isCancelled {
+          continuation.resume()
+        } else {
+          heldWaiters[id] = continuation
+        }
+      }
+    } onCancel: {
+      Task { await self.stopWaiting(id) }
+    }
+  }
+
+  private func stopWaiting(_ id: UUID) {
+    heldWaiters.removeValue(forKey: id)?.resume()
+  }
 
   func close() { isOpen = false }
 
@@ -28,7 +49,11 @@ private actor Gate {
 
   func pass() async {
     if isOpen { return }
-    await withCheckedContinuation { waiting.append($0) }
+    await withCheckedContinuation { continuation in
+      waiting.append(continuation)
+      for waiter in heldWaiters.values { waiter.resume() }
+      heldWaiters = [:]
+    }
   }
 }
 
@@ -70,10 +95,11 @@ struct ADBToolsLogcatTests {
   private func makeTools(
     _ fake: FakeToolDevice,
     target: @escaping @Sendable (DeviceID) async -> ADBRoute? = { _ in ADBRoute(serial: serial) },
-    limits: ADBTools.Limits = Self.fast
+    limits: ADBTools.Limits = Self.fast, clock: any Clock<Duration> = ContinuousClock()
   ) -> ADBTools {
     ADBTools(
-      device: fake, target: target, journal: journal, scratch: scratch, limits: limits)
+      device: fake, target: target, journal: journal, scratch: scratch, now: Date.init,
+      limits: limits, clock: clock)
   }
 
   static var fast: ADBTools.Limits {
@@ -302,9 +328,9 @@ struct ADBToolsLogcatTests {
     let run = start(makeTools(fake, limits: limits), client)
     await log.send(["first"])
     // The first batch is now with the held client; what follows queues up behind it.
-    #expect(try await eventually(timeout: .seconds(5)) { await client.gate.held == 1 })
+    await client.gate.waitUntilHeld()
     await log.send((0..<500).map { "burst \($0)" })
-    #expect(try await eventually(timeout: .seconds(5)) { await log.pendingCount == 0 })
+    await log.waitUntilRead()
     await client.gate.open()
     await log.end()
     #expect(try await run.value == .done)
@@ -319,20 +345,26 @@ struct ADBToolsLogcatTests {
     let fake = FakeToolDevice()
     let log = FakeLogcat()
     await fake.set { $0.logcats = [log] }
-    let defaults = ADBTools.Limits()
-    let tools = makeTools(fake, limits: defaults)
+    let clock = ManualClock()
+    let tools = makeTools(fake, limits: ADBTools.Limits(), clock: clock)
     let client = Client()
-    let clock = ContinuousClock()
-    let began = clock.now
+    await client.gate.close()
     let run = start(tools, client)
+    await log.send(["line 0"])
+    // The first batch is with the held client; the backlog queues up behind it.
+    await client.gate.waitUntilHeld()
     for chunk in 0..<100 {
-      await log.send((0..<100).map { "line \(chunk * 100 + $0)" })
+      await log.send((0..<100).map { "line \(chunk * 100 + $0 + 1)" })
     }
+    await log.waitUntilRead()
+    await client.gate.open()
     await log.end()
-    #expect(try await run.value == .done)
-    #expect(client.lines == (0..<10_000).map { "line \($0)" })
+    // Pauses pass at once on this clock; they are counted instead.
+    #expect(
+      try await clock.advancing(by: ADBTools.Limits().logInterval) { try await run.value } == .done)
+    #expect(client.lines == (0...10_000).map { "line \($0)" })
     #expect(client.batches.allSatisfy { $0.skipped == 0 })
-    // Twenty full batches behind the default 100 ms pause each would take over two seconds.
-    #expect(clock.now - began < .seconds(1))
+    // Twenty full batches go out back to back: the only pause is after the queue empties.
+    #expect(await clock.sleepCount <= 1)
   }
 }

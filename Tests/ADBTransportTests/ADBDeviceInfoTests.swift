@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -140,7 +141,7 @@ struct ADBDeviceInfoTests {
     defer { server.stop() }
     let tools = ADBDeviceTools(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: .seconds(5),
-      captureLimit: 1024, captureWait: .seconds(5))
+      captureLimit: 1024, captureWait: .seconds(5), clock: ManualClock())
     return try await tools.deviceInfo(route: ADBRoute(serial: Self.serial))
   }
 

@@ -90,6 +90,13 @@ public actor ADBHost {
   /// A new list for every change the server reports, and `[]` once when the server goes away.
   /// It reconnects on its own and finishes only when the consumer stops iterating.
   public nonisolated func trackDevices() -> AsyncStream<[ADBDevice]> {
+    trackDevices(yielded: {})
+  }
+
+  /// As `trackDevices()`; `yielded` runs after each list is handed to the stream.
+  nonisolated func trackDevices(
+    yielded: @escaping @Sendable () -> Void
+  ) -> AsyncStream<[ADBDevice]> {
     // Each list replaces the last, so a slow consumer needs only the newest.
     AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let task = Task {
@@ -98,6 +105,7 @@ public actor ADBHost {
           case .devices(let devices): continuation.yield(devices)
           case .unavailable: continuation.yield([])
           }
+          yielded()
         }
         continuation.finish()
       }
@@ -189,6 +197,21 @@ public actor ADBHost {
     try await launcher(adb)
   }
 
+  /// A host service such as `connect:` or `pair:`, whose refusal is an answer, not a failure.
+  func service(_ request: String) async throws(ADBError) -> ADBServiceAnswer {
+    let framed = try ADBWire.frame(request)
+    let stream = try await ADBStream.open(port: port)
+    do throws(ADBError) {
+      try await stream.write(framed)
+      let answer = try await stream.readServiceAnswer()
+      await stream.close()
+      return answer
+    } catch {
+      await stream.close()
+      throw error
+    }
+  }
+
   func query(_ request: String) async throws(ADBError) -> String {
     let framed = try ADBWire.frame(request)
     let stream = try await ADBStream.open(port: port)
@@ -232,11 +255,12 @@ public actor ADBHost {
           try await startServer()
           continue
         } catch {
-          Self.log.error("adb server not started: \(String(describing: error), privacy: .public)")
+          Self.log.error("adb server not started: \(String(describing: error), privacy: .private)")
         }
       }
       let delay = backoff.next()
-      Self.log.info("adb server unavailable; retrying in \(delay.components.seconds)s")
+      Self.log.info(
+        "adb server unavailable; retrying in \(delay.components.seconds, privacy: .public)s")
       if (try? await Task.sleep(for: delay)) == nil { break }
     }
   }
@@ -261,7 +285,7 @@ public actor ADBHost {
         }
       } catch {
         if !Task.isCancelled {
-          Self.log.info("device tracking ended: \(String(describing: error), privacy: .public)")
+          Self.log.info("device tracking ended: \(String(describing: error), privacy: .private)")
         }
       }
       return reached

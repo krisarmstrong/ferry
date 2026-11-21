@@ -62,11 +62,13 @@ private final class PreviewServices: SystemServicing {
   func startedAgentBuild() -> String? { nil }
   func recordStartedAgent(_ build: String) {}
   func restartAgent() async -> Bool { true }
+  func registerExtensions() async {}
+  func agentIsEnabled() async -> Bool { true }
   func helperStatus() async -> HelperStatus { .allowed }
   func loginItemStatus() async -> LoginItemStatus { .disabled }
   func setOpensAtLogin(_ enabled: Bool) async {}
   func unregisterAgent() {}
-  func removeAgentData() {}
+  func removeFerryData(keeping preserved: [URL]) {}
   func open(_ url: URL) {}
   func reveal(_ urls: [URL]) {}
   func quit() {}
@@ -82,6 +84,9 @@ private final class PreviewServices: SystemServicing {
   func openInTerminal(_ script: URL) async -> Bool { false }
   func platformToolsAcceptance() -> LicenseAcceptance? { nil }
   func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance) {}
+  func hasMark(_ mark: OnboardingMark) -> Bool { true }
+  func recordMark(_ mark: OnboardingMark) {}
+  func forgetFirstRun() {}
   func fetchedPlatformToolsVersion() -> String? { nil }
   func fetchPlatformTools(accepted: LicenseAcceptance?) async throws(PlatformToolsError) {}
 }

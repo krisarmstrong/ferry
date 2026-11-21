@@ -56,7 +56,12 @@ extension DevicePresentation {
   static func saveLogFailure(_ reason: String) -> MenuNotice {
     let shown = DisplayText.escaped(reason)
     return MenuNotice(
-      LocalizedStringResource("Couldn't save the log: \(shown)", bundle: .module))
+      LocalizedStringResource(
+        """
+        Ferry couldn't save the log. Choose another folder or free some space, then try again. \
+        (\(shown))
+        """,
+        bundle: .module))
   }
 
   static var terminalFailure: MenuNotice {

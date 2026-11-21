@@ -26,8 +26,12 @@ import os
     string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!
 
   static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "AppModel")
-  private static let pollInterval = Duration.seconds(2)
+  static let pollInterval = Duration.seconds(2)
   static let emptyGuideDelay = Duration.seconds(10)
+  /// After restarting an agent it could not reach, how many times the app asks it for its status,
+  /// `recoveryPause` apart, before leaving it until the next outage.
+  static let recoveryChecks = 5
+  static let recoveryPause = Duration.seconds(1)
 
   public private(set) var devices: [AttachedDevice] = []
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
@@ -78,6 +82,9 @@ import os
   var requestedRecordings: [DeviceID: Date] = [:]
   /// Finished recordings being saved, so each is collected once.
   var collectingRecordings: Set<DeviceID> = []
+  /// The collection a status started for each device, kept until the device is no longer listed
+  /// with a recording: a caller (a test) can wait for it to end.
+  @ObservationIgnored var backgroundCollections: [DeviceID: Task<Void, Never>] = [:]
   /// Finished recordings the app could not save, and why.
   var unsavedRecordings: [DeviceID: UnsavedRecording] = [:]
   /// Unsaved recordings whose capture folders are being checked, so each is checked once.
@@ -108,12 +115,18 @@ import os
   public internal(set) var removalError: String?
   /// Read from the system once launched (see `launch()`) and each time the menu opens; off
   /// until then.
-  public private(set) var loginItem = LoginItemStatus.disabled
+  public internal(set) var loginItem = LoginItemStatus.disabled
   /// Set by the app when the build can update itself; the menu shows Check for Updates… only
   /// then.
   public var updater: (any UpdateChecking)?
+  /// Counts changes to the updater's settings, which are not observable, so the menu redraws.
+  var updateSettingChanges = 0
   /// The login item change being applied, how many have been requested, and how many applied.
   private var loginItemChange: Task<Void, Never>?
+  /// The agent build launch restarted, recorded once that agent answers (see `startAgent()`).
+  var restartedBuild: String?
+  /// Set when the agent was restarted for this outage, or is being; cleared once it answers.
+  var recoveryAttempted = false
   private var loginItemRequests = 0
   private var loginItemsApplied = 0
 
@@ -127,15 +140,20 @@ import os
   /// Set with `isGuidePresented`, and cleared by the one view that brings the guide window
   /// forward, so reopening the menu does not pull the guide in front of it again.
   var guideOpenPending = false
-  /// The message whose Help topic the Help window should open, until it takes it.
-  var helpRequest: String?
+  /// What the Help window should open, until it takes it.
+  var helpRequest: HelpRequest?
+  /// The welcome window (see `AppModel+Welcome`).
+  var welcome = WelcomeState()
+  /// The menu says macOS asks before Ferry uses the local network: once, the first time the user
+  /// reaches for Wi-Fi.
+  public internal(set) var showsLocalNetworkNote = false
 
   let client: any AgentSending
   let services: any SystemServicing
   let sleep: @Sendable (Duration) async throws -> Void
   let now: @Sendable () -> ContinuousClock.Instant
   /// Devices the guide has opened for this app run.
-  private var guidedDevices: Set<DeviceID> = []
+  var guidedDevices: Set<DeviceID> = []
   var emptyGuideShown = false
 
   public convenience init(
@@ -156,18 +174,28 @@ import os
   }
 
   public func refresh() async {
+    if await readStatus() == .lost, agent == .unreachable { await recoverAgent() }
+  }
+
+  /// Asks the agent for its status and shows it.
+  func readStatus() async -> StatusRead {
     do {
       switch try await client.send(.status, file: nil) {
       case .status(let report):
         apply(report)
+        return .answered
       default:
         Self.log.error("agent answered status with something else")
         agent = .unreachable
+        return .failed
       }
+    } catch .cancelled {
+      return .cancelled
     } catch {
       Self.log.error("status request failed: \(String(describing: error), privacy: .private)")
       agent = services.appWasReplaced() ? .replaced : .unreachable
       helper = await services.helperStatus()
+      return error == .deviceDisconnected ? .lost : .failed
     }
   }
 
@@ -232,30 +260,6 @@ import os
     services.open(Self.loginItemsSettings)
   }
 
-  /// Starts the agent, reads its status, then whether Ferry opens at login, and updates the adb
-  /// Ferry fetched if this release pins a newer one. The system calls run off the main actor (see
-  /// `SystemServices`), so the app opens without waiting on them.
-  public func launch() async {
-    await startAgent()
-    await refresh()
-    loginItem = await services.loginItemStatus()
-    considerPlatformToolsUpdate()
-  }
-
-  /// Registers the agent, or restarts it when the agent in the bundle is not the one last
-  /// started: after an update the old agent keeps running until it stops, and would serve the
-  /// new app and extensions its old code. Without the agent's identity it only registers. A
-  /// restart that failed to register is not recorded, so the next launch tries again.
-  private func startAgent() async {
-    guard let build = services.agentBuild(), build != services.startedAgentBuild() else {
-      await services.registerAgent()
-      return
-    }
-    if await services.restartAgent() {
-      services.recordStartedAgent(build)
-    }
-  }
-
   /// The Open at Login row: shows `enabled` at once, then applies it after any change still
   /// being applied, so quick toggles reach macOS in order and the switch never snaps back
   /// meanwhile. Once the last change is applied, it shows what macOS reports.
@@ -289,7 +293,7 @@ import os
       try await services.setOpensAtLogin(enabled)
       actionError = nil
     } catch {
-      Self.log.error("open at login: \(error, privacy: .public)")
+      Self.log.error("open at login: \(error, privacy: .private)")
       actionError = MenuNotice(
         LocalizedStringResource("Could not change Open at Login.", bundle: .module))
     }
@@ -324,6 +328,11 @@ import os
     let devices = report.devices
     self.devices = devices
     helper = .allowed
+    recoveryAttempted = false
+    if let build = restartedBuild {
+      services.recordStartedAgent(build)
+      restartedBuild = nil
+    }
     provider = report.provider
     transfers = report.transfers
     noteADBStatus(report.adbStatus)
@@ -341,6 +350,7 @@ import os
     forgetDetailsOfGoneDevices()
     forgetForwardsOfGoneDevices()
     agent = .running
+    considerWelcome()
     let states = devices.map { "\(DevicePresentation.kind(of: $0.state))/\($0.method.rawValue)" }
       .joined(separator: ",")
     let adb = report.adbStatus.map { String(describing: $0) } ?? "unknown"
@@ -349,10 +359,7 @@ import os
       devices: [\(states, privacy: .public)] \
       provider: \(report.provider.rawValue, privacy: .public) adb: \(adb, privacy: .public)
       """)
-    for device in devices where DevicePresentation.needsFileTransferSteps(device) {
-      guard guidedDevices.insert(device.id).inserted, !isGuidePresented else { continue }
-      showGuide(for: device)
-    }
+    guideNewDevices()
   }
 }
 

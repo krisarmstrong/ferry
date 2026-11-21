@@ -86,7 +86,7 @@ final class FinderSync: FIFinderSync {
       try await center.add(
         UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     } catch {
-      log.error("cannot post a notification: \(error, privacy: .public)")
+      log.error("cannot post a notification: \(error, privacy: .private)")
     }
   }
 }

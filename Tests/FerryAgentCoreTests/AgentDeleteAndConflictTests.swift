@@ -73,7 +73,7 @@ struct AgentDeleteAndConflictTests {
         == .done)
     #expect(await setup.device.contents(of: try path("/Reports"), in: setup.storage) == nil)
     #expect(
-      await setup.send(.list(domain: setup.domain, folder: .root)) == .entries([]))
+      await setup.send(.list(domain: setup.domain, folder: .root)) == .page(entries: [], next: nil))
   }
 
   /// A partial an earlier upload abandoned is invisible, so the folder looks empty in Finder and
@@ -332,7 +332,7 @@ extension AgentDeleteAndConflictTests {
 
 extension AgentResponse {
   fileprivate var entryNames: [String] {
-    guard case .entries(let entries) = self else { return [] }
+    guard case .page(let entries, _) = self else { return [] }
     return entries.compactMap(\.item.path.name)
   }
 }

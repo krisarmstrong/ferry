@@ -92,7 +92,7 @@ struct AgentQueueDeadlineTests {
     setup.release.finish()
 
     #expect(await setup.upload.value.isEntry)
-    guard case .entries(let entries) = try await listing.value else {
+    guard case .page(let entries, _) = try await listing.value else {
       Issue.record("no listing")
       return
     }
@@ -156,7 +156,7 @@ struct AgentQueueDeadlineTests {
     setup.release.finish()
 
     #expect(await setup.upload.value.isEntry)
-    guard case .entries(let entries) = try await listing.value else {
+    guard case .page(let entries, _) = try await listing.value else {
       Issue.record("no listing")
       return
     }

@@ -31,29 +31,25 @@ struct WirelessADBFixRound2Tests {
     await adb.set {
       for index in 1...5 {
         let address = "203.0.113.\(index):5555"
-        $0.connectDelay[address] = .milliseconds(500)
         $0.units[address] = .init(
           info: DeviceInfo(id: DeviceID(serial: "U\(index)"), manufacturer: "", model: "Unit"))
       }
     }
+    await adb.holdConnects()
     let wireless = WirelessADB(adb: adb, store: file, timing: Self.fast)
     let running = Task { await wireless.run() }
     defer { running.cancel() }
     await adb.publish()
     #expect(try await eventually { await adb.inFlight == 4 })
+    let reconnects = try #require(await wireless.reconnecting)
     // Whichever one is still queued: the order of the remembered list is not fixed.
     let tried = await adb.calls
     let queued = try #require(
       (1...5).first { !tried.contains(.connect("203.0.113.\($0):5555")) })
     let fifth = DeviceID(serial: "U\(queued)")
     await wireless.forget(fifth)
-    #expect(
-      try await eventually {
-        let connects = await adb.calls.filter { if case .connect = $0 { true } else { false } }
-        let busy = await adb.inFlight
-        return connects.count >= 4 && busy == 0
-      })
-    try await Task.sleep(for: .milliseconds(700))
+    await adb.releaseConnects()
+    await reconnects.value
     #expect(!(await adb.calls.contains(.connect("203.0.113.\(queued):5555"))))
     #expect(await adb.calls.contains(.disconnect("203.0.113.\(queued):5555")))
     #expect(await !wireless.remembered().map(\.id).contains(fifth))
@@ -73,15 +69,17 @@ struct WirelessADBFixRound2Tests {
     let adb = FakeWirelessADB()
     await adb.set {
       $0.units["192.0.2.31:5555"] = .init(info: Self.etherScope)
-      $0.connectDelay["192.0.2.31:5555"] = .milliseconds(300)
     }
+    await adb.holdConnects()
     let wireless = WirelessADB(adb: adb, store: file, timing: Self.fast)
     let running = Task { await wireless.run() }
     defer { running.cancel() }
     await adb.publish()
     #expect(try await eventually { await adb.inFlight == 1 })
+    let reconnects = try #require(await wireless.reconnecting)
     await wireless.forget(Self.etherScope.id)
-    try await Task.sleep(for: .milliseconds(500))
+    await adb.releaseConnects()
+    await reconnects.value
     #expect(await wireless.remembered().isEmpty)
     #expect(await adb.calls.last == .disconnect("192.0.2.31:5555"))
   }

@@ -34,19 +34,26 @@ public protocol SystemServicing {
   /// The agent `recordStartedAgent` last recorded.
   func startedAgentBuild() -> String?
   func recordStartedAgent(_ build: String)
-  /// Stops the running agent and registers the one in the bundle, then has macOS read the
-  /// bundle again, so the extensions it holds are the bundle's too. False if the new agent could
-  /// not be registered.
+  /// Stops the running agent, which removes its launchd job, and registers the one in the
+  /// bundle. False if the new agent could not be registered.
   func restartAgent() async -> Bool
+  /// Has Launch Services read the app and each extension in it again, so macOS uses the ones in
+  /// this bundle: after a manual reinstall it can forget the File Provider extension for minutes
+  /// (error -2001). Harmless when nothing changed.
+  func registerExtensions() async
   /// What macOS says about the helper now.
   func helperStatus() async -> HelperStatus
+  /// Whether macOS has the agent registered and enabled (`SMAppService.Status.enabled`), whether
+  /// or not launchd manages to start it.
+  func agentIsEnabled() async -> Bool
   /// Whether Ferry opens at login.
   func loginItemStatus() async -> LoginItemStatus
   func setOpensAtLogin(_ enabled: Bool) async throws
   func unregisterAgent() async throws
-  /// Deletes the agent's own folder (remembered devices, item tables, the adb server record),
-  /// once it is unregistered and has exited, so no last save re-creates it.
-  func removeAgentData() async throws
+  /// Waits for the unregistered agent to exit, stops an adb server running Ferry's own fetched
+  /// adb, then deletes what Ferry kept in Application Support, except a folder holding one of
+  /// `preserved` (see `FerryDataRemoval`).
+  func removeFerryData(keeping preserved: [URL]) async
   func open(_ url: URL)
   /// Shows the items in Finder.
   func reveal(_ urls: [URL])
@@ -76,6 +83,12 @@ public protocol SystemServicing {
   /// The Android SDK License acceptance recorded in Ferry's defaults.
   func platformToolsAcceptance() -> LicenseAcceptance?
   func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance)
+  /// Whether Ferry's defaults record that the user was shown `mark`'s thing.
+  func hasMark(_ mark: OnboardingMark) -> Bool
+  func recordMark(_ mark: OnboardingMark)
+  /// Forgets that Ferry ran on this Mac: the onboarding marks and the agent last started, so a
+  /// reinstall is a first run and shows the welcome.
+  func forgetFirstRun()
   /// The version of the platform tools Ferry fetched and would use, if any.
   func fetchedPlatformToolsVersion() -> String?
   /// Fetches the pinned platform tools (see `PlatformToolsFetcher`).
@@ -111,14 +124,14 @@ public final class SystemServices: SystemServicing {
       do {
         try agent.register()
       } catch {
-        Self.log.error("registering the agent failed: \(error, privacy: .public)")
+        Self.log.error("registering the agent failed: \(error, privacy: .private)")
       }
       Self.log.info("agent status: \(Self.describe(agent.status), privacy: .public)")
     }.value
   }
 
   /// Where `recordStartedAgent` keeps the agent last started.
-  private nonisolated static let startedAgentKey = "StartedAgentBuild"
+  nonisolated static let startedAgentKey = "StartedAgentBuild"
 
   public func agentBuild() -> String? {
     let agent = Bundle.main.bundleURL.appending(path: "Contents/MacOS/FerryAgent")
@@ -140,29 +153,63 @@ public final class SystemServices: SystemServicing {
   }
 
   public func restartAgent() async -> Bool {
-    let bundle = Bundle.main.bundleURL
-    return await Task.detached(priority: .utility) {
+    await Task.detached(priority: .utility) {
       let agent = SMAppService.agent(plistName: Self.agentPlist)
       // Waits until launchd has stopped the old agent. Not registered (a first launch) is fine.
       do {
         try await agent.unregister()
       } catch {
-        Self.log.info("unregistering the agent to restart it: \(error, privacy: .public)")
+        Self.log.info("unregistering the agent to restart it: \(error, privacy: .private)")
       }
       let registered: Bool
       do {
         try agent.register()
         registered = true
       } catch {
-        Self.log.error("registering the agent failed: \(error, privacy: .public)")
+        Self.log.error("registering the agent failed: \(error, privacy: .private)")
         registered = false
       }
       Self.log.info("agent restarted, status: \(Self.describe(agent.status), privacy: .public)")
-      let launchServices = LSRegisterURL(bundle as CFURL, true)
-      if launchServices != noErr {
-        Self.log.error("registering the bundle with Launch Services failed: \(launchServices)")
-      }
       return registered
+    }.value
+  }
+
+  /// Not a copy that will go away: one macOS translocated, or one on a read-only volume such as a
+  /// mounted disk image. Registered, it would be the copy macOS uses, and the installed one would
+  /// lose its extensions once it went.
+  nonisolated static func registersExtensions(of bundle: URL, onReadOnlyVolume: Bool) -> Bool {
+    !onReadOnlyVolume && !bundle.path.contains("/AppTranslocation/")
+  }
+
+  public func registerExtensions() async {
+    let bundle = Bundle.main.bundleURL
+    let plugIns = Bundle.main.builtInPlugInsURL
+    await Task.detached(priority: .utility) {
+      let readOnly =
+        (try? bundle.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false
+      guard Self.registersExtensions(of: bundle, onReadOnlyVolume: readOnly) else {
+        Self.log.info("not registering a translocated or read-only copy with Launch Services")
+        return
+      }
+      let extensions =
+        plugIns.flatMap {
+          try? FileManager.default.contentsOfDirectory(
+            at: $0, includingPropertiesForKeys: nil)
+        }?.filter { $0.pathExtension == "appex" } ?? []
+      for url in [bundle] + extensions {
+        let status = LSRegisterURL(url as CFURL, true)
+        if status != noErr {
+          let name = url.lastPathComponent
+          Self.log.error(
+            "registering \(name, privacy: .public) failed: \(status, privacy: .public)")
+        }
+      }
+    }.value
+  }
+
+  public func agentIsEnabled() async -> Bool {
+    await Task.detached(priority: .utility) {
+      SMAppService.agent(plistName: Self.agentPlist).status == .enabled
     }.value
   }
 
@@ -203,33 +250,8 @@ public final class SystemServices: SystemServicing {
     }.value
   }
 
-  public func removeAgentData() async throws {
-    // Unregistering stops the agent, but it may still be saving: up to 5 s for it to exit.
-    let agent = Bundle.main.bundleURL.appending(path: "Contents/MacOS/FerryAgent")
-      .resolvingSymlinksInPath().path
-    let deadline = ContinuousClock.now + .seconds(5)
-    while Self.isRunning(agent), ContinuousClock.now < deadline {
-      try? await Task.sleep(for: .milliseconds(100))
-    }
-    let support = try FileManager.default.url(
-      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
-    let folder = support.appending(path: "io.github.krisarmstrong.ferry.agent")
-    guard FileManager.default.fileExists(atPath: folder.path) else { return }
-    try FileManager.default.removeItem(at: folder)
-  }
-
-  /// Whether a process of this user runs the program at `path`.
-  private static func isRunning(_ path: String) -> Bool {
-    let count = proc_listallpids(nil, 0)
-    guard count > 0 else { return false }
-    var pids = [pid_t](repeating: 0, count: Int(count) * 2)
-    let listed = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-    guard listed > 0 else { return false }
-    var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) * 4)
-    return pids.prefix(Int(listed)).contains { pid in
-      let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
-      return length > 0 && String(bytes: buffer.prefix(Int(length)), encoding: .utf8) == path
-    }
+  public func removeFerryData(keeping preserved: [URL]) async {
+    await FerryDataRemoval.standard.run(keeping: preserved)
   }
 
   public func open(_ url: URL) {
@@ -257,7 +279,7 @@ public final class SystemServices: SystemServicing {
     NSWorkspace.shared.openApplication(at: bundle, configuration: configuration) { _, error in
       Task { @MainActor in
         if let error {
-          Self.log.error("relaunching failed: \(error, privacy: .public)")
+          Self.log.error("relaunching failed: \(error, privacy: .private)")
         } else {
           NSApplication.shared.terminate(nil)
         }
@@ -328,7 +350,7 @@ public final class SystemServices: SystemServicing {
         [script], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration())
       return true
     } catch {
-      Self.log.error("opening Terminal failed: \(error, privacy: .public)")
+      Self.log.error("opening Terminal failed: \(error, privacy: .private)")
       return false
     }
   }

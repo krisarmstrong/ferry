@@ -36,7 +36,7 @@ struct UserGuideMirrorTests {
 
   /// The guide is rendered from help.json by scripts/user-guide.py (`make guide`): the
   /// committed file must be exactly what the script renders now.
-  @Test func theGuideIsWhatTheGeneratorRenders() throws {
+  @Test func theGuideIsWhatTheGeneratorRenders() async throws {
     let process = Process()
     process.executableURL = URL(filePath: "/usr/bin/env")
     process.arguments = [
@@ -44,9 +44,19 @@ struct UserGuideMirrorTests {
     ]
     let output = Pipe()
     process.standardOutput = output
-    try process.run()
-    let rendered = output.fileHandleForReading.readDataToEndOfFile()
-    process.waitUntilExit()
+    // Read on a dispatch thread, not one of the shared pool's, which the other tests need.
+    let rendered = try await withCheckedThrowingContinuation { continuation in
+      DispatchQueue.global().async {
+        do {
+          try process.run()
+          let data = output.fileHandleForReading.readDataToEndOfFile()
+          process.waitUntilExit()
+          continuation.resume(returning: data)
+        } catch {
+          continuation.resume(throwing: error)
+        }
+      }
+    }
     #expect(process.terminationStatus == 0)
     let committed = try Data(contentsOf: Self.root.appending(path: "docs/user-guide.md"))
     #expect(rendered == committed, "docs/user-guide.md is out of date: run make guide")

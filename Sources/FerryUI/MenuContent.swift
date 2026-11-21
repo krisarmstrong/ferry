@@ -41,6 +41,7 @@ public struct MenuContent: View {
         openWindow(id: SetupGuide.windowID)
       }
     }
+    .presentsWelcome(model)
   }
 
   private var header: some View {
@@ -72,7 +73,9 @@ public struct MenuContent: View {
       StatusRow(symbol: "ellipsis.circle", title: Text("Checking…", bundle: .module))
     }
     if model.agent == .unreachable {
-      HelperRow(status: model.helper) { model.openLoginItems() }
+      HelperRow(
+        status: model.helper, openSettings: { model.openLoginItems() },
+        relaunch: { model.relaunch() })
     }
     if model.agent == .replaced {
       StatusRow(
@@ -113,6 +116,17 @@ public struct MenuContent: View {
     ForEach(model.awaitingAuthorization, id: \.self) { address in
       let line = DevicePresentation.waitingLine(for: address)
       StatusRow(symbol: "hand.raised", title: Text(verbatim: line.text), help: line.help)
+    }
+    if model.showsLocalNetworkNote {
+      StatusRow(
+        symbol: "network", title: Text(Self.localNetworkTitle),
+        helpTopic: AppModel.localNetworkHelpTopic
+      ) {
+        Text(Self.localNetworkDetail)
+      } actions: {
+        StatusAction(title: Text("OK", bundle: .module)) { model.dismissLocalNetworkNote() }
+      }
+      .accessibilityElement(children: .contain)
     }
     if let message = model.wirelessMessage {
       StatusRow(
@@ -196,6 +210,11 @@ public struct MenuContent: View {
         }))
   }
 
+  static let localNetworkTitle = LocalizedStringResource(
+    "macOS asks before Ferry uses your network", bundle: .module)
+  static let localNetworkDetail = LocalizedStringResource(
+    "Click Allow when it asks, so Ferry can reach devices over Wi-Fi.", bundle: .module)
+
   private func openGuide(for device: AttachedDevice?) {
     model.showGuide(for: device)
   }
@@ -205,10 +224,12 @@ public struct MenuContent: View {
   }
 }
 
-/// The agent did not answer. If macOS will not run it, the fix is in System Settings.
+/// The agent did not answer. If macOS will not run it, the fix is in System Settings; if it
+/// does, quitting and reopening Ferry, which Relaunch does.
 private struct HelperRow: View {
   let status: HelperStatus
   let openSettings: () -> Void
+  let relaunch: () -> Void
 
   var body: some View {
     switch status {
@@ -216,7 +237,10 @@ private struct HelperRow: View {
       StatusRow(
         symbol: "exclamationmark.triangle", tint: .yellow,
         title: Text(MenuStatusText.helperNotResponding),
-        help: MenuStatusText.helperNotResponding.key)
+        help: MenuStatusText.helperNotResponding.key
+      ) {
+        StatusAction(title: Text("Relaunch", bundle: .module), action: relaunch)
+      }
     case .requiresApproval:
       blocked(MenuStatusText.allowHelper)
     case .notFound:
