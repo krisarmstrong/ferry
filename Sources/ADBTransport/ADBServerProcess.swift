@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import PlatformTools
 import Synchronization
 
 /// Starts the adb server as a child of this process. `ADBServerKeeper` uses it; tests fake it.
@@ -16,8 +17,10 @@ protocol ProcessTable: Sendable {
   func started(_ pid: pid_t) -> UInt64?
   /// The process's program.
   func path(_ pid: pid_t) -> String?
-  /// The process listening on `port` over TCP, if one is.
+  /// The process listening on `port` over TCP on a loopback address, where `host:kill` goes.
   func listener(onTCPPort port: UInt16) -> pid_t?
+  /// Whether the code the process runs is Google's `adb`.
+  func runsGoogleADB(_ pid: pid_t) -> Bool
 }
 
 /// `posix_spawn` without a new process group or session: launchd ends every process in the
@@ -81,6 +84,8 @@ final class SystemServerSpawner: ADBServerSpawner {
 
 /// libproc, for processes the agent may read: those of the same user.
 struct SystemProcessTable: ProcessTable {
+  func runsGoogleADB(_ pid: pid_t) -> Bool { CodeSignature.isRunningGoogleSigned(pid: pid) }
+
   func started(_ pid: pid_t) -> UInt64? {
     var info = proc_bsdinfo()
     let size = Int32(MemoryLayout<proc_bsdinfo>.size)
@@ -122,6 +127,18 @@ struct SystemProcessTable: ProcessTable {
       let tcp = socket.psi.soi_proto.pri_tcp
       return tcp.tcpsi_state == TSI_S_LISTEN
         && UInt16(bigEndian: UInt16(truncatingIfNeeded: tcp.tcpsi_ini.insi_lport)) == port
+        && Self.isLoopback(tcp.tcpsi_ini)
     }
+  }
+
+  /// 127.0.0.0/8 or ::1: the addresses `host:kill` to localhost reaches.
+  static func isLoopback(_ address: in_sockinfo) -> Bool {
+    if address.insi_vflag & UInt8(INI_IPV4) != 0 {
+      let ipv4 = UInt32(bigEndian: address.insi_laddr.ina_46.i46a_addr4.s_addr)
+      return ipv4 >> 24 == 127
+    }
+    var loopback = in6addr_loopback
+    var local = address.insi_laddr.ina_6
+    return memcmp(&local, &loopback, MemoryLayout<in6_addr>.size) == 0
   }
 }

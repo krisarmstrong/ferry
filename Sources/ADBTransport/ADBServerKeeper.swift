@@ -161,45 +161,60 @@ public actor ADBServerKeeper {
     return try result.get()
   }
 
-  /// Stops the server once no command is using it, holding new commands back meanwhile.
-  private func replace() async {
+  /// Stops the server once no command is using it, holding new commands back meanwhile, if
+  /// `isTheOne` still holds then: the port may have changed hands during the wait. Returns
+  /// whether it stopped it.
+  private func replace(if isTheOne: () -> Bool) async -> Bool {
     replacing = true
     if commands > 0 {
       await withCheckedContinuation { waitingReplacement = $0 }
     }
-    await stop()
+    let stopping = isTheOne()
+    if stopping { await stop() }
     replacing = false
     let waiting = waitingCommands
     waitingCommands = []
     for command in waiting { command.resume() }
+    return stopping
   }
 
   /// At agent start: replaces the server an earlier agent recorded, if it is still the one
   /// answering. Returns whether it did.
   @discardableResult
   public func replaceRecordedOrphan() async -> Bool {
-    guard let recorded = ADBServerRecord.load(record), recorded.pid != child,
-      table.started(recorded.pid) == recorded.started, table.path(recorded.pid) == recorded.path,
-      await answers()
-    else { return false }
+    guard let recorded = ADBServerRecord.load(record), recorded.pid != child else { return false }
+    // The recorded process, still running, and the one holding the port `host:kill` reaches.
+    let isRecorded = { [table, port] in
+      table.listener(onTCPPort: port) == recorded.pid
+        && table.started(recorded.pid) == recorded.started
+        && table.path(recorded.pid) == recorded.path
+    }
+    guard isRecorded() else { return false }
     Self.log.notice("replacing the adb server an earlier agent started (\(recorded.pid))")
-    await replace()
+    guard await replace(if: isRecorded) else { return false }
     try? FileManager.default.removeItem(at: record)
     return true
   }
 
   /// For a server no record names: one Ferry's agent started before it kept records outlives
   /// that agent and is cut off from the network in the same way. When adb finds no route to an
-  /// address the agent itself reaches, the server listening is replaced if it runs `fetched`,
-  /// Ferry's own adb, which only Ferry starts. Once per agent. Returns whether it did.
+  /// address the agent itself reaches, the server listening on the port is replaced if its
+  /// program, resolved, is `fetched` (Ferry's current fetched adb, signature-checked on disk)
+  /// and the code it runs is Google's adb. A server running an older fetched version, Homebrew's
+  /// or Android Studio's is left alone. Once per agent. Returns whether it did.
   public func replaceFerryServer(fetched: URL?) async -> Bool {
     guard !replacedFerryServer, let fetched, let pid = table.listener(onTCPPort: port),
-      pid != child, table.path(pid) == fetched.resolvingSymlinksInPath().path
+      pid != child
     else { return false }
+    let program = fetched.resolvingSymlinksInPath().path
+    let isFerrys = { [table, port] in
+      table.listener(onTCPPort: port) == pid && table.path(pid) == program
+        && table.runsGoogleADB(pid)
+    }
+    guard isFerrys() else { return false }
     replacedFerryServer = true
     Self.log.notice("replacing an adb server cut off from the network (\(pid))")
-    await replace()
-    return true
+    return await replace(if: isFerrys)
   }
 
   /// `host:kill`, then waits for the port to fall silent so the next start does not find it.

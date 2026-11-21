@@ -18,6 +18,8 @@ struct ADBServerKeeperTests {
     var started: [pid_t: UInt64] = [:]
     var paths: [pid_t: String] = [:]
     var listener: pid_t?
+    /// Processes whose running code is Google's adb.
+    var googleADB: Set<pid_t> = []
     var kills = 0
     /// How many more times a started server does not answer yet, as one coming up does.
     var notYet = 0
@@ -58,6 +60,7 @@ struct ADBServerKeeperTests {
     func started(_ pid: pid_t) -> UInt64? { fakes { $0.started[pid] } }
     func path(_ pid: pid_t) -> String? { fakes { $0.paths[pid] } }
     func listener(onTCPPort port: UInt16) -> pid_t? { fakes { $0.listener } }
+    func runsGoogleADB(_ pid: pid_t) -> Bool { fakes { $0.googleADB.contains(pid) } }
   }
 
   static let adb = URL(
@@ -159,6 +162,7 @@ struct ADBServerKeeperTests {
       state.answering = true
       state.started[9] = 5
       state.paths[9] = Self.adb.path
+      state.listener = 9
     }
     #expect(await Self.keeper(fakes, record: record).replaceRecordedOrphan())
     #expect(fakes { $0.kills } == 1)
@@ -180,6 +184,7 @@ struct ADBServerKeeperTests {
       state.answering = true
       state.started[9] = started
       state.paths[9] = path
+      state.listener = 9
     }
     #expect(await Self.keeper(fakes, record: record).replaceRecordedOrphan() == false)
     #expect(fakes { $0.kills } == 0)
@@ -200,6 +205,7 @@ struct ADBServerKeeperTests {
       state.answering = true
       state.listener = 33
       state.paths[33] = Self.adb.path
+      state.googleADB = [33]
     }
     let keeper = Self.keeper(fakes, record: Self.recordFile())
     #expect(await keeper.replaceFerryServer(fetched: Self.adb))
@@ -250,6 +256,10 @@ struct ADBServerProcessTests {
     #expect(table.started(getpid()) != nil)
     #expect(table.started(getpid()) == table.started(getpid()))
     #expect(table.path(getpid()) == Bundle.main.executableURL?.resolvingSymlinksInPath().path)
+  }
+
+  @Test func thisProcessDoesNotRunGooglesADB() {
+    #expect(SystemProcessTable().runsGoogleADB(getpid()) == false)
   }
 
   @Test func theTableFindsTheListenerOnAPort() throws {
