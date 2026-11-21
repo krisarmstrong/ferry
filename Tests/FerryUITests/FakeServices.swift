@@ -58,19 +58,42 @@ final class FakeServices: SystemServicing {
   /// Whether a restart registers the new agent.
   var restartSucceeds = true
 
+  /// Runs after each restart and each bootout, as launchd would start the agent then.
+  var afterRestart: (@MainActor () -> Void)?
+  var afterBootOut: (@MainActor () -> Void)?
+
   func restartAgent() async -> Bool {
     log.record("restartAgent")
+    afterRestart?()
     return restartSucceeds
+  }
+
+  func bootOutAgent() async {
+    log.record("bootOutAgent")
+    afterBootOut?()
+  }
+
+  /// Whether an agent process runs, asked each time; one runs unless a test says otherwise.
+  var agentRunning: @MainActor () -> Bool = { true }
+  private(set) var runningChecks = 0
+
+  func agentIsRunning() async -> Bool {
+    runningChecks += 1
+    return agentRunning()
   }
 
   func helperStatus() async -> HelperStatus {
     helper
   }
 
-  /// Whether macOS reports the agent enabled (`SMAppService.Status.enabled`).
+  /// Whether macOS reports the agent enabled (`SMAppService.Status.enabled`). Answers from
+  /// `agentEnabledAnswers`, in order, come first.
   var agentEnabled = false
+  var agentEnabledAnswers: [Bool] = []
 
-  func agentIsEnabled() async -> Bool { agentEnabled }
+  func agentIsEnabled() async -> Bool {
+    agentEnabledAnswers.isEmpty ? agentEnabled : agentEnabledAnswers.removeFirst()
+  }
 
   func registerExtensions() async {
     log.record("registerExtensions")
@@ -117,8 +140,25 @@ final class FakeServices: SystemServicing {
     heldLoginItemChange = nil
   }
 
+  /// Set: unregistering waits until `releaseUnregister()`, and is announced on
+  /// `unregistersHeld`.
+  var holdsUnregister = false
+  private var heldUnregister: CheckedContinuation<Void, Never>?
+  let (unregistersHeld, unregisterHeld) = AsyncStream<Void>.makeStream()
+
   func unregisterAgent() async throws {
     log.record("unregisterAgent")
+    if holdsUnregister {
+      await withCheckedContinuation { continuation in
+        heldUnregister = continuation
+        unregisterHeld.yield()
+      }
+    }
+  }
+
+  func releaseUnregister() {
+    heldUnregister?.resume()
+    heldUnregister = nil
   }
 
   func removeFerryData(keeping preserved: [URL]) async {

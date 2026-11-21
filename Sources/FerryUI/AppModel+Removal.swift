@@ -30,6 +30,8 @@ extension AppModel {
   /// locations had not sent to a device are shown in Finder, since the menu goes away.
   public func removeFerry() async {
     removalError = nil
+    // The agent is about to be unregistered: a status lost meanwhile must not restart it.
+    removing = true
     let preserved: [URL]
     do {
       guard case .removed(let saved) = try await client.send(.removeAllDomains, file: nil) else {
@@ -43,6 +45,7 @@ extension AppModel {
       preserved = saved.filter(Self.holdsSomething)
     } catch {
       Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .private)")
+      removing = false
       if services.appWasReplaced() {
         agent = .replaced
         removalError = Self.replacedMessage

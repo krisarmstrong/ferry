@@ -23,8 +23,10 @@ Sources/FerryAgentCore/DeviceHub+Swap.swift: log.info("device \(id.serial, priva
 Sources/FerryAgentCore/DeviceHub.swift: "device \(info.id.serial, privacy: .private) opened over \(opened.rawValue, privacy: .public)"
 Sources/FerryAgentCore/DomainController+Visibility.swift: \(change, privacy: .public) domain \(identifier, privacy: .private) failed: \
 
-# Ferry's own bundle names (Ferry.app and its .appex), with Launch Services' status code.
-Sources/FerryUI/SystemServices.swift: "registering \(name, privacy: .public) failed: \(status, privacy: .public)")
+# Launch Services' status code for Ferry's own bundle.
+Sources/FerryUI/SystemServices.swift: Self.log.error("registering Ferry with Launch Services failed: \(status, privacy: .public)")
+# launchctl's exit status for a bootout of Ferry's own agent job.
+Sources/FerryUI/SystemServices+Agent.swift: Self.log.notice("booted out the agent's job: \(status, privacy: .public)")
 
 # An MTP storage's numeric ID, which the device assigns per session.
 Sources/MTPTransport/MTPDevice.swift: "storage \(id, privacy: .public): \(named, privacy: .private) as \(key, privacy: .private)")

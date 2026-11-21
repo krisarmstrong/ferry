@@ -28,10 +28,6 @@ import os
   static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "AppModel")
   static let pollInterval = Duration.seconds(2)
   static let emptyGuideDelay = Duration.seconds(10)
-  /// After restarting an agent it could not reach, how many times the app asks it for its status,
-  /// `recoveryPause` apart, before leaving it until the next outage.
-  static let recoveryChecks = 5
-  static let recoveryPause = Duration.seconds(1)
 
   public private(set) var devices: [AttachedDevice] = []
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
@@ -127,6 +123,8 @@ import os
   var restartedBuild: String?
   /// Set when the agent was restarted for this outage, or is being; cleared once it answers.
   var recoveryAttempted = false
+  /// Set while Remove Ferry runs: the agent it unregisters must not be restarted.
+  var removing = false
   private var loginItemRequests = 0
   private var loginItemsApplied = 0
 
@@ -152,6 +150,8 @@ import os
   let services: any SystemServicing
   let sleep: @Sendable (Duration) async throws -> Void
   let now: @Sendable () -> ContinuousClock.Instant
+  /// Returns once a status request has waited `statusDeadline` (see `requestStatus()`).
+  let statusDeadline: @Sendable () async throws -> Void
   /// Devices the guide has opened for this app run.
   var guidedDevices: Set<DeviceID> = []
   var emptyGuideShown = false
@@ -165,12 +165,16 @@ import os
   init(
     client: any AgentSending, services: any SystemServicing,
     sleep: @escaping @Sendable (Duration) async throws -> Void,
-    now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }
+    now: @escaping @Sendable () -> ContinuousClock.Instant = { .now },
+    statusDeadline: @escaping @Sendable () async throws -> Void = {
+      try await Task.sleep(for: AppModel.statusDeadline)
+    }
   ) {
     self.client = client
     self.services = services
     self.sleep = sleep
     self.now = now
+    self.statusDeadline = statusDeadline
   }
 
   public func refresh() async {
@@ -180,7 +184,7 @@ import os
   /// Asks the agent for its status and shows it.
   func readStatus() async -> StatusRead {
     do {
-      switch try await client.send(.status, file: nil) {
+      switch try await requestStatus() {
       case .status(let report):
         apply(report)
         return .answered
@@ -249,15 +253,6 @@ import os
       answeredFor? += Self.pollInterval
     }
     cancelDetailReads()
-  }
-
-  public func turnOnInFinder() {
-    services.open(Self.loginItemsSettings)
-  }
-
-  /// Where the user allows Ferry's helper to run in the background.
-  public func openLoginItems() {
-    services.open(Self.loginItemsSettings)
   }
 
   /// The Open at Login row: shows `enabled` at once, then applies it after any change still
@@ -364,6 +359,15 @@ import os
 }
 
 extension AppModel {
+  public func turnOnInFinder() {
+    services.open(Self.loginItemsSettings)
+  }
+
+  /// Where the user allows Ferry's helper to run in the background.
+  public func openLoginItems() {
+    services.open(Self.loginItemsSettings)
+  }
+
   /// An ejected device reports `.ejected`, which never opens the guide.
   public func eject(_ id: DeviceID) async {
     await perform(.eject(id))

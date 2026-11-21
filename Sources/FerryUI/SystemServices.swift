@@ -37,9 +37,14 @@ public protocol SystemServicing {
   /// Stops the running agent, which removes its launchd job, and registers the one in the
   /// bundle. False if the new agent could not be registered.
   func restartAgent() async -> Bool
-  /// Has Launch Services read the app and each extension in it again, so macOS uses the ones in
-  /// this bundle: after a manual reinstall it can forget the File Provider extension for minutes
-  /// (error -2001). Harmless when nothing changed.
+  /// Removes the agent's launchd job (`launchctl bootout`) and waits, bounded, until launchd no
+  /// longer lists it: a job launchd keeps but cannot spawn can outlast a restart.
+  func bootOutAgent() async
+  /// Whether this user runs the agent from this bundle now.
+  func agentIsRunning() async -> Bool
+  /// Has Launch Services read the app, and with it the extensions inside it, again, so macOS
+  /// uses the ones in this bundle: after a manual reinstall it can forget the File Provider
+  /// extension for minutes (error -2001). Harmless when nothing changed.
   func registerExtensions() async
   /// What macOS says about the helper now.
   func helperStatus() async -> HelperStatus
@@ -101,11 +106,11 @@ public protocol SystemServicing {
 /// it when called on the main thread; every call to it runs on a detached utility task.
 @MainActor
 public final class SystemServices: SystemServicing {
-  private nonisolated static let log = Logger(
+  nonisolated static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "App")
 
   /// Where `SMAppService.agent(plistName:)` finds the agent, in `Contents/Library/LaunchAgents`.
-  private nonisolated static let agentPlist = "io.github.krisarmstrong.ferry.agent.plist"
+  nonisolated static let agentPlist = "io.github.krisarmstrong.ferry.agent.plist"
 
   /// The app's executable and its bundle's seal, and which files they were at launch.
   private let bundleFiles = [
@@ -183,7 +188,6 @@ public final class SystemServices: SystemServicing {
 
   public func registerExtensions() async {
     let bundle = Bundle.main.bundleURL
-    let plugIns = Bundle.main.builtInPlugInsURL
     await Task.detached(priority: .utility) {
       let readOnly =
         (try? bundle.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false
@@ -191,18 +195,11 @@ public final class SystemServices: SystemServicing {
         Self.log.info("not registering a translocated or read-only copy with Launch Services")
         return
       }
-      let extensions =
-        plugIns.flatMap {
-          try? FileManager.default.contentsOfDirectory(
-            at: $0, includingPropertiesForKeys: nil)
-        }?.filter { $0.pathExtension == "appex" } ?? []
-      for url in [bundle] + extensions {
-        let status = LSRegisterURL(url as CFURL, true)
-        if status != noErr {
-          let name = url.lastPathComponent
-          Self.log.error(
-            "registering \(name, privacy: .public) failed: \(status, privacy: .public)")
-        }
+      // The app bundle only: Launch Services reads the extensions inside it, and registering an
+      // .appex on its own fails with kLSNotAnApplicationErr (-10811).
+      let status = LSRegisterURL(bundle as CFURL, true)
+      if status != noErr {
+        Self.log.error("registering Ferry with Launch Services failed: \(status, privacy: .public)")
       }
     }.value
   }
