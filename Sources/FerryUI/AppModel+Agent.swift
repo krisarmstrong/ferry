@@ -32,12 +32,23 @@ extension AppModel {
   /// the agent, while `SMAppService` still says it is enabled, until the job is removed. An agent
   /// the app cannot reach while macOS has it enabled is therefore restarted (unregistered, which
   /// removes the job, and registered again), once per outage: a restart cuts off every transfer.
-  /// Then the app asks for its status a bounded number of times.
+  /// Then the app asks for its status a bounded number of times. A status the menu cancelled by
+  /// closing says nothing about the agent, and one lost because launchd relaunched the agent
+  /// mid-call is answered when asked again, so neither restarts it.
   func recoverAgent() async {
-    guard !recoveryAttempted else { return }
+    guard !Task.isCancelled, !recoveryAttempted else { return }
     recoveryAttempted = true
     guard await services.agentIsEnabled() else {
       // Off or awaiting approval is the user's choice; look again at the next failure.
+      recoveryAttempted = false
+      return
+    }
+    guard (try? await sleep(Self.recoveryPause)) != nil else {
+      recoveryAttempted = false
+      return
+    }
+    if await readStatus() { return }
+    guard agent == .unreachable else {
       recoveryAttempted = false
       return
     }

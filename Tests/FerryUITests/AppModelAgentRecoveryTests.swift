@@ -51,22 +51,44 @@ struct AppModelAgentRecoveryTests {
   @Test func anEnabledAgentThatCannotBeReachedIsRestartedOnce() async {
     let services = FakeServices(log: log)
     services.agentEnabled = true
-    let client = FlakyClient(FakeClient(log: log), failures: 1)
+    let client = FlakyClient(FakeClient(log: log), failures: 2)
     let model = model(client, services)
     await model.launch()
     #expect(
       log.all == [
-        "registerAgent", "registerExtensions", "status unreachable", "restartAgent", "status",
-        "readLoginItem",
+        "registerAgent", "registerExtensions", "status unreachable", "status unreachable",
+        "restartAgent", "status", "readLoginItem",
       ])
     #expect(model.agent == .running)
+  }
+
+  /// A call in flight when launchd relaunched the agent fails once; the next one reaches it, so
+  /// nothing is restarted.
+  @Test func oneLostCallIsAskedAgainBeforeAnyRestart() async {
+    let services = FakeServices(log: log)
+    services.agentEnabled = true
+    let model = model(FlakyClient(FakeClient(log: log), failures: 1), services)
+    await model.launch()
+    #expect(!log.all.contains("restartAgent"))
+    #expect(model.agent == .running)
+  }
+
+  /// A status cut short by the menu closing is no sign of a stuck agent.
+  @Test func aCancelledRefreshRestartsNothing() async {
+    let services = FakeServices(log: log)
+    services.agentEnabled = true
+    let model = model(FlakyClient(FakeClient(log: log), failures: 1000), services)
+    let refresh = Task { await model.refresh() }
+    refresh.cancel()
+    await refresh.value
+    #expect(!log.all.contains("restartAgent"))
   }
 
   /// Turned off, or waiting for approval: the user's setting, not a stuck job.
   @Test func anAgentMacOSDoesNotHaveEnabledIsLeftAlone() async {
     let services = FakeServices(log: log)
     services.agentEnabled = false
-    let model = model(FlakyClient(FakeClient(log: log), failures: 1), services)
+    let model = model(FlakyClient(FakeClient(log: log), failures: 2), services)
     await model.launch()
     #expect(!log.all.contains("restartAgent"))
     #expect(model.agent == .unreachable)
@@ -77,7 +99,7 @@ struct AppModelAgentRecoveryTests {
     let services = FakeServices(log: log)
     services.agentEnabled = true
     services.replaced = true
-    let model = model(FlakyClient(FakeClient(log: log), failures: 1), services)
+    let model = model(FlakyClient(FakeClient(log: log), failures: 2), services)
     await model.launch()
     #expect(!log.all.contains("restartAgent"))
     #expect(model.agent == .replaced)
@@ -95,13 +117,14 @@ struct AppModelAgentRecoveryTests {
     await model.refresh()
     #expect(log.all.filter { $0 == "restartAgent" }.count == 1)
     let checks = log.all.filter { $0 == "status unreachable" }.count
-    #expect(checks == 1 + AppModel.recoveryChecks + 2)
+    // The first failure, the one asked again, the checks after the restart, two refreshes.
+    #expect(checks == 1 + 1 + AppModel.recoveryChecks + 2)
     #expect(model.agent == .unreachable)
 
     client.setFailures(0)
     await model.refresh()
     #expect(model.agent == .running)
-    client.setFailures(1)
+    client.setFailures(2)
     await model.refresh()
     #expect(log.all.filter { $0 == "restartAgent" }.count == 2)
   }
