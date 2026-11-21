@@ -22,7 +22,8 @@ extension AppModel {
   }
 
   /// Removes Ferry's locations from Finder, unregisters the agent, deletes Ferry's data and stops
-  /// its own adb server once the agent has exited, unregisters the login item, and quits. Stops
+  /// its own adb server once the agent has exited, forgets that Ferry ran here (so a reinstall
+  /// shows the welcome), unregisters the login item, and quits. Stops
   /// if the locations or the agent remain, so the user can try again rather than being left
   /// with locations no agent serves. Once the agent is gone a retry could only fail, so a login
   /// item that will not unregister is logged and Ferry quits anyway. Changes the
@@ -37,6 +38,8 @@ extension AppModel {
       try await services.unregisterAgent()
       // Once the agent has exited, so it cannot write its tables or devices back.
       await services.removeFerryData(keeping: saved)
+      // So a reinstall is a first run, with the welcome.
+      services.forgetFirstRun()
       preserved = saved.filter(Self.holdsSomething)
     } catch {
       Self.log.error("removing Ferry failed: \(String(describing: error), privacy: .private)")

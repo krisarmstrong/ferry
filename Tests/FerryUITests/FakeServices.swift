@@ -19,8 +19,24 @@ final class FakeServices: SystemServicing {
   /// Whether the app's executable was replaced since launch.
   var replaced = false
 
+  /// What the user has been shown once (see `OnboardingMark`).
+  var marks: Set<OnboardingMark> = []
+
   init(log: CallLog) {
     self.log = log
+  }
+
+  func hasMark(_ mark: OnboardingMark) -> Bool { marks.contains(mark) }
+
+  /// Not logged: every first status records one, which would crowd the logs tests compare.
+  func recordMark(_ mark: OnboardingMark) {
+    marks.insert(mark)
+  }
+
+  /// Not logged either: the removal tests compare its log.
+  func forgetFirstRun() {
+    marks = []
+    startedAgent = nil
   }
 
   func registerAgent() async {

@@ -2412,6 +2412,57 @@
     },
     "Nothing to change: Ferry restarts adb by itself and reconnects your devices. If this one isn't back in a few seconds, click **Connect Again**." : {
       "extractionState" : "manual"
+    },
+    "Welcome to Ferry" : {
+
+    },
+    "Ferry puts the files on your Android device in Finder." : {
+
+    },
+    "Ferry is ready" : {
+
+    },
+    "Your device is in Finder's sidebar, under Locations." : {
+
+    },
+    "You can open this again from Help." : {
+
+    },
+    "Not Now" : {
+
+    },
+    "Connect a device" : {
+
+    },
+    "Get Android Platform Tools" : {
+
+    },
+    "Connect it to the Mac with a USB cable, then choose Transfer files on it." : {
+
+    },
+    "Optional. USB debugging, Wi-Fi and a device's tools need adb, which Ferry downloads from Google once." : {
+
+    },
+    "Show Welcome Window" : {
+
+    },
+    "macOS asks before Ferry uses your network" : {
+
+    },
+    "Click Allow when it asks, so Ferry can reach devices over Wi-Fi." : {
+
+    },
+    "OK" : {
+
+    },
+    "The first time Ferry opens, a welcome window lists what is left to set up: connecting a device, turning on Ferry in Finder and, for USB debugging or Wi-Fi, getting adb. Each step is ticked once it is done." : {
+
+    },
+    "The first time Ferry reaches a device over the network, macOS asks whether Ferry may find devices on your local network. Click **Allow**: without it, Ferry can't reach devices over Wi-Fi." : {
+
+    },
+    "Ferry also forgets that it ran on this Mac, so if you install it again the welcome opens again." : {
+
     }
   },
   "version" : "1.0"

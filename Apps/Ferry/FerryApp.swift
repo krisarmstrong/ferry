@@ -2,8 +2,8 @@ import FerryIPC
 import FerryUI
 import SwiftUI
 
-/// The menu-bar app: registers the agent, shows its devices, and hosts the setup guide, Help
-/// and the developer tools' windows. Ferry has no Settings window: Open at Login is in the menu,
+/// The menu-bar app: registers the agent, shows its devices, and hosts the welcome, the setup
+/// guide, Help and the developer tools' windows. Ferry has no Settings window: Open at Login is in the menu,
 /// Remove Ferry… in Help.
 @main
 struct FerryApp: App {
@@ -26,10 +26,20 @@ struct FerryApp: App {
     MenuBarExtra {
       MenuContent(model: model)
     } label: {
+      // The icon exists from launch, so it opens the first run's welcome (see WelcomeView).
       Image("MenuBarGlyph")
         .accessibilityLabel(Text(verbatim: "Ferry"))
+        .presentsWelcome(model)
     }
     .menuBarExtraStyle(.window)
+
+    // Shown once, on a Mac new to Ferry, and from Help.
+    Window(WelcomeView.windowTitle, id: WelcomeView.windowID) {
+      WelcomeView(model: model)
+    }
+    .windowResizability(.contentSize)
+    .defaultLaunchBehavior(.suppressed)
+    .restorationBehavior(.disabled)
 
     Window(SetupGuide.windowTitle, id: SetupGuide.windowID) {
       SetupGuide(model: model)

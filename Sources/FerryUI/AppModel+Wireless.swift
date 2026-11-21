@@ -59,6 +59,7 @@ extension AppModel {
     guard opening else { return }
     networkForm = NetworkForm(kind: kind)
     wantsNetwork = true
+    noteWiFiUse()
   }
 
   /// Escape, or the form's row clicked again: the form goes, with what it was sending and what
@@ -110,6 +111,7 @@ extension AppModel {
   }
 
   public func useOverWiFi(_ id: DeviceID) async {
+    noteWiFiUse()
     await performWireless(.enableWireless(id))
   }
 

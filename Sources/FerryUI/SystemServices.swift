@@ -83,6 +83,12 @@ public protocol SystemServicing {
   /// The Android SDK License acceptance recorded in Ferry's defaults.
   func platformToolsAcceptance() -> LicenseAcceptance?
   func recordPlatformToolsAcceptance(_ acceptance: LicenseAcceptance)
+  /// Whether Ferry's defaults record that the user was shown `mark`'s thing.
+  func hasMark(_ mark: OnboardingMark) -> Bool
+  func recordMark(_ mark: OnboardingMark)
+  /// Forgets that Ferry ran on this Mac: the onboarding marks and the agent last started, so a
+  /// reinstall is a first run and shows the welcome.
+  func forgetFirstRun()
   /// The version of the platform tools Ferry fetched and would use, if any.
   func fetchedPlatformToolsVersion() -> String?
   /// Fetches the pinned platform tools (see `PlatformToolsFetcher`).
@@ -125,7 +131,7 @@ public final class SystemServices: SystemServicing {
   }
 
   /// Where `recordStartedAgent` keeps the agent last started.
-  private nonisolated static let startedAgentKey = "StartedAgentBuild"
+  nonisolated static let startedAgentKey = "StartedAgentBuild"
 
   public func agentBuild() -> String? {
     let agent = Bundle.main.bundleURL.appending(path: "Contents/MacOS/FerryAgent")

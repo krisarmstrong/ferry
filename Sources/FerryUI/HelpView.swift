@@ -85,7 +85,11 @@ private struct HelpBrowser: View {
     .frame(minWidth: 680, minHeight: 440)
     .onAppear { model.helpAppeared() }
     .onChange(of: model.helpRequest, initial: true) { _, _ in
-      if let key = model.takeHelpRequest() { _ = navigator.open(message: key) }
+      switch model.takeHelpRequest() {
+      case .message(let key)?: _ = navigator.open(message: key)
+      case .topic(let id)?: _ = navigator.open(topic: id)
+      case nil: break
+      }
     }
     .onChange(of: navigator.selection) { _, selection in
       UserDefaults.standard.set(selection, forKey: HelpView.selectionKey)
@@ -296,8 +300,20 @@ private struct HelpBodyView: View {
         }
         .buttonStyle(.bordered)
       }
-      if blocks.action == .removeFerry {
+      switch blocks.action {
+      case .removeFerry?:
         RemoveFerryButton(model: model)
+      case .showWelcome?:
+        Button {
+          model.showWelcome()
+          _ = model.takeWelcomeOpenRequest()
+          openWindow(id: WelcomeView.windowID)
+        } label: {
+          Text("Show Welcome Window", bundle: .module)
+        }
+        .buttonStyle(.bordered)
+      case nil:
+        EmptyView()
       }
     }
   }

@@ -195,6 +195,24 @@ struct HelpNavigatorTests {
     #expect(navigator.highlighted == nil)
   }
 
+  /// A link to a topic clears the search, which could hide it, and opens it with nothing marked.
+  @Test func aTopicLinkOpensItsTopic() {
+    var navigator = Self.navigator(at: "menu")
+    navigator.query = "recording"
+    let opened = navigator.open(topic: "get-adb")
+    #expect(opened)
+    #expect(navigator.query.isEmpty)
+    #expect(navigator.shownTopic?.id == "get-adb")
+    #expect(navigator.highlighted == nil)
+  }
+
+  @Test func anUnknownTopicChangesNothing() {
+    var navigator = Self.navigator(at: "menu")
+    let opened = navigator.open(topic: "no-such-topic")
+    #expect(!opened)
+    #expect(navigator.selection == "menu")
+  }
+
   /// The sidebar clears its selection while a search is typed: that keeps the topic chosen.
   @Test func aClearedSelectionKeepsTheTopic() {
     var navigator = Self.navigator(at: "menu")
@@ -211,7 +229,23 @@ struct HelpRequestTests {
     let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
     #expect(model.takeHelpRequest() == nil)
     model.showHelp(forMessage: "The device was disconnected. Reconnect it, then try again.")
-    #expect(model.takeHelpRequest() == "The device was disconnected. Reconnect it, then try again.")
+    #expect(
+      model.takeHelpRequest()
+        == .message("The device was disconnected. Reconnect it, then try again."))
+    #expect(model.takeHelpRequest() == nil)
+  }
+
+  /// VoiceOver reads a topic's link as "Help:" and the topic's title.
+  @Test func aTopicLinkIsReadByItsTitle() {
+    #expect(HelpLinkButton.label(forTopic: "turn-on-finder") == "Help: Turn on Ferry in Finder")
+  }
+
+  /// A step of the welcome names its topic, not a message.
+  @Test func aTopicLinkIsTakenOnce() {
+    let log = CallLog()
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    model.showHelp(topic: "turn-on-finder")
+    #expect(model.takeHelpRequest() == .topic("turn-on-finder"))
     #expect(model.takeHelpRequest() == nil)
   }
 }

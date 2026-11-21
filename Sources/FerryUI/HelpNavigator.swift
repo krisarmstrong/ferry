@@ -72,4 +72,13 @@ struct HelpNavigator: Equatable {
     linkRequests += 1
     return true
   }
+
+  /// A welcome step's Help link: clears the search and opens the topic with this id, nothing
+  /// marked. False, changing nothing, for an id Help does not have.
+  mutating func open(topic id: String) -> Bool {
+    guard content.topics.contains(where: { $0.id == id }) else { return false }
+    query = ""
+    select(id)
+    return true
+  }
 }

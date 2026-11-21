@@ -17,6 +17,7 @@ extension AppModel {
   /// Ferry fetched if this release pins a newer one. The system calls run off the main actor (see
   /// `SystemServices`), so the app opens without waiting on them.
   public func launch() async {
+    noteFirstRun()
     restartedBuild = await startAgent()
     await refresh()
     // After the first status, so the menu's devices never wait on Launch Services.

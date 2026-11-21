@@ -19,13 +19,21 @@ public struct MenuNotice: Equatable, Sendable {
   }
 }
 
-/// The Help link beside a problem in the menu: a question mark that opens the problem's entry in
-/// Help. Nothing when the message has no entry, or outside the menu, which puts its model in the
-/// environment.
+/// The Help link beside a problem in the menu, or a step of the welcome: a question mark that
+/// opens the problem's entry, or the step's topic, in Help. Nothing when the message has no
+/// entry, or outside a view that puts its model in the environment.
 struct HelpLinkButton: View {
   @Environment(AppModel.self) private var model: AppModel?
   @Environment(\.openWindow) private var openWindow
-  let key: String?
+  let request: HelpRequest?
+
+  init(key: String?) {
+    request = key.map(HelpRequest.message)
+  }
+
+  init(topic id: String) {
+    request = .topic(id)
+  }
 
   /// What VoiceOver reads for the link: "Help:" and the problem's words, each value as "…". A
   /// key is the problem's English text, whichever module's catalog holds it.
@@ -36,10 +44,19 @@ struct HelpLinkButton: View {
         "Help: \(HelpMessage.wording(of: problem))", bundle: .module))
   }
 
+  /// What VoiceOver reads for a topic's link: "Help:" and the topic's title.
+  static func label(forTopic id: String) -> String {
+    let title = HelpContent.bundled?.topics.first { $0.id == id }.map { HelpText.plain($0.title) }
+    return String(localized: LocalizedStringResource("Help: \(title ?? id)", bundle: .module))
+  }
+
   var body: some View {
-    if let key, let model {
+    if let request, let model {
       Button {
-        model.showHelp(forMessage: key)
+        switch request {
+        case .message(let key): model.showHelp(forMessage: key)
+        case .topic(let id): model.showHelp(topic: id)
+        }
         NSApp.activate()
         openWindow(id: HelpView.windowID)
       } label: {
@@ -49,7 +66,14 @@ struct HelpLinkButton: View {
       .buttonStyle(.borderless)
       .help(Text("Help", bundle: .module))
       // Several problems can show at once: each link names its own (audit L5).
-      .accessibilityLabel(Self.label(forMessage: key))
+      .accessibilityLabel(label(request))
+    }
+  }
+
+  private func label(_ request: HelpRequest) -> String {
+    switch request {
+    case .message(let key): Self.label(forMessage: key)
+    case .topic(let id): Self.label(forTopic: id)
     }
   }
 }

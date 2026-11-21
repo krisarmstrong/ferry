@@ -18,7 +18,7 @@ Message  = { message, cause, fix }
 link     = { title, target }    target: "guide", "guide:<DeviceFamily case>", "debugging" or
                                 "debugging:<DeviceFamily case>"
 definitions = [{ term, detail }]
-action   = "removeFerry"
+action   = "removeFerry" or "showWelcome"
 ```
 
 - `id` is unique across topics. It is the selection the window remembers.
@@ -100,6 +100,8 @@ problem.
   the Troubleshooting category's last topic. It asks to confirm, then removes Ferry's locations
   and helper and quits. If that fails, the reason shows under the button. Ferry has no Settings
   window, so Remove Ferry lives here.
+  `"showWelcome"` is **Show Welcome Window**, on What Ferry does: it opens the first-run welcome
+  again, which never opens by itself once it is complete or closed.
 - The minimum size is about 680 × 440. The sidebar collapses like any split view.
 - `help.json` is loaded once from the bundle into `Decodable` structs. If it is missing or does
   not decode, a fault is logged and the window shows "Help isn't available". `make app` checks

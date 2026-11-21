@@ -208,6 +208,8 @@ struct HelpDefinition: Decodable, Sendable, Hashable {
 enum HelpAction: String, Decodable, Sendable {
   /// Remove Ferry…, after a confirmation.
   case removeFerry
+  /// Show Welcome Window: the first-run welcome, again.
+  case showWelcome
 }
 
 /// A button that opens the setup guide: with the model picker, or with one family's steps, on
