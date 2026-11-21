@@ -65,13 +65,16 @@ struct MenuPresentationTests {
   // MARK: Tile
 
   @Test(arguments: [
-    (ready, ConnectionMethod.usbADB, DevicePresentation.Tile(glyph: .phone, isActive: true)),
-    (ready, .usbFileTransfer, .init(glyph: .phone, isActive: true)),
-    (ready, .wifiADB, .init(glyph: .phone, isActive: true)),
-    (.notSharingFiles, .usbFileTransfer, .init(glyph: .phone, isActive: false)),
-    (.ejected, .usbADB, .init(glyph: .phone, isActive: false)),
-    (.busy, .usbFileTransfer, .init(glyph: .phone, isActive: false)),
-    (.failed(.deviceBusy), .wifiADB, .init(glyph: .phone, isActive: false)),
+    (
+      ready, ConnectionMethod.usbADB,
+      DevicePresentation.Tile(glyph: .device(.pixel), isActive: true)
+    ),
+    (ready, .usbFileTransfer, .init(glyph: .device(.pixel), isActive: true)),
+    (ready, .wifiADB, .init(glyph: .device(.pixel), isActive: true)),
+    (.notSharingFiles, .usbFileTransfer, .init(glyph: .device(.pixel), isActive: false)),
+    (.ejected, .usbADB, .init(glyph: .device(.pixel), isActive: false)),
+    (.busy, .usbFileTransfer, .init(glyph: .device(.pixel), isActive: false)),
+    (.failed(.deviceBusy), .wifiADB, .init(glyph: .device(.pixel), isActive: false)),
   ])
   func theTileIsActiveOnlyWhenReady(
     state: DeviceState, method: ConnectionMethod, tile: DevicePresentation.Tile
@@ -80,33 +83,53 @@ struct MenuPresentationTests {
   }
 
   /// The tile draws what kind of device it is, read from what the device reports: NetAlly's
-  /// testers by model name, tablets by name or Samsung's tablet model numbers, else a phone.
+  /// testers by model name, whatever their maker reports; tablets by name or Samsung's tablet
+  /// model numbers; Samsung's foldables and other phones and Google's Pixels by their makers;
+  /// else a phone.
   @Test(arguments: [
-    ("", "EtherScope-nXG", DevicePresentation.TileGlyph.tester),
-    ("", "LinkRunner 10G", .tester),
-    ("NetAlly", "LinkRunner 100G", .tester),
-    ("", "NetAlly AirCheck G3", .tester),
-    ("", "CyberScope", .tester),
-    ("NetAlly", "", .tester),
-    ("Google", "Pixel 8", .phone),
-    ("Samsung", "Galaxy S24", .phone),
-    ("samsung", "SM-S921U", .phone),
+    ("", "EtherScope nXG", DevicePresentation.TileGlyph.device(.etherScope)),
+    ("", "EtherScope-nXG", .device(.etherScope)),
+    ("NetAlly", "CyberScope", .device(.etherScope)),
+    ("", "CyberScope XRF", .device(.etherScope)),
+    ("", "LinkRunner 10G", .device(.linkRunner)),
+    ("NetAlly", "LinkRunner 100G", .device(.linkRunner)),
+    ("freescale", "LinkRunner-100G", .device(.linkRunner)),
+    ("NetAlly", "LinkRunner G2", .device(.linkRunner)),
+    ("", "LinkRunner AT 4000", .device(.linkRunnerAT)),
+    ("NetAlly", "LinkRunner AT 2000", .device(.linkRunnerAT)),
+    ("", "AirCheck G3", .device(.airCheck)),
+    ("", "NetAlly AirCheck G3", .device(.airCheck)),
+    ("NetAlly", "", .device(.tester)),
+    ("NetAlly", "Test Accessory", .device(.tester)),
+    ("Google", "Pixel 8", .device(.pixel)),
+    ("Google", "Pixel 8 Pro", .device(.pixel)),
+    ("Google", "Pixel Fold", .device(.pixel)),
+    ("Google", "Nexus 5X", .phone),
+    ("", "Pixel 8 Pro", .phone),
+    ("Samsung", "Galaxy S24", .device(.galaxy)),
+    ("samsung", "SM-S921U", .device(.galaxy)),
+    ("samsung", "SM-S928U", .device(.galaxy)),
+    ("samsung", "SM-A546E", .device(.galaxy)),
+    ("samsung", "SM-F946U", .device(.foldable)),
+    ("samsung", "SM-F731B", .device(.foldable)),
+    ("Samsung", "Galaxy Z Fold5", .device(.foldable)),
+    ("Samsung", "Galaxy Z Flip5", .device(.foldable)),
     ("", "", .phone),
-    ("Google", "Pixel Tablet", .tablet),
-    ("Samsung", "Galaxy Tab S9", .tablet),
-    ("samsung", "SM-X710", .tablet),
-    ("samsung", "SM-T870", .tablet),
-    ("samsung", "SM-P613", .tablet),
-    ("LENOVO", "Lenovo TB-X606F", .tablet),
-    ("LENOVO", "TB3-850F", .tablet),
+    ("Acme", "Widget 3000", .phone),
+    ("Google", "Pixel Tablet", .device(.tablet)),
+    ("Samsung", "Galaxy Tab S9", .device(.tablet)),
+    ("samsung", "SM-X710", .device(.tablet)),
+    ("samsung", "SM-T870", .device(.tablet)),
+    ("samsung", "SM-P613", .device(.tablet)),
+    ("LENOVO", "Lenovo TB-X606F", .device(.tablet)),
+    ("LENOVO", "TB3-850F", .device(.tablet)),
     ("Generic", "STB-100", .phone),
     ("Generic", "TB-200", .phone),
-    ("Xiaomi", "Mi Pad 5", .tablet),
-    ("HUAWEI", "MatePad 11", .tablet),
-    ("HUAWEI", "MediaPad M5", .tablet),
-    ("Amazon", "KFTRWI", .tablet),
-    ("Amazon", "Fire HD 10", .tablet),
-    ("Google", "Pixel Fold", .phone),
+    ("Xiaomi", "Mi Pad 5", .device(.tablet)),
+    ("HUAWEI", "MatePad 11", .device(.tablet)),
+    ("HUAWEI", "MediaPad M5", .device(.tablet)),
+    ("Amazon", "KFTRWI", .device(.tablet)),
+    ("Amazon", "Fire HD 10", .device(.tablet)),
     ("Motorola", "moto g stylus", .phone),
   ])
   func theTileShowsTheKindOfDevice(
