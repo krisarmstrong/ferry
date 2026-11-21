@@ -198,7 +198,22 @@ the result for each.
     adb server, and files under `~/Library/Application Support/Ferry` and
     `~/Library/Application Support/io.github.krisarmstrong.ferry.agent` (both deleted after #33).
 12. **Upgrade over a developer build** (signing identity change): the helper restarts without a
-    manual `launchctl` step (W2).
+    manual `launchctl` step (W2). The opposite direction, a developer build over Developer ID
+    0.4.0, was proven on the integration branch (see the V1 fix report); this check covers
+    the release build going over a developer one.
+13. **Pair by code** from the menu (`host:pair`): pair a device with Wi-Fi debugging, confirm it
+    connects and is remembered. Never exercised on hardware: the integration smoke test ran with
+    the screen locked.
+14. **Forget** that device from the menu (`host:disconnect`, whose failure path is new): the
+    menu drops it, and `adb devices` no longer lists it.
+15. **Create while the device is refused:** with the device attached but refusing Ferry
+    (unauthorized, or the adb server cut off from the network), create a small file in the
+    device's Finder location. Record what Finder shows and what reaches the device.
+16. **The stray duplicate after a refused create:** after check 15, and again once the device
+    is reachable, look for a local-only copy named like `name 2.txt` beside the real file. The
+    integration smoke test left one (`integration-small 2.txt`) that never reached the device,
+    which could leave a user believing a file was sent. Note whether it appears, whether it
+    ever syncs, and whether Finder marks it as not uploaded.
 
 ## W5 fixes (2026-11-20)
 
