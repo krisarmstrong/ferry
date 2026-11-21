@@ -96,8 +96,8 @@ final class FakeServices: SystemServicing {
     log.record("unregisterAgent")
   }
 
-  func removeAgentData() async throws {
-    log.record("removeAgentData")
+  func removeFerryData(keeping preserved: [URL]) async {
+    log.record("removeData")
   }
 
   func open(_ url: URL) {

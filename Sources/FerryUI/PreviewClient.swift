@@ -66,7 +66,7 @@ private final class PreviewServices: SystemServicing {
   func loginItemStatus() async -> LoginItemStatus { .disabled }
   func setOpensAtLogin(_ enabled: Bool) async {}
   func unregisterAgent() {}
-  func removeAgentData() {}
+  func removeFerryData(keeping preserved: [URL]) {}
   func open(_ url: URL) {}
   func reveal(_ urls: [URL]) {}
   func quit() {}

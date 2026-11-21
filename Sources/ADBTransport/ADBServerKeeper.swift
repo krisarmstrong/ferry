@@ -1,6 +1,7 @@
 import Darwin
 import DeviceKit
 import Foundation
+import PlatformTools
 import Synchronization
 import os
 

@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import PlatformTools
 import Synchronization
 import Testing
 
@@ -62,6 +63,7 @@ struct ADBServerKeeperTests {
   struct FakeTable: ProcessTable {
     let fakes: Fakes
 
+    func processes() -> [pid_t] { fakes { Array($0.paths.keys) } }
     func started(_ pid: pid_t) -> UInt64? { fakes { $0.started[pid] } }
     func path(_ pid: pid_t) -> String? { fakes { $0.paths[pid] } }
     func listener(onTCPPort port: UInt16) -> pid_t? { fakes { $0.listener } }

@@ -55,7 +55,8 @@ let package = Package(
         "DeviceKit", "MTPTransport",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ]),
-    .testTarget(name: "ADBTransportTests", dependencies: ["ADBTransport", "DeviceKit"]),
+    .testTarget(
+      name: "ADBTransportTests", dependencies: ["ADBTransport", "DeviceKit", "PlatformTools"]),
     .testTarget(name: "PlatformToolsTests", dependencies: ["PlatformTools"]),
     .testTarget(
       name: "DeviceKitTests", dependencies: ["DeviceKit", "DeviceKitTestSupport"]),

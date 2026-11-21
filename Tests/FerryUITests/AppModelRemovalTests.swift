@@ -25,7 +25,7 @@ extension AppModelTests {
     await model.removeFerry()
     #expect(
       log.all == [
-        "removeAllDomains", "unregisterAgent", "removeAgentData", "readLoginItem",
+        "removeAllDomains", "unregisterAgent", "removeData", "readLoginItem",
         "opensAtLogin false", "quit",
       ])
   }
@@ -37,7 +37,7 @@ extension AppModelTests {
     await model.removeFerry()
     #expect(
       log.all == [
-        "removeAllDomains", "unregisterAgent", "removeAgentData", "readLoginItem",
+        "removeAllDomains", "unregisterAgent", "removeData", "readLoginItem",
         "opensAtLogin false", "quit",
       ])
   }
@@ -131,7 +131,7 @@ extension AppModelTests {
     let reveal = holdingFile ? ["reveal \(saved.path)"] : []
     #expect(
       log.all
-        == ["removeAllDomains", "unregisterAgent", "removeAgentData"] + reveal + [
+        == ["removeAllDomains", "unregisterAgent", "removeData"] + reveal + [
           "readLoginItem", "opensAtLogin false", "quit",
         ])
   }
