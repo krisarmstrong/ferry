@@ -209,6 +209,17 @@ public actor ADBStream {
     }
   }
 
+  /// A query's reply after its `OKAY`: one length-prefixed payload, or `FAIL` and a reason. A
+  /// host service the server runs on a thread of its own (`connect:`, `pair:`) is acknowledged
+  /// with `OKAY` as soon as it starts, so its own failure follows that `OKAY` (AOSP
+  /// packages/modules/adb 1cf2f017, sockets.cpp:894, services.cpp:155). `FAIL` is never a
+  /// length: its letters are not all hex digits.
+  func readReply() async throws(ADBError) -> String {
+    let head = try await read(exactly: 4)
+    if head == Data("FAIL".utf8) { throw .failed(try await readFrame()) }
+    return try ADBWire.text(try await read(exactly: ADBWire.length(of: head)))
+  }
+
   /// One length-prefixed payload.
   func readFrame() async throws(ADBError) -> String {
     let length = try ADBWire.length(of: try await read(exactly: 4))

@@ -26,6 +26,22 @@ struct ShellLaunchTests {
     #expect(script.contains("'/opt/homebrew/bin/adb' -s '0123456789abcdef' shell\n"))
   }
 
+  /// The adb serving the server runs the shell with nothing said; Ferry's own copy, used when
+  /// Ferry could not tell which adb that is, is named before adb starts, in the user's language.
+  @Test func aFallbackAdbIsNamedBeforeItRuns() throws {
+    let file = URL(filePath: "/tmp/ferry-shell-X/shell.command")
+    let matched = ShellLaunch.script(for: try target(), file: file)
+    #expect(!matched.contains("print -r --"))
+    let fallback = try #require(
+      ShellTarget(adb: "/opt/homebrew/bin/adb", serial: "S", runsServer: false))
+    let script = ShellLaunch.script(for: fallback, file: file)
+    let note = ShellLaunch.quoted(String(localized: ShellLaunch.fallbackNote))
+    let lines = script.split(separator: "\n").map(String.init)
+    let noteLine = try #require(lines.firstIndex(of: "print -r -- \(note)"))
+    let adbLine = try #require(lines.firstIndex { $0.hasPrefix("'/opt/homebrew/bin/adb'") })
+    #expect(noteLine < adbLine)
+  }
+
   /// A route adb gave a connection id selects the unit by it; one without uses the serial.
   @Test func thePinnedConnectionIsSelectedByItsID() throws {
     let file = URL(filePath: "/tmp/ferry-shell-X/shell.command")

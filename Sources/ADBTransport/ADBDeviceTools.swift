@@ -43,6 +43,8 @@ public struct ADBDeviceTools: Sendable {
   /// wait between two reads of the display's state, on the injected clock.
   let wakeLimit: Duration
   let pause: @Sendable (Duration) async throws -> Void
+  /// The executable serving the adb server's port, if it can be read (see `ADBServerProcess`).
+  private let serverExecutable: @Sendable () -> URL?
 
   public init(host: ADBHost) {
     self.init(
@@ -55,9 +57,12 @@ public struct ADBDeviceTools: Sendable {
     wakeLimit: Duration = .seconds(2),
     pause: @escaping @Sendable (Duration) async throws -> Void = {
       try await ContinuousClock().sleep(for: $0)
-    }
+    },
+    serverExecutable: (@Sendable () -> URL?)? = nil
   ) {
     self.host = host
+    self.serverExecutable =
+      serverExecutable ?? { ADBServerProcess.executable(listeningOn: host.port) }
     self.answerLimit = answerLimit
     self.captureLimit = captureLimit
     self.captureWait = captureWait
@@ -224,15 +229,18 @@ public struct ADBDeviceTools: Sendable {
     }
   }
 
-  /// The `adb` the locator finds, which a shell in Terminal runs.
+  /// The `adb` a shell in Terminal runs: the one serving the adb server when Ferry can tell,
+  /// else the one the locator finds, marked as a fallback.
   ///
-  /// Open in Terminal, Connect by Address and Pair with Code (`ADBCommand`) run this located adb,
-  /// Ferry's fetched copy first, as a client of whatever server answers. An adb client of a
-  /// different version than that server may restart it, so these can still disturb a server
-  /// another adb started; Ferry itself never starts one over it. Connecting and pairing over the
-  /// host protocol when a server answers is the follow-up (plan, Task 22).
-  public func adbPath() -> URL? {
-    host.adbURL()
+  /// An adb client of another version than the server may restart it, and that server may be
+  /// another tool's. The server is the process listening on its port; it counts only when that
+  /// program is named `adb` and is still executable. Connecting and pairing never run an adb:
+  /// they ask the server (see `ADBWireless`).
+  public func shellADB() -> ShellADB? {
+    guard let server = serverExecutable(), server.lastPathComponent == "adb",
+      FileManager.default.isExecutableFile(atPath: server.path)
+    else { return host.adbURL().map { ShellADB(url: $0, runsServer: false) } }
+    return ShellADB(url: server, runsServer: true)
   }
 
   // MARK: Plumbing

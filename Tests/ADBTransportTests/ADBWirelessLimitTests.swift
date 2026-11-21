@@ -9,11 +9,14 @@ struct ADBWirelessLimitTests {
   /// the agent holds its Wi-Fi gate across these calls.
   @Test(
     .timeLimit(.minutes(1)),
-    arguments: ["devices", "connect", "mdns", "device", "tcpPort", "addresses", "tcpip"])
+    arguments: [
+      "devices", "connect", "pair", "disconnect", "mdns", "device", "tcpPort", "addresses",
+      "tcpip",
+    ])
   func everyAnswerIsBounded(_ call: String) async throws {
     let server = try await FakeADBServer.start { peer in
       let request = try await peer.request()
-      if request == "host:version", call == "connect" {
+      if request == "host:version" {
         try await peer.answer("0029")
         return
       }
@@ -28,13 +31,16 @@ struct ADBWirelessLimitTests {
     defer { server.stop() }
     let wireless = ADBWireless(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb),
-      run: FakeADBRunner(output: "connected to 192.0.2.31:5555\n").run,
-      answerLimit: .milliseconds(200))
+      answerLimit: .milliseconds(200), commandLimit: .milliseconds(200))
     let serial = "192.0.2.31:5555"
     let error = await #expect(throws: ADBError.self) {
       switch call {
       case "devices": _ = try await wireless.devices()
       case "connect": _ = try await wireless.connect(WirelessEndpoint(parsing: serial)!)
+      case "pair":
+        _ = try await wireless.pair(
+          WirelessEndpoint(parsing: serial)!, code: PairingCode("482913")!)
+      case "disconnect": try await wireless.disconnect(WirelessEndpoint(parsing: serial)!)
       case "mdns": _ = try await wireless.mdnsServices()
       case "device": _ = try await wireless.device(at: serial)
       case "tcpPort": _ = try await wireless.tcpPort(of: serial)
@@ -47,5 +53,26 @@ struct ADBWirelessLimitTests {
       return
     }
     #expect(detail.hasPrefix("no answer within"))
+  }
+
+  /// The server holds a connect or pair open while it reaches the device, far longer than any
+  /// other answer: those requests wait `commandLimit`, not `answerLimit`.
+  @Test(.timeLimit(.minutes(1)))
+  func connectWaitsTheCommandLimit() async throws {
+    let server = try await FakeADBServer.start { peer in
+      switch try await peer.request() {
+      case "host:version": try await peer.answer("0029")
+      case "host:devices-l": try await peer.answer("192.0.2.31:5555 device\n")
+      default:
+        try await Task.sleep(for: .milliseconds(600))
+        try await peer.answer("connected to 192.0.2.31:5555")
+      }
+    }
+    defer { server.stop() }
+    let wireless = ADBWireless(
+      host: ADBHost(port: server.port, locator: ADBHostTests.noAdb),
+      answerLimit: .milliseconds(200), commandLimit: .seconds(20))
+    let outcome = try await wireless.connect(WirelessEndpoint(parsing: "192.0.2.31")!)
+    #expect(outcome == .connected(serial: "192.0.2.31:5555"))
   }
 }

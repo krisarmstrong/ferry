@@ -181,7 +181,7 @@ public actor ADBHost {
     do throws(ADBError) {
       try await stream.write(framed)
       try await stream.expectOkay()
-      let reply = try await stream.readFrame()
+      let reply = try await stream.readReply()
       await stream.close()
       return reply
     } catch {

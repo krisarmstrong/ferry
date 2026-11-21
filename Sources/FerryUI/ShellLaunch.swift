@@ -23,14 +23,24 @@ enum ShellLaunch {
     "'" + text.replacing("'", with: "'\\''") + "'"
   }
 
-  static func script(for target: ShellTarget, file: URL) -> String {
+  /// Printed before adb starts when the agent could not tell which adb serves the server.
+  static let fallbackNote = LocalizedStringResource(
     """
-    #!/bin/zsh
-    rm -f -- \(quoted(file.path))
-    rmdir -- \(quoted(file.deletingLastPathComponent().path)) 2>/dev/null
-    \(quoted(target.adb)) \(select(target)) shell
+    Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. \
+    If its version differs, adb may restart the server.
+    """,
+    bundle: .module)
 
-    """
+  static func script(for target: ShellTarget, file: URL) -> String {
+    let note =
+      target.runsServer ? "" : "print -r -- \(quoted(String(localized: fallbackNote)))\n"
+    return """
+      #!/bin/zsh
+      rm -f -- \(quoted(file.path))
+      rmdir -- \(quoted(file.deletingLastPathComponent().path)) 2>/dev/null
+      \(note)\(quoted(target.adb)) \(select(target)) shell
+
+      """
   }
 
   /// `-t <id>` when adb named the unit's connection, so the shell never reaches another unit

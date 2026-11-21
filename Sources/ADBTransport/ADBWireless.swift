@@ -33,57 +33,91 @@ public struct ADBMDNSService: Sendable, Equatable {
   public static let connectType = "_adb-tls-connect._tcp"
 }
 
-/// adb over the network: connecting, pairing and disconnecting through the `adb` command, and
-/// what they need from the server and the device through the host protocol. It never scans a
-/// network: the only addresses it learns are those adb's own mDNS lists and those a device on
-/// USB reports for itself.
+/// adb over the network: connecting, pairing and disconnecting, and what they need from the
+/// server and the device, all through the host protocol. It never runs an `adb` program: an adb
+/// client of another version than the running server may restart it, and that server may be
+/// another tool's. Without a server it fails; Ferry starts one only through `ADBHost`. It never
+/// scans a network: the only addresses it learns are those adb's own mDNS lists and those a
+/// device on USB reports for itself.
+///
+/// The requests are those `adb connect`, `adb pair` and `adb disconnect` send, in AOSP
+/// packages/modules/adb at 1cf2f017d312f73b3dc53bda85ef2610e35a80e9: client/commandline.cpp
+/// :1787, :1811 and :1792. The server answers connect and pair from services.cpp:137-157 and
+/// disconnect from adb.cpp:1441.
 public struct ADBWireless: Sendable {
   private let host: ADBHost
-  private let run: ADBCommandRunner
   private let answerLimit: Duration
+  private let commandLimit: Duration
+
+  /// How long a connect, pair or disconnect may take. The server holds a connect open while it
+  /// reaches the device, about ten seconds for an unreachable one; this only stops one that never
+  /// answers.
+  public static let defaultCommandLimit = Duration.seconds(30)
 
   public init(
-    host: ADBHost, run: @escaping ADBCommandRunner,
-    answerLimit: Duration = ADBTransport.defaultAnswerLimit
+    host: ADBHost, answerLimit: Duration = ADBTransport.defaultAnswerLimit,
+    commandLimit: Duration = defaultCommandLimit
   ) {
     self.host = host
-    self.run = run
     self.answerLimit = answerLimit
+    self.commandLimit = commandLimit
   }
 
-  /// The real server and the `adb` the locator finds.
+  /// The real server.
   public init(locator: ADBLocator = ADBLocator()) {
-    self.init(host: ADBHost(locator: locator), run: ADBCommand.runner(locator: locator))
+    self.init(host: ADBHost(locator: locator))
   }
 
+  static func connectRequest(_ endpoint: WirelessEndpoint) -> String {
+    "host:connect:\(endpoint.argument)"
+  }
+
+  static func disconnectRequest(_ endpoint: WirelessEndpoint) -> String {
+    "host:disconnect:\(endpoint.argument)"
+  }
+
+  /// The code comes first: the server splits at the first `:` (services.cpp:271), and the
+  /// address may hold more of them.
+  static func pairRequest(_ endpoint: WirelessEndpoint, _ code: PairingCode) -> String {
+    "host:pair:\(code.digits):\(endpoint.argument)"
+  }
+
+  /// The server answers `connected to …`, `already connected to …`, `failed to authenticate
+  /// to …` or why it could not connect (client/transport_emulator.cpp:80-133), always as a reply
+  /// rather than a failure, so its device list decides.
   public func connect(_ endpoint: WirelessEndpoint) async throws(ADBError) -> ADBConnectOutcome {
-    try await requireServer()
-    let result = try await run(ADBCommand.connect(endpoint))
+    let reply = try await command(Self.connectRequest(endpoint)).words
     let listed = try await devices().first { $0.serial == endpoint.argument }
     switch listed?.state {
     case .device: return .connected(serial: endpoint.argument)
     case .unauthorized: return .awaitingAllow
     default:
-      if result.output.contains("failed to authenticate") { return .awaitingAllow }
-      return .failed(Self.detail(result.output))
+      if reply.contains("failed to authenticate") { return .awaitingAllow }
+      return .failed(Self.detail(reply))
     }
   }
 
+  /// An address the server refuses, one it no longer has (`no such device`), is already
+  /// disconnected.
   public func disconnect(_ endpoint: WirelessEndpoint) async throws(ADBError) {
-    try await requireServer()
-    _ = try await run(ADBCommand.disconnect(endpoint))
+    _ = try await command(Self.disconnectRequest(endpoint))
   }
 
-  /// adb prints `Successfully paired to <address> [guid=<name>]`, or `Failed: <reason>`.
+  /// The server answers `Successfully paired to <address> [guid=<name>]`, or fails with
+  /// `Failed: <reason>` (client/adb_wifi.cpp:250); a server older than pairing does not know
+  /// the request.
   public func pair(_ endpoint: WirelessEndpoint, code: PairingCode) async throws(ADBError)
     -> ADBPairOutcome
   {
-    try await requireServer()
-    let output = try await run(ADBCommand.pair(endpoint, code)).output
-    guard output.contains("Successfully paired") else { return .failed(Self.detail(output)) }
-    let guid = output.firstRange(of: "[guid=").flatMap { start in
-      output[start.upperBound...].firstIndex(of: "]").map {
-        String(output[start.upperBound..<$0])
+    let reply: String
+    switch try await command(Self.pairRequest(endpoint, code)) {
+    case .reply(let words): reply = words
+    case .refused(let reason): return .failed(Self.detail(reason))
+    }
+    guard reply.contains("Successfully paired") else { return .failed(Self.detail(reply)) }
+    let guid = reply.firstRange(of: "[guid=").flatMap { start in
+      reply[start.upperBound...].firstIndex(of: "]").map {
+        String(reply[start.upperBound..<$0])
       }
     }
     return .paired(guid: guid?.isEmpty == false ? guid : nil)
@@ -155,8 +189,33 @@ public struct ADBWireless: Sendable {
     guard text.contains("restarting in TCP mode") else { throw .failed(Self.detail(text)) }
   }
 
-  private func requireServer() async throws(ADBError) {
-    _ = try await bounded { [host] () async throws(ADBError) in try await host.version() }
+  /// What the server said to a connect, pair or disconnect.
+  private enum ServiceAnswer: Sendable {
+    case reply(String)
+    /// It answered `FAIL`, with this reason.
+    case refused(String)
+
+    var words: String {
+      switch self {
+      case .reply(let words), .refused(let words): words
+      }
+    }
+  }
+
+  /// One host query, given `commandLimit`. The server's own refusal is an answer; running out of
+  /// time, or no server, is thrown.
+  private func command(_ request: String) async throws(ADBError) -> ServiceAnswer {
+    let host = host
+    let ask: @Sendable () async throws(ADBError) -> ServiceAnswer = {
+      () async throws(ADBError) -> ServiceAnswer in
+      do throws(ADBError) {
+        return .reply(try await host.query(request))
+      } catch {
+        guard case .failed(let reason) = error else { throw error }
+        return .refused(reason)
+      }
+    }
+    return try await ADBTransport.within(commandLimit, ask)
   }
 
   /// Every answer from the server or a device is bounded, as a scan's are: the agent waits on
@@ -167,7 +226,7 @@ public struct ADBWireless: Sendable {
     try await ADBTransport.within(answerLimit, body)
   }
 
-  /// The first line of adb's output, at most 200 characters: enough to say what went wrong.
+  /// The first line of the server's words, at most 200 characters: enough to say what went wrong.
   static func detail(_ output: String) -> String {
     let line = output.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
     return String(line.trimmingCharacters(in: .whitespaces).prefix(200))

@@ -9,6 +9,11 @@ private struct CoverageCatalog: Decodable {
   let strings: [String: CoverageCatalogEntry]
 }
 
+/// Open in Terminal's note when it runs Ferry's own adb (`ShellLaunch.fallbackNote`).
+private let shellFallbackNote =
+  "Ferry couldn't tell which adb started the adb server, so this uses Ferry's own adb. "
+  + "If its version differs, adb may restart the server."
+
 /// Every error, refusal and problem Ferry can show has a Troubleshooting entry in Help, with its
 /// exact words, its cause and its fix. The table lists each message by its key in the String
 /// Catalog of the module that shows it, with the topic that explains it.
@@ -51,6 +56,7 @@ struct HelpMessageCoverageTests {
     ("trouble-adb", "This needs USB debugging. Turn it on, then try again."),
     ("trouble-adb", "Ferry can't find adb. Get it from the Ferry menu, then try again."),
     ("trouble-adb", "Ferry couldn't open Terminal."),
+    ("trouble-adb", shellFallbackNote),
     ("trouble-network", "Waiting for you to allow this Mac on %@"),
     ("trouble-network", "Tap Allow on the device to finish connecting."),
     (

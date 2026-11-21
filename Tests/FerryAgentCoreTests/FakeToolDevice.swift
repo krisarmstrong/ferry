@@ -117,15 +117,18 @@ actor FakeToolDevice: ADBToolDevice {
     forwardList.removeAll { $0.local == local }
   }
 
-  nonisolated func adbPath() -> URL? { adbLocation.value }
+  nonisolated func shellADB() -> ShellADB? { adbLocation.value }
   nonisolated let adbLocation = AdbLocation()
 }
 
 /// Where the fake finds adb, settable from a test without awaiting the device.
 final class AdbLocation: Sendable {
-  private let path = Mutex<URL?>(URL(fileURLWithPath: "/opt/homebrew/bin/adb"))
-  var value: URL? { path.withLock { $0 } }
-  func set(_ url: URL?) { path.withLock { $0 = url } }
+  private let adb = Mutex<ShellADB?>(
+    ShellADB(url: URL(fileURLWithPath: "/opt/homebrew/bin/adb"), runsServer: true))
+  var value: ShellADB? { adb.withLock { $0 } }
+  func set(_ url: URL?, runsServer: Bool = true) {
+    adb.withLock { $0 = url.map { ShellADB(url: $0, runsServer: runsServer) } }
+  }
 }
 
 /// A device's log as a test scripts it: lines go in with `send`, and end with `end()`, `fail`, or
