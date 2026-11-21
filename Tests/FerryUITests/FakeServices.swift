@@ -96,6 +96,10 @@ final class FakeServices: SystemServicing {
     log.record("unregisterAgent")
   }
 
+  func removeAgentData() throws {
+    log.record("removeAgentData")
+  }
+
   func open(_ url: URL) {
     log.record("open \(url.absoluteString)")
   }
