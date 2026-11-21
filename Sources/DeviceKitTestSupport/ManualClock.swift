@@ -52,14 +52,16 @@ public final class ManualClock: Clock, Sendable {
 
   /// Runs `operation`, moving time on by `step` again and again until it returns: every wait it
   /// makes on this clock passes, however many there are and whenever each begins. For an
-  /// operation that must time out, once the test has seen it reach the wait that does.
+  /// operation that must time out, once the test has seen it reach the wait that does. The ticks
+  /// are a millisecond apart in real time, only so that they do not keep a thread of the shared
+  /// pool busy; no outcome depends on that pace.
   public func advancing<T>(by step: Duration, _ operation: () async throws -> T) async rethrows
     -> T
   {
     let ticking = Task {
       while !Task.isCancelled {
         await advance(by: step)
-        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(1))
       }
     }
     defer { ticking.cancel() }

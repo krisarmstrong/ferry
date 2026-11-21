@@ -60,16 +60,20 @@ struct DomainControllerCardTests {
     }
   }
 
+  /// Between two looks at what the agent did: a millisecond, so that a waiting test does not keep
+  /// a thread of the shared pool busy. No outcome depends on it.
+  static func pause() async { try? await Task.sleep(for: .milliseconds(1)) }
+
   func until(_ harness: AgentHarness, _ condition: ([FakeDomainManager.Call]) -> Bool) async {
     await passing(harness) {
-      while await !condition(harness.manager.calls), !Task.isCancelled { await Task.yield() }
+      while await !condition(harness.manager.calls), !Task.isCancelled { await Self.pause() }
     }
   }
 
   func served(_ harness: AgentHarness, by method: ConnectionMethod) async {
     await passing(harness) {
       while await harness.hub.devices().first?.method != method, !Task.isCancelled {
-        await Task.yield()
+        await Self.pause()
       }
     }
   }
@@ -81,7 +85,7 @@ struct DomainControllerCardTests {
         do throws(TransportError) {
           return try await harness.controller.items(of: domain).id(for: item)
         } catch .deviceDisconnected {
-          await Task.yield()
+          await Self.pause()
         }
       }
       return nil

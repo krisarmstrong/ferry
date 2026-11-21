@@ -30,6 +30,7 @@ final class FakeADBRunner: Sendable {
   }
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct ADBWirelessTests {
   static let etherScope = WirelessEndpoint(parsing: "192.0.2.31")!
   static let code = PairingCode("482913")!

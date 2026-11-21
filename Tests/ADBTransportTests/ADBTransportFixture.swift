@@ -33,7 +33,7 @@ enum TransportFixture {
 
   static func transport(
     port: UInt16, locator: ADBLocator = findsAdb, clock: TestClock = TestClock(),
-    answerLimit: Duration = .seconds(10), limits: ManualClock = ManualClock(),
+    answerLimit: Duration = .seconds(10), limits: any Clock<Duration> = ContinuousClock(),
     serving: @escaping ADBNetworkPolicy = { _, _ in true }
   ) -> ADBTransport {
     ADBTransport(
