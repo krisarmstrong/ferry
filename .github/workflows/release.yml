@@ -272,6 +272,17 @@ jobs:
           path: .build/dist/appcast
           if-no-files-found: error
           retention-days: 7
+      # LGPL-2.1: the exact libusb and libmtp source the bundled libraries were built from, as
+      # scripts/build-libmtp.sh downloaded and checked them, for the publish job to attach.
+      - name: Hand the LGPL source on
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lgpl-source
+          path: |
+            .build/deps/src/libusb-*.tar.bz2
+            .build/deps/src/libmtp-*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
       # Also when a step failed before removing its own.
       - name: Remove the keychain and the key files
         if: always()
@@ -339,6 +350,10 @@ jobs:
         with:
           name: dmg
           path: .build/dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lgpl-source
+          path: .build/dist/lgpl-source
       - name: Import the Developer ID certificate
         env:
           DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
@@ -410,8 +425,11 @@ jobs:
         run: |
           version="${TAG#v}"
           releases="repos/$GITHUB_REPOSITORY/releases"
+          # LGPL-2.1: the exact libusb and libmtp source the bundled libraries were built from,
+          # as the build job handed them on.
           for file in ".build/dist/appcast/Ferry-$version.zip" ".build/dist/Ferry-$version.dmg" \
-            .build/dist/appcast/appcast.xml; do
+            .build/dist/appcast/appcast.xml .build/dist/lgpl-source/libusb-*.tar.bz2 \
+            .build/dist/lgpl-source/libmtp-*.tar.gz; do
             name="$(basename "$file")"
             # A re-run replaces what an earlier attempt attached.
             for asset in $(gh api "$releases/$RELEASE_ID/assets" \

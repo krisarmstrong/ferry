@@ -1370,6 +1370,18 @@
             "In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched.",
             "Drag Ferry from Applications to the Trash."
           ]
+        },
+        {
+          "id": "acknowledgements",
+          "title": "Acknowledgements",
+          "symbol": "text.book.closed",
+          "paragraphs": [
+            "Ferry is released under the MIT License. It is built on the work of others:",
+            "**Sparkle**, which keeps Ferry up to date, is © Andy Matuschak and the Sparkle contributors, under the MIT License. Its licence, with the third-party notices it lists, is in Ferry.app/Contents/Resources/Licenses/Sparkle-LICENSE.txt.",
+            "**libmtp** and **libusb**, which let Ferry talk to devices over MTP, are under the GNU Lesser General Public License, version 2.1. Ferry ships them unmodified in Ferry.app/Contents/Frameworks, with their licence texts in Ferry.app/Contents/Resources/Licenses. The exact source code each release was built from is attached to that release on GitHub, at github.com/krisarmstrong/ferry/releases; Licenses/README.txt names each tarball with its SHA-256.",
+            "**adb**, from Google's Android SDK Platform-Tools, is not part of Ferry. Ferry downloads it from Google only after you accept the Android SDK License, which Ferry shows first and keeps with the app.",
+            "Android is a trademark of Google LLC."
+          ]
         }
       ]
     }
