@@ -15,7 +15,7 @@ struct AppModelAgentRestartTests {
     services.startedAgent = "agent-1"
     let model = AppModel(client: FakeClient(log: log), services: services)
     await model.launch()
-    #expect(log.all == ["registerAgent", "status", "readLoginItem"])
+    #expect(log.all == ["registerAgent", "registerExtensions", "status", "readLoginItem"])
   }
 
   @Test func updatedAgentIsRestartedBeforeTheFirstStatus() async {
@@ -25,7 +25,10 @@ struct AppModelAgentRestartTests {
     let model = AppModel(client: FakeClient(log: log), services: services)
     await model.launch()
     #expect(
-      log.all == ["restartAgent", "recordStartedAgent agent-2", "status", "readLoginItem"])
+      log.all == [
+        "restartAgent", "registerExtensions", "status", "recordStartedAgent agent-2",
+        "readLoginItem",
+      ])
     #expect(services.startedAgent == "agent-2")
   }
 
@@ -38,7 +41,10 @@ struct AppModelAgentRestartTests {
     let model = AppModel(client: FakeClient(log: log), services: services)
     await model.launch()
     #expect(
-      log.all == ["restartAgent", "recordStartedAgent agent-1", "status", "readLoginItem"])
+      log.all == [
+        "restartAgent", "registerExtensions", "status", "recordStartedAgent agent-1",
+        "readLoginItem",
+      ])
   }
 
   /// A restart that could not register the new agent records nothing, so the next launch tries
@@ -50,15 +56,16 @@ struct AppModelAgentRestartTests {
     services.restartSucceeds = false
     let model = AppModel(client: UnreachableClient(), services: services)
     await model.launch()
-    #expect(log.all == ["restartAgent", "readLoginItem"])
+    #expect(log.all == ["restartAgent", "registerExtensions", "readLoginItem"])
     #expect(services.startedAgent == "agent-1")
     #expect(model.agent == .unreachable)
 
     services.restartSucceeds = true
     await AppModel(client: FakeClient(log: log), services: services).launch()
     #expect(
-      log.all.suffix(4) == [
-        "restartAgent", "recordStartedAgent agent-2", "status", "readLoginItem",
+      log.all.suffix(5) == [
+        "restartAgent", "registerExtensions", "status", "recordStartedAgent agent-2",
+        "readLoginItem",
       ])
   }
 
@@ -70,7 +77,7 @@ struct AppModelAgentRestartTests {
     services.startedAgent = "agent-1"
     let model = AppModel(client: FakeClient(log: log), services: services)
     await model.launch()
-    #expect(log.all == ["registerAgent", "status", "readLoginItem"])
+    #expect(log.all == ["registerAgent", "registerExtensions", "status", "readLoginItem"])
     #expect(services.startedAgent == "agent-1")
   }
 }

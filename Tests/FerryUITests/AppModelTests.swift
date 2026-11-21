@@ -190,7 +190,7 @@ struct AppModelTests {
   @Test func launchRegistersTheAgentThenReadsStatusAndLoginItem() async {
     let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
     await model.launch()
-    #expect(log.all == ["registerAgent", "status", "readLoginItem"])
+    #expect(log.all == ["registerAgent", "registerExtensions", "status", "readLoginItem"])
     #expect(model.opensAtLogin)
   }
 

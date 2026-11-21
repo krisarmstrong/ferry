@@ -33,12 +33,18 @@ public protocol SystemServicing {
   /// The agent `recordStartedAgent` last recorded.
   func startedAgentBuild() -> String?
   func recordStartedAgent(_ build: String)
-  /// Stops the running agent and registers the one in the bundle, then has macOS read the
-  /// bundle again, so the extensions it holds are the bundle's too. False if the new agent could
-  /// not be registered.
+  /// Stops the running agent, which removes its launchd job, and registers the one in the
+  /// bundle. False if the new agent could not be registered.
   func restartAgent() async -> Bool
+  /// Has Launch Services read the app and each extension in it again, so macOS uses the ones in
+  /// this bundle: after a manual reinstall it can forget the File Provider extension for minutes
+  /// (error -2001). Harmless when nothing changed.
+  func registerExtensions() async
   /// What macOS says about the helper now.
   func helperStatus() async -> HelperStatus
+  /// Whether macOS has the agent registered and enabled (`SMAppService.Status.enabled`), whether
+  /// or not launchd manages to start it.
+  func agentIsEnabled() async -> Bool
   /// Whether Ferry opens at login.
   func loginItemStatus() async -> LoginItemStatus
   func setOpensAtLogin(_ enabled: Bool) async throws
@@ -136,8 +142,7 @@ public final class SystemServices: SystemServicing {
   }
 
   public func restartAgent() async -> Bool {
-    let bundle = Bundle.main.bundleURL
-    return await Task.detached(priority: .utility) {
+    await Task.detached(priority: .utility) {
       let agent = SMAppService.agent(plistName: Self.agentPlist)
       // Waits until launchd has stopped the old agent. Not registered (a first launch) is fine.
       do {
@@ -154,11 +159,32 @@ public final class SystemServices: SystemServicing {
         registered = false
       }
       Self.log.info("agent restarted, status: \(Self.describe(agent.status), privacy: .public)")
-      let launchServices = LSRegisterURL(bundle as CFURL, true)
-      if launchServices != noErr {
-        Self.log.error("registering the bundle with Launch Services failed: \(launchServices)")
-      }
       return registered
+    }.value
+  }
+
+  public func registerExtensions() async {
+    let bundle = Bundle.main.bundleURL
+    let plugIns = Bundle.main.builtInPlugInsURL
+    await Task.detached(priority: .utility) {
+      let extensions =
+        plugIns.flatMap {
+          try? FileManager.default.contentsOfDirectory(
+            at: $0, includingPropertiesForKeys: nil)
+        }?.filter { $0.pathExtension == "appex" } ?? []
+      for url in [bundle] + extensions {
+        let status = LSRegisterURL(url as CFURL, true)
+        if status != noErr {
+          Self.log.error(
+            "registering \(url.lastPathComponent, privacy: .public) failed: \(status)")
+        }
+      }
+    }.value
+  }
+
+  public func agentIsEnabled() async -> Bool {
+    await Task.detached(priority: .utility) {
+      SMAppService.agent(plistName: Self.agentPlist).status == .enabled
     }.value
   }
 
