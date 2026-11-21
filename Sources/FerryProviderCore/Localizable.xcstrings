@@ -12,6 +12,16 @@
         }
       }
     },
+    "Ferry can't do this from the Mac on this device. Do it on the device instead." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry can't do this from the Mac on this device. Do it on the device instead."
+          }
+        }
+      }
+    },
     "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry." : {
       "localizations" : {
         "en" : {
@@ -61,17 +71,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Symbolic links and aliases can’t be copied to the device."
-          }
-        }
-      }
-    },
-    "The device does not support %@." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The device does not support %@."
           }
         }
       }

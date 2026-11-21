@@ -51,12 +51,12 @@
         }
       }
     },
-    "Couldn't install the app: %@" : {
+    "Ferry can't do this from the Mac on this device. Do it on the device instead." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn't install the app: %@"
+            "value" : "Ferry can't do this from the Mac on this device. Do it on the device instead."
           }
         }
       }
@@ -231,22 +231,22 @@
         }
       }
     },
-    "The device can't do this. Do it on the device instead." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The device can't do this. Do it on the device instead."
-          }
-        }
-      }
-    },
     "The device can't store that name. Choose another name." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device can't store that name. Choose another name."
+          }
+        }
+      }
+    },
+    "The device didn't install the app. Check that it suits this device, then try again. (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device didn't install the app. Check that it suits this device, then try again. (%@)"
           }
         }
       }

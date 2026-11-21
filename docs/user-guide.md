@@ -461,15 +461,15 @@ The device shares no storage, which happens while it is locked.
 
 Unlock the device and choose **Refresh**, then try again.
 
-**The device can't do this. Do it on the device instead.**
+**Ferry can't do this from the Mac on this device. Do it on the device instead.**
 
-The device doesn't offer what was asked, such as moving a file in one step.
+The device doesn't offer what was asked, such as moving a file in one step, or Ferry can't do it from the Mac.
 
 Do it on the device itself, or copy the file to its new place and delete the original.
 
 **Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry.**
 
-The connection to the device, a file on this Mac, or Ferry's helper failed in the middle of the task. Ferry's log has the details.
+The connection to the device, a file on this Mac, or Ferry's helper failed in the middle of the task.
 
 Try again. If it keeps failing, plug the device straight into the Mac and keep it unlocked, check that the Mac has free space, or quit and reopen Ferry. A copy in Finder retries by itself once the device is back.
 
@@ -763,7 +763,7 @@ Turning on ADB over Wi-Fi restarts ADB on the device, which would stop a transfe
 
 Let them finish, then try again.
 
-**adb: …**
+**adb refused the request. Check the address and that the device is on the network, then try again. (…)**
 
 adb refused the request. The rest of the message is adb's reason.
 
@@ -808,12 +808,6 @@ Choose a name without a package extension, such as .app or .rtfd.
 macOS shows such a folder as an app or a document, so Ferry keeps it read-only.
 
 Change it on the device, or copy it to the Mac.
-
-**The device does not support ….**
-
-The device can't do what Finder asked, such as moving a file in one step.
-
-Copy the file to its new place, then delete the original.
 
 **The device saved “…” as “…”.**
 
@@ -1057,7 +1051,7 @@ The device's internal storage is too full to install the app.
 
 Free up space on the device, then try again.
 
-**Couldn't install the app: …**
+**The device didn't install the app. Check that it suits this device, then try again. (…)**
 
 The device refused the app for a reason Ferry has no plain words for. The rest of the message is the device's own reason.
 
@@ -1171,7 +1165,7 @@ The log came faster than Ferry could show it, so some lines were left out.
 
 Set **Level** or **Filter** to show fewer lines.
 
-**Couldn't save the log: …**
+**Ferry couldn't save the log. Choose another folder or free some space, then try again. (…)**
 
 Ferry could not write the file. The rest of the message says why.
 

@@ -113,9 +113,17 @@ struct ToolPresentationTests {
       "The app couldn't be read by the device. It may be damaged or unsigned."
     ),
     // Unknown: the code itself.
-    ("INSTALL_FAILED_SOMETHING_NEW", "Couldn't install the app: INSTALL_FAILED_SOMETHING_NEW"),
+    (
+      "INSTALL_FAILED_SOMETHING_NEW",
+      "The device didn't install the app. Check that it suits this device, then try again. "
+        + "(INSTALL_FAILED_SOMETHING_NEW)"
+    ),
     // pm's own words, escaped.
-    ("Error: \u{202E}evil", "Couldn't install the app: Error: \\u{202E}evil"),
+    (
+      "Error: \u{202E}evil",
+      "The device didn't install the app. Check that it suits this device, then try again. "
+        + "(Error: \\u{202E}evil)"
+    ),
   ])
   func pmsRefusalsReadPlainly(reason: String, message: String) {
     #expect(DevicePresentation.message(for: .installFailed(reason)) == message)

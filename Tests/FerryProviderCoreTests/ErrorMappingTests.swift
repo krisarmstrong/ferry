@@ -106,7 +106,7 @@ struct ErrorMappingTests {
     case .macDiskFull: .cocoa(.fileWriteOutOfSpace, [])
     case .nameChangedByDevice(let requested, let actual):
       .cocoa(.fileWriteInvalidFileName, [requested, actual])
-    case .unsupported(let what): .cocoa(.featureUnsupported, [what])
+    case .unsupported: .cocoa(.featureUnsupported, ["on the device instead"])
     case .sizeMismatch: .cocoa(.fileWriteUnknown, ["2", "1"])
     case .downloadSizeMismatch: .cocoa(.fileReadCorruptFile, ["7", "3"])
     case .io: .cocoa(.xpcConnectionReplyInvalid, ["couldn't finish"])

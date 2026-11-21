@@ -164,7 +164,11 @@ enum DevicePresentation {
         in System Settings › Privacy & Security › Local Network.
         """, bundle: .module)
     case .adb(let detail):
-      LocalizedStringResource("adb: \(DisplayText.escaped(detail))", bundle: .module)
+      LocalizedStringResource(
+        """
+        adb refused the request. Check the address and that the device is on the network, then \
+        try again. (\(DisplayText.escaped(detail)))
+        """, bundle: .module)
     }
   }
 

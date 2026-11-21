@@ -117,7 +117,10 @@ extension HelpMessageCoverageTests {
     ),
     ("trouble-device", "The device was disconnected. Reconnect it, then try again."),
     ("trouble-device", "The device shows no storage. Unlock it, then try again."),
-    ("trouble-device", "The device can't do this. Do it on the device instead."),
+    (
+      "trouble-device",
+      "Ferry can't do this from the Mac on this device. Do it on the device instead."
+    ),
     (
       "trouble-device",
       "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry."
@@ -204,7 +207,10 @@ extension HelpMessageCoverageTests {
       then try again.
       """
     ),
-    ("trouble-network", "adb: %@"),
+    (
+      "trouble-network",
+      "adb refused the request. Check the address and that the device is on the network, then try again. (%@)"
+    ),
     ("trouble-network", "Remembered · not nearby"),
     ("trouble-finder", "Connect the device and choose Transfer files to see its files."),
     (
@@ -226,7 +232,6 @@ extension HelpMessageCoverageTests {
       from this Mac. Change them on the device.
       """
     ),
-    ("trouble-finder", "The device does not support %@."),
     ("trouble-finder", "The device saved “%@” as “%@”."),
     ("trouble-finder", "The device sent %llu bytes of a file it lists as %llu bytes."),
     ("trouble-finder", "The device stored %llu bytes where %llu were sent."),
@@ -284,7 +289,10 @@ extension HelpMessageCoverageTests {
     ("trouble-install", "The device's app verification refused the app."),
     ("trouble-install", "The install was cancelled on the device."),
     ("trouble-install", "The device doesn't have enough space for the app."),
-    ("trouble-install", "Couldn't install the app: %@"),
+    (
+      "trouble-install",
+      "The device didn't install the app. Check that it suits this device, then try again. (%@)"
+    ),
     ("trouble-capture", "The device didn't send a screenshot. Unlock it and try again."),
     (
       "trouble-capture",
@@ -311,7 +319,10 @@ extension HelpMessageCoverageTests {
     ("trouble-tools", "That forward is already gone."),
     ("trouble-tools", "The device ended the log."),
     ("trouble-tools", "— Lines skipped: %lld. The log came faster than Ferry could show it. —"),
-    ("trouble-tools", "Couldn't save the log: %@"),
+    (
+      "trouble-tools",
+      "Ferry couldn't save the log. Choose another folder or free some space, then try again. (%@)"
+    ),
     ("trouble-helper", "Turn on Ferry in Finder"),
     ("trouble-helper", "Allow Ferry's helper"),
     ("trouble-helper", "macOS can't find Ferry's helper"),

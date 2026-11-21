@@ -133,7 +133,9 @@ public enum PresentationText {
         "The app couldn't be read by the device. It may be damaged or unsigned.", bundle: .module)
     }
     let shown = DisplayText.escaped(reason)
-    return LocalizedStringResource("Couldn't install the app: \(shown)", bundle: .module)
+    return LocalizedStringResource(
+      "The device didn't install the app. Check that it suits this device, then try again. (\(shown))",
+      bundle: .module)
   }
 
   private static let installReasons: [String: LocalizedStringResource] = [
@@ -213,7 +215,8 @@ private enum TransportText {
     "The device shows no storage. Unlock it, then try again.", bundle: .module)
 
   static let unsupported = LocalizedStringResource(
-    "The device can't do this. Do it on the device instead.", bundle: .module)
+    "Ferry can't do this from the Mac on this device. Do it on the device instead.", bundle: .module
+  )
 
   static let lostContact = LocalizedStringResource(
     "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry.",

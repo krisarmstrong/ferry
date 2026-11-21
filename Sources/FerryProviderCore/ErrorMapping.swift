@@ -55,8 +55,9 @@ public enum ErrorMapping {
     case .nameChangedByDevice(let requested, let actual):
       return described(
         .fileWriteInvalidFileName, ProviderText.nameChanged(requested: requested, actual: actual))
-    case .unsupported(let what):
-      return described(.featureUnsupported, ProviderText.unsupported(what))
+    // The detail is developer text, in the agent's log; Finder shows the menu's words.
+    case .unsupported:
+      return described(.featureUnsupported, ProviderText.unsupported)
     case .sizeMismatch(let expected, let actual):
       return described(
         .fileWriteUnknown, ProviderText.sizeMismatch(expected: expected, actual: actual))

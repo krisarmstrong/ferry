@@ -156,7 +156,10 @@ struct HelpNavigatorTests {
   @Test func aMessageOpensItsTopicDuringASearch() {
     var navigator = Self.navigator()
     navigator.query = "telemetry"
-    let opened = navigator.open(message: "adb: %@")
+    let opened = navigator.open(
+      message:
+        "adb refused the request. Check the address and that the device is on the network, then try again. (%@)"
+    )
     #expect(opened)
     #expect(navigator.query.isEmpty)
     #expect(navigator.shownTopic?.id == "trouble-network")

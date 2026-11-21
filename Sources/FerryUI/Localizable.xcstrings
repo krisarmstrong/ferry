@@ -1,10 +1,31 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry." : {
+    "adb refused the request. Check the address and that the device is on the network, then try again. (%@)" : {
+
+    },
+    "Ferry couldn't save the log. Choose another folder or free some space, then try again. (%@)" : {
+
+    },
+    "Ferry can't do this from the Mac on this device. Do it on the device instead." : {
       "extractionState" : "manual"
     },
-    "The connection to the device, a file on this Mac, or Ferry's helper failed in the middle of the task. Ferry's log has the details." : {
+    "The device doesn't offer what was asked, such as moving a file in one step, or Ferry can't do it from the Mac." : {
+      "extractionState" : "manual"
+    },
+    "The connection to the device, a file on this Mac, or Ferry's helper failed in the middle of the task." : {
+      "extractionState" : "manual"
+    },
+    "adb refused the request. Check the address and that the device is on the network, then try again. (…)" : {
+      "extractionState" : "manual"
+    },
+    "The device didn't install the app. Check that it suits this device, then try again. (…)" : {
+      "extractionState" : "manual"
+    },
+    "Ferry couldn't save the log. Choose another folder or free some space, then try again. (…)" : {
+      "extractionState" : "manual"
+    },
+    "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry." : {
       "extractionState" : "manual"
     },
     "Try again. If it keeps failing, plug the device straight into the Mac and keep it unlocked, check that the Mac has free space, or quit and reopen Ferry. A copy in Finder retries by itself once the device is back." : {
@@ -29,12 +50,6 @@
       "extractionState" : "manual"
     },
     "Unlock the device and choose **Refresh**, then try again." : {
-      "extractionState" : "manual"
-    },
-    "The device can't do this. Do it on the device instead." : {
-      "extractionState" : "manual"
-    },
-    "The device doesn't offer what was asked, such as moving a file in one step." : {
       "extractionState" : "manual"
     },
     "Do it on the device itself, or copy the file to its new place and delete the original." : {
@@ -477,9 +492,6 @@
       }
     },
     "Could not remove Ferry. Make sure Ferry is running, then try again." : {
-
-    },
-    "Couldn't save the log: %@" : {
 
     },
     "Debug" : {
@@ -960,9 +972,6 @@
     },
     "adb isn't running" : {
       "extractionState" : "manual"
-    },
-    "adb: %@" : {
-
     },
     "macOS can't find Ferry's helper" : {
       "localizations" : {
@@ -1491,9 +1500,6 @@
     "Let them finish, then try again." : {
       "extractionState" : "manual"
     },
-    "adb: …" : {
-      "extractionState" : "manual"
-    },
     "adb refused the request. The rest of the message is adb's reason." : {
       "extractionState" : "manual"
     },
@@ -1552,15 +1558,6 @@
       "extractionState" : "manual"
     },
     "Change it on the device, or copy it to the Mac." : {
-      "extractionState" : "manual"
-    },
-    "The device does not support …." : {
-      "extractionState" : "manual"
-    },
-    "The device can't do what Finder asked, such as moving a file in one step." : {
-      "extractionState" : "manual"
-    },
-    "Copy the file to its new place, then delete the original." : {
       "extractionState" : "manual"
     },
     "The device saved “…” as “…”." : {
@@ -1917,9 +1914,6 @@
     "The device's internal storage is too full to install the app." : {
       "extractionState" : "manual"
     },
-    "Couldn't install the app: …" : {
-      "extractionState" : "manual"
-    },
     "The device refused the app for a reason Ferry has no plain words for. The rest of the message is the device's own reason." : {
       "extractionState" : "manual"
     },
@@ -2078,9 +2072,6 @@
       "extractionState" : "manual"
     },
     "Set **Level** or **Filter** to show fewer lines." : {
-      "extractionState" : "manual"
-    },
-    "Couldn't save the log: …" : {
       "extractionState" : "manual"
     },
     "Ferry could not write the file. The rest of the message says why." : {

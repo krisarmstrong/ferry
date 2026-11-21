@@ -279,6 +279,9 @@ struct LogcatSessionTests {
       await client.push(LogBatch(lines: ["a"], skipped: 0))
       await session.save()
     }
-    #expect(session.saveError?.help == "Couldn't save the log: %@")
+    #expect(
+      session.saveError?.help
+        == "Ferry couldn't save the log. Choose another folder or free some space, then try again. (%@)"
+    )
   }
 }
