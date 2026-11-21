@@ -40,12 +40,16 @@ public actor ADBSession: DeviceSession {
   let watches = WatchConnections()
   /// Tells the transport the device is free again; runs once, when the session ends.
   private var onRelease: (@Sendable () async -> Void)?
+  /// What the answer limits of `reachable()` and the folder watches are measured on.
+  let clock: any Clock<Duration>
 
   public init(
     host: ADBHost, serial: String, transportID: String?, info: DeviceInfo,
     features: Set<String>, method: ConnectionMethod, partials: PartialRegistry = PartialRegistry(),
+    clock: any Clock<Duration> = ContinuousClock(),
     onRelease: @escaping @Sendable () async -> Void = {}
   ) {
+    self.clock = clock
     self.host = host
     self.route = ADBRoute(serial: serial, transportID: transportID)
     self.method = method
@@ -291,7 +295,7 @@ extension ADBSession {
   func reachable() async -> Bool {
     do throws(ADBError) {
       let (host, route) = (host, route)
-      _ = try await ADBTransport.within(ADBTransport.defaultAnswerLimit) {
+      _ = try await ADBTransport.within(ADBTransport.defaultAnswerLimit, on: clock) {
         () async throws(ADBError) in try await host.features(route)
       }
       return true

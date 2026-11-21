@@ -1,19 +1,19 @@
 import Synchronization
 
 /// A clock that moves only when a test calls `advance(by:)`.
-final class ManualClock: Clock, Sendable {
-  struct Instant: InstantProtocol {
-    let offset: Duration
+public final class ManualClock: Clock, Sendable {
+  public struct Instant: InstantProtocol {
+    public let offset: Duration
 
-    func advanced(by duration: Duration) -> Instant {
+    public func advanced(by duration: Duration) -> Instant {
       Instant(offset: offset + duration)
     }
 
-    func duration(to other: Instant) -> Duration {
+    public func duration(to other: Instant) -> Duration {
       other.offset - offset
     }
 
-    static func < (lhs: Instant, rhs: Instant) -> Bool {
+    public static func < (lhs: Instant, rhs: Instant) -> Bool {
       lhs.offset < rhs.offset
     }
   }
@@ -21,31 +21,49 @@ final class ManualClock: Clock, Sendable {
   private let nanoseconds = Atomic<Int64>(0)
   private let sleepers = Sleepers()
 
-  var now: Instant {
+  public init() {}
+
+  public var now: Instant {
     Instant(offset: .nanoseconds(nanoseconds.load(ordering: .acquiring)))
   }
 
-  var minimumResolution: Duration { .nanoseconds(1) }
+  public var minimumResolution: Duration { .nanoseconds(1) }
 
   /// Sleeps requested so far, finished or not.
-  var sleepCount: Int {
+  public var sleepCount: Int {
     get async { await sleepers.count }
   }
 
-  func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+  public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
     try await sleepers.sleep(until: deadline, now: now)
   }
 
   /// Moves time forward and wakes every sleeper whose deadline has passed.
-  func advance(by duration: Duration) async {
+  public func advance(by duration: Duration) async {
     let (seconds, attoseconds) = duration.components
     nanoseconds.add(seconds * 1_000_000_000 + attoseconds / 1_000_000_000, ordering: .releasing)
     await sleepers.wake(upTo: now)
   }
 
   /// Returns once someone is sleeping on this clock.
-  func waitForSleeper() async {
+  public func waitForSleeper() async {
     await sleepers.waitForSleeper()
+  }
+
+  /// Runs `operation`, moving time on by `step` again and again until it returns: every wait it
+  /// makes on this clock passes, however many there are and whenever each begins. For an
+  /// operation that must time out, once the test has seen it reach the wait that does.
+  public func advancing<T>(by step: Duration, _ operation: () async throws -> T) async rethrows
+    -> T
+  {
+    let ticking = Task {
+      while !Task.isCancelled {
+        await advance(by: step)
+        await Task.yield()
+      }
+    }
+    defer { ticking.cancel() }
+    return try await operation()
   }
 }
 

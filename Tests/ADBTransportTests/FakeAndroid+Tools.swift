@@ -95,7 +95,7 @@ extension FakeAndroid {
     }
     guard words == ["screencap", "-p"] else { throw ScriptError.unexpected(command) }
     if state.withLock({ $0.hangingPrograms.contains("screencap") }) {
-      _ = try? await peer.stream.read(exactly: 1)
+      await hang(peer)
       return
     }
     try await peer.raw(state.withLock { $0.tools.screencap })

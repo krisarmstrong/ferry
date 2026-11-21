@@ -49,6 +49,9 @@ actor FakeWirelessADB: WirelessADBControl {
   var nameless: Set<String> = []
   /// Runs while the identity of an adb serial is read: what a scan would see then.
   var whileIdentifying: (@Sendable (String) -> Void)?
+  /// Set by `holdConnects()`: each connect waits, once recorded, for `releaseConnects()`.
+  private var connectsHeld = false
+  private var heldConnects: [CheckedContinuation<Void, Never>] = []
   /// Set by `holdDisconnects()`: each disconnect waits, once recorded, for `releaseDisconnects()`.
   private var disconnectsHeld = false
   private var heldDisconnects: [CheckedContinuation<Void, Never>] = []
@@ -90,6 +93,9 @@ actor FakeWirelessADB: WirelessADBControl {
     inFlight += 1
     maxInFlight = max(maxInFlight, inFlight)
     if let delay = connectDelay[endpoint.argument] { try? await Task.sleep(for: delay) }
+    if connectsHeld {
+      await withCheckedContinuation { heldConnects.append($0) }
+    }
     inFlight -= 1
     if connectThrows.contains(endpoint.argument) { throw .failed("adb did not finish") }
     // adb reconnects an offline TCP transport by itself: `connect` finds it there.
@@ -114,6 +120,16 @@ actor FakeWirelessADB: WirelessADBControl {
       await withCheckedContinuation { heldDisconnects.append($0) }
     }
     listed[endpoint.argument] = nil
+  }
+
+  func holdConnects() {
+    connectsHeld = true
+  }
+
+  func releaseConnects() {
+    connectsHeld = false
+    for held in heldConnects { held.resume() }
+    heldConnects = []
   }
 
   func holdDisconnects() {

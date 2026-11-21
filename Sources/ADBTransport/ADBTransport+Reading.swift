@@ -33,10 +33,11 @@ extension ADBTransport {
     platformVendors.contains(manufacturer.lowercased())
   }
 
-  /// `body`'s result, or a failure once `limit` has passed. `body` is cancelled then, which
-  /// closes the connection it waits on.
+  /// `body`'s result, or a failure once `limit` has passed on `clock`. `body` is cancelled then,
+  /// which closes the connection it waits on.
   static func within<T: Sendable>(
-    _ limit: Duration, _ body: @escaping @Sendable () async throws(ADBError) -> T
+    _ limit: Duration, on clock: any Clock<Duration> = ContinuousClock(),
+    _ body: @escaping @Sendable () async throws(ADBError) -> T
   ) async throws(ADBError) -> T {
     let result = await withTaskGroup(of: Result<T, ADBError>?.self) { group in
       group.addTask {
@@ -47,7 +48,7 @@ extension ADBTransport {
         }
       }
       group.addTask {
-        guard (try? await Task.sleep(for: limit)) != nil else { return nil }
+        guard (try? await clock.sleep(for: limit)) != nil else { return nil }
         return .failure(.failed("no answer within \(limit)"))
       }
       for await outcome in group {
@@ -99,7 +100,8 @@ extension ADBTransport {
   /// `answerLimit`. One whose serial cannot be read in time is left out, uncached, and asked
   /// again next scan; a cancelled scan throws.
   static func read(
-    _ listings: Set<Listing>, on host: ADBHost, within limit: Duration
+    _ listings: Set<Listing>, on host: ADBHost, within limit: Duration,
+    clock: any Clock<Duration>
   ) async throws(TransportError) -> [Listing: DeviceInfo] {
     let results = await withTaskGroup(of: (Listing, Result<DeviceInfo?, ADBError>).self) { group in
       for listing in listings {
@@ -108,7 +110,7 @@ extension ADBTransport {
             return (
               listing,
               .success(
-                try await Self.within(limit) { () async throws(ADBError) in
+                try await Self.within(limit, on: clock) { () async throws(ADBError) in
                   try await Self.info(
                     of: listing.serial, on: host, transportID: listing.transportID)
                 })

@@ -36,17 +36,18 @@ extension ADBDeviceTools {
   /// the display came on; a device that refuses the key, or does not answer, is not waited for
   /// further, and the caller captures anyway.
   public func wakeScreen(route: ADBRoute) async -> Bool {
-    let (host, keyLimit) = (host, answerLimit)
+    let (host, keyLimit, clock) = (host, answerLimit, clock)
     do throws(ADBError) {
       let key = try ADBShell.command("input", ["keyevent", "KEYCODE_WAKEUP"])
       let power = try ADBShell.command("dumpsys", ["power"])
-      let pressed = try await ADBTransport.within(keyLimit) { () async throws(ADBError) in
+      let pressed = try await ADBTransport.within(keyLimit, on: clock) {
+        () async throws(ADBError) in
         try await host.run(route: route, command: key).status == 0
       }
       guard pressed else { return false }
       let (limit, pause) = (wakeLimit, pause)
       // Bounded twice: by the paced waits, and in time, for a read that never answers.
-      return try await ADBTransport.within(limit) { () async throws(ADBError) -> Bool in
+      return try await ADBTransport.within(limit, on: clock) { () async throws(ADBError) -> Bool in
         var waited = Duration.zero
         while true {
           let result = try await host.run(route: route, command: power)

@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Synchronization
 import Testing
@@ -40,16 +41,19 @@ struct ADBWakeTests {
     #expect(ADBWake.display(fromDumpsysPower: "Display Power: state=") == nil)
   }
 
+  /// The limits are measured on `clock`, which stands still unless the test moves it; the paced
+  /// waits between reads return at once.
   private func withTools<T>(
     _ device: FakeAndroid, answerLimit: Duration = .seconds(5), wakeLimit: Duration = .seconds(5),
-    pauses: Pauses = Pauses(), _ body: (ADBDeviceTools) async throws -> T
+    pauses: Pauses = Pauses(), clock: ManualClock = ManualClock(),
+    _ body: (ADBDeviceTools) async throws -> T
   ) async throws -> T {
     let server = try await device.serve(serial: Self.serial)
     defer { server.stop() }
     let tools = ADBDeviceTools(
       host: ADBHost(port: server.port, locator: ADBHostTests.noAdb), answerLimit: answerLimit,
       captureLimit: ADBDeviceTools.defaultCaptureLimit, captureWait: .seconds(5),
-      wakeLimit: wakeLimit, pause: { pauses.record($0) })
+      wakeLimit: wakeLimit, pause: { pauses.record($0) }, clock: clock)
     return try await body(tools)
   }
 
@@ -85,12 +89,10 @@ struct ADBWakeTests {
   @Test func aDisplayThatStaysOffIsGivenUpAtTheLimit() async throws {
     let device = FakeAndroid()
     device.setTools { $0.displayOn = false }
-    let start = ContinuousClock.now
     let woke = try await withTools(device, wakeLimit: .milliseconds(300)) {
       await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
     }
     #expect(!woke)
-    #expect(ContinuousClock.now - start < .seconds(5))
   }
 
   /// A device that refuses the key is not read at all: the capture goes ahead at once.
@@ -112,13 +114,18 @@ struct ADBWakeTests {
   @Test func aHangingKeyIsGivenUpAtTheAnswerLimit() async throws {
     let device = FakeAndroid()
     device.state.withLock { $0.hangingPrograms = ["input"] }
-    let start = ContinuousClock.now
+    let clock = ManualClock()
     let limits = (answer: Duration.milliseconds(300), wake: Duration.seconds(10))
-    let woke = try await withTools(device, answerLimit: limits.answer, wakeLimit: limits.wake) {
-      await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
+    let woke = try await withTools(
+      device, answerLimit: limits.answer, wakeLimit: limits.wake, clock: clock
+    ) { tools in
+      async let woke = tools.wakeScreen(route: ADBRoute(serial: Self.serial))
+      await device.waitForHangs(1)
+      await clock.waitForSleeper()
+      await clock.advance(by: limits.answer)
+      return await woke
     }
     #expect(!woke)
-    #expect(ContinuousClock.now - start < .seconds(5))
     #expect(!device.commands.contains(["dumpsys", "power"]))
   }
 
@@ -146,13 +153,9 @@ struct ADBWakeTests {
       await $0.wakeScreen(route: ADBRoute(serial: Self.serial))
     }
     #expect(!woke)
-    // The 300 ms are also a bound in time, which a loaded machine can reach first, even with a
-    // read on its way: the paced waits never pass it, and each read but the first follows one.
-    let waits = pauses.all
-    let reads = device.commands.filter { $0 == ["dumpsys", "power"] }.count
-    #expect(waits.allSatisfy { $0 == .milliseconds(100) })
-    #expect(waits.count <= 3)
-    #expect((waits.count...(waits.count + 1)).contains(reads))
+    // The waits reach the limit, and each read but the first follows one.
+    #expect(pauses.all == Array(repeating: .milliseconds(100), count: 3))
+    #expect(device.commands.filter { $0 == ["dumpsys", "power"] }.count == 4)
   }
 
   /// A device whose `dumpsys power` has no display line will never say the display is on, so

@@ -187,7 +187,7 @@ extension ADBTools {
       if run.isStopped || run.isRouteLost { return false }
       guard await sink(batch) else { return true }
       // A backlog goes out at once; the pause only batches up a log that is keeping pace.
-      if await queue.isEmpty { try? await Task.sleep(for: limits.logInterval) }
+      if await queue.isEmpty { try? await clock.sleep(for: limits.logInterval) }
     }
     return false
   }

@@ -44,9 +44,9 @@ struct AppModelRecordingTests {
 
   private func saves() -> Int { log.all.filter { $0.hasPrefix("saveRecording") }.count }
 
-  /// Lets the collections a status started run.
-  private func settle() async {
-    for _ in 0..<20 { await Task.yield() }
+  /// Waits for the collections the statuses so far started, to the end.
+  private func settle(_ model: AppModel) async {
+    for collection in model.backgroundCollections.values { await collection.value }
   }
 
   @Test func anUnsavableRecordingWaitsWithoutRetrying() async throws {
@@ -58,7 +58,7 @@ struct AppModelRecordingTests {
     #expect(model.actionError == DevicePresentation.notice(for: .cannotSave))
     for _ in 0..<3 {
       await model.refresh()
-      await settle()
+      await settle(model)
     }
     #expect(saves() == 0)
     #expect(model.recording(on: id) != nil)
@@ -78,10 +78,7 @@ struct AppModelRecordingTests {
     #expect(chmod(root.path, 0o700) == 0)
     clock.advance(.seconds(30))
     await model.refresh()
-    let deadline = ContinuousClock.now + .seconds(5)
-    while saves() == 0, ContinuousClock.now < deadline {
-      try await Task.sleep(for: .milliseconds(10))
-    }
+    await settle(model)
     #expect(saves() == 1)
     let recordings = root.appending(path: "LinkRunner-100G/Screen Recordings")
     #expect(try FileManager.default.contentsOfDirectory(atPath: recordings.path).count == 1)
@@ -116,11 +113,9 @@ struct AppModelRecordingTests {
     model.preservedChanges = [kept]
     model.toolMessage = "Installed “a.apk”."
     await model.refresh()
-    let deadline = ContinuousClock.now + .seconds(5)
-    while saves() == 0 || model.recording(on: id) != nil, ContinuousClock.now < deadline {
-      try await Task.sleep(for: .milliseconds(10))
-    }
+    await settle(model)
     #expect(saves() == 1)
+    #expect(model.recording(on: id) == nil)
     #expect(model.preservedChanges == [kept])
     #expect(model.toolMessage == "Installed “a.apk”.")
   }
@@ -144,19 +139,19 @@ struct AppModelRecordingTests {
     services.folders = [folder]
     client.setTool(.failure(.deviceDisconnected))
     await model.refresh()
-    try await waitForSaves(1)
-    await settle()
+    try await waitForSaves(1, model)
+    await settle(model)
     #expect(model.recordingUnsaved(on: id))
     await model.refresh()
-    await settle()
+    await settle(model)
     #expect(saves() == 1)
 
     // Replugged between two statuses: only its session number says so.
     serve(session: 2)
     client.setTool(.done, writes: Data("....ftypmp42".utf8))
     await model.refresh()
-    try await waitForSaves(2)
-    await settle()
+    try await waitForSaves(2, model)
+    await settle(model)
     #expect(!model.recordingUnsaved(on: id))
     #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).count == 1)
   }
@@ -174,12 +169,12 @@ struct AppModelRecordingTests {
     await model.refresh()
     // A check starts with the status that allows it; none did.
     #expect(!model.probingRecordings.contains(id))
-    await settle()
+    await settle(model)
     #expect(saves() == 0)
 
     clock.advance(.seconds(21))
     await model.refresh()
-    try await waitForSaves(1)
+    try await waitForSaves(1, model)
   }
 
   /// A save the agent refused for another reason waits for the user, even across a reconnect.
@@ -188,10 +183,10 @@ struct AppModelRecordingTests {
     services.folders = [try TestScratch.folder("refused")]
     client.setTool(.toolFailed(.recordingBusy))
     await model.refresh()
-    try await waitForSaves(1)
+    try await waitForSaves(1, model)
     serve(session: 2)
     await model.refresh()
-    await settle()
+    await settle(model)
     #expect(saves() == 1)
     #expect(model.recordingUnsaved(on: id))
   }
@@ -224,11 +219,8 @@ struct AppModelRecordingTests {
     #expect(!CaptureFiles.takesNewFiles(writable.appending(path: "missing")))
   }
 
-  private func waitForSaves(_ count: Int) async throws {
-    let deadline = ContinuousClock.now + .seconds(5)
-    while saves() < count, ContinuousClock.now < deadline {
-      try await Task.sleep(for: .milliseconds(10))
-    }
+  private func waitForSaves(_ count: Int, _ model: AppModel) async throws {
+    await settle(model)
     try #require(saves() == count)
   }
 
@@ -237,7 +229,7 @@ struct AppModelRecordingTests {
     let model = setUp(method: .usbFileTransfer)
     services.folders = [try TestScratch.folder("ejected")]
     await model.refresh()
-    await settle()
+    await settle(model)
     #expect(saves() == 0)
   }
 }

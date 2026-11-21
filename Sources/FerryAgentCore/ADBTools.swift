@@ -169,6 +169,8 @@ public actor ADBTools {
   let scratch: URL
   let now: @Sendable () -> Date
   let limits: Limits
+  /// What the pause between log batches is measured on.
+  let clock: any Clock<Duration>
   var recordings: [DeviceID: Recording] = [:]
   var logcats: [DeviceID: LogcatRun] = [:]
   /// Streams a stop came for before they were up.
@@ -177,8 +179,10 @@ public actor ADBTools {
   public init(
     device: any ADBToolDevice, target: @escaping @Sendable (DeviceID) async -> ADBRoute?,
     journal: ToolJournal, scratch: URL = FileManager.default.temporaryDirectory,
-    now: @escaping @Sendable () -> Date = Date.init, limits: Limits = Limits()
+    now: @escaping @Sendable () -> Date = Date.init, limits: Limits = Limits(),
+    clock: any Clock<Duration> = ContinuousClock()
   ) {
+    self.clock = clock
     self.device = device
     self.target = target
     self.journal = journal

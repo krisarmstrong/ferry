@@ -97,8 +97,8 @@ extension ADBDeviceTools {
     async throws(ADBError) -> String?
   {
     let command = try ADBShell.command(program, arguments)
-    let (host, limit) = (host, answerLimit)
-    let result = try await ADBTransport.within(limit) { () async throws(ADBError) in
+    let (host, limit, clock) = (host, answerLimit, clock)
+    let result = try await ADBTransport.within(limit, on: clock) { () async throws(ADBError) in
       try await host.run(route: route, command: command)
     }
     guard result.status == 0 else { return nil }

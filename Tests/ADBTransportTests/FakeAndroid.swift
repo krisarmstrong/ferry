@@ -56,6 +56,9 @@ final class FakeAndroid: Sendable {
     var sendFailure: String?
     /// Programs the shell starts but never answers for, as on a wedged device.
     var hangingPrograms: Set<String> = []
+    /// How many times one of them has been started, and who waits for a count.
+    var hangs = 0
+    var hangWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
     /// What `getprop <name>` prints.
     var properties: [String: String] = [:]
     /// What `ip -4 addr` prints.
@@ -120,6 +123,31 @@ final class FakeAndroid: Sendable {
   static func internalPath(_ relative: String) -> Path { bytes(internalRoot + relative) }
 
   // MARK: Test setup and inspection
+
+  /// Returns once a hanging program has been started `count` times in all: the client is then
+  /// waiting on an answer that never comes.
+  func waitForHangs(_ count: Int) async {
+    await withCheckedContinuation { continuation in
+      let reached = state.withLock { state in
+        guard state.hangs < count else { return true }
+        state.hangWaiters.append((count, continuation))
+        return false
+      }
+      if reached { continuation.resume() }
+    }
+  }
+
+  /// A hanging program has started: answers nothing until the client gives up and closes.
+  func hang(_ peer: Peer) async {
+    let due = state.withLock { state in
+      state.hangs += 1
+      let hangs = state.hangs
+      defer { state.hangWaiters.removeAll { $0.count <= hangs } }
+      return state.hangWaiters.filter { $0.count <= hangs }.map(\.continuation)
+    }
+    for waiter in due { waiter.resume() }
+    _ = try? await peer.stream.read(exactly: 1)
+  }
 
   func addFolder(_ relative: String, mtime: Int64 = 1_650_000_000) {
     state.withLock { $0.nodes[Self.internalPath(relative)] = .folder(mtime: mtime) }

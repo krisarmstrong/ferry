@@ -75,6 +75,7 @@ extension AppModel {
   func collectFinishedRecordings() {
     let listed = Set(recordings.map(\.device))
     unsavedRecordings = unsavedRecordings.filter { listed.contains($0.key) }
+    backgroundCollections = backgroundCollections.filter { listed.contains($0.key) }
     for recording in recordings
     where recording.finished && !collectingRecordings.contains(recording.device) {
       let id = recording.device
@@ -83,17 +84,17 @@ extension AppModel {
       else { continue }
       switch unsavedRecordings[id] {
       case nil:
-        Task { await collectRecording(on: id, userInitiated: false) }
+        backgroundCollections[id] = Task { await collectRecording(on: id, userInitiated: false) }
       case .deviceLost(let lostIn):
         guard let session = sessions[id], session != lostIn else { continue }
-        Task { await collectRecording(on: id, userInitiated: false) }
+        backgroundCollections[id] = Task { await collectRecording(on: id, userInitiated: false) }
       case .refused:
         continue
       case .noFolder(let failedWith, let checked):
         guard now() - checked >= Self.folderCheckInterval, probingRecordings.insert(id).inserted
         else { continue }
         let waiting = UnsavedRecording.noFolder(failedWith, checked: checked)
-        Task {
+        backgroundCollections[id] = Task {
           let found = await writableCaptureFolders(of: id)
           probingRecordings.remove(id)
           guard unsavedRecordings[id] == waiting else { return }

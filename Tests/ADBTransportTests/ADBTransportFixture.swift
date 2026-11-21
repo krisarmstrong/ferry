@@ -1,4 +1,5 @@
 import DeviceKit
+import DeviceKitTestSupport
 import Foundation
 import Testing
 import os
@@ -32,14 +33,15 @@ enum TransportFixture {
 
   static func transport(
     port: UInt16, locator: ADBLocator = findsAdb, clock: TestClock = TestClock(),
-    answerLimit: Duration = .seconds(10),
+    answerLimit: Duration = .seconds(10), limits: ManualClock = ManualClock(),
     serving: @escaping ADBNetworkPolicy = { _, _ in true }
   ) -> ADBTransport {
     ADBTransport(
       host: ADBHost(
         port: port, locator: locator, launcher: { _ in },
         backoff: Backoff(initial: .milliseconds(20), maximum: .milliseconds(100))),
-      locator: locator, answerLimit: answerLimit, serving: serving, now: { clock.now })
+      locator: locator, answerLimit: answerLimit, clock: limits, serving: serving,
+      now: { clock.now })
   }
 
   /// A hub serving `entries`, started on a free port; the caller kills it.

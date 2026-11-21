@@ -185,20 +185,20 @@ struct LogcatSessionTests {
   /// The cost of a batch with the ring full and a filter set, measured on the main actor: the
   /// agent sends up to ten batches a second, so a batch must take a small part of 100 ms. The
   /// whole-ring filter it replaces took several times the bound here (50,000 case-insensitive
-  /// searches a batch); filtering only the batch takes a few milliseconds in a debug build.
+  /// searches a batch); filtering only the batch takes a few milliseconds in a debug build. The
+  /// cost is the thread's CPU time, which other work on a busy machine does not add to.
   @Test func aBatchWithAFullRingAndAFilterIsCheap() {
     let session = session()
     session.receive(
       LogBatch(lines: (0..<50_000).map { "01-02 03:04:05.678  1  2 I T: \($0)" }, skipped: 0))
     session.filterText = "t:"
     let batches = 20
-    let clock = ContinuousClock()
-    let elapsed = clock.measure {
-      for batch in 0..<batches {
-        let lines = (0..<500).map { "01-02 03:04:05.678  1  2 I T: n\(batch * 500 + $0)" }
-        session.receive(LogBatch(lines: lines, skipped: 0))
-      }
+    let began = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+    for batch in 0..<batches {
+      let lines = (0..<500).map { "01-02 03:04:05.678  1  2 I T: n\(batch * 500 + $0)" }
+      session.receive(LogBatch(lines: lines, skipped: 0))
     }
+    let elapsed = Duration.nanoseconds(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - began)
     #expect(elapsed / batches < .milliseconds(25))
     #expect(session.shown.count == 50_000)
   }
