@@ -21,4 +21,9 @@ final class SparkleUpdates: UpdateChecking {
     NSApp.activate()
     controller.checkForUpdates(nil)
   }
+
+  var installsAutomatically: Bool {
+    get { controller.updater.automaticallyDownloadsUpdates }
+    set { controller.updater.automaticallyDownloadsUpdates = newValue }
+  }
 }

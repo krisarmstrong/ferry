@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "To choose yourself, turn off **Install Updates Automatically** in the Ferry menu. Ferry still checks once a day, and asks before it downloads a new version. On a managed Mac, an administrator can set the same choice with `defaults write io.github.krisarmstrong.ferry SUAutomaticallyUpdate -bool false`." : {
+      "extractionState" : "manual"
+    },
+    "Install Updates Automatically" : {
+
+    },
     "%@: changes wait to be sent. Reconnect it to finish." : {
 
     },
