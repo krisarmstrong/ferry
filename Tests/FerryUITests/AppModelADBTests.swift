@@ -26,6 +26,18 @@ struct AppModelADBTests {
     #expect(model.awaitingAuthorization == ["192.0.2.31:5555"])
   }
 
+  /// adb kept a USB device offline after the agent asked it to reconnect: the menu asks for a
+  /// replug on that device only.
+  @Test func aDeviceStuckOfflineNeedsAReplug() async {
+    let client = FakeClient(log: log)
+    client.setStatus(
+      [device("A1", model: "Pixel 8", .ready([]))], needsReplug: [DeviceID(serial: "A1")])
+    let model = model(client)
+    await model.refresh()
+    #expect(model.needsReplug(DeviceID(serial: "A1")))
+    #expect(!model.needsReplug(DeviceID(serial: "B1")))
+  }
+
   /// adb is installed but its server does not answer: Check Again is how the user retries.
   @Test(arguments: [
     (ADBStatus?.some(.serverDown), true, true), (.some(.serverDown), false, false),

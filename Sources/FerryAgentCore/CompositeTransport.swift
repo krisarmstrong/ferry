@@ -85,7 +85,8 @@ public actor CompositeTransport: DeviceTransport {
       devices: last.devices, busy: last.busy, notSharing: last.notSharing, ejected: last.ejected,
       rescanAfter: staleRetry, method: last.method, methods: last.methods,
       awaitingAuthorization: last.awaitingAuthorization, presentOverUSB: last.presentOverUSB,
-      adbStatus: last.adbStatus, awaitingUSBDebugging: last.awaitingUSBDebugging)
+      adbStatus: last.adbStatus, awaitingUSBDebugging: last.awaitingUSBDebugging,
+      stuckOffline: last.stuckOffline)
   }
 
   private func merge(mtp viaMTP: DeviceScan, adb viaADB: DeviceScan) -> DeviceScan {
@@ -136,7 +137,8 @@ public actor CompositeTransport: DeviceTransport {
       method: .usbFileTransfer, methods: methods,
       awaitingAuthorization: viaMTP.awaitingAuthorization + viaADB.awaitingAuthorization,
       presentOverUSB: onUSB, adbStatus: viaADB.adbStatus ?? viaMTP.adbStatus,
-      awaitingUSBDebugging: viaMTP.awaitingUSBDebugging.union(viaADB.awaitingUSBDebugging))
+      awaitingUSBDebugging: viaMTP.awaitingUSBDebugging.union(viaADB.awaitingUSBDebugging),
+      stuckOffline: viaADB.stuckOffline)
   }
 
   private func rememberNames(_ viaMTP: DeviceScan) {

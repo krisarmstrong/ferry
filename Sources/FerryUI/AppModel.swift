@@ -28,10 +28,6 @@ import os
   static let log = Logger(subsystem: "io.github.krisarmstrong.ferry", category: "AppModel")
   static let pollInterval = Duration.seconds(2)
   static let emptyGuideDelay = Duration.seconds(10)
-  /// After restarting an agent it could not reach, how many times the app asks it for its status,
-  /// `recoveryPause` apart, before leaving it until the next outage.
-  static let recoveryChecks = 5
-  static let recoveryPause = Duration.seconds(1)
 
   public private(set) var devices: [AttachedDevice] = []
   /// Assumed on until the agent says otherwise, so the turn-on row does not flash at launch.
@@ -49,6 +45,8 @@ import os
   private(set) var sessions: [DeviceID: UInt64] = [:]
   /// Devices with USB debugging on that wait for the user to allow this Mac on them.
   private(set) var awaitingUSBDebugging: Set<DeviceID> = []
+  /// USB devices adb keeps offline even after a reconnect: they need a replug.
+  private(set) var replugNeeded: Set<DeviceID> = []
   /// Network devices (`host:port`) waiting for the user to allow this Mac on them.
   public private(set) var awaitingAuthorization: [String] = []
   /// Devices the agent reconnects over the network.
@@ -127,6 +125,8 @@ import os
   var restartedBuild: String?
   /// Set when the agent was restarted for this outage, or is being; cleared once it answers.
   var recoveryAttempted = false
+  /// Set while Remove Ferry runs: the agent it unregisters must not be restarted.
+  var removing = false
   private var loginItemRequests = 0
   private var loginItemsApplied = 0
 
@@ -152,12 +152,14 @@ import os
   let services: any SystemServicing
   let sleep: @Sendable (Duration) async throws -> Void
   let now: @Sendable () -> ContinuousClock.Instant
+  /// Returns once a status request has waited `statusDeadline` (see `requestStatus()`).
+  let statusDeadline: @Sendable () async throws -> Void
   /// Devices the guide has opened for this app run.
   var guidedDevices: Set<DeviceID> = []
   var emptyGuideShown = false
 
   public convenience init(
-    client: any AgentSending, services: any SystemServicing = SystemServices()
+    client: any AgentSending, services: any SystemServicing
   ) {
     self.init(client: client, services: services, sleep: { try await Task.sleep(for: $0) })
   }
@@ -165,12 +167,16 @@ import os
   init(
     client: any AgentSending, services: any SystemServicing,
     sleep: @escaping @Sendable (Duration) async throws -> Void,
-    now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }
+    now: @escaping @Sendable () -> ContinuousClock.Instant = { .now },
+    statusDeadline: @escaping @Sendable () async throws -> Void = {
+      try await Task.sleep(for: AppModel.statusDeadline)
+    }
   ) {
     self.client = client
     self.services = services
     self.sleep = sleep
     self.now = now
+    self.statusDeadline = statusDeadline
   }
 
   public func refresh() async {
@@ -180,7 +186,7 @@ import os
   /// Asks the agent for its status and shows it.
   func readStatus() async -> StatusRead {
     do {
-      switch try await client.send(.status, file: nil) {
+      switch try await requestStatus() {
       case .status(let report):
         apply(report)
         return .answered
@@ -249,15 +255,6 @@ import os
       answeredFor? += Self.pollInterval
     }
     cancelDetailReads()
-  }
-
-  public func turnOnInFinder() {
-    services.open(Self.loginItemsSettings)
-  }
-
-  /// Where the user allows Ferry's helper to run in the background.
-  public func openLoginItems() {
-    services.open(Self.loginItemsSettings)
   }
 
   /// The Open at Login row: shows `enabled` at once, then applies it after any change still
@@ -339,6 +336,7 @@ import os
     usbWatchFailed = report.usbWatchFailed
     sessions = report.sessions
     awaitingUSBDebugging = Set(report.awaitingUSBDebugging)
+    replugNeeded = Set(report.needsReplug)
     awaitingAuthorization = report.awaitingAuthorization
     remembered = report.remembered
     connectedAddresses = report.connectedAddresses
@@ -360,36 +358,5 @@ import os
       provider: \(report.provider.rawValue, privacy: .public) adb: \(adb, privacy: .public)
       """)
     guideNewDevices()
-  }
-}
-
-extension AppModel {
-  /// An ejected device reports `.ejected`, which never opens the guide.
-  public func eject(_ id: DeviceID) async {
-    await perform(.eject(id))
-  }
-
-  /// Mounts an ejected device again.
-  public func mount(_ id: DeviceID) async {
-    await perform(.recheck(id))
-  }
-
-  /// Asks the agent to open a device again, after the app holding it quits.
-  public func recheck(_ id: DeviceID) async {
-    await perform(.recheck(id))
-  }
-
-  /// The transfers running on `device`.
-  public func transfers(on device: DeviceID) -> [ActiveTransfer] {
-    transfers.filter { $0.device == device }
-  }
-
-  /// No answer from the agent yet, so whether a device is attached is not known.
-  public var isChecking: Bool { agent == .checking }
-
-  /// Ferry's locations exist and are all off in Finder: not an error, but the user must turn
-  /// Ferry on. With no location yet there is nothing to turn on.
-  public var showsTurnOnRow: Bool {
-    agent == .running && provider == .disabled
   }
 }

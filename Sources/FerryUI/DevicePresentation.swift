@@ -56,11 +56,16 @@ enum DevicePresentation {
     case moreTools
     /// USB debugging is on and waits for the user to allow this Mac on the device.
     case allowUSBDebugging
+    /// adb keeps the device offline over USB even after a reconnect; a replug brings it back.
+    case replugCable
   }
 
-  static func hint(for device: AttachedDevice, awaitingUSBDebugging: Bool) -> Hint? {
+  static func hint(
+    for device: AttachedDevice, awaitingUSBDebugging: Bool, needsReplug: Bool = false
+  ) -> Hint? {
     switch device.state {
     case .ready, .notSharingFiles:
+      if needsReplug { return .replugCable }
       if awaitingUSBDebugging { return .allowUSBDebugging }
       if case .ready = device.state, device.method == .usbFileTransfer { return .moreTools }
       return nil

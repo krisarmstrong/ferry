@@ -21,6 +21,7 @@ extension DeviceHub {
     if ejecting.contains(id) { throw .deviceNotFound(id) }
     let session = try session(for: id)
     leases[id, default: 0] += 1
+    leasesGranted += 1
     return SessionLease(device: id, session: session)
   }
 
@@ -50,6 +51,11 @@ extension DeviceHub {
   /// recent scan.
   public func awaitingUSBDebugging() -> [DeviceID] {
     awaitingDebugging.sorted { $0.serial < $1.serial }
+  }
+
+  /// USB devices adb keeps offline even after a reconnect, as of the most recent scan.
+  public func stuckOfflineDevices() -> [DeviceID] {
+    stuckOffline.sorted { $0.serial < $1.serial }
   }
 
   /// Swaps and ejects waiting for a device's requests to finish.

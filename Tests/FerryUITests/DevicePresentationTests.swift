@@ -38,6 +38,17 @@ struct DevicePresentationTests {
         == .allowUSBDebugging)
   }
 
+  /// adb kept the device offline over USB even after a reconnect: only a replug brings it back,
+  /// and that comes before anything else the line would say.
+  @Test(arguments: [DeviceState.ready([]), .notSharingFiles])
+  func aDeviceStuckOfflineAsksForAReplug(state: DeviceState) {
+    let device = Self.attached(state, .usbFileTransfer)
+    #expect(
+      DevicePresentation.hint(for: device, awaitingUSBDebugging: true, needsReplug: true)
+        == .replugCable)
+    #expect(DevicePresentation.hint(for: device, awaitingUSBDebugging: false) != .replugCable)
+  }
+
   /// An unauthorised device adb lists alone is not sharing files, but file transfer is not what
   /// it needs.
   @Test func anUnauthorisedADBDeviceNeedsAllowNotTransferFiles() {

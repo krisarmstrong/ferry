@@ -35,8 +35,34 @@ the tag's commit is on `main`.
    `scripts/dmg-requirements.txt`). dmgbuild is third-party code, so it runs only in the `dmg`
    job, which has no secrets, on the stapled app the build job hands on; the `publish` job
    then signs, notarizes and staples the image, and `scripts/check-dmg.sh --release` checks
-   its signature, both staples and Gatekeeper's verdict. CI builds and checks the image on
-   every change, from the ad hoc release build.
+   its signature, both staples and Gatekeeper's verdict. Before it signs anything,
+   `scripts/check-dmg-contents.sh` checks the image holds exactly the stapled app from the
+   build job's `Ferry-X.Y.Z.zip`, file for file (type, mode, link target and SHA-256, with
+   the same code directory hash and team), beside only the Applications link, the background
+   and the layout, so the publish job never signs content the dmg job changed. CI builds and
+   checks the image on every change, from the ad hoc release build, and
+   `scripts/check-dmg-contents-test.sh` shows that check refusing a changed byte and an extra
+   entry.
+
+## What runs while the signing identity is usable
+
+dmgbuild runs where no signing material is. Other third-party code does not, and that is a
+known, accepted residual. In the build job, `make release` runs after the Developer ID identity
+is imported into an unlocked keychain whose partition list lets `codesign` use it, so these run
+while any code on the runner could sign with it:
+
+- libusb's and libmtp's `configure` scripts and their builds (`scripts/build-libmtp.sh`);
+- pkg-config, built from the pinned pkgconf source (`scripts/build-pkgconf.sh`);
+- XcodeGen, from its pinned release zip;
+- Xcode's package resolution of Sparkle and the framework's build phases.
+
+Each is pinned: the tarballs and the XcodeGen zip by SHA-256, Sparkle by commit in
+`project.yml` (whose `Package.swift` fixes the checksum SwiftPM checks the framework against).
+What runs is what was reviewed when the pin changed; a change upstream fails the build rather
+than running. The secrets live only in the `release` environment, which
+deploys from `main` only. Moving these builds ahead of the keychain import would narrow the
+window, but that path has never run a release, so it waits until it can be tried on a release
+that is not V1.
 
 ## When the release PR shows no passing `check`
 
@@ -67,8 +93,10 @@ installed Ferry sees a missing feed. What to do depends on the cause.
 workflow run, within 30 days. It builds the same tag again. A connection to the notary service
 that drops (`NSURLErrorDomain` -1005 or -1001) is already tried three times by
 `scripts/notarize.sh`, during the upload and again while waiting, so a re-run is for an outage
-that lasts longer. A submission with no verdict after 30 minutes fails as a timeout; a re-run
-submits it again. The pinned pkgconf comes from one host, distfiles.ariadne.space; if it is down,
+that lasts longer. Each wait on a submission lasts at most 30 minutes, and one whose connection
+drops is started again, so a slow notarization can take about 91 minutes before it fails as a
+timeout; the build and publish jobs' timeouts (150 and 120 minutes) allow for that. A re-run
+submits the file again, which is harmless: Apple gives the same bytes the same verdict. The pinned pkgconf comes from one host, distfiles.ariadne.space; if it is down,
 the install step fails, and a re-run once it is back is the fix.
 
 **The wrong certificate**: the import step fails, naming what `DEVELOPER_ID_P12_BASE64` holds,

@@ -1,4 +1,5 @@
 import Darwin
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -60,11 +61,11 @@ struct ADBServerKeeperGateTests {
     }
     for await _ in commandHeld { break }
     let replacing = Task { await keeper.replaceFerryServer(fetched: Keeper.adb) }
-    try await Task.sleep(for: .milliseconds(50))
+    while await keeper.replacementsUnderWay == 0, !Task.isCancelled { await Task.yield() }
     let second = Task {
       try await keeper.whileServing { () async throws(ADBError) -> Int in fakes { $0.kills } }
     }
-    try await Task.sleep(for: .milliseconds(50))
+    while await keeper.commandsWaiting == 0, !Task.isCancelled { await Task.yield() }
     release.yield()
     try await first.value
     #expect(await replacing.value)
@@ -141,13 +142,16 @@ struct ADBServerKeeperGateTests {
     defer { try? FileManager.default.removeItem(at: record) }
     try Self.recordedOrphan(fakes, record: record)
     let restart = Box<ADBServerKeeper?>(nil)
-    // A limit the stop can never reach in this test: ending when the port falls silent (never,
-    // the new server answers) would run into the time limit, not pass by the clock.
+    // Limits the stop can never reach in this test: ending when the port falls silent (never,
+    // the new server answers) would run into the time limit, not pass by the clock. Time moves
+    // only by the test's hand, so no limit runs out on a loaded machine either.
+    let clock = ManualClock()
     let keeper = Keeper.keeper(
       fakes, record: record, exits: .milliseconds(300), limit: .seconds(3600),
+      callLimit: .seconds(3600), clock: clock,
       whileStopping: { try? await restart.value?.start(Keeper.adb) })
     await restart.set(keeper)
-    #expect(await keeper.replaceRecordedOrphan())
+    #expect(await clock.advancing(by: .milliseconds(10)) { await keeper.replaceRecordedOrphan() })
     #expect(fakes { $0.spawned.count } == 1)
     #expect(ADBServerRecord.load(record)?.pid == 4242)
   }

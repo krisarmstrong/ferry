@@ -80,8 +80,10 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
     runs-on: macos-26
-    # A notarization of at most 30 minutes, with its retries, plus the build.
-    timeout-minutes: 120
+    # scripts/notarize.sh at its worst: three uploads and three waits of up to 30 minutes each
+    # (a wait whose connection drops is started again with its full 30 minutes), 90 s between
+    # attempts, so about 95 minutes. Plus the build (about 10 minutes) and margin.
+    timeout-minutes: 150
     environment: release
     permissions:
       contents: write
@@ -328,8 +330,8 @@ jobs:
   publish:
     needs: [release-please, build, dmg]
     runs-on: macos-26
-    # A notarization of at most 30 minutes, with its retries.
-    timeout-minutes: 60
+    # scripts/notarize.sh at its worst, about 95 minutes (see the build job), and margin.
+    timeout-minutes: 120
     environment: release
     permissions:
       contents: write
@@ -414,6 +416,10 @@ jobs:
             | sed -n "s/^ *[0-9]*) \([0-9A-F]\{40\}\) \"Developer ID Application: .* ($team)\"$/\1/p" \
             | head -1)"
           [ -n "$identity" ] || { echo "::error::no Developer ID Application identity of team $team"; exit 1; }
+          # The image comes from the dmg job, which ran dmgbuild: sign it only if it holds
+          # exactly the app this job's build job notarized and stapled, file for file.
+          ditto -x -k ".build/dist/appcast/Ferry-$version.zip" "$RUNNER_TEMP/stapled"
+          scripts/check-dmg-contents.sh "$dmg" "$RUNNER_TEMP/stapled/Ferry.app"
           codesign --sign "$identity" --timestamp "$dmg"
           scripts/notarize.sh "$dmg"
           xcrun stapler staple "$dmg"

@@ -197,6 +197,13 @@ public actor ADBHost {
     try await launcher(adb)
   }
 
+  /// `adb reconnect offline`: the server drops and reopens every connection it lists offline,
+  /// which brings back a USB device whose first read failed when the server started, as long as
+  /// the device is still answering.
+  func reconnectOffline() async throws(ADBError) {
+    _ = try await query("host:reconnect-offline")
+  }
+
   /// A host service such as `connect:` or `pair:`, whose refusal is an answer, not a failure.
   func service(_ request: String) async throws(ADBError) -> ADBServiceAnswer {
     let framed = try ADBWire.frame(request)
@@ -250,10 +257,13 @@ public actor ADBHost {
         emit(.unavailable)
       }
       if !connected && !startedThisOutage {
-        startedThisOutage = true
         do throws(ADBError) {
+          startedThisOutage = true
           try await startServer()
           continue
+        } catch .adbNotInstalled {
+          // Nothing ran: look again on the next try, since Ferry may fetch adb meanwhile.
+          startedThisOutage = false
         } catch {
           Self.log.error("adb server not started: \(String(describing: error), privacy: .private)")
         }

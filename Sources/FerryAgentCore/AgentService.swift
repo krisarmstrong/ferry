@@ -325,7 +325,8 @@ extension AgentService {
       unconfirmed: await wireless?.unconfirmed() ?? [],
       recordings: await tools?.recordingsRunning() ?? [],
       usbWatchFailed: usbWatch?.failed ?? false, sessions: await hub.heldSessions(),
-      connectedAddresses: addresses, waitingToSend: await domains.locationsWaitingToSend())
+      connectedAddresses: addresses, waitingToSend: await domains.locationsWaitingToSend(),
+      needsReplug: await hub.stuckOfflineDevices())
   }
 }
 

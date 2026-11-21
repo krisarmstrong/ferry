@@ -34,6 +34,8 @@ final class FakeADBHub: Sendable {
     var server: FakeADBServer?
     var trackers: [UUID: AsyncStream<String>.Continuation] = [:]
     var deviceListings = 0
+    var reconnects = 0
+    var reconnectHeals = false
   }
 
   private let state = OSAllocatedUnfairLock(initialState: State())
@@ -44,6 +46,13 @@ final class FakeADBHub: Sendable {
 
   /// The port the server listens on; the same across restarts.
   var port: UInt16 { state.withLock { $0.server?.port ?? 0 } }
+
+  /// How many `host:reconnect-offline` requests the server answered.
+  var reconnects: Int { state.withLock { $0.reconnects } }
+
+  /// Whether `host:reconnect-offline` brings offline devices back (a server whose first USB
+  /// read failed at start keeps them offline, so by default it does not).
+  func reconnectHeals(_ heals: Bool) { state.withLock { $0.reconnectHeals = heals } }
 
   /// How many `host:devices-l` queries the server answered.
   var deviceListings: Int { state.withLock { $0.deviceListings } }
@@ -101,6 +110,19 @@ final class FakeADBHub: Sendable {
       try await peer.answer(listing)
     case "host:track-devices-l":
       try await track(peer)
+    case "host:reconnect-offline":
+      let healed = state.withLock { state -> [Entry]? in
+        state.reconnects += 1
+        guard state.reconnectHeals else { return nil }
+        return state.entries.map {
+          $0.state == "offline"
+            ? Entry(
+              $0.serial, "device", model: $0.model, device: $0.device,
+              transportID: $0.transportID) : $0
+        }
+      }
+      try await peer.answer("reconnecting")
+      if let healed { set(healed) }
     default:
       if let (transportID, rest) = Self.transportID(in: first) {
         // Selected by its connection: only the entry with that transport id answers.

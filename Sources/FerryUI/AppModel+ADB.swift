@@ -6,6 +6,11 @@ extension AppModel {
     awaitingUSBDebugging.contains(device)
   }
 
+  /// adb keeps the device offline over USB even after the agent asked it to reconnect.
+  public func needsReplug(_ device: DeviceID) -> Bool {
+    replugNeeded.contains(device)
+  }
+
   /// adb is installed but its server does not answer, and Ferry has a device that could use it
   /// or the user opened a network form: the same rule as the offer to get adb.
   public var showsADBNotRunning: Bool {

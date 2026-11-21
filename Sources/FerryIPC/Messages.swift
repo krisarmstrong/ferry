@@ -163,6 +163,9 @@ public struct StatusReport: Codable, Sendable, Equatable {
   /// The names of hidden Finder locations (their device is away) still holding changes not
   /// sent to the device, which nothing in Finder shows while the location is hidden.
   public let waitingToSend: [String]
+  /// USB devices adb keeps offline even after the agent asked it to reconnect them: only a
+  /// replug brings them back.
+  public let needsReplug: [DeviceID]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
@@ -171,7 +174,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
     sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:],
-    waitingToSend: [String] = []
+    waitingToSend: [String] = [], needsReplug: [DeviceID] = []
   ) {
     self.devices = devices
     self.provider = provider
@@ -186,6 +189,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.sessions = sessions
     self.connectedAddresses = connectedAddresses
     self.waitingToSend = waitingToSend
+    self.needsReplug = needsReplug
   }
 }
 

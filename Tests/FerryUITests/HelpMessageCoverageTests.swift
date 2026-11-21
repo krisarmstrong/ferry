@@ -167,6 +167,7 @@ extension HelpMessageCoverageTests {
     ("trouble-device", "%@: changes wait to be sent. Reconnect it to finish."),
     ("trouble-adb", "Waiting for Allow"),
     ("trouble-adb", "Allow USB debugging on the device"),
+    ("trouble-adb", "Unplug the cable and plug it in again to use USB debugging"),
     ("trouble-adb", "adb isn't on this Mac"),
     ("trouble-adb", "Couldn't download adb. Ferry needs an internet connection once."),
     ("trouble-adb", "The download didn't pass Ferry's checks, so Ferry deleted it."),

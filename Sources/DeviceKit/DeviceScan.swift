@@ -31,6 +31,9 @@ public struct DeviceScan: Sendable, Equatable, Codable {
   /// Devices adb lists over USB as unauthorised: USB debugging is on, but the user has not yet
   /// allowed this Mac on the device. Another route may still serve them.
   public let awaitingUSBDebugging: Set<DeviceID>
+  /// Devices adb lists offline over USB even after Ferry asked it to reconnect them: its first
+  /// read from the device failed, and only a replug brings it back.
+  public let stuckOffline: Set<DeviceID>
 
   /// `method` is how the transport reaches what it lists: MTP is always `.usbFileTransfer`. A
   /// transport with more than one route names the exceptions in `methods`.
@@ -39,7 +42,8 @@ public struct DeviceScan: Sendable, Equatable, Codable {
     ejected: [DeviceInfo] = [], rescanAfter: Duration? = nil,
     method: ConnectionMethod = .usbFileTransfer, methods: [DeviceID: ConnectionMethod] = [:],
     awaitingAuthorization: [String] = [], presentOverUSB: Set<DeviceID> = [],
-    adbStatus: ADBStatus? = nil, awaitingUSBDebugging: Set<DeviceID> = []
+    adbStatus: ADBStatus? = nil, awaitingUSBDebugging: Set<DeviceID> = [],
+    stuckOffline: Set<DeviceID> = []
   ) {
     self.devices = devices
     self.busy = busy
@@ -52,6 +56,7 @@ public struct DeviceScan: Sendable, Equatable, Codable {
     self.presentOverUSB = presentOverUSB
     self.adbStatus = adbStatus
     self.awaitingUSBDebugging = awaitingUSBDebugging
+    self.stuckOffline = stuckOffline
   }
 
   /// How the transport reaches `id`.
