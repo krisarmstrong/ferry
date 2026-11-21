@@ -21,6 +21,7 @@ extension DeviceHub {
     if ejecting.contains(id) { throw .deviceNotFound(id) }
     let session = try session(for: id)
     leases[id, default: 0] += 1
+    leasesGranted += 1
     return SessionLease(device: id, session: session)
   }
 

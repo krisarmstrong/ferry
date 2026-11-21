@@ -106,6 +106,8 @@ public actor DeviceHub {
   var kept: [DeviceID: any DeviceSession] = [:]
   /// Leases handed out and not yet released, by device.
   var leases: [DeviceID: Int] = [:]
+  /// Leases handed out in all, so a test can wait for requests it parked to have run.
+  var leasesGranted = 0
   /// Swaps and ejects waiting for their device's leases to be released.
   var drainWaiters: [DeviceID: [CheckedContinuation<Void, Never>]] = [:]
   /// Devices whose session is being replaced.

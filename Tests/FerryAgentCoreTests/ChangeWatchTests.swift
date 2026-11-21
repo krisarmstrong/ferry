@@ -164,6 +164,45 @@ struct ChangeWatchTests {
     #expect(watched.device.watches.requests.last?.count == ChangeWatch.folderLimit)
   }
 
+  /// A rewatch while the session is being replaced: the watch it replaces and its own both wait
+  /// for the lease. Once the swap ends, only the newer one opens, with the newer folder set; the
+  /// older one, opened after it, would put its folders back on the device.
+  @Test(.timeLimit(.minutes(1)))
+  func aWatchReplacedWhileLeasingNeverOpens() async throws {
+    // More folders than the watch holds, so each listing below changes the set watched.
+    let names = (0..<(ChangeWatch.folderLimit + 2)).map { "/F\($0)" }
+    let watched = try await Watched(folders: names)
+    defer { watched.finish() }
+    // The first two are known to the domain, as listed before this agent started, so listing
+    // them again below brings them into the set.
+    for name in names.prefix(2) { try await watched.list(name, quietly: true) }
+    for name in names.dropFirst(2) { try await watched.list(name) }
+    let open = Set(try names.suffix(ChangeWatch.folderLimit).map(watched.hint))
+    await watched.device.watches.waitUntil { $0.last.map(Set.init) == open }
+    let opened = watched.device.watches.requests.count
+    let hub = watched.harness.hub
+    let id = watched.device.info.id
+    // A request holds the session, so the swap waits, and every lease waits for the swap.
+    let held = try await hub.lease(id)
+    let method = try #require(await hub.entries[id]?.method)
+    await hub.beginSwap(id, to: .method(method))
+    for name in names.prefix(2) { await watched.changes.listed(try path(name), in: watched.domain) }
+    while await hub.requestsAwaitingSwap < 2, !Task.isCancelled { await Task.yield() }
+    let granted = await hub.leasesGranted
+    await hub.release(held)
+    // Both parked follows have leased and released: the older one has had its chance to open.
+    while !Task.isCancelled {
+      let leased = await hub.leasesGranted
+      let out = await hub.leases[id]
+      if leased >= granted + 2, out == nil { break }
+      await Task.yield()
+    }
+    let newest = Set(
+      try (names.prefix(2) + names.suffix(ChangeWatch.folderLimit - 2)).map(watched.hint))
+    #expect(watched.device.watches.requests.count == opened + 1)
+    #expect(watched.device.watches.requests.last.map(Set.init) == newest)
+  }
+
   /// A hint lists its folder again once its short window closes, and a change it finds is
   /// signalled.
   @Test func aHintListsItsFolder() async throws {
