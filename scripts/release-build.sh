@@ -2,8 +2,7 @@
 # Builds Ferry.app for release into .build/release/Build/Products/Release: libusb and libmtp
 # from pinned sources (scripts/build-libmtp.sh) in Contents/Frameworks, every part signed with
 # the team's Developer ID Application identity and the hardened runtime, then checks the bundle
-# (`make check-app CONFIG=Release`) and packages it as .build/release/Ferry.dmg (scripts/make-dmg.sh).
-# It does not notarize; the release workflow does.
+# (`make check-app CONFIG=Release`). It does not notarize; the release workflow does.
 #
 # Usage: scripts/release-build.sh [team|adhoc]
 #   team   (default) the Developer ID Application identity of FERRY_TEAM_ID in the keychain
@@ -84,7 +83,4 @@ codesign --force --sign "$identity" "${runtime[@]}" "$frameworks/Sparkle.framewo
 codesign --force --sign "$identity" "${runtime[@]}" --preserve-metadata=entitlements "$app"
 
 make check-app CONFIG=Release APP="$app" SIGN="$sign"
-# The disk image, built and checked here so every CI run covers it. The release workflow builds
-# it again from the stapled app, then signs, notarizes and staples it.
-scripts/make-dmg.sh "$app" "$derived/Ferry.dmg"
 echo "$app"

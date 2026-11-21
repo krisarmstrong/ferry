@@ -26,14 +26,17 @@ the tag's commit is on `main`.
    PR shows no passing `check`, see below.
 2. Merge the release PR. release-please tags `vX.Y.Z` and creates the GitHub release as a
    **draft**.
-3. The build job signs, notarizes and staples Ferry, attaches `Ferry-X.Y.Z.zip`,
-   `Ferry-X.Y.Z.dmg` and `appcast.xml`, then publishes the release as the latest. Installed
+3. The build job signs, notarizes and staples Ferry; the publish job attaches
+   `Ferry-X.Y.Z.zip`, `Ferry-X.Y.Z.dmg` and `appcast.xml`, then publishes the release as the
+   latest. Installed
    copies read `releases/latest/download/appcast.xml` and update within a day.
-   The DMG opens on a designed window (`Design/DMG`) with the app and a link to Applications;
-   `scripts/make-dmg.sh` builds it with dmgbuild (pinned by hash in
-   `scripts/dmg-requirements.txt`) and `scripts/check-dmg.sh` checks it, once as built and
-   again once it is signed and stapled. Every CI run builds and checks it too, in
-   `make release SIGN=adhoc`.
+   The DMG opens on a designed window (`Design/DMG`) with the app and a link to Applications.
+   `scripts/make-dmg.sh` builds it with dmgbuild (wheels pinned by SHA-256 in
+   `scripts/dmg-requirements.txt`). dmgbuild is third-party code, so it runs only in the `dmg`
+   job, which has no secrets, on the stapled app the build job hands on; the `publish` job
+   then signs, notarizes and staples the image, and `scripts/check-dmg.sh --release` checks
+   its signature, both staples and Gatekeeper's verdict. CI builds and checks the image on
+   every change, from the ad hoc release build.
 
 ## When the release PR shows no passing `check`
 

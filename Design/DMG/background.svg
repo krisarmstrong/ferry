@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
   <!-- The DMG window's background, 640 x 400 pt. Finder draws the icon labels black in light
-       mode and white in dark mode, on no backing: the blue behind them has a relative
-       luminance near 0.18, which gives both at least 4.5:1. -->
+       mode and white in dark mode, on no backing: the blue behind them, mid-gradient,
+       has a relative luminance near 0.18, which gives both at least 4.5:1 there. -->
   <defs>
     <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#3E7BB5"/>
