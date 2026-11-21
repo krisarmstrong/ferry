@@ -81,12 +81,21 @@ struct FerryDataRemovalTests {
     FileManager.default.fileExists(atPath: url.path)
   }
 
+  /// Stands in for the user's Trash: removal moves folders here, never into the real Trash.
+  private var trash: URL { home.appending(path: ".Trash", directoryHint: .isDirectory) }
+
   private func removal(_ table: FakeTable, stopped: Stopped = Stopped())
     -> FerryDataRemoval
   {
-    FerryDataRemoval(
+    let trash = trash
+    return FerryDataRemoval(
       home: home, agent: agent, table: table,
-      terminate: { pid in stopped.pids.withLock { $0.append(pid) } }, pause: {})
+      terminate: { pid in stopped.pids.withLock { $0.append(pid) } }, pause: {},
+      discard: { folder in
+        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(
+          at: folder, to: trash.appending(path: folder.lastPathComponent))
+      })
   }
 
   @Test func ferrysDataGoes() async throws {
@@ -103,6 +112,22 @@ struct FerryDataRemovalTests {
 
     for url in [adb, accepted, table, remembered] { #expect(!exists(url), "\(url.path)") }
     #expect(exists(other))
+  }
+
+  /// Ferry's data goes to the Trash, not away for good: a Remove Ferry clicked by mistake can be
+  /// undone by putting the folders back.
+  @Test func ferrysDataGoesToTheTrash() async throws {
+    defer { try? FileManager.default.removeItem(at: home) }
+    _ = try make("Library/Application Support/Ferry/platform-tools/36.0.0", file: "adb")
+    _ = try make("Library/Application Support/Ferry", file: "license.json")
+    _ = try make(
+      "Library/Application Support/io.github.krisarmstrong.ferry.agent", file: "wireless.json")
+
+    await removal(FakeTable([:])).run(keeping: [])
+
+    #expect(exists(trash.appending(path: "Ferry/platform-tools/36.0.0/adb")))
+    #expect(exists(trash.appending(path: "Ferry/license.json")))
+    #expect(exists(trash.appending(path: "io.github.krisarmstrong.ferry.agent/wireless.json")))
   }
 
   /// Unregistering does not wait for the agent: nothing is deleted until it has exited, so it
