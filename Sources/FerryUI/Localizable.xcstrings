@@ -199,12 +199,6 @@
     "**adb**, from Google's Android SDK Platform-Tools, is not part of Ferry. Ferry downloads it from Google only after you accept the Android SDK License, which Ferry shows first and keeps with the app." : {
       "extractionState" : "manual"
     },
-    "To choose yourself, turn off **Install Updates Automatically** in the Ferry menu. Ferry still checks once a day, and asks before it downloads a new version. On a managed Mac, an administrator can set the same choice with `defaults write io.github.krisarmstrong.ferry SUAutomaticallyUpdate -bool false`." : {
-      "extractionState" : "manual"
-    },
-    "Install Updates Automatically" : {
-
-    },
     "Removes Ferry's locations from Finder, stops Ferry's helper, moves what Ferry keeps on this Mac to the Trash and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state; starting again then downloads adb from Google again." : {
       "extractionState" : "manual"
     },
