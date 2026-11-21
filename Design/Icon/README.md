@@ -72,10 +72,10 @@ Renditions: `Default`, `Dark`, `TintedLight`, `TintedDark` (with `--tint-color` 
 
 ## Menu bar
 
-The status item draws `MenuBarGlyph` (a template image) at 18 pt, its intrinsic size. Every
-straight edge sits on a whole point, so it lands on pixels at 1x and 2x; only the curves of the
-hull and bow are anti-aliased. The 16 and 22 pt drawings are the same glyph on those grids, for
-a smaller or larger menu bar if one is ever wanted.
+The status item draws `MenuBarGlyph` (a template image) at 18 pt, its intrinsic size. The 16
+and 22 pt drawings are the same glyph on those grids, for a smaller or larger menu bar if one is
+ever wanted. In all three every vertical and horizontal edge sits on a whole point, so it lands
+on pixels at 1x and 2x; only the curves of the hull and bow are anti-aliased.
 
 ## Finder location
 
