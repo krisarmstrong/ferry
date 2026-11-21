@@ -1264,7 +1264,9 @@ Install Ferry again.
 
 ### Remove Ferry
 
-Removes Ferry's locations from Finder, stops Ferry's helper and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state.
+Removes Ferry's locations from Finder, stops Ferry's helper, deletes what Ferry keeps on this Mac and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state; starting again then downloads adb from Google again.
+
+Once the helper has stopped, Ferry deletes ~/Library/Application Support/Ferry (the adb it downloaded, and that you accepted Google's license) and ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (its lists of your devices' files and the devices it reconnects over the network). If Ferry's own adb is still running, Ferry stops it, including a shell you opened from Ferry's menu; an adb you installed yourself is left alone. Changes Finder had not sent to a device are kept, and shown in Finder.
 
 The **Remove Ferry…** button is here in Ferry Help. Ferry asks you to confirm first.
 
@@ -1290,8 +1292,9 @@ Ferry connects to the internet for two things. It checks daily for updates at Gi
 
 ### Uninstall
 
-1. In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, and Ferry quits. Files on your devices are not touched.
+1. In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, Ferry deletes its data in ~/Library/Application Support, and Ferry quits. Files on your devices are not touched.
 2. Drag Ferry from Applications to the Trash.
+3. To remove Ferry's preferences too, delete ~/Library/Preferences/io.github.krisarmstrong.ferry.plist and Ferry's folder in ~/Library/Group Containers.
 
 ### Acknowledgements
 
