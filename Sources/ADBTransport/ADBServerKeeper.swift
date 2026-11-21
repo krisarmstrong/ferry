@@ -60,10 +60,14 @@ public actor ADBServerKeeper {
   private var starting: Task<Result<Void, ADBError>, Never>?
   /// adb client commands running now (`whileServing`), which a replacement waits out.
   private var commands = 0
-  /// A replacement is stopping the server: no command starts until it is done.
-  private var replacing = false
+  /// Replacements under way: no command starts until none is.
+  private var replacing = 0
   private var waitingCommands: [CheckedContinuation<Void, Never>] = []
-  private var waitingReplacement: CheckedContinuation<Void, Never>?
+  /// One replacement at a time; the others wait their turn here.
+  private var replacementRunning = false
+  private var waitingTurns: [CheckedContinuation<Void, Never>] = []
+  /// Replacements waiting for running commands to end.
+  private var waitingReplacements: [CheckedContinuation<Void, Never>] = []
 
   /// `record` is where the server's start is kept, in the agent's own folder.
   public init(port: UInt16 = 5037, record: URL) {
@@ -151,7 +155,7 @@ public actor ADBServerKeeper {
   public func whileServing<T: Sendable>(
     _ body: @Sendable () async throws(ADBError) -> T
   ) async throws(ADBError) -> T {
-    while replacing {
+    while replacing > 0 {
       await withCheckedContinuation { waitingCommands.append($0) }
     }
     commands += 1
@@ -162,9 +166,10 @@ public actor ADBServerKeeper {
       result = .failure(error)
     }
     commands -= 1
-    if commands == 0, let waiting = waitingReplacement {
-      waitingReplacement = nil
-      waiting.resume()
+    if commands == 0 {
+      let waiting = waitingReplacements
+      waitingReplacements = []
+      for replacement in waiting { replacement.resume() }
     }
     return try result.get()
   }
@@ -173,9 +178,15 @@ public actor ADBServerKeeper {
   /// `isTheOne` still holds then: the port may have changed hands during the wait. Returns
   /// whether it stopped it.
   private func replace(_ pid: pid_t, if isTheOne: () -> Bool) async -> Bool {
-    replacing = true
+    replacing += 1
+    // In turn: each checks the port only once the one before has stopped its server, so it
+    // never stops the next server the trackers started.
+    while replacementRunning {
+      await withCheckedContinuation { waitingTurns.append($0) }
+    }
+    replacementRunning = true
     if commands > 0 {
-      await withCheckedContinuation { waitingReplacement = $0 }
+      await withCheckedContinuation { waitingReplacements.append($0) }
     }
     let stopping = isTheOne()
     if stopping {
@@ -184,7 +195,10 @@ public actor ADBServerKeeper {
       removeRecord(naming: pid)
       await stop(pid)
     }
-    replacing = false
+    replacementRunning = false
+    if !waitingTurns.isEmpty { waitingTurns.removeFirst().resume() }
+    replacing -= 1
+    guard replacing == 0 else { return stopping }
     let waiting = waitingCommands
     waitingCommands = []
     for command in waiting { command.resume() }

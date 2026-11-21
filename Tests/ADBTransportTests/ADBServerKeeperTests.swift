@@ -103,10 +103,17 @@ struct ADBServerKeeperTests {
         }
         await whileStopping?()
         guard let pid else { return }
-        guard let exits else { return fakes { $0.started[pid] = nil } }
+        // An exited server runs no more and holds the port no more.
+        let exit = { @Sendable in
+          fakes { state in
+            state.started[pid] = nil
+            if state.listener == pid { state.listener = nil }
+          }
+        }
+        guard let exits else { return exit() }
         Task {
           try? await Task.sleep(for: exits)
-          fakes { $0.started[pid] = nil }
+          exit()
         }
       },
       limit: .seconds(2), poll: .milliseconds(10), callLimit: .milliseconds(300))

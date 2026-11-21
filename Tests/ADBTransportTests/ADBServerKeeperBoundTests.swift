@@ -44,4 +44,36 @@ struct ADBServerKeeperBoundTests {
     _ = await Keeper.outcome { () async throws(ADBError) in try await keeper.start(Keeper.adb) }
     #expect(began.duration(to: .now) < .seconds(5))
   }
+
+  /// Two replacements waiting on the same running command both go on once it ends.
+  @Test(.timeLimit(.minutes(1)))
+  func twoReplacementsWaitingForACommandBothEnd() async throws {
+    let fakes = Keeper.Fakes()
+    let record = Keeper.recordFile()
+    defer { try? FileManager.default.removeItem(at: record) }
+    try Gate.recordedOrphan(fakes, record: record)
+    fakes { $0.googleADB = [9] }
+    let keeper = Keeper.keeper(fakes, record: record)
+    let (commandHeld, holding) = AsyncStream.makeStream(of: Void.self)
+    let (released, release) = AsyncStream.makeStream(of: Void.self)
+    let command = Task {
+      try await keeper.whileServing { () async throws(ADBError) in
+        holding.yield()
+        for await _ in released { break }
+      }
+    }
+    for await _ in commandHeld { break }
+    let orphan = Task { await keeper.replaceRecordedOrphan() }
+    let cutOff = Task { await keeper.replaceFerryServer(fetched: Keeper.adb) }
+    try await Task.sleep(for: .milliseconds(100))
+    release.yield()
+    try await command.value
+    let ended = await ADBServerKeeper.race(.seconds(5)) {
+      _ = await orphan.value
+      _ = await cutOff.value
+      return true
+    }
+    #expect(ended == true)
+    #expect(fakes { $0.kills } == 1)
+  }
 }
