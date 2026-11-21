@@ -62,6 +62,8 @@ private final class PreviewServices: SystemServicing {
   func startedAgentBuild() -> String? { nil }
   func recordStartedAgent(_ build: String) {}
   func restartAgent() async -> Bool { true }
+  func registerExtensions() async {}
+  func agentIsEnabled() async -> Bool { true }
   func helperStatus() async -> HelperStatus { .allowed }
   func loginItemStatus() async -> LoginItemStatus { .disabled }
   func setOpensAtLogin(_ enabled: Bool) async {}

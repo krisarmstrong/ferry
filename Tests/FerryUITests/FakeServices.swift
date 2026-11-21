@@ -51,6 +51,15 @@ final class FakeServices: SystemServicing {
     helper
   }
 
+  /// Whether macOS reports the agent enabled (`SMAppService.Status.enabled`).
+  var agentEnabled = false
+
+  func agentIsEnabled() async -> Bool { agentEnabled }
+
+  func registerExtensions() async {
+    log.record("registerExtensions")
+  }
+
   /// Set: the next read answers what it found once `releaseLoginItemRead()` is called, and is
   /// announced on `loginItemReadsHeld`.
   var holdsNextLoginItemRead = false
