@@ -338,4 +338,16 @@ struct ItemTableJournalTests {
     ItemTable.discardAll(in: folder)
     #expect(!FileManager.default.fileExists(atPath: journal.path))
   }
+
+  /// A save that cannot append (the store folder went away) writes a snapshot instead, so the
+  /// table keeps being saved.
+  @Test func aFailedAppendWritesASnapshot() async throws {
+    let folder = store()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let table = ItemTable(domain: tableDomain, store: folder)
+    _ = await table.observed(try file("/a"))
+    try FileManager.default.removeItem(at: folder)
+    let later = await table.observed(try file("/b"))
+    #expect(await ItemTable(domain: tableDomain, store: folder).path(for: later.id) != nil)
+  }
 }

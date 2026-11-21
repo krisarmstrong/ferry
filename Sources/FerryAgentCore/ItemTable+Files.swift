@@ -102,7 +102,10 @@ extension ItemTable {
     do {
       journalBytes += try Self.append(batch, to: journal)
     } catch {
-      log.error("saving item table failed: \(error, privacy: .private)")
+      // The folder may have gone (an append does not make it): a snapshot does, and holds
+      // everything, so later saves append again.
+      log.error("appending to the item table failed: \(error, privacy: .private)")
+      compact()
     }
   }
 
