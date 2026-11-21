@@ -43,15 +43,12 @@ let vouching = WirelessVouching()
 let toolJournal = ToolJournal(store: toolStore)
 // The adb server this agent starts is its child and ends with it. One an earlier agent left
 // running is cut off from the local network, so it is replaced before anything relies on it:
-// before the trackers and the reconnects below exist. Waited for here rather than with a
-// top-level `await`, which would make this file an async main and `dispatchMain()` below trap.
+// before the trackers and the reconnects below exist. Bounded: a wedged server must not keep
+// the agent from serving. A replacement still running then is held off by the keeper's gate.
 let adbServer = ADBServerKeeper(record: adbServerRecord)
-let orphanReplaced = DispatchSemaphore(value: 0)
-Task.detached {
-  await adbServer.replaceRecordedOrphan()
-  orphanReplaced.signal()
+if !AgentStartup.wait(upTo: .seconds(10), for: { await adbServer.replaceRecordedOrphan() }) {
+  log.error("replacing an earlier agent's adb server took too long; starting anyway")
 }
-orphanReplaced.wait()
 let adb = ADBTransport(
   keeper: adbServer,
   serving: { vouching.serves($0, as: $1) },

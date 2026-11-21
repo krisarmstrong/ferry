@@ -22,6 +22,9 @@ struct ADBServerKeeperTests {
     var googleADB: Set<pid_t> = []
     /// The program the kernel reports for a spawned server, when it differs from the URL run.
     var resolved: String?
+    /// A wedged server: it takes the connection and never answers, ignoring cancellation.
+    var killHangs = false
+    var answersHang = false
     var kills = 0
     /// How many more times a started server does not answer yet, as one coming up does.
     var notYet = 0
@@ -82,7 +85,8 @@ struct ADBServerKeeperTests {
       port: 5037, record: record, spawner: FakeSpawner(fakes: fakes),
       table: FakeTable(fakes: fakes),
       answers: {
-        fakes { state in
+        if fakes({ $0.answersHang }) { await Self.never() }
+        return fakes { state in
           guard state.notYet == 0 else {
             state.notYet -= 1
             return false
@@ -91,6 +95,7 @@ struct ADBServerKeeperTests {
         }
       },
       kill: {
+        if fakes({ $0.killHangs }) { await Self.never() }
         let pid = fakes { state -> pid_t? in
           state.kills += 1
           state.answering = false
@@ -104,7 +109,12 @@ struct ADBServerKeeperTests {
           fakes { $0.started[pid] = nil }
         }
       },
-      limit: .seconds(2), poll: .milliseconds(10))
+      limit: .seconds(2), poll: .milliseconds(10), callLimit: .milliseconds(300))
+  }
+
+  /// Suspends for good, cancelled or not.
+  static func never() async {
+    await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in }
   }
 
   static func outcome(_ body: () async throws(ADBError) -> Void) async -> ADBError? {

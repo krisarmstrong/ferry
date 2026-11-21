@@ -1,6 +1,7 @@
 import Darwin
 import DeviceKit
 import Foundation
+import Synchronization
 import os
 
 /// The adb server the agent started: its PID, when it started (microseconds since 1970) and its
@@ -49,6 +50,9 @@ public actor ADBServerKeeper {
   private let kill: @Sendable () async -> Void
   private let limit: Duration
   private let poll: Duration
+  /// How long one question to a server (`answers`, `kill`) may take: a wedged one accepts the
+  /// connection and never answers.
+  private let callLimit: Duration
   /// The server this agent started, while it may be running.
   private var child: pid_t?
   private var replacedFerryServer = false
@@ -74,7 +78,8 @@ public actor ADBServerKeeper {
   init(
     port: UInt16, record: URL, spawner: any ADBServerSpawner, table: any ProcessTable,
     answers: @escaping @Sendable () async -> Bool, kill: @escaping @Sendable () async -> Void,
-    limit: Duration = .seconds(10), poll: Duration = .milliseconds(100)
+    limit: Duration = .seconds(10), poll: Duration = .milliseconds(100),
+    callLimit: Duration = .seconds(5)
   ) {
     self.port = port
     self.record = record
@@ -84,6 +89,7 @@ public actor ADBServerKeeper {
     self.kill = kill
     self.limit = limit
     self.poll = poll
+    self.callLimit = callLimit
   }
 
   /// `adb-server.json` beside the agent's other state.
@@ -114,7 +120,7 @@ public actor ADBServerKeeper {
   }
 
   private func spawnAndWait(_ adb: URL) async throws(ADBError) {
-    if await answers() { return }
+    if await answersInTime() { return }
     let pid = try spawner.spawn(adb, arguments: ["-L", "tcp:\(port)", "server", "nodaemon"])
     child = pid
     // The kernel's program, symlinks resolved, as the orphan check reads it back.
@@ -127,11 +133,11 @@ public actor ADBServerKeeper {
     }
     let deadline = ContinuousClock.now + limit
     while ContinuousClock.now < deadline {
-      if await answers() { return }
+      if await answersInTime() { return }
       // Another server took the port first: it answers, and this one has nothing to serve.
       if spawner.hasExited(pid) {
         child = nil
-        if await answers() { return }
+        if await answersInTime() { return }
         throw .failed("the adb server exited at start")
       }
       try? await Task.sleep(for: poll)
@@ -222,6 +228,36 @@ public actor ADBServerKeeper {
     return await replace(pid, if: isFerrys)
   }
 
+  /// `answers`, bounded: a server that does not answer in time is not answering.
+  private func answersInTime() async -> Bool {
+    await Self.race(callLimit, answers) ?? false
+  }
+
+  /// `kill`, bounded.
+  private func killInTime(_ pid: pid_t) async {
+    if await Self.race(callLimit, { [kill] in await kill() }) == nil {
+      Self.log.error("the adb server (\(pid)) did not answer host:kill in time")
+    }
+  }
+
+  /// `body`'s result, or nil once `limit` has passed. Unlike a task group, it does not wait for
+  /// `body` to end: a body that ignores cancellation is left behind, cancelled, rather than
+  /// holding the caller.
+  static func race<T: Sendable>(
+    _ limit: Duration, _ body: @escaping @Sendable () async -> T
+  ) async -> T? {
+    let first = FirstOf<T>()
+    return await withCheckedContinuation { continuation in
+      first.wait(continuation)
+      let work = Task { first.give(await body()) }
+      Task {
+        try? await Task.sleep(for: limit)
+        first.give(nil)
+        work.cancel()
+      }
+    }
+  }
+
   /// The record, if it names `pid`: a newer server's is left.
   private func removeRecord(naming pid: pid_t) {
     guard ADBServerRecord.load(record)?.pid == pid else { return }
@@ -232,10 +268,34 @@ public actor ADBServerKeeper {
   /// silent: the trackers may already have a new server answering on it.
   private func stop(_ pid: pid_t) async {
     let started = table.started(pid)
-    await kill()
+    await killInTime(pid)
     let deadline = ContinuousClock.now + limit
     while started != nil, table.started(pid) == started, ContinuousClock.now < deadline {
       try? await Task.sleep(for: poll)
     }
+  }
+}
+
+/// The first answer a race gives; later ones are dropped.
+private final class FirstOf<T: Sendable>: Sendable {
+  private let state = Mutex<(waiting: CheckedContinuation<T?, Never>?, given: T??)>(
+    (nil, .none))
+
+  func wait(_ continuation: CheckedContinuation<T?, Never>) {
+    let given = state.withLock { state -> T?? in
+      if case .none = state.given { state.waiting = continuation }
+      return state.given
+    }
+    if case .some(let value) = given { continuation.resume(returning: value) }
+  }
+
+  func give(_ value: T?) {
+    let waiting = state.withLock { state -> CheckedContinuation<T?, Never>? in
+      guard case .none = state.given else { return nil }
+      state.given = .some(value)
+      defer { state.waiting = nil }
+      return state.waiting
+    }
+    waiting?.resume(returning: value)
   }
 }
