@@ -207,13 +207,20 @@ struct DeviceTile: View {
   }
 
   @ViewBuilder private var glyph: some View {
-    if let symbol = tile.glyph.symbolName {
-      Image(systemName: symbol)
-        .font(.system(size: 12, weight: .semibold))
-    } else {
-      DeviceGlyph(kind: tile.glyph == .tester ? .tester : .tablet)
-        .frame(width: 15, height: 15)
+    switch tile.glyph {
+    case .tester:
+      DeviceGlyph(kind: .tester).frame(width: 15, height: 15)
+    case .tablet:
+      DeviceGlyph(kind: .tablet).frame(width: 15, height: 15)
+    case .phone:
+      symbol(DevicePresentation.TileGlyph.phoneSymbol)
+    case .symbol(let name):
+      symbol(name)
     }
+  }
+
+  private func symbol(_ name: String) -> some View {
+    Image(systemName: name).font(.system(size: 12, weight: .semibold))
   }
 }
 
