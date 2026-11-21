@@ -254,6 +254,7 @@ private func wirelessResponses() throws -> [AgentResponse] {
   for failure: WirelessFailure in [
     .adbUnavailable, .notOverUSB, .notRemembered, .noConnectService, .otherDevice,
     .adb("failed to connect"), .unidentified, .offerChanged, .pairingNeedsAddress, .deviceInUse,
+    .localNetworkDenied,
   ] {
     all.append(.wireless(.failed(failure)))
   }

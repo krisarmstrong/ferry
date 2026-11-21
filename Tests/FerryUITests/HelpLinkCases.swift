@@ -132,7 +132,7 @@ enum HelpLinkCases {
   enum Outcome: CaseIterable {
     case connected, awaitingAllow, needsConfirmation, needsNetwork
     case adbUnavailable, notOverUSB, notRemembered, noConnectService, otherDevice, unidentified
-    case pairingNeedsAddress, offerChanged, deviceInUse, adb
+    case pairingNeedsAddress, offerChanged, deviceInUse, localNetworkDenied, adb
   }
 
   static func kind(of outcome: WirelessOutcome) -> Outcome {
@@ -152,6 +152,7 @@ enum HelpLinkCases {
       case .pairingNeedsAddress: .pairingNeedsAddress
       case .offerChanged: .offerChanged
       case .deviceInUse: .deviceInUse
+      case .localNetworkDenied: .localNetworkDenied
       case .adb: .adb
       }
     }
@@ -172,6 +173,7 @@ enum HelpLinkCases {
     case .pairingNeedsAddress: .failed(.pairingNeedsAddress)
     case .offerChanged: .failed(.offerChanged)
     case .deviceInUse: .failed(.deviceInUse)
+    case .localNetworkDenied: .failed(.localNetworkDenied)
     case .adb: .failed(.adb("refused"))
     }
   }

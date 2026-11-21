@@ -35,6 +35,9 @@ actor FakeWirelessADB: WirelessADBControl {
   var serverUp = true
   /// How long `connect` takes for an address, as an unreachable host does.
   var connectDelay: [String: Duration] = [:]
+  /// What adb says when a connect to an address with no unit fails, by address; otherwise
+  /// "Connection refused".
+  var connectFailure: [String: String] = [:]
   /// Connects that throw (adb timed out), by address.
   var connectThrows: Set<String> = []
   /// Identity reads that fail, by adb serial.
@@ -87,7 +90,8 @@ actor FakeWirelessADB: WirelessADBControl {
     inFlight -= 1
     if connectThrows.contains(endpoint.argument) { throw .failed("adb did not finish") }
     guard let unit = units[endpoint.argument] else {
-      return .failed("failed to connect to '\(endpoint.argument)': Connection refused")
+      let reason = connectFailure[endpoint.argument] ?? "Connection refused"
+      return .failed("failed to connect to '\(endpoint.argument)': \(reason)")
     }
     listed[endpoint.argument] = unit.authorized ? .device : .unauthorized
     return unit.authorized ? .connected(serial: endpoint.argument) : .awaitingAllow

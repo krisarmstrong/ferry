@@ -64,6 +64,8 @@ public enum WirelessFailure: Codable, Sendable, Equatable {
   /// Use over Wi-Fi restarts the device's adb, which would cut off a transfer, a screen recording
   /// or a log stream running on it.
   case deviceInUse
+  /// adb found no route to the device, and macOS denies Ferry the local network (TN3179).
+  case localNetworkDenied
   /// adb's own words, one line.
   case adb(String)
 }

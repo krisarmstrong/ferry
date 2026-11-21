@@ -147,6 +147,8 @@ public actor WirelessADB {
   let located: @Sendable (DeviceID) async -> String?
   /// What the hub may serve over the network, kept in step with `entries`.
   let vouching: WirelessVouching
+  /// Whether macOS denies the agent the local network for an address (`LocalNetworkAccess`).
+  let localNetworkDenied: @Sendable (WirelessEndpoint) async -> Bool
   /// The reconnects started at agent start or when adb's server came back, if still running.
   var reconnecting: Task<Void, Never>?
   /// How many startup reconnects run at once.
@@ -157,11 +159,13 @@ public actor WirelessADB {
   /// it by the name Ferry has, not the one the host reports. `located` extends that to devices
   /// that are unplugged but have a Finder location, which such a host would otherwise take over.
   /// `vouching` is shared with the `ADBTransport` that serves network routes.
+  /// `localNetworkDenied` is asked only when adb finds no route to an address.
   public init(
     adb: any WirelessADBControl, store: URL, timing: Timing = Timing(),
     known: @escaping @Sendable () async -> [DeviceID: String] = { [:] },
     located: @escaping @Sendable (DeviceID) async -> String? = { _ in nil },
-    vouching: WirelessVouching = WirelessVouching()
+    vouching: WirelessVouching = WirelessVouching(),
+    localNetworkDenied: @escaping @Sendable (WirelessEndpoint) async -> Bool = { _ in false }
   ) {
     self.adb = adb
     file = store
@@ -169,6 +173,7 @@ public actor WirelessADB {
     self.known = known
     self.located = located
     self.vouching = vouching
+    self.localNetworkDenied = localNetworkDenied
     let loaded = WirelessStore.load(store)
     entries = loaded.entries
     if !loaded.intact { vouching.storeUnreadable() }
@@ -209,7 +214,7 @@ public actor WirelessADB {
       do throws(ADBError) {
         switch try await adb.pair(endpoint, code: code) {
         case .failed(let detail):
-          return .failed(.adb(detail))
+          return .failed(await failure(reaching: endpoint, detail))
         case .paired(let guid):
           guard let service = await connectService(guid: guid, pairedAt: endpoint) else {
             return .failed(.noConnectService)

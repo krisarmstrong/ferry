@@ -53,7 +53,9 @@ let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 // claiming the serial of a device the hub serves is not believed without the user.
 let wireless = WirelessADB(
   adb: ADBWireless(), store: wirelessStore,
-  known: { await hub.shownNames() }, located: { await domains.location(of: $0) }, vouching: vouching
+  known: { await hub.shownNames() }, located: { await domains.location(of: $0) },
+  vouching: vouching,
+  localNetworkDenied: { await LocalNetworkAccess.isDenied($0) }
 )
 Task { await wireless.run() }
 Task {

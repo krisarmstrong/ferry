@@ -75,6 +75,13 @@ struct HelpMessageCoverageTests {
     (
       "trouble-network",
       """
+      Ferry needs Local Network access to reach devices over Wi-Fi. Turn it on in System \
+      Settings › Privacy & Security › Local Network.
+      """
+    ),
+    (
+      "trouble-network",
+      """
       Ferry is using this device. Wait for its transfers, screen recording and log to finish, \
       then try again.
       """
@@ -198,19 +205,6 @@ struct HelpMessageCoverageTests {
     ("trouble-helper", "Help isn't available"),
   ]
 
-  /// Keys in the small catalogs that are not messages: names, notices of success, menu titles.
-  private static let notMessages: [String: Set<String>] = [
-    "FerryText": ["Unknown device"],
-    "FerryAgentCore": ["conflict from Mac", "conflict from Mac %lld"],
-    "FerryProviderCore": [],
-    "FerrySyncCore": [
-      "Download already had a file with that name, so it’s there as “%@”.", "Install on %@",
-      "Installed %lld apps on %@", "Installed “%@” on %@", "It’s in Download.",
-      "Select files to send", "Send selected files to a device", "Send to %@",
-      "Sent %lld files to %@", "Sent “%@” to %@", "They’re in Download.",
-    ],
-  ]
-
   private static let help = HelpContent.bundled ?? HelpContent(version: 0, categories: [])
 
   private static func catalogKeys(_ module: String) throws -> Set<String> {
@@ -280,4 +274,19 @@ struct HelpMessageCoverageTests {
       #expect(!message.cause.isEmpty && !message.fix.isEmpty, "\(message.message)")
     }
   }
+}
+
+extension HelpMessageCoverageTests {
+  /// Keys in the small catalogs that are not messages: names, notices of success, menu titles.
+  private static let notMessages: [String: Set<String>] = [
+    "FerryText": ["Unknown device"],
+    "FerryAgentCore": ["conflict from Mac", "conflict from Mac %lld"],
+    "FerryProviderCore": [],
+    "FerrySyncCore": [
+      "Download already had a file with that name, so it’s there as “%@”.", "Install on %@",
+      "Installed %lld apps on %@", "Installed “%@” on %@", "It’s in Download.",
+      "Select files to send", "Send selected files to a device", "Send to %@",
+      "Sent %lld files to %@", "Sent “%@” to %@", "They’re in Download.",
+    ],
+  ]
 }

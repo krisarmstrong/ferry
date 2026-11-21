@@ -673,6 +673,12 @@ The address changed after the menu showed it.
 
 Open the menu again and choose from what it shows now.
 
+**Ferry needs Local Network access to reach devices over Wi-Fi. Turn it on in System Settings › Privacy & Security › Local Network.**
+
+macOS asks before an app reaches devices on your network. Ferry was not allowed, so macOS blocks it, and adb reports "No route to host" even though the device answers.
+
+Open System Settings → **Privacy & Security** → **Local Network**, turn on Ferry, then click **Connect Again**. If Ferry isn't listed, connect once more and click **Allow** when macOS asks.
+
 **Ferry is using this device. Wait for its transfers, screen recording and log to finish, then try again.**
 
 Turning on ADB over Wi-Fi restarts ADB on the device, which would stop a transfer, a screen recording or a log.

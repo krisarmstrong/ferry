@@ -196,7 +196,7 @@ extension WirelessADB {
           "connecting \(endpoint.argument, privacy: .private) failed: \(detail, privacy: .private)")
         // adb can keep a connection it could not use (offline, or listed in another form).
         await drop(endpoint)
-        return .failed(.adb(detail))
+        return .failed(await failure(reaching: endpoint, detail))
       }
     } catch {
       // adb may finish the connect after its client gave up (a timeout): nothing is kept.
@@ -352,6 +352,17 @@ extension WirelessADB {
 
   static func advertises(_ service: ADBMDNSService, _ id: DeviceID) -> Bool {
     service.type == ADBMDNSService.connectType && service.name.hasPrefix(instancePrefix(id))
+  }
+
+  /// adb's words, unless they are the "No route to host" macOS gives a program it denies the
+  /// local network and the agent's own check confirms the denial: a device the user could
+  /// otherwise reach would look unreachable.
+  func failure(reaching endpoint: WirelessEndpoint, _ detail: String) async -> WirelessFailure {
+    guard detail.contains("No route to host"), await localNetworkDenied(endpoint) else {
+      return .adb(detail)
+    }
+    log.error("macOS denies Ferry the local network: \(endpoint.argument, privacy: .private)")
+    return .localNetworkDenied
   }
 
   static func failure(_ error: ADBError) -> WirelessOutcome {
