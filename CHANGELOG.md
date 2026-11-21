@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/krisarmstrong/ferry/compare/v0.5.0...v0.6.0) (2026-11-21)
+
+
+### Features
+
+* **updates:** always install updates automatically; remove the menu toggle ([#42](https://github.com/krisarmstrong/ferry/issues/42)) ([6739a1f](https://github.com/krisarmstrong/ferry/commit/6739a1f6b653d11622f86050944b2ed9423f8d9f))
+
+
+### Bug Fixes
+
+* **remove:** move Ferry's data to the Trash instead of deleting it ([#41](https://github.com/krisarmstrong/ferry/issues/41)) ([eebe61f](https://github.com/krisarmstrong/ferry/commit/eebe61f65900b692b6b6c216e809d93f6e3cad29))
+* **test:** ManualClock never loses a wakeup to a racing advance ([#39](https://github.com/krisarmstrong/ferry/issues/39)) ([7561184](https://github.com/krisarmstrong/ferry/commit/7561184f676591baf7267f2ca3a96e8375620fb8))
+
 ## [0.5.0](https://github.com/krisarmstrong/ferry/compare/v0.4.0...v0.5.0) (2026-11-21)
 
 
