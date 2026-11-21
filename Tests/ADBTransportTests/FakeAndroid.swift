@@ -58,7 +58,7 @@ final class FakeAndroid: Sendable {
     var hangingPrograms: Set<String> = []
     /// How many times one of them has been started, and who waits for a count.
     var hangs = 0
-    var hangWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    var hangWaiters: [UUID: (count: Int, continuation: CheckedContinuation<Void, Never>)] = [:]
     /// What `getprop <name>` prints.
     var properties: [String: String] = [:]
     /// What `ip -4 addr` prints.
@@ -124,16 +124,21 @@ final class FakeAndroid: Sendable {
 
   // MARK: Test setup and inspection
 
-  /// Returns once a hanging program has been started `count` times in all: the client is then
-  /// waiting on an answer that never comes.
+  /// Returns once a hanging program has been started `count` times in all (the client is then
+  /// waiting on an answer that never comes), or the caller is cancelled, as by a time limit.
   func waitForHangs(_ count: Int) async {
-    await withCheckedContinuation { continuation in
-      let reached = state.withLock { state in
-        guard state.hangs < count else { return true }
-        state.hangWaiters.append((count, continuation))
-        return false
+    let id = UUID()
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        let reached = state.withLock { state in
+          guard state.hangs < count, !Task.isCancelled else { return true }
+          state.hangWaiters[id] = (count, continuation)
+          return false
+        }
+        if reached { continuation.resume() }
       }
-      if reached { continuation.resume() }
+    } onCancel: {
+      state.withLock { $0.hangWaiters.removeValue(forKey: id) }?.continuation.resume()
     }
   }
 
@@ -142,8 +147,9 @@ final class FakeAndroid: Sendable {
     let due = state.withLock { state in
       state.hangs += 1
       let hangs = state.hangs
-      defer { state.hangWaiters.removeAll { $0.count <= hangs } }
-      return state.hangWaiters.filter { $0.count <= hangs }.map(\.continuation)
+      let due = state.hangWaiters.filter { $0.value.count <= hangs }
+      for id in due.keys { state.hangWaiters[id] = nil }
+      return due.values.map(\.continuation)
     }
     for waiter in due { waiter.resume() }
     _ = try? await peer.stream.read(exactly: 1)

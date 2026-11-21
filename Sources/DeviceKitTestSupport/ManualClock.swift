@@ -50,18 +50,24 @@ public final class ManualClock: Clock, Sendable {
     await sleepers.waitForSleeper()
   }
 
+  /// Returns once `count` sleeps have been requested in all, finished or not, or the calling
+  /// task is cancelled.
+  public func waitForSleeps(_ count: Int) async {
+    await sleepers.waitForCount(count)
+  }
+
   /// Runs `operation`, moving time on by `step` again and again until it returns: every wait it
   /// makes on this clock passes, however many there are and whenever each begins. For an
-  /// operation that must time out, once the test has seen it reach the wait that does. The ticks
-  /// are a millisecond apart in real time, only so that they do not keep a thread of the shared
-  /// pool busy; no outcome depends on that pace.
+  /// operation that must time out, once the test has seen it reach the wait that does. Time moves
+  /// only while something sleeps on the clock, so the ticks never spin with nobody waiting.
   public func advancing<T>(by step: Duration, _ operation: () async throws -> T) async rethrows
     -> T
   {
     let ticking = Task {
       while !Task.isCancelled {
+        await waitForSleeper()
         await advance(by: step)
-        try? await Task.sleep(for: .milliseconds(1))
+        await Task.yield()
       }
     }
     defer { ticking.cancel() }
@@ -80,10 +86,17 @@ private actor Sleepers {
   private var sleeping: [Sleeper] = []
   private var cancelled: Set<Int> = []
   private var watchers: [Int: CheckedContinuation<Void, Never>] = [:]
+  private var countWatchers: [Int: (count: Int, continuation: CheckedContinuation<Void, Never>)] =
+    [:]
   private var nextWatcher = 0
 
   func sleep(until deadline: ManualClock.Instant, now: ManualClock.Instant) async throws {
     count += 1
+    let reached = countWatchers.filter { $0.value.count <= count }
+    for (id, watcher) in reached {
+      countWatchers[id] = nil
+      watcher.continuation.resume()
+    }
     guard deadline > now else { return }
     let id = count
     try await withTaskCancellationHandler {
@@ -132,6 +145,25 @@ private actor Sleepers {
 
   private func stopWatching(_ id: Int) {
     watchers.removeValue(forKey: id)?.resume()
+    countWatchers.removeValue(forKey: id)?.continuation.resume()
+  }
+
+  /// Returns once `target` sleeps have been requested, or the calling task is cancelled.
+  func waitForCount(_ target: Int) async {
+    guard count < target, !Task.isCancelled else { return }
+    nextWatcher += 1
+    let id = nextWatcher
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if Task.isCancelled {
+          continuation.resume()
+        } else {
+          countWatchers[id] = (target, continuation)
+        }
+      }
+    } onCancel: {
+      Task { await self.stopWatching(id) }
+    }
   }
 
   private func cancel(_ id: Int) {

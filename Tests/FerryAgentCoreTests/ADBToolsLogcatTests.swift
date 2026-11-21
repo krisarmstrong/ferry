@@ -15,14 +15,28 @@ private let serial = "0123456789abcdef"
 private actor Gate {
   private var isOpen = true
   private var waiting: [CheckedContinuation<Void, Never>] = []
-  private var heldWaiters: [CheckedContinuation<Void, Never>] = []
+  private var heldWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
   /// How many callers the closed gate is holding.
   var held: Int { waiting.count }
 
-  /// Returns once the closed gate holds a caller.
+  /// Returns once the closed gate holds a caller, or the test is cancelled.
   func waitUntilHeld() async {
-    guard waiting.isEmpty else { return }
-    await withCheckedContinuation { heldWaiters.append($0) }
+    let id = UUID()
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if !waiting.isEmpty || Task.isCancelled {
+          continuation.resume()
+        } else {
+          heldWaiters[id] = continuation
+        }
+      }
+    } onCancel: {
+      Task { await self.stopWaiting(id) }
+    }
+  }
+
+  private func stopWaiting(_ id: UUID) {
+    heldWaiters.removeValue(forKey: id)?.resume()
   }
 
   func close() { isOpen = false }
@@ -37,8 +51,8 @@ private actor Gate {
     if isOpen { return }
     await withCheckedContinuation { continuation in
       waiting.append(continuation)
-      for waiter in heldWaiters { waiter.resume() }
-      heldWaiters = []
+      for waiter in heldWaiters.values { waiter.resume() }
+      heldWaiters = [:]
     }
   }
 }
