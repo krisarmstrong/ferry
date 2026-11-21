@@ -236,7 +236,8 @@ public actor ADBTransport: DeviceTransport {
       release(id)
       if error == .cancelled { throw .cancelled }
       // Gone since the scan, or the server with it: the next scan says which.
-      Self.log.info("not opening \(serial, privacy: .private): \(String(describing: error))")
+      Self.log.info(
+        "not opening \(serial, privacy: .private): \(String(describing: error), privacy: .private)")
       throw .deviceNotFound(id)
     }
     // Ejected while the device answered: no session for it.

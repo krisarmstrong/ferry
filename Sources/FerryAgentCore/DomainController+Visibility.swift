@@ -46,9 +46,12 @@ extension DomainController {
       try await manager.setHidden(identifier, hidden: hidden)
       return true
     } catch {
+      let change = hidden ? "hiding" : "showing"
       log.error(
-        "\(hidden ? "hiding" : "showing") domain \(identifier, privacy: .private) failed: \(error, privacy: .private)"
-      )
+        """
+        \(change, privacy: .public) domain \(identifier, privacy: .private) failed: \
+        \(error, privacy: .private)
+        """)
       scheduleVisibilityRetry()
       return false
     }

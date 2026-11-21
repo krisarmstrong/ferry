@@ -51,7 +51,7 @@ extension AppModel {
     do {
       try await services.removeAgentData()
     } catch {
-      Self.log.error("removing the agent's folder failed: \(error, privacy: .public)")
+      Self.log.error("removing the agent's folder failed: \(error, privacy: .private)")
     }
     if !preserved.isEmpty {
       services.reveal(preserved)

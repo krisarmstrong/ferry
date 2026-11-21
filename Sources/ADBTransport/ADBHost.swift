@@ -236,7 +236,8 @@ public actor ADBHost {
         }
       }
       let delay = backoff.next()
-      Self.log.info("adb server unavailable; retrying in \(delay.components.seconds)s")
+      Self.log.info(
+        "adb server unavailable; retrying in \(delay.components.seconds, privacy: .public)s")
       if (try? await Task.sleep(for: delay)) == nil { break }
     }
   }

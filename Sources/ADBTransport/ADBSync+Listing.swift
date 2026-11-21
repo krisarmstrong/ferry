@@ -89,6 +89,8 @@ extension ADBSync {
 
   /// A name that is not UTF-8 cannot be addressed again, so it is left out; say so once.
   private static func logUnnamed(_ count: Int) {
-    if count > 0 { log.info("listing skipped \(count) names that are not valid UTF-8") }
+    if count > 0 {
+      log.info("listing skipped \(count, privacy: .public) names that are not valid UTF-8")
+    }
   }
 }

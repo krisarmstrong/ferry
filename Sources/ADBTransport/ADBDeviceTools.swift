@@ -267,7 +267,8 @@ public struct ADBDeviceTools: Sendable {
     case .success(let output):
       let detail = Self.text(output.stdout + output.stderr)
       Self.log.error(
-        "\(what, privacy: .private): status \(output.status) \(detail, privacy: .private)")
+        "\(what, privacy: .private): status \(output.status, privacy: .public) \(detail, privacy: .private)"
+      )
     case .failure(let error):
       Self.log.error(
         "\(what, privacy: .private) failed: \(String(describing: error), privacy: .private)")

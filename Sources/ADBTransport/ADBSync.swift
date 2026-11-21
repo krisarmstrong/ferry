@@ -205,7 +205,9 @@ public actor ADBSync {
       if error == 0 { listing.entries[index].stat = exact }
     }
     if unaddressable > 0 {
-      Self.log.info("listing kept the 32-bit size of \(unaddressable) entries with paths too long")
+      Self.log.info(
+        "listing kept the 32-bit size of \(unaddressable, privacy: .public) entries with paths too long"
+      )
     }
     return listing
   }

@@ -55,7 +55,9 @@ public struct PlatformToolsFetcher: Sendable {
     }
     guard archive.count == release.size, Self.hex(SHA256.hash(data: archive)) == release.sha256
     else {
-      Self.log.error("platform tools download is \(archive.count) bytes, not the pinned archive")
+      Self.log.error(
+        "platform tools download is \(archive.count, privacy: .public) bytes, not the pinned archive"
+      )
       throw .mismatch
     }
     let zip = try ZipArchive(archive)

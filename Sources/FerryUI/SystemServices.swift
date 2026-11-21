@@ -160,7 +160,8 @@ public final class SystemServices: SystemServicing {
       Self.log.info("agent restarted, status: \(Self.describe(agent.status), privacy: .public)")
       let launchServices = LSRegisterURL(bundle as CFURL, true)
       if launchServices != noErr {
-        Self.log.error("registering the bundle with Launch Services failed: \(launchServices)")
+        Self.log.error(
+          "registering the bundle with Launch Services failed: \(launchServices, privacy: .public)")
       }
       return registered
     }.value
