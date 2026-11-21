@@ -1,4 +1,5 @@
 import Darwin
+import DeviceKit
 import Foundation
 import os
 
@@ -20,7 +21,7 @@ public struct ADBServerRecord: Codable, Sendable, Equatable {
   }
 
   func save(to file: URL) throws {
-    try JSONEncoder().encode(self).write(to: file, options: .atomic)
+    try PrivateFile.write(JSONEncoder().encode(self), to: file)
   }
 }
 
@@ -116,9 +117,10 @@ public actor ADBServerKeeper {
     if await answers() { return }
     let pid = try spawner.spawn(adb, arguments: ["-L", "tcp:\(port)", "server", "nodaemon"])
     child = pid
-    if let started = table.started(pid) {
+    // The kernel's program, symlinks resolved, as the orphan check reads it back.
+    if let started = table.started(pid), let program = table.path(pid) {
       do {
-        try ADBServerRecord(pid: pid, started: started, path: adb.path).save(to: record)
+        try ADBServerRecord(pid: pid, started: started, path: program).save(to: record)
       } catch {
         Self.log.error("recording the adb server failed: \(error, privacy: .public)")
       }

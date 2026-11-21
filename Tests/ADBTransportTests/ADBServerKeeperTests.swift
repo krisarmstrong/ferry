@@ -20,6 +20,8 @@ struct ADBServerKeeperTests {
     var listener: pid_t?
     /// Processes whose running code is Google's adb.
     var googleADB: Set<pid_t> = []
+    /// The program the kernel reports for a spawned server, when it differs from the URL run.
+    var resolved: String?
     var kills = 0
     /// How many more times a started server does not answer yet, as one coming up does.
     var notYet = 0
@@ -42,7 +44,7 @@ struct ADBServerKeeperTests {
       fakes { state in
         let pid = state.nextPID
         state.spawned.append((adb.path, arguments))
-        state.paths[pid] = adb.path
+        state.paths[pid] = state.resolved ?? adb.path
         state.started[pid] = 777
         state.nextPID += 1
         state.notYet = state.slowStart
@@ -143,6 +145,24 @@ struct ADBServerKeeperTests {
     _ = try await (first, second)
     #expect(fakes { $0.spawned.count } == 1)
     #expect(ADBServerRecord.load(record)?.pid == 4242)
+  }
+
+  /// Written as the agent's other stores are: 0600 in a 0700 folder made for it. The program is
+  /// the kernel's, symlinks resolved, as the orphan check reads it back.
+  @Test func theRecordIsPrivateAndNamesTheResolvedProgram() async throws {
+    let fakes = Fakes()
+    fakes { $0.resolved = "/opt/homebrew/Caskroom/android-platform-tools/37/platform-tools/adb" }
+    let folder = FileManager.default.temporaryDirectory.appending(path: "ferry-agent-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let record = folder.appending(path: "adb-server.json")
+    try await Self.keeper(fakes, record: record).start(URL(filePath: "/opt/homebrew/bin/adb"))
+    let saved = try #require(ADBServerRecord.load(record))
+    #expect(saved.path == "/opt/homebrew/Caskroom/android-platform-tools/37/platform-tools/adb")
+    let mode = { (url: URL) in
+      (try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int)
+    }
+    #expect(mode(record) == 0o600)
+    #expect(mode(folder) == 0o700)
   }
 
   @Test func aServerThatAnswersIsLeftAlone() async throws {

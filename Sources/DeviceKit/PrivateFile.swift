@@ -1,11 +1,12 @@
 import Foundation
 
-/// The agent's own stores (remembered devices, the tool file journal) name devices and where
-/// they are: they are never readable by another user, not even for a moment.
-enum PrivateFile {
+/// The agent's own stores (remembered devices, the tool file journal, the adb server it started)
+/// name devices and where they are: they are never readable by another user, not even for a
+/// moment.
+public enum PrivateFile {
   /// Writes `data` to a new 0600 file beside `file`, flushes it, and renames it over `file`. A
   /// folder made for it is 0700. Nothing is left behind if any step fails.
-  static func write(_ data: Data, to file: URL) throws {
+  public static func write(_ data: Data, to file: URL) throws {
     let folder = file.deletingLastPathComponent()
     let temporary = folder.appending(path: ".\(file.lastPathComponent)-\(UUID().uuidString)")
     do {
