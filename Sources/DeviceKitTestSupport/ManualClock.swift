@@ -64,14 +64,25 @@ public final class ManualClock: Clock, Sendable {
     -> T
   {
     let ticking = Task {
-      while !Task.isCancelled {
+      while true {
         await waitForSleeper()
+        guard !Task.isCancelled else { return }
         await advance(by: step)
         await Task.yield()
       }
     }
-    defer { ticking.cancel() }
-    return try await operation()
+    // The ticking ends before this returns: a tick after it would move time under the caller's
+    // next operation.
+    do {
+      let value = try await operation()
+      ticking.cancel()
+      await ticking.value
+      return value
+    } catch {
+      ticking.cancel()
+      await ticking.value
+      throw error
+    }
   }
 }
 
