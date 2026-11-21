@@ -73,7 +73,6 @@ enum FerryUILabels {
     "In Login Items & Extensions, turn on Ferry under Allow in the Background.",
     "Info",
     "Install App…",
-    "Install Updates Automatically",
     "Installed “%@”.",
     "Installing “%@”…",
     "Is %@ your %@?",

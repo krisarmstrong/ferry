@@ -118,7 +118,6 @@ import os
   /// then.
   public var updater: (any UpdateChecking)?
   /// Counts changes to the updater's settings, which are not observable, so the menu redraws.
-  var updateSettingChanges = 0
   /// The login item change being applied, how many have been requested, and how many applied.
   private var loginItemChange: Task<Void, Never>?
   /// The agent build launch restarted, recorded once that agent answers (see `startAgent()`).
