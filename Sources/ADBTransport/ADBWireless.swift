@@ -52,8 +52,9 @@ public struct ADBWireless: Sendable {
   }
 
   /// The real server and the `adb` the locator finds.
-  public init(locator: ADBLocator = ADBLocator()) {
-    self.init(host: ADBHost(locator: locator), run: ADBCommand.runner(locator: locator))
+  public init(locator: ADBLocator = ADBLocator(), keeper: ADBServerKeeper? = nil) {
+    self.init(
+      host: ADBHost(locator: locator, keeper: keeper), run: ADBCommand.runner(locator: locator))
   }
 
   public func connect(_ endpoint: WirelessEndpoint) async throws(ADBError) -> ADBConnectOutcome {

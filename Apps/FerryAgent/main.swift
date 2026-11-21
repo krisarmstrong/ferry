@@ -19,10 +19,12 @@ guard let identity = FerryIdentity() else {
 let itemStore: URL
 let wirelessStore: URL
 let toolStore: URL
+let adbServerRecord: URL
 do {
   itemStore = try DomainController.defaultItemStore()
   wirelessStore = try WirelessADB.defaultStore()
   toolStore = try ToolJournal.defaultStore()
+  adbServerRecord = try ADBServerKeeper.defaultRecord()
 } catch {
   log.fault("no item store: \(error, privacy: .public)")
   exit(EXIT_FAILURE)
@@ -39,7 +41,12 @@ let vouching = WirelessVouching()
 // Files the tools left on a device (it went away, or the agent stopped) are removed the next
 // time a session for it opens.
 let toolJournal = ToolJournal(store: toolStore)
+// The adb server this agent starts is its child and ends with it. One an earlier agent left
+// running is cut off from the local network, so it is replaced before anything relies on it.
+let adbServer = ADBServerKeeper(record: adbServerRecord)
+Task { await adbServer.replaceRecordedOrphan() }
 let adb = ADBTransport(
+  keeper: adbServer,
   serving: { vouching.serves($0, as: $1) },
   opened: { id, route, tools in Task { await toolJournal.sweep(id, route: route, using: tools) }
   })
@@ -52,7 +59,7 @@ let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
 // Devices on the network: connected when the user asks, remembered, and reconnected. A host
 // claiming the serial of a device the hub serves is not believed without the user.
 let wireless = WirelessADB(
-  adb: ADBWireless(), store: wirelessStore,
+  adb: ADBWireless(keeper: adbServer), store: wirelessStore,
   known: { await hub.shownNames() }, located: { await domains.location(of: $0) },
   vouching: vouching,
   localNetworkDenied: { await LocalNetworkAccess.isDenied($0) }

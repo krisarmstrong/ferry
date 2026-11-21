@@ -38,10 +38,17 @@ public actor ADBHost {
   private let launcher: @Sendable (URL) async throws(ADBError) -> Void
   private let backoff: Backoff
 
-  public init(port: UInt16 = 5037, locator: ADBLocator) {
+  /// With a `keeper`, the server Ferry starts is the agent's child and ends with it (see
+  /// `ADBServerKeeper`). Without one, as for `ferryctl`, it is `adb start-server`'s daemon.
+  public init(port: UInt16 = 5037, locator: ADBLocator, keeper: ADBServerKeeper? = nil) {
     self.init(
       port: port, locator: locator,
-      launcher: { (adb) async throws(ADBError) in try await Self.startServer(adb: adb, port: port)
+      launcher: { (adb) async throws(ADBError) in
+        if let keeper {
+          try await keeper.start(adb)
+        } else {
+          try await Self.startServer(adb: adb, port: port)
+        }
       },
       backoff: Backoff())
   }
@@ -67,6 +74,20 @@ public actor ADBHost {
       throw .protocolViolation("version \(reply) is not hex")
     }
     return version
+  }
+
+  /// `host:kill`: the server answers OKAY and exits.
+  public func kill() async throws(ADBError) {
+    let framed = try ADBWire.frame("host:kill")
+    let stream = try await ADBStream.open(port: port)
+    do throws(ADBError) {
+      try await stream.write(framed)
+      try await stream.expectOkay()
+      await stream.close()
+    } catch {
+      await stream.close()
+      throw error
+    }
   }
 
   public func devices() async throws(ADBError) -> [ADBDevice] {

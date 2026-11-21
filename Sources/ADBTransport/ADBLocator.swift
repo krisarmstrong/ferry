@@ -2,7 +2,8 @@ import Foundation
 import PlatformTools
 
 /// Finds the `adb` that starts the server and pairs and connects. A server already answering is
-/// used as it is, whichever adb started it, and never needs one; Ferry never stops a server.
+/// used as it is, whichever adb started it, and never needs one; Ferry stops only a server its
+/// own agent started (see `ADBServerKeeper`).
 ///
 /// In order: the `adb` Ferry fetched from Google (see `PlatformToolsFetcher`), checked against
 /// Google's signature again whenever the file changed since it last passed, then one already on
