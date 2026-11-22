@@ -25,4 +25,30 @@ extension DomainControllerTests {
     #expect(await manager.calls == removed)
     #expect(await harness.controller.domains.isEmpty)
   }
+
+  /// Remove Ferry finishes before the failed listing schedules its retry, so there is no retry
+  /// to cancel: the retry itself finds the controller retired and adopts nothing.
+  @Test func aListingRetryScheduledAfterRemoveAllDoesNothing() async throws {
+    let domain = domainID(await makeDevice("GONE"))
+    let manager = FakeDomainManager(existing: [domain], listingFailures: 1)
+    let (arrivals, ticks) = AsyncStream.makeStream(of: Void.self)
+    defer { ticks.finish() }
+    let hub = DeviceHub(
+      transport: FakeTransport(devices: []), arrivals: arrivals, clock: ManualClock())
+    let retryClock = ManualClock()
+    let controller = DomainController(
+      hub: hub, manager: manager, itemStore: itemStore(), clock: retryClock)
+    _ = try await controller.removeAll()
+    #expect(await controller.listingRetryTask == nil)
+
+    let running = Task { await controller.run() }
+    defer { running.cancel() }
+    await retryClock.waitForSleeper()
+    let removed = await manager.calls
+    await retryClock.advance(by: DomainController.listingRetry)
+    await controller.listingRetryTask?.value
+
+    #expect(await manager.calls == removed)
+    #expect(await controller.domains.isEmpty)
+  }
 }
