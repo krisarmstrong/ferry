@@ -32,7 +32,7 @@ extension WirelessADB {
     let deadline = ContinuousClock.now + timing.settle
     while ContinuousClock.now < deadline {
       if (try? await adb.devices()) != nil { return true }
-      try? await Task.sleep(for: timing.poll)
+      guard (try? await Task.sleep(for: timing.poll)) != nil else { return false }
     }
     return false
   }

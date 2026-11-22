@@ -18,6 +18,7 @@ extension WirelessADB {
     defer {
       poller.cancel()
       refusals.cancel()
+      reconnecting?.cancel()
     }
     var reconnectDue = true
     for await event in adb.trackServer() {
@@ -31,7 +32,7 @@ extension WirelessADB {
         // The server came back during a pass (one the pass replaced, say): its list may be the
         // only one it sends, so it is not dropped but followed by another pass.
         guard reconnecting == nil else {
-          reconnectAgain = true
+          queuedPass = listed
           continue
         }
         reconnecting = Task { await self.reconnectMissing(listed) }
@@ -83,7 +84,7 @@ extension WirelessADB {
   /// Reads adb's mDNS only while a remembered device is missing, and offers a connect service
   /// named for its serial to the user; it is never connected to here.
   func offerFromMDNS() async {
-    guard let listed = try? await adb.devices() else { return }
+    guard !entries.isEmpty, let listed = try? await adb.devices() else { return }
     let missing = entries.filter { isMissing($0.key, $0.value, from: listed) }
     guard !missing.isEmpty, let services = try? await adb.mdnsServices() else { return }
     for (id, entry) in missing {

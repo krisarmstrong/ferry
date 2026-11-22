@@ -8,20 +8,20 @@ extension WirelessADB {
   /// so a user's request never waits behind addresses that do not answer.
   /// A device forgotten after the list was taken is skipped, and is not adopted if it answers.
   func reconnectMissing(_ listed: [ADBDevice]) async {
-    var listed = listed
-    while true {
-      reconnectAgain = false
+    var next: [ADBDevice]? = listed
+    while let listed = next, !Task.isCancelled {
       await reconnectPass(listed)
-      guard reconnectAgain else { break }
-      guard let now = try? await adb.devices() else {
-        // Gone again: its next list starts the pass.
-        reconnectAgain = false
-        break
-      }
-      listed = now
+      // Taken in the same turn as it is read, so a comeback during the pass is never cleared
+      // unrun, and its own list is the one used: the server may send no other.
+      next = queuedPass
+      queuedPass = nil
     }
+    queuedPass = nil
     reconnecting = nil
   }
+
+  /// Whether another pass is due once the running one ends.
+  var passRequested: Bool { queuedPass != nil }
 
   private func reconnectPass(_ listed: [ADBDevice]) async {
     let since = forgets
@@ -33,7 +33,7 @@ extension WirelessADB {
         group.addTask { await self.reconnect(id, entry, since: since, offline: offline) }
       }
       while await group.next() != nil {
-        guard let (id, entry) = due.next() else { continue }
+        guard !Task.isCancelled, let (id, entry) = due.next() else { continue }
         group.addTask { await self.reconnect(id, entry, since: since, offline: offline) }
       }
     }
