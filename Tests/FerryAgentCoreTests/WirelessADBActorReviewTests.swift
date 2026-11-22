@@ -53,6 +53,8 @@ struct WirelessADBActorReviewTests {
 
   /// The device answers in the pass that was running when adb's server came back. The pass the
   /// comeback asked for reads what adb lists now, so it does not connect to the device again.
+  /// Main re-read the list too; this guards the queued pass against running on the comeback's
+  /// own, stale list (the queued-list-only version, 275f313).
   @Test func aPassAfterAComebackSkipsADeviceTheFirstPassReconnected() async throws {
     let file = try Self.store(remembering: 1)
     defer { try? FileManager.default.removeItem(at: file) }
@@ -98,6 +100,28 @@ struct WirelessADBActorReviewTests {
 
     let tried = await adb.calls.filter { if case .connect = $0 { true } else { false } }
     #expect(tried.count == WirelessADB.reconnectLimit)
+  }
+
+  /// A reconnect cancelled while it tries one address tries no other, and asks mDNS nothing.
+  @Test func aCancelledReconnectStopsAtTheAddressItIsOn() async throws {
+    let file = WirelessADBTests.storeFile()
+    defer { try? FileManager.default.removeItem(at: file) }
+    let stored = """
+      {"devices":{"U1":{"name":"Unit","addresses":[\
+      {"address":"203.0.113.1:5555","learnt":"usb"},{"address":"203.0.113.2:5555","learnt":"usb"}]}}}
+      """
+    try Data(stored.utf8).write(to: file)
+    let adb = FakeWirelessADB()
+    await adb.holdConnects()
+    let wireless = WirelessADB(adb: adb, store: file)
+    let reconnecting = Task { await wireless.reconnect(DeviceID(serial: "U1")) }
+    while await adb.inFlight == 0, !Task.isCancelled { await Task.yield() }
+
+    reconnecting.cancel()
+    _ = await reconnecting.value
+
+    #expect(await Self.connects(to: "203.0.113.2:5555", in: adb) == 0)
+    #expect(await !adb.calls.contains(.mdns))
   }
 
   /// A cancelled wait for a replaced server stops at once rather than asking adb again and again

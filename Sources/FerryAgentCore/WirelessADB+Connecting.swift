@@ -130,14 +130,17 @@ extension WirelessADB {
     // Forgotten since this was planned (and perhaps added again by the user): left alone.
     func stale() -> Bool { since.flatMap { since in forgotten[id].map { $0 > since } } == true }
     for address in entry.addresses where address.learnt.reconnects {
-      guard entries[id]?.addresses.contains(address) == true, !stale() else { continue }
+      // Cancelled (the agent stopping): no further address is tried.
+      guard !Task.isCancelled, entries[id]?.addresses.contains(address) == true, !stale()
+      else { continue }
       last = await attempt(
         address.endpoint, for: Purpose(learnt: address.learnt, expected: id, since: since),
         all: [address.endpoint])
       if last.reachedTheDevice { return last }
     }
     // Forgotten meanwhile: nothing more is done for it, not even an offer.
-    guard entries[id] != nil, !stale(), let services = try? await adb.mdnsServices(),
+    guard !Task.isCancelled, entries[id] != nil, !stale(),
+      let services = try? await adb.mdnsServices(),
       let service = services.first(where: { Self.advertises($0, id) }), entries[id] != nil,
       !stale()
     else { return last }
