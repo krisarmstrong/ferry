@@ -240,6 +240,7 @@ public actor DeviceHub {
       entries[id] = nil
       ejected.remove(id)
       backoff[id] = nil
+      swapHolds[id] = nil
       log.info("device \(id.serial, privacy: .private) detached")
       continuation.yield(.detached(id))
     }

@@ -284,6 +284,8 @@ extension DeviceHub {
   /// a replug of the same device, or another way to reach it, may already be waiting.
   func drop(_ id: DeviceID) {
     entries[id] = nil
+    // A hold is for one connection's swap: the device reached again starts afresh.
+    swapHolds[id] = nil
     if let session = kept.removeValue(forKey: id) {
       requestFreeTask { await session.close() }
     }
