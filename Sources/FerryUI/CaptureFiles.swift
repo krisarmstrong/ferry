@@ -4,7 +4,7 @@ import Foundation
 /// Where the app saves screenshots and screen recordings: `~/Documents/Ferry`, a folder per
 /// device named as the menu names it, `Screenshots` and `Screen Recordings` in it, made by the
 /// first save (macOS asks for Documents then, never before), under names like macOS's own:
-/// `Screenshot <model> 2026-11-18 at 17.09.27.png`. Choose Folder… saves a waiting recording in
+/// `Screenshot <model> 2026-11-18 at 17.09.27.png`, worded in the Mac's language. Choose Folder… saves a waiting recording in
 /// the folder the user picks instead.
 ///
 /// The app creates a hidden temporary file in the folder and sends it to the agent as a writable
@@ -18,11 +18,15 @@ enum CaptureFiles {
     case recording
     case logcat
 
-    var prefix: String {
+    /// The file's name from the model, the day and the time, each already safe for a path.
+    func name(model: String, day: String, time: String) -> LocalizedStringResource {
       switch self {
-      case .screenshot: "Screenshot"
-      case .recording: "Screen Recording"
-      case .logcat: "Logcat"
+      case .screenshot:
+        LocalizedStringResource("Screenshot \(model) \(day) at \(time)", bundle: .module)
+      case .recording:
+        LocalizedStringResource("Screen Recording \(model) \(day) at \(time)", bundle: .module)
+      case .logcat:
+        LocalizedStringResource("Logcat \(model) \(day) at \(time)", bundle: .module)
       }
     }
 
@@ -67,7 +71,8 @@ enum CaptureFiles {
     return true
   }
 
-  /// The name before any ` 2` and the extension, dated in `timeZone` as macOS dates its own.
+  /// The name before any ` 2` and the extension, dated in `timeZone` as macOS dates its own. A
+  /// translation's words are made path-safe like the model.
   static func baseName(
     _ kind: Kind, model: String, at date: Date, timeZone: TimeZone = .current
   ) -> String {
@@ -81,15 +86,22 @@ enum CaptureFiles {
     }
     let day = "\(parts.year ?? 0)-\(two(parts.month))-\(two(parts.day))"
     let time = "\(two(parts.hour)).\(two(parts.minute)).\(two(parts.second))"
-    return "\(kind.prefix) \(fileSafe(model)) \(day) at \(time)"
+    return pathSafe(String(localized: kind.name(model: fileSafe(model), day: day, time: time)))
   }
 
   /// The device's model (which the device chose) as one path component: no `/` or `:`, no
   /// control or format characters (bidi overrides among them), no leading dot, at most 64
   /// characters.
   static func fileSafe(_ model: String) -> String {
+    let text = String(pathSafe(model).prefix(64)).trimmingCharacters(in: .whitespaces)
+    return text.isEmpty ? "Android" : text
+  }
+
+  /// `text` as one path component: no `/` or `:`, no control or format characters, no leading
+  /// dot or surrounding spaces.
+  static func pathSafe(_ text: String) -> String {
     var safe = String.UnicodeScalarView()
-    for scalar in model.unicodeScalars {
+    for scalar in text.unicodeScalars {
       switch scalar.properties.generalCategory {
       case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate, .privateUse,
         .unassigned:
@@ -100,8 +112,7 @@ enum CaptureFiles {
     }
     var text = String(safe).trimmingCharacters(in: .whitespaces)
     while text.hasPrefix(".") { text.removeFirst() }
-    text = String(text.prefix(64)).trimmingCharacters(in: .whitespaces)
-    return text.isEmpty ? "Android" : text
+    return text.trimmingCharacters(in: .whitespaces)
   }
 
   /// Deletes the hidden capture files older than `age` in `folders`: ones an app that quit or

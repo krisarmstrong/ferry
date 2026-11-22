@@ -28,12 +28,27 @@ struct ProviderTextTests {
         == "The device saved “Résumé.txt” as “RESUME.TXT”.")
     #expect(
       String(localized: ProviderText.sizeMismatch(expected: 2, actual: 1))
-        == "The device stored 1 bytes where 2 were sent.")
+        == "The device stored 1 byte where 2 were sent.")
     #expect(
       String(localized: ProviderText.folderTooDeep("Deep"))
         == "“Deep” holds folders nested more than 64 deep, which Ferry does not delete.")
     #expect(
       String(localized: ProviderText.link)
         == "Symbolic links and aliases can’t be copied to the device.")
+  }
+
+  /// A byte count agrees with its number, in English and in Spanish.
+  @Test func byteCountsAgreeWithTheirNumber() throws {
+    let key = "The device stored %llu bytes where %llu were sent."
+    func format(_ language: String) throws -> String {
+      let path = try #require(Bundle.module.path(forResource: language, ofType: "lproj"))
+      return try #require(Bundle(path: path)).localizedString(forKey: key, value: nil, table: nil)
+    }
+    #expect(
+      String.localizedStringWithFormat(try format("en"), UInt64(0), UInt64(1))
+        == "The device stored 0 bytes where 1 was sent.")
+    #expect(
+      String.localizedStringWithFormat(try format("es"), UInt64(1), UInt64(2))
+        == "El dispositivo guardó 1 byte, pero se enviaron 2.")
   }
 }

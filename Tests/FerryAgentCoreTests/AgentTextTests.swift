@@ -30,6 +30,15 @@ struct AgentTextTests {
         == "Connect the device and choose Transfer files to see its files.")
   }
 
+  /// An SD card's Finder location is the device's name and the card, in the Mac's language.
+  @Test func theCardLocationIsTranslated() throws {
+    #expect(String(localized: AgentText.cardLocation("Phone")) == "Phone – SD card")
+    let path = try #require(Bundle.module.path(forResource: "es", ofType: "lproj"))
+    let spanish = try #require(Bundle(path: path))
+      .localizedString(forKey: "%@ – SD card", value: nil, table: nil)
+    #expect(String(format: spanish, "Phone") == "Phone – tarjeta SD")
+  }
+
   /// The XPC layer's refusals reach the client in the agent's words.
   @Test func theAgentGivesItsRefusalsInItsWords() throws {
     let harness = try AgentHarness()

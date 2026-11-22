@@ -8,6 +8,12 @@
             "state" : "translated",
             "value" : "A newer version of the app is installed. Uninstall it first."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hay una versión más reciente de la app instalada. Desinstálala primero."
+          }
         }
       }
     },
@@ -17,6 +23,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Another app is using the device. Quit Image Capture or Android File Transfer."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otra app está usando el dispositivo. Sal de Captura de Imagen o de Android File Transfer."
           }
         }
       }
@@ -28,6 +40,12 @@
             "state" : "translated",
             "value" : "Another app on the device already defines one of this app's permissions."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otra app del dispositivo ya define uno de los permisos de esta app."
+          }
         }
       }
     },
@@ -37,6 +55,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Another app on the device already uses this app's content provider."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otra app del dispositivo ya usa el proveedor de contenido de esta app."
           }
         }
       }
@@ -48,6 +72,12 @@
             "state" : "translated",
             "value" : "Cancelled."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelado."
+          }
         }
       }
     },
@@ -57,6 +87,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ferry can't do this from the Mac on this device. Do it on the device instead."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry no puede hacer esto desde la Mac en este dispositivo. Hazlo en el dispositivo."
           }
         }
       }
@@ -68,6 +104,12 @@
             "state" : "translated",
             "value" : "Ferry can't find adb. Get it from the Ferry menu, then try again."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry no encuentra adb. Obtenlo desde el menú de Ferry e inténtalo de nuevo."
+          }
         }
       }
     },
@@ -77,6 +119,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ferry can't save to its folder in Documents. Allow Ferry in Privacy & Security."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry no puede guardar en su carpeta de Documentos. Permite el acceso a Ferry en Privacidad y seguridad."
           }
         }
       }
@@ -88,6 +136,12 @@
             "state" : "translated",
             "value" : "Ferry couldn't finish this. Try again; if it keeps failing, reconnect the device or reopen Ferry."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry no pudo terminar esto. Inténtalo de nuevo; si sigue fallando, vuelve a conectar el dispositivo o vuelve a abrir Ferry."
+          }
         }
       }
     },
@@ -97,6 +151,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ferry's helper didn't answer in time. Try again in a moment."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El asistente de Ferry no respondió a tiempo. Inténtalo de nuevo en un momento."
           }
         }
       }
@@ -108,6 +168,12 @@
             "state" : "translated",
             "value" : "That app is larger than 4 GB."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esa app ocupa más de 4 GB."
+          }
         }
       }
     },
@@ -117,6 +183,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "That file isn't an Android app (.apk)."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese archivo no es una app de Android (.apk)."
           }
         }
       }
@@ -128,6 +200,12 @@
             "state" : "translated",
             "value" : "That folder is nested too deep to delete from the Mac. Delete it on the device."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esa carpeta está anidada a demasiada profundidad para eliminarla desde la Mac. Elimínala en el dispositivo."
+          }
         }
       }
     },
@@ -137,6 +215,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "That forward is already gone."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese reenvío ya no existe."
           }
         }
       }
@@ -148,6 +232,12 @@
             "state" : "translated",
             "value" : "That item is no longer on the device. Refresh, then try again."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese ítem ya no está en el dispositivo. Actualiza e inténtalo de nuevo."
+          }
         }
       }
     },
@@ -157,6 +247,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "That item is read-only from the Mac. Change it on the device."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese ítem es de solo lectura desde la Mac. Cámbialo en el dispositivo."
           }
         }
       }
@@ -168,6 +264,12 @@
             "state" : "translated",
             "value" : "The app couldn't be read by the device. It may be damaged or unsigned."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no pudo leer la app. Puede estar dañada o no estar firmada."
+          }
         }
       }
     },
@@ -177,6 +279,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The app doesn't support this device's processor."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app no es compatible con el procesador de este dispositivo."
           }
         }
       }
@@ -188,6 +296,12 @@
             "state" : "translated",
             "value" : "The app is a test build, which the device won't install."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app es una compilación de prueba, que el dispositivo no instala."
+          }
         }
       }
     },
@@ -197,6 +311,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The app is already installed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app ya está instalada."
           }
         }
       }
@@ -208,6 +328,12 @@
             "state" : "translated",
             "value" : "The app needs a library the device doesn't have."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app necesita una biblioteca que el dispositivo no tiene."
+          }
         }
       }
     },
@@ -217,6 +343,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The app needs a newer version of Android."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app necesita una versión más reciente de Android."
           }
         }
       }
@@ -228,6 +360,12 @@
             "state" : "translated",
             "value" : "The device already has an item with that name. Rename one, then try again."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo ya tiene un ítem con ese nombre. Cámbiale el nombre a uno e inténtalo de nuevo."
+          }
         }
       }
     },
@@ -237,6 +375,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device can't store that name. Choose another name."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no puede guardar ese nombre. Elige otro nombre."
           }
         }
       }
@@ -248,6 +392,12 @@
             "state" : "translated",
             "value" : "The device didn't install the app. Check that it suits this device, then try again. (%@)"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no instaló la app. Comprueba que sea adecuada para este dispositivo e inténtalo de nuevo. (%@)"
+          }
         }
       }
     },
@@ -257,6 +407,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device didn't record its screen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no grabó su pantalla."
           }
         }
       }
@@ -268,6 +424,12 @@
             "state" : "translated",
             "value" : "The device didn't record its screen: %@"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no grabó su pantalla: %@"
+          }
         }
       }
     },
@@ -277,6 +439,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device didn't send a screenshot. Unlock it and try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no envió una captura de pantalla. Desbloquéalo e inténtalo de nuevo."
           }
         }
       }
@@ -288,6 +456,12 @@
             "state" : "translated",
             "value" : "The device doesn't allow installing apps over USB."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no permite instalar apps por USB."
+          }
         }
       }
     },
@@ -297,6 +471,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device doesn't have enough space for the app."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no tiene suficiente espacio para la app."
           }
         }
       }
@@ -308,6 +488,12 @@
             "state" : "translated",
             "value" : "The device is already recording its screen."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo ya está grabando su pantalla."
+          }
         }
       }
     },
@@ -317,6 +503,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device is not sharing files. Unlock it and choose Transfer files, then try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no está compartiendo archivos. Desbloquéalo, elige Transferir archivos e inténtalo de nuevo."
           }
         }
       }
@@ -328,6 +520,12 @@
             "state" : "translated",
             "value" : "The device is out of space. Free some space on it, then try again."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo se quedó sin espacio. Libera espacio en él e inténtalo de nuevo."
+          }
         }
       }
     },
@@ -337,6 +535,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device isn't recording its screen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no está grabando su pantalla."
           }
         }
       }
@@ -348,6 +552,12 @@
             "state" : "translated",
             "value" : "The device saved the file under another name. Look for it in the folder."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo guardó el archivo con otro nombre. Búscalo en la carpeta."
+          }
         }
       }
     },
@@ -357,6 +567,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device sent more than a recording can be, so Ferry deleted it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo envió más de lo que puede ocupar una grabación, así que Ferry la eliminó."
           }
         }
       }
@@ -368,6 +584,12 @@
             "state" : "translated",
             "value" : "The device shows no storage. Unlock it, then try again."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no muestra ningún almacenamiento. Desbloquéalo e inténtalo de nuevo."
+          }
         }
       }
     },
@@ -377,6 +599,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device was disconnected. Reconnect it, then try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo se desconectó. Vuelve a conectarlo e inténtalo de nuevo."
           }
         }
       }
@@ -388,6 +616,12 @@
             "state" : "translated",
             "value" : "The device's app verification refused the app."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La verificación de apps del dispositivo rechazó la app."
+          }
         }
       }
     },
@@ -397,6 +631,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The file changed on the device. Refresh, then try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El archivo cambió en el dispositivo. Actualiza e inténtalo de nuevo."
           }
         }
       }
@@ -408,6 +648,12 @@
             "state" : "translated",
             "value" : "The file didn't arrive complete. Try again."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El archivo no llegó completo. Inténtalo de nuevo."
+          }
         }
       }
     },
@@ -417,6 +663,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The file is too large for that storage. Use internal storage, or a smaller file."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El archivo es demasiado grande para ese almacenamiento. Usa el almacenamiento interno o un archivo más pequeño."
           }
         }
       }
@@ -428,6 +680,12 @@
             "state" : "translated",
             "value" : "The folder isn't empty. Delete what it holds first."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La carpeta no está vacía. Elimina primero lo que contiene."
+          }
         }
       }
     },
@@ -437,6 +695,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The folder's listing went out of date. Try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La lista de la carpeta quedó desactualizada. Inténtalo de nuevo."
           }
         }
       }
@@ -448,6 +712,12 @@
             "state" : "translated",
             "value" : "The install was cancelled on the device."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La instalación se canceló en el dispositivo."
+          }
         }
       }
     },
@@ -457,6 +727,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The installed app is signed differently. Uninstall it first."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app instalada tiene otra firma. Desinstálala primero."
           }
         }
       }
@@ -468,6 +744,12 @@
             "state" : "translated",
             "value" : "The recording is still being finished. Try again in a moment."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La grabación todavía se está terminando. Inténtalo de nuevo en un momento."
+          }
         }
       }
     },
@@ -477,6 +759,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The recording stopped arriving. It's still on the device: choose a folder, or discard it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La grabación dejó de llegar. Sigue en el dispositivo: elige una carpeta o descártala."
           }
         }
       }
@@ -488,6 +776,12 @@
             "state" : "translated",
             "value" : "This Mac is out of space. Free some space, then try again."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta Mac se quedó sin espacio. Libera espacio e inténtalo de nuevo."
+          }
         }
       }
     },
@@ -497,6 +791,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "This needs USB debugging. Turn it on, then try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esto requiere depuración por USB. Actívala e inténtalo de nuevo."
           }
         }
       }
@@ -508,6 +808,12 @@
             "state" : "translated",
             "value" : "Unknown device"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispositivo desconocido"
+          }
         }
       }
     },
@@ -518,6 +824,12 @@
             "state" : "translated",
             "value" : "Use a port from 1024 to 65535 on this Mac and from 1 to 65535 on the device."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa un puerto de 1024 a 65535 en esta Mac y de 1 a 65535 en el dispositivo."
+          }
         }
       }
     },
@@ -527,6 +839,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "adb couldn't forward the port: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "adb no pudo reenviar el puerto: %@"
           }
         }
       }
