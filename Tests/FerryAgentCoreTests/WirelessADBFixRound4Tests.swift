@@ -45,10 +45,10 @@ struct WirelessADBFixRound4Tests {
     ])
     #expect(vouching.serves(vouched.argument, as: known))
     // The retry removes it.
-    #expect(
-      try await eventually(timeout: .seconds(20)) {
-        vouching.serves(Self.address, as: Self.stranger)
-      })
+    await harness.retryClock.waitForSleeper()
+    await harness.retryClock.advance(by: DomainController.listingRetry)
+    await harness.controller.listingRetryTask?.value
+    #expect(vouching.serves(Self.address, as: Self.stranger))
     #expect(await harness.controller.location(of: Self.stranger) == nil)
     #expect(await manager.calls.filter { $0 == .remove(unknown) }.count == 2)
   }
@@ -83,10 +83,10 @@ struct WirelessADBFixRound4Tests {
     #expect(await wireless.connect(typed) == .needsConfirmation(typed))
 
     // The retry lists the domains: the set is complete and exact from then on.
-    #expect(
-      try await eventually(timeout: .seconds(20)) {
-        vouching.serves(Self.address, as: Self.stranger)
-      })
+    await harness.retryClock.waitForSleeper()
+    await harness.retryClock.advance(by: DomainController.listingRetry)
+    await harness.controller.listingRetryTask?.value
+    #expect(vouching.serves(Self.address, as: Self.stranger))
     #expect(!vouching.serves(Self.address, as: Self.located))
     #expect(await harness.controller.location(of: Self.stranger) == nil)
     #expect(await harness.controller.location(of: Self.located) != nil)

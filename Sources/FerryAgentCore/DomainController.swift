@@ -88,6 +88,8 @@ public actor DomainController {
   /// Times the retry of a hide or show that failed.
   let clock: any Clock<Duration>
   var visibilityRetryTask: Task<Void, Never>?
+  /// Lists the system's domains again after a failed listing (see `retryListing()`).
+  var listingRetryTask: Task<Void, Never>?
   /// The wait before the latest retry of a hide or show; `nil` once one succeeds.
   var visibilityRetryDelay: Duration?
   var domains: [String: Domain] = [:]
@@ -381,6 +383,7 @@ extension DomainController {
 
   private func removeEveryDomain() async -> Result<[URL], TransportError> {
     retired = true
+    listingRetryTask?.cancel()
     domains = [:]
     for table in tables.values {
       await table.discard()
