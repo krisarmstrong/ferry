@@ -107,17 +107,17 @@ struct SpanishLocalizationTests {
 
   /// The strings of `module` in `language`, from its catalog compiled as Xcode compiles it for
   /// the app (see `CompiledCatalog`).
-  private static func strings(_ module: String, _ language: String) throws -> Bundle {
-    try CompiledCatalog.strings(
+  private static func strings(_ module: String, _ language: String) async throws -> Bundle {
+    try await CompiledCatalog.strings(
       root.appending(path: "Sources/\(module)/Localizable.xcstrings"), language: language)
   }
 
   private static let absent = "\u{1}absent"
 
   /// Every string of Help, in Spanish, from the compiled FerryUI bundle.
-  @Test func helpResolvesInSpanish() throws {
+  @Test func helpResolvesInSpanish() async throws {
     let help = try #require(HelpContent.bundled)
-    let spanish = try Self.strings("FerryUI", "es")
+    let spanish = try await Self.strings("FerryUI", "es")
     let strings = help.categories.map(\.title) + help.topics.flatMap(\.strings)
     #expect(!strings.isEmpty)
     var untranslated: [String] = []
@@ -151,23 +151,23 @@ struct SpanishLocalizationTests {
   ])
   func countedMessagesHavePluralForms(
     language: String, key: String, one: String, two: String
-  ) throws {
-    let strings = try Self.strings("FerrySyncCore", language)
+  ) async throws {
+    let strings = try await Self.strings("FerrySyncCore", language)
     let format = strings.localizedString(forKey: key, value: Self.absent, table: nil)
     #expect(String.localizedStringWithFormat(format, 1, "Phone") == one)
     #expect(String.localizedStringWithFormat(format, 2, "Phone") == two)
   }
 
   /// "Sent 1 of 2" is the usual partial send: the Spanish verb agrees with the first number.
-  @Test func partialSendsAgreeWithTheirCount() throws {
-    let strings = try Self.strings("FerrySyncCore", "es")
+  @Test func partialSendsAgreeWithTheirCount() async throws {
+    let strings = try await Self.strings("FerrySyncCore", "es")
     let format = strings.localizedString(forKey: "Sent %lld of %lld to %@", value: nil, table: nil)
     #expect(String.localizedStringWithFormat(format, 1, 2, "Phone") == "Se envió 1 de 2 a Phone")
     #expect(String.localizedStringWithFormat(format, 2, 3, "Phone") == "Se enviaron 2 de 3 a Phone")
   }
 
-  @Test func theAlsoNotSentLineAgreesWithItsCount() throws {
-    let strings = try Self.strings("FerrySyncCore", "es")
+  @Test func theAlsoNotSentLineAgreesWithItsCount() async throws {
+    let strings = try await Self.strings("FerrySyncCore", "es")
     let format = strings.localizedString(forKey: "Also not sent: %lld.", value: nil, table: nil)
     #expect(String.localizedStringWithFormat(format, 1) == "Tampoco se envió: 1.")
     #expect(String.localizedStringWithFormat(format, 3) == "Tampoco se enviaron: 3.")
@@ -175,9 +175,9 @@ struct SpanishLocalizationTests {
 
   /// A capture's file name is worded in the Mac's language; its words never add a path
   /// separator, a colon or a leading dot.
-  @Test func fileNamesAreTranslatedAndSafe() throws {
+  @Test func fileNamesAreTranslatedAndSafe() async throws {
     // FerryUI's English is its keys.
-    let spanish = try Self.strings("FerryUI", "es")
+    let spanish = try await Self.strings("FerryUI", "es")
     for key in ["Screenshot %@ %@ at %@", "Screen Recording %@ %@ at %@", "Logcat %@ %@ at %@"] {
       let translated = spanish.localizedString(forKey: key, value: Self.absent, table: nil)
       #expect(translated != Self.absent, "\(key)")

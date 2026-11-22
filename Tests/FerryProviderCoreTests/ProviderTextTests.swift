@@ -40,20 +40,22 @@ struct ProviderTextTests {
   }
 
   /// A byte count agrees with its number, in English and in Spanish, once compiled.
-  @Test func byteCountsAgreeWithTheirNumber() throws {
+  @Test func byteCountsAgreeWithTheirNumber() async throws {
     let key = "The device stored %llu bytes where %llu were sent."
     let catalog = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
       .appending(path: "Sources/FerryProviderCore/Localizable.xcstrings")
-    func format(_ language: String) throws -> String {
-      try CompiledCatalog.strings(catalog, language: language)
+    func format(_ language: String) async throws -> String {
+      try await CompiledCatalog.strings(catalog, language: language)
         .localizedString(forKey: key, value: nil, table: nil)
     }
+    let english = try await format("en")
+    let spanish = try await format("es")
     #expect(
-      String.localizedStringWithFormat(try format("en"), UInt64(0), UInt64(1))
+      String.localizedStringWithFormat(english, UInt64(0), UInt64(1))
         == "The device stored 0 bytes where 1 was sent.")
     #expect(
-      String.localizedStringWithFormat(try format("es"), UInt64(1), UInt64(2))
+      String.localizedStringWithFormat(spanish, UInt64(1), UInt64(2))
         == "El dispositivo guardó 1 byte, pero se enviaron 2.")
   }
 }

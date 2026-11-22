@@ -32,12 +32,12 @@ struct AgentTextTests {
   }
 
   /// An SD card's Finder location is the device's name and the card, in the Mac's language.
-  @Test func theCardLocationIsTranslated() throws {
+  @Test func theCardLocationIsTranslated() async throws {
     #expect(String(localized: AgentText.cardLocation("Phone")) == "Phone – SD card")
     let catalog = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
       .appending(path: "Sources/FerryAgentCore/Localizable.xcstrings")
-    let spanish = try CompiledCatalog.strings(catalog, language: "es")
+    let spanish = try await CompiledCatalog.strings(catalog, language: "es")
       .localizedString(forKey: "%@ – SD card", value: nil, table: nil)
     #expect(String(format: spanish, "Phone") == "Phone – tarjeta SD")
   }
