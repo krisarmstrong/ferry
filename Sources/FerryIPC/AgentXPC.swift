@@ -23,6 +23,8 @@ public enum Refusal: Sendable {
   case badRequest
   /// The client's role may not send it (see `ClientRole.allows`).
   case notAllowed
+  /// The connection already has `AgentListenerDelegate.maxInFlightPerConnection` requests running.
+  case tooManyRequests
 }
 
 /// Serves agent requests from the app and the FileProvider extension.
@@ -65,7 +67,21 @@ extension AgentHandling {
 /// Each connection is tagged with the role of the Ferry process it comes from, and its requests
 /// are limited to that role's (see `ClientRole.allows`).
 public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Sendable {
+  /// The most requests one connection may have running at once; the next is refused with
+  /// `Refusal.tooManyRequests` until one finishes. A cancel is not a request and always passes.
+  ///
+  /// 128 is a backstop against a runaway or hostile client, set above anything Ferry's own
+  /// clients send. It was derived from how they send, not measured against a running Finder:
+  /// the Finder Sync extension sends one file at a time per menu action (`FinderSender`); the app
+  /// has a handful of requests open (a transfer, a log stream, a recording, polling); the
+  /// FileProvider extension is the only unbounded sender, and fileproviderd paces its own calls
+  /// to tens. The agent also runs each device's work one request at a time, so extra concurrency
+  /// would only queue. A request that carries a file holds a descriptor, and a process starts
+  /// with 256 of them, so the cap is half that: many connections cannot exhaust them either.
+  public static let maxInFlightPerConnection = 128
+
   private let handler: any AgentHandling
+  private let maxInFlight: Int
   /// The role a new connection's peer has, having set the connection's code-signing
   /// requirement; `nil` refuses the connection. A role of `nil` inside admits a test peer with
   /// every request allowed.
@@ -91,16 +107,21 @@ public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Senda
   /// Admits any peer in `role`, or with every request allowed for `nil`, which only an anonymous
   /// listener in tests may use.
   convenience init(
-    handler: any AgentHandling, role: ClientRole?, lost: (@Sendable () -> Void)? = nil
+    handler: any AgentHandling, role: ClientRole?,
+    maxInFlight: Int = AgentListenerDelegate.maxInFlightPerConnection,
+    lost: (@Sendable () -> Void)? = nil
   ) {
-    self.init(handler: handler, lost: lost) { _ in .some(role) }
+    self.init(handler: handler, maxInFlight: maxInFlight, lost: lost) { _ in .some(role) }
   }
 
   private init(
-    handler: any AgentHandling, lost: (@Sendable () -> Void)? = nil,
+    handler: any AgentHandling,
+    maxInFlight: Int = AgentListenerDelegate.maxInFlightPerConnection,
+    lost: (@Sendable () -> Void)? = nil,
     admit: @escaping @Sendable (NSXPCConnection) -> ClientRole??
   ) {
     self.handler = handler
+    self.maxInFlight = maxInFlight
     self.lost = lost
     self.admit = admit
   }
@@ -109,7 +130,7 @@ public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Senda
     _ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection
   ) -> Bool {
     guard let role = admit(connection) else { return false }
-    let service = AgentService(handler: handler, role: role)
+    let service = AgentService(handler: handler, role: role, maxInFlight: maxInFlight)
     connection.exportedInterface = NSXPCInterface(with: AgentXPC.self)
     connection.exportedObject = service
     // A client that went away (quit, crashed, relaunched) waits for nothing it sent. The Finder
@@ -139,10 +160,26 @@ final class AgentService: NSObject, AgentXPC, Sendable {
   private let role: ClientRole?
   /// The cancellations of this connection's requests that can be cancelled, while they run.
   private let running = Mutex<[String: RequestCancellation]>([:])
+  private let maxInFlight: Int
+  /// The requests of this connection that were accepted and have not replied.
+  private let inFlight = Mutex(0)
 
-  init(handler: any AgentHandling, role: ClientRole?) {
+  init(
+    handler: any AgentHandling, role: ClientRole?,
+    maxInFlight: Int = AgentListenerDelegate.maxInFlightPerConnection
+  ) {
     self.handler = handler
     self.role = role
+    self.maxInFlight = maxInFlight
+  }
+
+  /// Takes a slot for a request, or says there is none.
+  private func admit() -> Bool {
+    inFlight.withLock { count in
+      guard count < maxInFlight else { return false }
+      count += 1
+      return true
+    }
   }
 
   func send(
@@ -163,6 +200,11 @@ final class AgentService: NSObject, AgentXPC, Sendable {
     if let role, !role.allows(decoded) {
       Self.log.error("refused a request its client may not send")
       reply(Self.encode(.failure(.io(handler.text(for: .notAllowed)))))
+      return
+    }
+    guard admit() else {
+      Self.log.error("refused a request: the connection has \(self.maxInFlight) in flight")
+      reply(Self.encode(.failure(.io(handler.text(for: .tooManyRequests)))))
       return
     }
     // Registered before this call returns, so a cancel, which XPC delivers after it, finds it.
@@ -191,6 +233,8 @@ final class AgentService: NSObject, AgentXPC, Sendable {
         }
       }
       self.running.withLock { $0[id] = nil }
+      // Freed before the reply, so a client that sends again on seeing it is not refused.
+      self.inFlight.withLock { $0 -= 1 }
       if reported.any, let connection {
         await Self.flush(id, on: connection)
       }
