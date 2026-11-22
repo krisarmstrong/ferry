@@ -56,6 +56,10 @@ actor FakeWirelessADB: WirelessADBControl {
   private var disconnectsHeld = false
   private var heldDisconnects: [CheckedContinuation<Void, Never>] = []
   private(set) var inFlight = 0
+  /// Device lists read so far, failed or not.
+  private(set) var devicesCalls = 0
+  /// How many device-list reads fail before one succeeds, with the server up.
+  var devicesFailures = 0
   private(set) var maxInFlight = 0
   private let events: AsyncStream<ADBServerEvent>
   private let feed: AsyncStream<ADBServerEvent>.Continuation
@@ -179,7 +183,12 @@ actor FakeWirelessADB: WirelessADBControl {
   }
 
   func devices() async throws(ADBError) -> [ADBDevice] {
+    devicesCalls += 1
     try requireServer()
+    if devicesFailures > 0 {
+      devicesFailures -= 1
+      throw .failed("adb did not answer")
+    }
     return currentList()
   }
 

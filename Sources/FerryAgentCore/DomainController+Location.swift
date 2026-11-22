@@ -23,20 +23,35 @@ extension DomainController {
 
   /// Lists the system's domains again, with back-off, until it works, then publishes the
   /// complete set. Meanwhile the set is published as incomplete, so nothing unvouched is served
-  /// and every device counts as possibly located.
+  /// and every device counts as possibly located. Remove Ferry ends it.
   func retryListing() {
-    Task {
+    listingRetryTask = requestFreeTask { [weak self, clock] in
       var delay = Self.listingRetry
-      while !retired {
-        guard (try? await Task.sleep(for: delay)) != nil else { return }
-        if await serially({ await self.adoptExisting() }) {
-          locationsComplete = true
-          publishLocations()
+      while true {
+        do {
+          try await clock.sleep(for: delay)
+        } catch {
           return
         }
+        guard let listed = await self?.listAgain(), !listed else { return }
         delay = min(delay * 2, .seconds(60))
       }
     }
+  }
+
+  /// Whether the system's domains could be listed and adopted; `nil` once Remove Ferry has run,
+  /// which leaves nothing to adopt. Checked in the operation queue, after which nothing can
+  /// retire the controller before the adoption.
+  private func listAgain() async -> Bool? {
+    let listed = await serially { () async -> Bool? in
+      guard await !self.retired else { return nil }
+      return await self.adoptExisting()
+    }
+    if listed == true {
+      locationsComplete = true
+      publishLocations()
+    }
+    return listed
   }
 
   /// The name of the Finder location Ferry has for `id`, connected or not, or `nil` if it has

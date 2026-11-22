@@ -154,8 +154,9 @@ public actor WirelessADB {
   let replaceCutOffServer: @Sendable () async -> Bool
   /// The reconnects started at agent start or when adb's server came back, if still running.
   var reconnecting: Task<Void, Never>?
-  /// adb listed devices while a reconnect pass ran: another pass runs once it ends.
-  var reconnectAgain = false
+  /// What adb listed when its server came back during a reconnect pass: another pass runs
+  /// against it once that one ends.
+  var queuedPass: [ADBDevice]?
   /// How many startup reconnects run at once.
   static let reconnectLimit = 4
 
