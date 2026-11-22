@@ -69,13 +69,18 @@ private struct CancelHarness {
   let lost: AsyncStream<Void>
   private let handler: ParkingHandler
 
-  init(role: ClientRole? = nil, starts: Bool = true) {
+  init(
+    role: ClientRole? = nil, starts: Bool = true,
+    maxInFlight: Int = AgentListenerDelegate.maxInFlightPerConnection
+  ) {
     let (started, startedContinuation) = AsyncStream.makeStream(of: AgentRequest.self)
     let (seen, seenContinuation) = AsyncStream.makeStream(of: Seen.self)
     let (lost, lostContinuation) = AsyncStream.makeStream(of: Void.self)
     handler = ParkingHandler(
       started: startedContinuation, seen: seenContinuation, released: Flag(), starts: starts)
-    delegate = AgentListenerDelegate(handler: handler, role: role) { lostContinuation.yield() }
+    delegate = AgentListenerDelegate(handler: handler, role: role, maxInFlight: maxInFlight) {
+      lostContinuation.yield()
+    }
     listener.delegate = delegate
     listener.resume()
     self.started = started
@@ -282,5 +287,105 @@ struct AgentCancelTests {
     try await Task.sleep(for: .milliseconds(400))
     harness.release()
     #expect(try await call.value == .done)
+  }
+}
+
+/// L1: a connection may have only so many requests in flight; the rest are refused with a reply.
+@Suite(.timeLimit(.minutes(1)))
+struct AgentInFlightCapTests {
+  private static let cap = 3
+  private static let list = AgentRequest.list(domain: "d", folder: .root)
+
+  /// Sends `count` requests on `proxy` and returns their replies as they come.
+  private func sendAll(
+    _ count: Int, on proxy: any AgentXPC, file: FileHandle? = nil
+  ) throws -> AsyncStream<(String, AgentResponse)> {
+    let (replies, continuation) = AsyncStream.makeStream(of: (String, AgentResponse).self)
+    let data = try JSONEncoder().encode(Self.list)
+    for index in 0..<count {
+      let id = "r\(index)"
+      proxy.send(data, id: id, file: file) { reply in
+        let response = try? JSONDecoder().decode(AgentResponse.self, from: reply)
+        continuation.yield((id, response ?? .done))
+      }
+    }
+    return replies
+  }
+
+  @Test func requestsOverTheCapAreRefusedWithAReply() async throws {
+    let harness = CancelHarness(maxInFlight: Self.cap)
+    defer { harness.finish() }
+    var started = harness.started.makeAsyncIterator()
+    let (connection, proxy) = try harness.connection()
+    defer { connection.invalidate() }
+
+    var replies = try sendAll(Self.cap + 1, on: proxy).makeAsyncIterator()
+    for _ in 0..<Self.cap { _ = await started.next() }
+    let refused = await replies.next()
+    #expect(refused?.1 == .failure(.io(Refusal.tooManyRequests.testText)))
+    harness.release()
+    var finished = 0
+    while await replies.next() != nil {
+      finished += 1
+      if finished == Self.cap { break }
+    }
+    #expect(finished == Self.cap)
+  }
+
+  @Test func aFinishedRequestFreesItsSlot() async throws {
+    let harness = CancelHarness(maxInFlight: Self.cap)
+    defer { harness.finish() }
+    var started = harness.started.makeAsyncIterator()
+    let (connection, proxy) = try harness.connection()
+    defer { connection.invalidate() }
+
+    var first = try sendAll(Self.cap, on: proxy).makeAsyncIterator()
+    for _ in 0..<Self.cap { _ = await started.next() }
+    harness.release()
+    for _ in 0..<Self.cap { _ = await first.next() }
+
+    // Released stays set, so each of these finishes at once; none may be refused.
+    var again = try sendAll(Self.cap, on: proxy).makeAsyncIterator()
+    for _ in 0..<Self.cap {
+      let reply = await again.next()
+      #expect(reply?.1 == .done)
+    }
+  }
+
+  @Test func theCapIsPerConnection() async throws {
+    let harness = CancelHarness(maxInFlight: Self.cap)
+    defer { harness.finish() }
+    var started = harness.started.makeAsyncIterator()
+    let (one, oneProxy) = try harness.connection()
+    let (two, twoProxy) = try harness.connection()
+    defer {
+      one.invalidate()
+      two.invalidate()
+    }
+
+    _ = try sendAll(Self.cap, on: oneProxy)
+    for _ in 0..<Self.cap { _ = await started.next() }
+    _ = try sendAll(Self.cap, on: twoProxy)
+    for _ in 0..<Self.cap { _ = await started.next() }
+  }
+
+  /// A cancel is not a request: it must get through a connection that is at its cap.
+  @Test func aCancelStillReachesAFullConnection() async throws {
+    let harness = CancelHarness(maxInFlight: Self.cap)
+    defer { harness.finish() }
+    var started = harness.started.makeAsyncIterator()
+    var seen = harness.seen.makeAsyncIterator()
+    let (connection, proxy) = try harness.connection()
+    defer { connection.invalidate() }
+
+    _ = try sendAll(Self.cap, on: proxy)
+    for _ in 0..<Self.cap { _ = await started.next() }
+    proxy.cancel("r0")
+    #expect(await seen.next() == .cancelled)
+  }
+
+  /// The real cap is far above anything Ferry's own clients send at once.
+  @Test func theRealCapIsGenerous() {
+    #expect(AgentListenerDelegate.maxInFlightPerConnection >= 100)
   }
 }

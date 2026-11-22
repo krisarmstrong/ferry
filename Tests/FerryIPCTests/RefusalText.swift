@@ -6,6 +6,7 @@ extension Refusal {
     switch self {
     case .badRequest: "bad request"
     case .notAllowed: "request not allowed"
+    case .tooManyRequests: "too many requests"
     }
   }
 }
