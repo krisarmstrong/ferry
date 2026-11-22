@@ -36,4 +36,23 @@ extension DeviceHubMethodTests {
     try #require(moving || opened == 2)
     #expect(await harness.next() == .changed(ready(mtpDevice, .usbADB)))
   }
+
+  /// A move whose new session cannot be opened, with no MTP session to fall back on, drops the
+  /// device. No hold is left behind for it: the device it would hold off is gone.
+  @Test func aMoveThatDropsTheDeviceLeavesNoSwapHold() async throws {
+    var harness = await MethodHarness()
+    defer { harness.finish() }
+    await harness.adb.setMethod(.wifiADB, for: id)
+    await harness.adb.attach(adbDevice)
+    harness.tick()
+    #expect(await harness.next() == .attached(ready(adbDevice, .wifiADB)))
+
+    await harness.adb.setMethod(.usbADB, for: id)
+    await harness.adb.failNextOpen(of: id, with: .io("open failed"))
+    harness.tick()
+    #expect(await harness.next() == .detached(id))
+    while await harness.hub.isSwapping(id), !Task.isCancelled { await Task.yield() }
+
+    #expect(await harness.hub.swapHolds[id] == nil)
+  }
 }

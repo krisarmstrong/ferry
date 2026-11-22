@@ -162,7 +162,7 @@ extension DeviceHub {
       guard entry.method != method else { return }
       if await move(entry, from: old, to: method) {
         swapHolds[id] = nil
-      } else {
+      } else if entries[id] != nil {
         holdSwaps(id)
       }
     }
