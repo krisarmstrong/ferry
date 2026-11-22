@@ -113,7 +113,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pudo instalar %#@apps@ en %2$@"
+            "value" : "%#@apps@ en %2$@"
           },
           "substitutions" : {
             "apps" : {
@@ -124,13 +124,13 @@
                   "one" : {
                     "stringUnit" : {
                       "state" : "translated",
-                      "value" : "%arg app"
+                      "value" : "No se pudo instalar %arg app"
                     }
                   },
                   "other" : {
                     "stringUnit" : {
                       "state" : "translated",
-                      "value" : "%arg apps"
+                      "value" : "No se pudieron instalar %arg apps"
                     }
                   }
                 }
@@ -191,7 +191,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pudo enviar %#@files@ a %2$@"
+            "value" : "%#@files@ a %2$@"
           },
           "substitutions" : {
             "files" : {
@@ -202,13 +202,13 @@
                   "one" : {
                     "stringUnit" : {
                       "state" : "translated",
-                      "value" : "%arg archivo"
+                      "value" : "No se pudo enviar %arg archivo"
                     }
                   },
                   "other" : {
                     "stringUnit" : {
                       "state" : "translated",
-                      "value" : "%arg archivos"
+                      "value" : "No se pudieron enviar %arg archivos"
                     }
                   }
                 }
@@ -353,13 +353,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installed %1$lld of %2$lld on %3$@"
+            "value" : "Installed %lld of %lld on %@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se instalaron %1$lld de %2$lld en %3$@"
+            "value" : "%#@done@ de %2$lld en %3$@"
+          },
+          "substitutions" : {
+            "done" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se instaló %arg"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se instalaron %arg"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -567,13 +589,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sent %1$lld of %2$lld to %3$@"
+            "value" : "Sent %lld of %lld to %@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se enviaron %1$lld de %2$lld a %3$@"
+            "value" : "%#@done@ de %2$lld a %3$@"
+          },
+          "substitutions" : {
+            "done" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se envió %arg"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se enviaron %arg"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }

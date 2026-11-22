@@ -876,7 +876,7 @@ El archivo no llegó al dispositivo. La línea siguiente explica por qué.
 
 Corrige lo que indica la línea siguiente y vuelve a enviarlo.
 
-**No se pudo enviar … archivos a …**
+**No se pudieron enviar … archivos a …**
 
 Ninguno de los archivos llegó al dispositivo. La línea siguiente explica por qué en uno de ellos.
 
@@ -906,7 +906,7 @@ La app no se instaló. La línea siguiente explica por qué.
 
 Corrige lo que indica la línea siguiente y vuelve a instalarla.
 
-**No se pudo instalar … apps en …**
+**No se pudieron instalar … apps en …**
 
 Ninguna de las apps se instaló. La línea siguiente explica por qué en una de ellas.
 

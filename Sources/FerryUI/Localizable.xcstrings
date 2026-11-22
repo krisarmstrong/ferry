@@ -5787,7 +5787,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pudo enviar … archivos a …"
+            "value" : "No se pudieron enviar … archivos a …"
           }
         }
       }
@@ -5952,7 +5952,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pudo instalar … apps en …"
+            "value" : "No se pudieron instalar … apps en …"
           }
         }
       }

@@ -153,7 +153,7 @@ struct SpanishLocalizationTests {
     ),
     (
       "es", "Couldn’t install %lld apps on %@", "No se pudo instalar 1 app en Phone",
-      "No se pudo instalar 2 apps en Phone"
+      "No se pudieron instalar 2 apps en Phone"
     ),
   ])
   func countedMessagesHavePluralForms(
@@ -163,6 +163,14 @@ struct SpanishLocalizationTests {
     let format = strings.localizedString(forKey: key, value: Self.absent, table: nil)
     #expect(String.localizedStringWithFormat(format, 1, "Phone") == one)
     #expect(String.localizedStringWithFormat(format, 2, "Phone") == two)
+  }
+
+  /// "Sent 1 of 2" is the usual partial send: the Spanish verb agrees with the first number.
+  @Test func partialSendsAgreeWithTheirCount() throws {
+    let strings = try Self.strings("FerrySyncCore", "es")
+    let format = strings.localizedString(forKey: "Sent %lld of %lld to %@", value: nil, table: nil)
+    #expect(String.localizedStringWithFormat(format, 1, 2, "Phone") == "Se envió 1 de 2 a Phone")
+    #expect(String.localizedStringWithFormat(format, 2, 3, "Phone") == "Se enviaron 2 de 3 a Phone")
   }
 
   @Test func theAlsoNotSentLineAgreesWithItsCount() throws {
