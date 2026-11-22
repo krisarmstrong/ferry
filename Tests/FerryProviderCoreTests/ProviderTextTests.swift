@@ -1,3 +1,4 @@
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -26,9 +27,10 @@ struct ProviderTextTests {
     #expect(
       String(localized: ProviderText.nameChanged(requested: "Résumé.txt", actual: "RESUME.TXT"))
         == "The device saved “Résumé.txt” as “RESUME.TXT”.")
+    // Its plural forms are checked compiled, below: an uncompiled catalog reads as its key.
     #expect(
-      String(localized: ProviderText.sizeMismatch(expected: 2, actual: 1))
-        == "The device stored 1 byte where 2 were sent.")
+      ProviderText.sizeMismatch(expected: 2, actual: 1).key
+        == "The device stored %llu bytes where %llu were sent.")
     #expect(
       String(localized: ProviderText.folderTooDeep("Deep"))
         == "“Deep” holds folders nested more than 64 deep, which Ferry does not delete.")
@@ -37,12 +39,15 @@ struct ProviderTextTests {
         == "Symbolic links and aliases can’t be copied to the device.")
   }
 
-  /// A byte count agrees with its number, in English and in Spanish.
+  /// A byte count agrees with its number, in English and in Spanish, once compiled.
   @Test func byteCountsAgreeWithTheirNumber() throws {
     let key = "The device stored %llu bytes where %llu were sent."
+    let catalog = URL(filePath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+      .appending(path: "Sources/FerryProviderCore/Localizable.xcstrings")
     func format(_ language: String) throws -> String {
-      let path = try #require(Bundle.module.path(forResource: language, ofType: "lproj"))
-      return try #require(Bundle(path: path)).localizedString(forKey: key, value: nil, table: nil)
+      try CompiledCatalog.strings(catalog, language: language)
+        .localizedString(forKey: key, value: nil, table: nil)
     }
     #expect(
       String.localizedStringWithFormat(try format("en"), UInt64(0), UInt64(1))

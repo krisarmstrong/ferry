@@ -1,10 +1,11 @@
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
 @testable import FerryUI
 
 /// Ferry ships in English and Spanish. Every key of every String Catalog has a Spanish
-/// translation that keeps the English's values, and the compiled bundles answer in Spanish:
+/// translation that keeps the English's values, and the compiled catalogs answer in Spanish:
 /// Help, the counted messages in both their forms, and the capture file names. The agent's and
 /// the FileProvider extension's tests check their own Spanish.
 struct SpanishLocalizationTests {
@@ -102,21 +103,13 @@ struct SpanishLocalizationTests {
     #expect(changed.isEmpty, "\(catalog) Spanish that drops or adds a value: \(changed.sorted())")
   }
 
-  // MARK: The compiled bundles
+  // MARK: The compiled catalogs
 
-  /// A module's compiled resource bundle, beside FerryUI's.
-  private static func bundle(_ module: String) throws -> Bundle {
-    let url = Bundle.module.bundleURL.deletingLastPathComponent()
-      .appending(path: "Ferry_\(module).bundle")
-    return try #require(Bundle(url: url), "no bundle for \(module)")
-  }
-
-  /// The strings of `module` in `language`, looked up the way the bundle looks up its own.
+  /// The strings of `module` in `language`, from its catalog compiled as Xcode compiles it for
+  /// the app (see `CompiledCatalog`).
   private static func strings(_ module: String, _ language: String) throws -> Bundle {
-    let path = try #require(
-      try bundle(module).path(forResource: language, ofType: "lproj"),
-      "\(module) has no \(language).lproj")
-    return try #require(Bundle(path: path))
+    try CompiledCatalog.strings(
+      root.appending(path: "Sources/\(module)/Localizable.xcstrings"), language: language)
   }
 
   private static let absent = "\u{1}absent"
