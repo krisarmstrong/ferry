@@ -82,8 +82,9 @@ Wi-Fi**, **Pair with Code…** and **Connect by Address…** reach a device over
 [Turn on USB debugging](docs/user-guide.md#turn-on-usb-debugging) and
 [Use a device over Wi-Fi](docs/user-guide.md#use-a-device-over-wi-fi).
 
-Full instructions: [User guide](docs/user-guide.md). The same help is in the app: choose
-**Help** in the Ferry menu, or click the **?** beside a problem in the menu to open its entry.
+Full instructions: [User guide](docs/user-guide.md) ([en español](docs/user-guide.es.md)). The
+same help is in the app: choose **Help** in the Ferry menu, or click the **?** beside a problem in
+the menu to open its entry. Ferry follows the Mac's language: English or Spanish.
 
 ## Build from source
 
