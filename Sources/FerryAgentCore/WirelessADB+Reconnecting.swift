@@ -11,17 +11,17 @@ extension WirelessADB {
     var next: [ADBDevice]? = listed
     while let listed = next, !Task.isCancelled {
       await reconnectPass(listed)
-      // Taken in the same turn as it is read, so a comeback during the pass is never cleared
-      // unrun, and its own list is the one used: the server may send no other.
-      next = queuedPass
+      // Taken in the same turn as it is read, so a comeback is never cleared unrun; one during
+      // the read below queues again.
+      guard let queued = queuedPass else { break }
       queuedPass = nil
+      // What adb lists now, since the pass may have reconnected devices after the comeback; its
+      // own list if adb does not answer, as the server may send no other.
+      next = (try? await adb.devices()) ?? queued
     }
     queuedPass = nil
     reconnecting = nil
   }
-
-  /// Whether another pass is due once the running one ends.
-  var passRequested: Bool { queuedPass != nil }
 
   private func reconnectPass(_ listed: [ADBDevice]) async {
     let since = forgets

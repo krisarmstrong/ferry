@@ -43,12 +43,39 @@ struct WirelessADBActorReviewTests {
 
     await adb.serverGone()
     await adb.publish()
-    while await !wireless.passRequested, !Task.isCancelled { await Task.yield() }
+    while await wireless.queuedPass == nil, !Task.isCancelled { await Task.yield() }
     await adb.set { $0.devicesFailures = 1 }
     await adb.releaseConnects()
     await reconnects.value
 
     #expect(await Self.connects(to: "203.0.113.1:5555", in: adb) == 2)
+  }
+
+  /// The device answers in the pass that was running when adb's server came back. The pass the
+  /// comeback asked for reads what adb lists now, so it does not connect to the device again.
+  @Test func aPassAfterAComebackSkipsADeviceTheFirstPassReconnected() async throws {
+    let file = try Self.store(remembering: 1)
+    defer { try? FileManager.default.removeItem(at: file) }
+    let adb = FakeWirelessADB()
+    await adb.set {
+      $0.units["203.0.113.1:5555"] = .init(
+        info: DeviceInfo(id: DeviceID(serial: "U1"), manufacturer: "", model: "Unit"))
+    }
+    await adb.holdConnects()
+    let wireless = WirelessADB(adb: adb, store: file)
+    let running = Task { await wireless.run() }
+    defer { running.cancel() }
+    await adb.publish()
+    while await adb.inFlight == 0, !Task.isCancelled { await Task.yield() }
+    let reconnects = try #require(await wireless.reconnecting)
+
+    await adb.serverGone()
+    await adb.publish()
+    while await wireless.queuedPass == nil, !Task.isCancelled { await Task.yield() }
+    await adb.releaseConnects()
+    await reconnects.value
+
+    #expect(await Self.connects(to: "203.0.113.1:5555", in: adb) == 1)
   }
 
   /// `run` follows adb until its task is cancelled, and the reconnects it started stop with it:
