@@ -95,7 +95,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los paquetes y los paquetes de apps no se pueden copiar al dispositivo. Comprímelo primero en un .zip."
+            "value" : "Los paquetes de documentos y de apps no se pueden copiar al dispositivo. Primero comprime el paquete en un .zip."
           }
         }
       }

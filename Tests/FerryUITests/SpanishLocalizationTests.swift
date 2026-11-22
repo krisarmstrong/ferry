@@ -11,8 +11,12 @@ struct SpanishLocalizationTests {
   private static let root = URL(filePath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 
-  static let modules = [
-    "FerryUI", "FerryText", "FerryAgentCore", "FerryProviderCore", "FerrySyncCore",
+  /// Every String Catalog: one per module, and the app's usage descriptions.
+  static let catalogs = [
+    "Sources/FerryUI/Localizable.xcstrings", "Sources/FerryText/Localizable.xcstrings",
+    "Sources/FerryAgentCore/Localizable.xcstrings",
+    "Sources/FerryProviderCore/Localizable.xcstrings",
+    "Sources/FerrySyncCore/Localizable.xcstrings", "Apps/Ferry/InfoPlist.xcstrings",
   ]
 
   private struct StringUnit: Decodable {
@@ -48,11 +52,8 @@ struct SpanishLocalizationTests {
     let strings: [String: Entry]
   }
 
-  private static func catalog(_ module: String) throws -> Catalog {
-    try JSONDecoder().decode(
-      Catalog.self,
-      from: Data(
-        contentsOf: root.appending(path: "Sources/\(module)/Localizable.xcstrings")))
+  private static func catalog(_ path: String) throws -> Catalog {
+    try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: root.appending(path: path)))
   }
 
   /// The values a string is shown with, by kind and count, whatever their order. A plural's
@@ -79,11 +80,11 @@ struct SpanishLocalizationTests {
     return text
   }
 
-  @Test(arguments: modules)
-  func everyKeyHasSpanishWithTheEnglishValues(module: String) throws {
+  @Test(arguments: catalogs)
+  func everyKeyHasSpanishWithTheEnglishValues(catalog: String) throws {
     var missing: [String] = []
     var changed: [String] = []
-    for (key, entry) in try Self.catalog(module).strings {
+    for (key, entry) in try Self.catalog(catalog).strings {
       guard let spanish = entry.localizations?["es"], spanish.stringUnit?.state == "translated",
         let other = Self.written(spanish), !other.isEmpty
       else {
@@ -97,8 +98,8 @@ struct SpanishLocalizationTests {
         changed.append("\(key) (\(form)): \(text)")
       }
     }
-    #expect(missing.isEmpty, "\(module) keys without Spanish: \(missing.sorted())")
-    #expect(changed.isEmpty, "\(module) Spanish that drops or adds a value: \(changed.sorted())")
+    #expect(missing.isEmpty, "\(catalog) keys without Spanish: \(missing.sorted())")
+    #expect(changed.isEmpty, "\(catalog) Spanish that drops or adds a value: \(changed.sorted())")
   }
 
   // MARK: The compiled bundles

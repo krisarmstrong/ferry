@@ -3,8 +3,8 @@ import Foundation
 
 /// Where the app saves screenshots and screen recordings: `~/Documents/Ferry`, a folder per
 /// device named as the menu names it, `Screenshots` and `Screen Recordings` in it, made by the
-/// first save (macOS asks for Documents then, never before), under names like macOS's own:
-/// `Screenshot <model> 2026-11-18 at 17.09.27.png`, worded in the Mac's language. Choose Folder… saves a waiting recording in
+/// first save (macOS asks for Documents then, never before), under names like macOS's own, in
+/// the Mac's language: `Screenshot <model> 2026-11-18 at 17.09.27.png`. Choose Folder… saves a waiting recording in
 /// the folder the user picks instead.
 ///
 /// The app creates a hidden temporary file in the folder and sends it to the agent as a writable

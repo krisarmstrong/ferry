@@ -158,7 +158,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ferry se conecta a internet para dos cosas. Busca actualizaciones a diario en GitHub, donde se publican las versiones de Ferry. Y descarga adb de Google: una vez, cuando aceptas la licencia de Google, y de nuevo sin preguntar cuando una actualización de Ferry necesita un adb más reciente bajo la licencia que aceptaste. Ninguna envía nada sobre ti ni sobre tus dispositivos: como cualquier descarga, ven la dirección IP de tu Mac, y GitHub ve qué versiones de Ferry y de su actualizador lo solicitan."
+            "value" : "Ferry se conecta a internet para dos cosas. Busca actualizaciones a diario en GitHub, donde se publican las versiones de Ferry. Y descarga adb de Google: una vez, cuando aceptas la licencia de Google, y de nuevo sin preguntar cuando una actualización de Ferry necesita un adb más reciente bajo la licencia que aceptaste. Ninguna de las dos envía nada sobre ti ni sobre tus dispositivos: como en cualquier descarga, ven la dirección IP de tu Mac, y GitHub ve qué versiones de Ferry y de su actualizador lo solicitan."
           }
         }
       }
@@ -256,7 +256,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alguien eliminó o movió el elemento en el dispositivo, u otra app lo hizo."
+            "value" : "Alguien eliminó o movió el ítem en el dispositivo, u otra app lo hizo."
           }
         }
       }
@@ -267,7 +267,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elige **Actualizar** para el dispositivo y busca el elemento donde está ahora."
+            "value" : "Elige **Actualizar** para el dispositivo y busca el ítem donde está ahora."
           }
         }
       }
@@ -289,7 +289,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ya hay un elemento con el mismo nombre en esa carpeta del dispositivo."
+            "value" : "Ya hay un ítem con el mismo nombre en esa carpeta del dispositivo."
           }
         }
       }
@@ -300,7 +300,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cambia el nombre del elemento en la Mac o en el dispositivo, y luego inténtalo de nuevo."
+            "value" : "Cambia el nombre del ítem en la Mac o en el dispositivo, y luego inténtalo de nuevo."
           }
         }
       }
@@ -333,7 +333,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cambia el nombre del elemento usando letras, dígitos, espacios, guiones y puntos, y luego inténtalo de nuevo."
+            "value" : "Cambia el nombre del ítem usando letras, dígitos, espacios, guiones y puntos, y luego inténtalo de nuevo."
           }
         }
       }
@@ -619,7 +619,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El elemento es una carpeta con nombre de app o de paquete de documento, o está dentro de una, y Ferry la mantiene de solo lectura."
+            "value" : "El ítem es una carpeta con nombre de app o de paquete de documento, o está dentro de una, y Ferry la mantiene de solo lectura."
           }
         }
       }
@@ -729,7 +729,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ferry se publica bajo la licencia MIT. Está construido sobre el trabajo de otros:"
+            "value" : "Ferry se publica bajo la licencia MIT. Se basa en el trabajo de otros:"
           }
         }
       }
@@ -806,7 +806,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Para eliminar también las preferencias de Ferry, borra ~/Library/Preferences/io.github.krisarmstrong.ferry.plist y la carpeta de Ferry en ~/Library/Group Containers."
+            "value" : "Para eliminar también las preferencias de Ferry, elimina ~/Library/Preferences/io.github.krisarmstrong.ferry.plist y la carpeta de Ferry en ~/Library/Group Containers."
           }
         }
       }
@@ -827,7 +827,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un dispositivo aparece en Finder solo mientras Ferry puede llegar a él. Cuando está desconectado y fuera de la red, bloqueado o sin compartir archivos, su ubicación desaparece de la barra lateral. Vuelve con sus archivos cuando Ferry puede llegar a él de nuevo."
+            "value" : "Un dispositivo aparece en Finder solo mientras Ferry puede llegar a él. Cuando está desconectado y fuera de la red, bloqueado o sin compartir archivos, su ubicación desaparece de la barra lateral. Vuelve con sus archivos cuando Ferry pueda volver a acceder a él."
           }
         }
       }
@@ -1112,7 +1112,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cualquiera en una red puede reclamar el número de serie de un dispositivo. Por eso, cuando una dirección nueva responde como un dispositivo que Ferry ya conoce, Ferry no la usa por sí mismo: el menú pregunta “¿*dirección* es tu *dispositivo*?”"
+            "value" : "Cualquiera en una red puede hacerse pasar por un dispositivo con solo declarar su número de serie. Por eso, cuando una dirección nueva responde como un dispositivo que Ferry ya conoce, Ferry no la usa por su cuenta: el menú pregunta “¿*dirección* es tu *dispositivo*?”"
           }
         }
       }
@@ -1349,7 +1349,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Una carpeta se elimina con su contenido solo si Finder ha mostrado todo lo que hay en ella, en todos los niveles, tal como está ahora. Si algo dentro es nuevo o ha cambiado en el dispositivo, o una carpeta interior nunca se abrió, la carpeta completa permanece y Finder la restaura. Vuelve a eliminarla para quitarla. Una carpeta anidada a más de 64 niveles de profundidad, o que contenga más de 100,000 elementos, también permanece. Una carpeta que contiene un archivo cuyo nombre la Mac no puede mostrar también permanece; elimínala en el dispositivo."
+            "value" : "Una carpeta se elimina con su contenido solo si Finder ha mostrado todo lo que hay en ella, en todos los niveles, tal como está ahora. Si algo dentro es nuevo o ha cambiado en el dispositivo, o una carpeta interior nunca se abrió, la carpeta completa permanece y Finder la restaura. Vuelve a eliminarla para quitarla. Una carpeta anidada a más de 64 niveles de profundidad, o que contenga más de 100,000 ítems, también permanece. Una carpeta que contiene un archivo cuyo nombre la Mac no puede mostrar también permanece; elimínala en el dispositivo."
           }
         }
       }
@@ -1391,7 +1391,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Después, en el probador: **Settings** → **System** → **About tester**. Toca **Build number** hasta que se active el modo de desarrollador."
+            "value" : "Después, en el probador: **Configuración** → **Sistema** → **About tester**. Toca **Número de compilación** hasta que se active el modo de desarrollador."
           }
         }
       }
@@ -1577,7 +1577,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comprueba que Ferry esté activado en File Providers, dentro de Ítems de inicio y extensiones."
+            "value" : "Comprueba que Ferry esté activado en Proveedores de archivos, dentro de Ítems de inicio y extensiones."
           }
         }
       }
@@ -1764,7 +1764,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Haz clic con la tecla Control presionada en un archivo que abriste y elige **Quitar descarga**. El archivo permanece en el dispositivo."
+            "value" : "Haz clic con la tecla Control presionada en un archivo que abriste y elige **Eliminar descarga**. El archivo permanece en el dispositivo."
           }
         }
       }
@@ -2044,7 +2044,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ferry las guarda en Documentos, en Ferry, y luego en una carpeta por dispositivo con Screenshots y Screen Recordings dentro, con nombres como los de macOS, por ejemplo Screenshot LinkRunner-100G 2026-11-18 at 17.09.27.png, y las muestra en Finder. macOS pregunta si Ferry puede usar Documentos la primera vez que guarda una. Nunca reemplaza un archivo. Una grabación espera en el dispositivo hasta que Ferry la haya guardado, aunque salgas de Ferry mientras tanto; después Ferry la elimina del dispositivo."
+            "value" : "Ferry las guarda en Documentos, en Ferry, y luego en una carpeta por dispositivo con Screenshots y Screen Recordings dentro, con nombres como los de macOS, por ejemplo Captura de pantalla LinkRunner-100G 2026-11-18 a las 17.09.27.png, y las muestra en Finder. macOS pregunta si Ferry puede usar Documentos la primera vez que guarda una. Nunca reemplaza un archivo. Una grabación espera en el dispositivo hasta que Ferry la haya guardado, aunque salgas de Ferry mientras tanto; después Ferry la elimina del dispositivo."
           }
         }
       }
@@ -2075,7 +2075,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pudo cargar la ayuda de Ferry. Al reinstalar Ferry se restaura."
+            "value" : "No se pudo cargar la ayuda de Ferry. Reinstalar Ferry la restablece."
           }
         }
       }
@@ -2266,7 +2266,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Si Ferry no puede guardar una grabación, el menú muestra Recording couldn't be saved: Elegir carpeta… la guarda donde elijas, y Descartar la elimina del dispositivo. Grabar pantalla vuelve a estar disponible una vez que se guarda o se descarta. Un dispositivo expulsado conserva su grabación hasta que Ferry lo sirva de nuevo."
+            "value" : "Si Ferry no puede guardar una grabación, el menú muestra No se pudo guardar la grabación: Elegir carpeta… la guarda donde elijas, y Descartar la elimina del dispositivo. Grabar pantalla vuelve a estar disponible una vez que se guarda o se descarta. Un dispositivo expulsado conserva su grabación hasta que Ferry lo sirva de nuevo."
           }
         }
       }
@@ -2416,7 +2416,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Administración Wi-Fi"
+            "value" : "Wi-Fi Management"
           }
         }
       }
@@ -2426,7 +2426,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prueba Wi-Fi"
+            "value" : "Wi-Fi Test"
           }
         }
       }
@@ -2436,7 +2436,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Administración por cable"
+            "value" : "Wired Management"
           }
         }
       }
@@ -2446,7 +2446,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prueba por cable"
+            "value" : "Wired Test"
           }
         }
       }
@@ -2503,7 +2503,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elementos del menú"
+            "value" : "Ítems del menú"
           }
         }
       }
@@ -4577,7 +4577,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Haz clic en **Cancelar** para detenerte mientras la app aún se está copiando. Una vez que el dispositivo la está instalando, la instalación termina."
+            "value" : "Haz clic en **Cancelar** para detener el proceso mientras la app aún se está copiando. Una vez que el dispositivo la está instalando, la instalación termina."
           }
         }
       }
@@ -5182,7 +5182,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Usar por Wi-Fi parte de un dispositivo que Ferry atiende mediante la depuración por USB."
+            "value" : "Usar por Wi-Fi parte de un dispositivo que Ferry sirve mediante la depuración por USB."
           }
         }
       }
@@ -5446,7 +5446,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los paquetes y los paquetes de apps no se pueden copiar al dispositivo. Comprímelo primero en un .zip."
+            "value" : "Los paquetes de documentos y de apps no se pueden copiar al dispositivo. Primero comprime el paquete en un .zip."
           }
         }
       }
@@ -7284,7 +7284,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los puertos por debajo de 1024 en una Mac requieren derechos de administrador."
+            "value" : "Los puertos por debajo de 1024 en una Mac requieren permisos de administrador."
           }
         }
       }
@@ -7975,7 +7975,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ferry busca una versión nueva una vez al día. Cuando hay una, la descarga en segundo plano y la instala la próxima vez que Ferry se cierra, así nada se detiene mientras trabajas."
+            "value" : "Ferry busca una versión nueva una vez al día. Cuando hay una, la descarga en segundo plano y la instala la próxima vez que Ferry se cierre, así nada se detiene mientras trabajas."
           }
         }
       }
@@ -8389,7 +8389,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ferry no pudo escribir en ~/Library/Application Support/Ferry/platform-tools: la Mac puede estar llena, o la carpeta bloqueada o pertenecer a otro usuario."
+            "value" : "Ferry no pudo escribir en ~/Library/Application Support/Ferry/platform-tools: la Mac puede estar llena, o la carpeta puede estar bloqueada o pertenecer a otro usuario."
           }
         }
       }
