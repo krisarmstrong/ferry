@@ -66,10 +66,9 @@ Legend: **Done** is in `main` and verified as stated. **Open** must land before 
   fails unless `pkg-config` is that build. What still runs with the identity usable, each on a
   pin, is an accepted residual named in `docs/RELEASING.md`. *Verified:* `release.yml`
   "Install XcodeGen, pkgconf and Sparkle's tools" and "Build and sign" steps.
-- Secrets: none in the repo; history scanned before the repo went public.
-
-**Later**
-- Secret scanning in CI: no gitleaks (or similar) step in `ci.yml`. Add a pinned step. (L13)
+- Secrets: none in the repo; history scanned before the repo went public, and on every change
+  since (L13). *Verified:* `ci.yml` job `secrets` runs gitleaks 8.30.1, pinned by SHA-256, over
+  the whole history; one prose false positive is fingerprinted in `.gitleaksignore`.
 
 ## Concurrency
 
@@ -95,10 +94,10 @@ Legend: **Done** is in `main` and verified as stated. **Open** must land before 
   No audit has re-read them for state that changes across an `await`; only the session gate's
   non-reentrancy is documented (`OperationGate.swift`).
 
-**Later**
-- Bound the number of requests a client may have in flight (L1). `AgentXPC.swift` has no cap per
-  connection; device work is already serialised, so the cost is descriptors and tasks, not device
-  load. Needs a back-pressure design FileProvider's own retry tolerates.
+**Done**
+- A client may have at most 128 requests in flight per connection (L1); the next is refused with a
+  reply, never dropped. *Verified:* `AgentListenerDelegate.maxInFlightPerConnection`,
+  `AgentInFlightCapTests`.
 
 ## Performance
 
