@@ -11,6 +11,11 @@
 		<string>_adb-tls-connect._tcp</string>
 		<string>_adb-tls-pairing._tcp</string>
 	</array>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>es</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
