@@ -284,7 +284,8 @@ extension AgentService {
   /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
   /// `body` recorded a change, even one followed by a failure. `folder` is where `body` puts an
   /// item: one the table does not know means the system holds identifiers the table lost (see
-  /// `DomainController.identifiersLost`).
+  /// `DomainController.identifiersLost`), and is answered as `.deviceDisconnected`, which it
+  /// retries once it has imported the domain again.
   func gated<T: Sendable>(
     _ domain: String, marksUse: Bool = true, into folder: ItemID? = nil,
     _ body: (DomainController.Route) async throws(TransportError) -> T
@@ -323,6 +324,7 @@ extension AgentService {
     case .failure(.unknownItem):
       if let folder, await route.items.path(for: folder) == nil {
         await domains.identifiersLost(domain)
+        throw .deviceDisconnected
       }
     case .failure:
       break

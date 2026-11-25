@@ -172,7 +172,9 @@ struct AgentIdentityStabilityTests {
   }
 
   /// FileProvider names a folder the table does not know as the place for a new item: an
-  /// earlier agent lost identifiers FileProvider still holds. The domain is reimported, once.
+  /// earlier agent lost identifiers FileProvider still holds. The domain is reimported, once, and
+  /// the request answered as one to retry: "no such item" would have FileProvider re-create the
+  /// folder chain by name.
   @Test func aCreateIntoAFolderTheTableLostReimportsTheDomainOnce() async throws {
     let device = try await seeded()
     let harness = try AgentHarness(devices: [device])
@@ -181,12 +183,12 @@ struct AgentIdentityStabilityTests {
     let domain = domainID(device)
     let lost = ItemID.random()
 
-    #expect(try await create(harness, domain, in: lost) == .failure(.unknownItem))
-    #expect(try await create(harness, domain, in: lost) == .failure(.unknownItem))
+    #expect(try await create(harness, domain, in: lost) == .failure(.deviceDisconnected))
+    #expect(try await create(harness, domain, in: lost) == .failure(.deviceDisconnected))
     let moved = await harness.service.handle(
       .move(domain: domain, id: try await harness.id(path(Self.file), in: domain), toFolder: lost),
       file: nil)
-    #expect(moved == .failure(.unknownItem))
+    #expect(moved == .failure(.deviceDisconnected))
 
     #expect(await harness.manager.calls.filter { $0 == .reimport(domain) }.count == 1)
   }

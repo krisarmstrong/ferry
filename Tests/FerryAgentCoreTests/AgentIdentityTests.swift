@@ -22,12 +22,19 @@ struct AgentIdentityTests {
 
     for request: AgentRequest in [
       .item(domain: domain, id: unknown), .list(domain: domain, folder: unknown),
-      .create(domain: domain, parent: unknown, name: "b", isFolder: true),
       .rename(domain: domain, id: unknown, to: "b"),
+    ] {
+      #expect(await service.handle(request, file: nil) == .failure(.unknownItem), "\(request)")
+    }
+    // A new place for an item that the table does not know is lost identifiers, retried once
+    // the domain is imported again (see `AgentIdentityStabilityTests`).
+    for request: AgentRequest in [
+      .create(domain: domain, parent: unknown, name: "b", isFolder: true),
       .move(
         domain: domain, id: try await harness.id(path("/a.txt"), in: domain), toFolder: unknown),
     ] {
-      #expect(await service.handle(request, file: nil) == .failure(.unknownItem), "\(request)")
+      #expect(
+        await service.handle(request, file: nil) == .failure(.deviceDisconnected), "\(request)")
     }
     // FileProvider's contract: deleting an item that is already gone succeeds.
     #expect(
