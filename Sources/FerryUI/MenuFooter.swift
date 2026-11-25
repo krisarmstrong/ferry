@@ -2,12 +2,16 @@ import AppKit
 import SwiftUI
 
 /// The rows at the foot of the menu: Open at Login, Check for Updates… (in a build that can
-/// update itself), Help and Quit Ferry. Updates always install by themselves. Ferry has no Settings
-/// window; Remove Ferry… is in Help, under Troubleshooting.
+/// update itself; Update Ready — Restart Ferry once an update waits for the next quit), Help and
+/// Quit Ferry. Updates always install by themselves. Ferry has no Settings
+/// window. Remove Ferry… is in Help, beside Uninstall; holding Option turns Quit Ferry into it,
+/// as a Mac menu shows an item's alternative, and it opens that Help topic, which confirms.
 struct MenuFooter: View {
   static let openAtLoginResource = LocalizedStringResource("Open at Login", bundle: .module)
   static let checkForUpdatesResource = LocalizedStringResource(
     "Check for Updates…", bundle: .module)
+  static let updateReadyResource = LocalizedStringResource(
+    "Update Ready — Restart Ferry", bundle: .module)
 
   /// The line under Open at Login while macOS waits for the user to allow it.
   static func loginItemDetail(_ status: LoginItemStatus) -> LocalizedStringResource? {
@@ -15,7 +19,15 @@ struct MenuFooter: View {
       ? LocalizedStringResource("Needs approval in System Settings", bundle: .module) : nil
   }
 
+  /// The last row's title: Remove Ferry… while Option is held.
+  static func quitTitle(optionHeld: Bool) -> LocalizedStringResource {
+    optionHeld
+      ? LocalizedStringResource("Remove Ferry…", bundle: .module)
+      : LocalizedStringResource("Quit Ferry", bundle: .module)
+  }
+
   @Environment(\.openWindow) private var openWindow
+  @State private var optionHeld = false
   let model: AppModel
 
   var body: some View {
@@ -35,7 +47,11 @@ struct MenuFooter: View {
         }
       }
       .toggleStyle(MenuToggleStyle())
-      if model.updater != nil {
+      if model.updateReady {
+        MenuRow(title: Text(Self.updateReadyResource)) {
+          model.restartToUpdate()
+        }
+      } else if model.updater != nil {
         MenuRow(title: Text(Self.checkForUpdatesResource)) {
           model.checkForUpdates()
         }
@@ -45,11 +61,20 @@ struct MenuFooter: View {
         openWindow(id: HelpView.windowID)
       }
       .keyboardShortcut("?")
-      MenuRow(title: Text("Quit Ferry", bundle: .module), shortcut: "⌘Q") {
-        NSApp.terminate(nil)
+      if optionHeld {
+        MenuRow(title: Text(Self.quitTitle(optionHeld: true))) {
+          model.showRemoveFerry()
+          NSApp.activate()
+          openWindow(id: HelpView.windowID)
+        }
+      } else {
+        MenuRow(title: Text(Self.quitTitle(optionHeld: false)), shortcut: "⌘Q") {
+          NSApp.terminate(nil)
+        }
+        .keyboardShortcut("q")
       }
-      .keyboardShortcut("q")
     }
+    .onModifierKeysChanged(mask: .option) { _, held in optionHeld = held.contains(.option) }
   }
 }
 
@@ -63,7 +88,7 @@ struct MenuToggleStyle: ToggleStyle {
     } label: {
       HStack(spacing: 8) {
         configuration.label
-          .lineLimit(1)
+          .fixedSize(horizontal: false, vertical: true)
         Spacer(minLength: 8)
         Image(systemName: "checkmark")
           .font(.callout.weight(.semibold))
@@ -73,6 +98,7 @@ struct MenuToggleStyle: ToggleStyle {
       }
     }
     .buttonStyle(MenuRowStyle())
+    .menuRowKeys { configuration.isOn.toggle() }
     .accessibilityRepresentation {
       Toggle(isOn: configuration.$isOn) { configuration.label }
     }

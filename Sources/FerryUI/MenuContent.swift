@@ -12,6 +12,7 @@ import SwiftUI
 /// the setup guide when the model asks for it.
 public struct MenuContent: View {
   @Environment(\.openWindow) private var openWindow
+  @Environment(\.dismiss) private var dismiss
   private let model: AppModel
 
   public init(model: AppModel) {
@@ -32,6 +33,7 @@ public struct MenuContent: View {
     }
     .padding(6)
     .frame(width: 320, alignment: .leading)
+    .menuKeyboard { dismiss() }
     // For the Help links beside its problems (see `HelpLinkButton`).
     .environment(model)
     .task { await model.watchWhileMenuOpen() }
@@ -79,7 +81,7 @@ public struct MenuContent: View {
     }
     if model.agent == .replaced {
       StatusRow(
-        symbol: "arrow.clockwise.circle", tint: .yellow, title: Text(MenuStatusText.updated),
+        symbol: "arrow.clockwise.circle", severity: .warning, title: Text(MenuStatusText.updated),
         help: MenuStatusText.updated.key
       ) {
         StatusAction(title: Text("Relaunch", bundle: .module)) { model.relaunch() }
@@ -138,7 +140,7 @@ public struct MenuContent: View {
     // Once the agent refuses this copy every action fails the same way: the row says why.
     if let error = model.actionError, model.agent != .replaced {
       StatusRow(
-        symbol: "exclamationmark.triangle", tint: .red, title: Text(verbatim: error.text),
+        symbol: "exclamationmark.triangle", severity: .error, title: Text(verbatim: error.text),
         help: error.help)
     }
     if !model.preservedChanges.isEmpty {
@@ -241,7 +243,7 @@ private struct HelperRow: View {
     switch status {
     case .allowed:
       StatusRow(
-        symbol: "exclamationmark.triangle", tint: .yellow,
+        symbol: "exclamationmark.triangle", severity: .warning,
         title: Text(MenuStatusText.helperNotResponding),
         help: MenuStatusText.helperNotResponding.key
       ) {
@@ -256,7 +258,7 @@ private struct HelperRow: View {
 
   private func blocked(_ title: LocalizedStringResource) -> some View {
     StatusRow(
-      symbol: "exclamationmark.triangle", tint: .yellow, title: Text(title), help: title.key
+      symbol: "exclamationmark.triangle", severity: .warning, title: Text(title), help: title.key
     ) {
       Text(
         "In Login Items & Extensions, turn on Ferry under Allow in the Background.",

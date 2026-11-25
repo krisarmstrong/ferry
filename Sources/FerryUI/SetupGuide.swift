@@ -16,6 +16,29 @@ public struct SetupGuide: View {
 
   public var body: some View {
     VStack(alignment: .leading, spacing: 16) {
+      // Scrolls only when the window cannot be tall enough, as with large text; Done stays
+      // below it (L8).
+      ViewThatFits(in: .vertical) {
+        guide
+        ScrollView { guide }
+      }
+      HStack {
+        Spacer()
+        Button {
+          dismissWindow(id: Self.windowID)
+        } label: {
+          Text("Done", bundle: .module)
+        }
+        .keyboardShortcut(.defaultAction)
+      }
+    }
+    .padding(20)
+    .frame(width: 460)
+    .onDisappear { model.isGuidePresented = false }
+  }
+
+  private var guide: some View {
+    VStack(alignment: .leading, spacing: 16) {
       Picker(selection: $model.guideTopic) {
         ForEach(GuideTopic.allCases, id: \.self) { topic in
           Text(topic.title)
@@ -58,19 +81,7 @@ public struct SetupGuide: View {
         .font(.callout)
         .foregroundStyle(.secondary)
       }
-      HStack {
-        Spacer()
-        Button {
-          dismissWindow(id: Self.windowID)
-        } label: {
-          Text("Done", bundle: .module)
-        }
-        .keyboardShortcut(.defaultAction)
-      }
     }
-    .padding(20)
-    .frame(width: 460)
-    .onDisappear { model.isGuidePresented = false }
   }
 }
 

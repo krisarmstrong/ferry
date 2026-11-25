@@ -257,6 +257,7 @@ struct AppModelWelcomeTests {
     let client = FakeClient(log: log)
     client.failRemoveAll()
     let services = FakeServices(log: log)
+    services.failRemoveDomains = true
     services.marks = Set(OnboardingMark.allCases)
     let model = AppModel(client: client, services: services)
     await model.removeFerry()

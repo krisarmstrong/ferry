@@ -210,6 +210,8 @@ enum HelpAction: String, Decodable, Sendable {
   case removeFerry
   /// Show Welcome Window: the first-run welcome, again.
   case showWelcome
+  /// Copy Diagnostics: a plain-text report on the pasteboard (`AppModel.diagnosticsReport()`).
+  case copyDiagnostics
 }
 
 /// A button that opens the setup guide: with the model picker, or with one family's steps, on

@@ -54,6 +54,9 @@ public protocol SystemServicing {
   /// Whether Ferry opens at login.
   func loginItemStatus() async -> LoginItemStatus
   func setOpensAtLogin(_ enabled: Bool) async throws
+  /// Removes every Ferry FileProvider domain, keeping changes not yet sent to a device, and
+  /// returns where they were saved: Remove Ferry's way when the agent cannot do it.
+  func removeFileProviderDomains() async throws -> [URL]
   func unregisterAgent() async throws
   /// Waits for the unregistered agent to exit, stops an adb server running Ferry's own fetched
   /// adb, then deletes what Ferry kept in Application Support, except a folder holding one of

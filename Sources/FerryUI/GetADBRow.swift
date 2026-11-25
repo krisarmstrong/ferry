@@ -38,7 +38,7 @@ struct GetADBRow: View {
       }
     case .failed:
       StatusRow(
-        symbol: "exclamationmark.triangle", tint: .yellow, title: Text(title), help: title.key
+        symbol: "exclamationmark.triangle", severity: .warning, title: Text(title), help: title.key
       ) {
         StatusAction(title: Text("Try Again", bundle: .module)) { model.retryPlatformTools() }
       }
@@ -57,7 +57,7 @@ struct ADBNotRunningRow: View {
 
   var body: some View {
     StatusRow(
-      symbol: "exclamationmark.triangle", tint: .yellow,
+      symbol: "exclamationmark.triangle", severity: .warning,
       title: Text(MenuStatusText.adbNotRunning), help: MenuStatusText.adbNotRunning.key
     ) {
       StatusAction(title: Text("Check Again", bundle: .module), action: checkAgain)

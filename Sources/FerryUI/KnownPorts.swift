@@ -10,19 +10,19 @@ enum KnownPorts {
     let name: LocalizedStringResource
   }
 
+  /// The CyberScope is built on the EtherScope nXG and labels the same ports; its model name is
+  /// matched by its start, which no unit's report has confirmed yet.
   static func ports(ofModel model: String) -> [Port]? {
-    switch model {
-    case "EtherScope-nXG":
-      [
-        Port(
-          interface: "wlan0", name: LocalizedStringResource("Wi-Fi Management", bundle: .module)),
-        Port(
-          interface: "eth0", name: LocalizedStringResource("Wired Management", bundle: .module)),
-        Port(interface: "eno0", name: LocalizedStringResource("Wired Test", bundle: .module)),
-        Port(interface: "wax0", name: LocalizedStringResource("Wi-Fi Test", bundle: .module)),
-      ]
-    default:
-      nil
+    guard model == "EtherScope-nXG" || model.lowercased().hasPrefix("cyberscope") else {
+      return nil
     }
+    return [
+      Port(
+        interface: "wlan0", name: LocalizedStringResource("Wi-Fi Management", bundle: .module)),
+      Port(
+        interface: "eth0", name: LocalizedStringResource("Wired Management", bundle: .module)),
+      Port(interface: "eno0", name: LocalizedStringResource("Wired Test", bundle: .module)),
+      Port(interface: "wax0", name: LocalizedStringResource("Wi-Fi Test", bundle: .module)),
+    ]
   }
 }

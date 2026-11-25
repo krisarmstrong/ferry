@@ -69,6 +69,7 @@ private final class PreviewServices: SystemServicing {
   func helperStatus() async -> HelperStatus { .allowed }
   func loginItemStatus() async -> LoginItemStatus { .disabled }
   func setOpensAtLogin(_ enabled: Bool) async {}
+  func removeFileProviderDomains() -> [URL] { [] }
   func unregisterAgent() {}
   func removeFerryData(keeping preserved: [URL]) {}
   func open(_ url: URL) {}

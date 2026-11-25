@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The menu-bar app: registers the agent, shows its devices, and hosts the welcome, the setup
 /// guide, Help and the developer tools' windows. Ferry has no Settings window: Open at Login is in the menu,
-/// Remove Ferry… in Help.
+/// Remove Ferry… in Help (and in the menu, with Option held).
 @main
 struct FerryApp: App {
   @State private var model: AppModel
@@ -15,7 +15,7 @@ struct FerryApp: App {
       preconditionFailure("FerryTeamID is missing from Ferry's Info.plist")
     }
     let model = AppModel(client: AgentClient(identity: identity), services: SystemServices())
-    model.updater = SparkleUpdates()
+    model.updater = SparkleUpdates { [weak model] in model?.updateIsReady() }
     _model = State(initialValue: model)
     // Registers the agent and reads the status once, so the log shows the devices before the
     // menu first opens. The system calls run off the main thread.
@@ -52,7 +52,7 @@ struct FerryApp: App {
     Window(PlatformToolsLicenseView.windowTitle, id: PlatformToolsLicenseView.windowID) {
       PlatformToolsLicenseView(model: model)
     }
-    .windowResizability(.contentSize)
+    .windowResizability(.contentMinSize)
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
 

@@ -2,7 +2,7 @@
 
 <!-- Generado desde Sources/FerryUI/help.json y Localizable.xcstrings con `make guide`. No edites este archivo. -->
 
-Ferry muestra los dispositivos Android como ubicaciones en Finder en tu Mac. Se creó primero para probadores de red, el LinkRunner 10G, el EtherScope nXG y el LinkRunner 100G, y también funciona con otros teléfonos Android.
+Ferry muestra los dispositivos Android como ubicaciones en Finder en tu Mac. Se creó primero para probadores de red, el LinkRunner 10G, el LinkRunner 100G, el EtherScope nXG y el CyberScope, y también funciona con el AirCheck G3 y otros teléfonos Android.
 
 Esta guía contiene la misma ayuda que **Ayuda** en el menú de Ferry, y además cómo instalar Ferry. Ferry es gratuito y de código abierto (MIT). Necesita macOS 26 o posterior en una Mac con Apple silicon.
 
@@ -15,6 +15,7 @@ Esta guía contiene la misma ayuda que **Ayuda** en el menú de Ferry, y además
   - [Conecta tu primer dispositivo](#conecta-tu-primer-dispositivo)
 - [Conexión](#conexión)
   - [Conectar un probador de red](#conectar-un-probador-de-red)
+  - [Conectar un AirCheck G3](#conectar-un-aircheck-g3)
   - [Conectar un teléfono Android](#conectar-un-teléfono-android)
   - [Activar la depuración por USB](#activar-la-depuración-por-usb)
   - [Obtener adb](#obtener-adb)
@@ -52,10 +53,11 @@ Esta guía contiene la misma ayuda que **Ayuda** en el menú de Ferry, y además
   - [Mensajes de capturas de pantalla y grabaciones](#mensajes-de-capturas-de-pantalla-y-grabaciones)
   - [Mensajes de reenvío de puertos y del registro](#mensajes-de-reenvío-de-puertos-y-del-registro)
   - [El asistente de Ferry y los ajustes](#el-asistente-de-ferry-y-los-ajustes)
-  - [Eliminar Ferry](#eliminar-ferry)
+  - [Diagnóstico para soporte](#diagnóstico-para-soporte)
 - [Acerca de Ferry](#acerca-de-ferry)
   - [Actualizaciones](#actualizaciones)
   - [Privacidad](#privacidad)
+  - [Eliminar Ferry](#eliminar-ferry)
   - [Desinstalar](#desinstalar)
   - [Agradecimientos](#agradecimientos)
 
@@ -103,11 +105,23 @@ En la app, **Cómo conectar** abre la guía de configuración.
 
 ### Conectar un probador de red
 
-Para el LinkRunner 10G, el EtherScope nXG y el LinkRunner 100G.
+Para el LinkRunner 10G, el LinkRunner 100G, el EtherScope nXG y el CyberScope.
 
 1. Conecta un cable USB-C al **puerto USB-C del lado izquierdo** de la unidad y a la Mac.
 2. En la unidad: **Configuración** (en la parte inferior de la pantalla de inicio) → **Dispositivos conectados** → **USB**.
 3. Toca **Transferir archivos**.
+
+El dispositivo aparece en Finder cuando comparte archivos.
+
+En la app, **Cómo conectar** abre la guía de configuración.
+
+### Conectar un AirCheck G3
+
+Estos son los pasos habituales de Android, que aún no se han comprobado en ningún AirCheck G3. Si un nombre en el probador es distinto, busca la notificación de USB o la configuración de USB.
+
+1. Conecta el probador a la Mac con un cable USB.
+2. En el probador, desliza hacia abajo el panel de notificaciones y toca la notificación de USB.
+3. En **Preferencias de USB**, elige **Transferencia de archivos**. O abre **Configuración** → **Dispositivos conectados** → **USB**.
 
 El dispositivo aparece en Finder cuando comparte archivos.
 
@@ -139,13 +153,21 @@ Los nombres de los menús varían un poco entre fabricantes de teléfonos. Busca
 
 En la app, **Cómo activar la depuración por USB** abre los pasos para activar la depuración por USB.
 
-#### LinkRunner 10G, LinkRunner 100G o EtherScope nXG
+#### LinkRunner 10G, LinkRunner 100G, EtherScope nXG o CyberScope
 
 1. Pide a NetAlly que active ADB en el probador.
 2. Después, en el probador: **Configuración** → **Sistema** → **About tester**. Toca **Número de compilación** hasta que se active el modo de desarrollador.
 3. Ve a **Configuración** → **Sistema** → **Opciones para desarrolladores** y activa **Depuración por USB**.
 4. Con el cable USB-C conectado a la Mac, desactiva y vuelve a activar **Depuración por USB**. El probador ofrece ADB solo después de esto.
 5. En el dispositivo, marca **Permitir siempre desde esta computadora** y toca **Aceptar**.
+
+Si el dispositivo acepta ADB por la red, usa **Conectar por dirección…**.
+
+#### AirCheck G3
+
+1. En el probador, abre **Configuración**, busca **Número de compilación** (normalmente en **Acerca de**) y tócalo hasta que se active el modo de desarrollador.
+2. En el probador, abre **Opciones para desarrolladores** en **Configuración** y activa **Depuración por USB**.
+3. En el dispositivo, marca **Permitir siempre desde esta computadora** y toca **Permitir**.
 
 Si el dispositivo acepta ADB por la red, usa **Conectar por dirección…**.
 
@@ -1238,6 +1260,12 @@ El asistente de Ferry está ocupado o bloqueado.
 
 Espera un momento e inténtalo de nuevo. Si sigue pasando, sal de Ferry y ábrelo de nuevo.
 
+**El asistente de Ferry tiene demasiadas solicitudes en espera. Inténtalo de nuevo en un momento.**
+
+El asistente de Ferry recibió más solicitudes a la vez de las que admite, así que rechazó esta.
+
+Espera a que terminen las copias en curso e inténtalo de nuevo. Si sigue pasando, sal de Ferry y ábrelo de nuevo.
+
 **Ferry se actualizó. Sal de Ferry y ábrelo de nuevo.**
 
 Una versión más reciente de Ferry reemplazó a esta mientras se ejecutaba.
@@ -1268,11 +1296,11 @@ macOS está esperando que permitas que Ferry se abra al iniciar sesión.
 
 Abre Ajustes del Sistema → **General** → **Ítems de inicio y extensiones** y permite Ferry.
 
-**No se pudo eliminar Ferry. Asegúrate de que Ferry esté abierto e inténtalo de nuevo.**
+**No se pudo eliminar Ferry. Inténtalo de nuevo; si sigue fallando, reinicia la Mac e inténtalo otra vez.**
 
-El asistente de Ferry no respondió, así que no se pudieron eliminar sus ubicaciones.
+macOS mantuvo las ubicaciones de Ferry en Finder, o no detuvo el asistente de Ferry.
 
-Sal de Ferry, ábrelo de nuevo y haz clic otra vez en **Eliminar Ferry…**.
+Haz clic en **Eliminar Ferry…** otra vez. Si sigue fallando, reinicia la Mac, abre Ferry y vuelve a eliminarlo.
 
 **La Ayuda no está disponible**
 
@@ -1280,21 +1308,17 @@ Falta la ayuda de Ferry en la app.
 
 Instala Ferry de nuevo.
 
-### Eliminar Ferry
+### Diagnóstico para soporte
 
-Elimina las ubicaciones de Ferry de Finder, detiene el asistente de Ferry, mueve a la Papelera lo que Ferry guarda en esta Mac y sale de Ferry, después de pedirte confirmación. Los archivos de tus dispositivos no se tocan. Úsalo antes de mover Ferry a la Papelera, o para empezar de nuevo desde cero; al empezar de nuevo, adb se vuelve a descargar de Google.
+Cuando pidas ayuda con Ferry, haz clic en **Copiar diagnóstico** y pega el informe en tu mensaje. Va al portapapeles y a ningún otro sitio: Ferry no envía nada.
 
-Cuando el asistente se detiene, Ferry mueve a la Papelera ~/Library/Application Support/Ferry (el adb que descargó y tu aceptación de la licencia de Google) y ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (sus listas de archivos de tus dispositivos y los dispositivos a los que se reconecta por la red), así que puedes recuperarlos si eliminaste Ferry por error. Si el adb propio de Ferry sigue en ejecución, Ferry lo detiene, incluido un shell que abriste desde el menú de Ferry; un adb que instalaste tú se deja intacto. Los cambios que Finder no había enviado a un dispositivo se conservan y se muestran en Finder.
-
-Ferry también olvida que se ejecutó en esta Mac, así que si lo instalas de nuevo, la bienvenida se abre otra vez.
-
-El botón **Eliminar Ferry…** está aquí, en la Ayuda de Ferry. Ferry te pide confirmación primero.
+El informe indica las versiones de Ferry, de su asistente y de macOS; si adb está instalado y su servidor en marcha, y la versión del adb propio de Ferry; el modelo de cada dispositivo conectado, cómo lo alcanza Ferry y su estado; y los últimos errores que mostró el menú, con su redacción general. Omite números de serie, direcciones de red, nombres de archivo y carpetas.
 
 ## Acerca de Ferry
 
 ### Actualizaciones
 
-Ferry busca una versión nueva una vez al día. Cuando hay una, la descarga en segundo plano y la instala la próxima vez que Ferry se cierre, así nada se detiene mientras trabajas.
+Ferry busca una versión nueva una vez al día. Cuando hay una, la descarga en segundo plano y la instala la próxima vez que Ferry se cierre, así nada se detiene mientras trabajas. Cuando ya se ha descargado, el menú de Ferry muestra **Actualización lista — Reiniciar Ferry** en lugar de Buscar actualizaciones…: elígelo para instalar la actualización y volver a abrir Ferry ahora.
 
 Para buscar ahora, elige **Buscar actualizaciones…** en el menú de Ferry. Ferry muestra las novedades de la versión y ofrece instalarla.
 
@@ -1308,9 +1332,21 @@ Ferry no tiene telemetría, ni analíticas, ni cuenta. Tus archivos van solo ent
 
 Ferry se conecta a internet para dos cosas. Busca actualizaciones a diario en GitHub, donde se publican las versiones de Ferry. Y descarga adb de Google: una vez, cuando aceptas la licencia de Google, y de nuevo sin preguntar cuando una actualización de Ferry necesita un adb más reciente bajo la licencia que aceptaste. Ninguna de las dos envía nada sobre ti ni sobre tus dispositivos: como en cualquier descarga, ven la dirección IP de tu Mac, y GitHub ve qué versiones de Ferry y de su actualizador lo solicitan.
 
+### Eliminar Ferry
+
+Elimina las ubicaciones de Ferry de Finder, detiene el asistente de Ferry, mueve a la Papelera lo que Ferry guarda en esta Mac y sale de Ferry, después de pedirte confirmación. Los archivos de tus dispositivos no se tocan. Úsalo antes de mover Ferry a la Papelera, o para empezar de nuevo desde cero; al empezar de nuevo, adb se vuelve a descargar de Google. Funciona incluso cuando el asistente de Ferry no responde.
+
+Para encontrarlo desde el menú, mantén presionada la tecla Opción con el menú de Ferry abierto: **Salir de Ferry** pasa a ser **Eliminar Ferry…**, que abre esta página.
+
+Cuando el asistente se detiene, Ferry mueve a la Papelera ~/Library/Application Support/Ferry (el adb que descargó y tu aceptación de la licencia de Google) y ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (sus listas de archivos de tus dispositivos y los dispositivos a los que se reconecta por la red), así que puedes recuperarlos si eliminaste Ferry por error. Si el adb propio de Ferry sigue en ejecución, Ferry lo detiene, incluido un shell que abriste desde el menú de Ferry; un adb que instalaste tú se deja intacto. Los cambios que Finder no había enviado a un dispositivo se conservan y se muestran en Finder.
+
+Ferry también olvida que se ejecutó en esta Mac, así que si lo instalas de nuevo, la bienvenida se abre otra vez.
+
+El botón **Eliminar Ferry…** está aquí, en la Ayuda de Ferry. Ferry te pide confirmación primero.
+
 ### Desinstalar
 
-1. En la Ayuda de Ferry, en **Solución de problemas**, haz clic en **Eliminar Ferry…** y confirma. Tus dispositivos desaparecen de Finder, el asistente de Ferry se detiene, Ferry mueve sus datos de ~/Library/Application Support a la Papelera y Ferry se cierra. Los archivos de tus dispositivos no se tocan.
+1. En la Ayuda de Ferry, en **Acerca de Ferry**, haz clic en **Eliminar Ferry…** y confirma. Tus dispositivos desaparecen de Finder, el asistente de Ferry se detiene, Ferry mueve sus datos de ~/Library/Application Support a la Papelera y Ferry se cierra. Los archivos de tus dispositivos no se tocan.
 2. Arrastra Ferry de Aplicaciones a la Papelera.
 3. Para eliminar también las preferencias de Ferry, elimina ~/Library/Preferences/io.github.krisarmstrong.ferry.plist y la carpeta de Ferry en ~/Library/Group Containers.
 

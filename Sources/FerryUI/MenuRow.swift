@@ -82,7 +82,7 @@ struct MenuRow: View {
             .accessibilityHidden(true)
         }
         title
-          .lineLimit(1)
+          .fixedSize(horizontal: false, vertical: true)
         Spacer(minLength: 8)
         if let shortcut {
           Text(verbatim: shortcut)
@@ -96,6 +96,7 @@ struct MenuRow: View {
       .padding(.leading, indent)
     }
     .buttonStyle(MenuRowStyle())
+    .menuRowKeys(action)
     .accessibilityValue(expandedValue)
   }
 
@@ -121,11 +122,49 @@ struct DisclosureChevron: View {
   }
 }
 
+/// How serious a status row is. Its symbol's colour shows it, and VoiceOver, which skips the
+/// symbol, reads it before the title (L6).
+enum StatusSeverity: Sendable {
+  case neutral
+  /// A step that is done, ticked in green; the row's own words say so.
+  case done
+  case warning
+  case error
+
+  var tint: Color? {
+    switch self {
+    case .neutral: nil
+    case .done: .green
+    case .warning: .yellow
+    case .error: .red
+    }
+  }
+
+  /// What VoiceOver reads for a row titled `title`.
+  func spokenLabel(_ title: Text) -> Text {
+    switch self {
+    case .neutral, .done: title
+    case .warning: Text("Warning: \(title)", bundle: .module)
+    case .error: Text("Error: \(title)", bundle: .module)
+    }
+  }
+
+  /// The same words, for a title that is already a string.
+  func spoken(_ title: String) -> String {
+    switch self {
+    case .neutral, .done: title
+    case .warning:
+      String(localized: LocalizedStringResource("Warning: \(title)", bundle: .module))
+    case .error: String(localized: LocalizedStringResource("Error: \(title)", bundle: .module))
+    }
+  }
+}
+
 /// A line of the menu that is not a device: a symbol, what it says, any detail, and the rows
 /// that act on it.
 struct StatusRow<Detail: View, Actions: View>: View {
   let symbol: String
-  var tint: Color?
+  var severity = StatusSeverity.neutral
   let title: Text
   /// The catalog key of the problem the row reports, whose Help entry its link opens.
   var help: String?
@@ -138,12 +177,13 @@ struct StatusRow<Detail: View, Actions: View>: View {
     VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
         Image(systemName: symbol)
-          .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+          .foregroundStyle(severity.tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
           .frame(width: MenuMetrics.symbolWidth)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 2) {
           title
             .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(severity.spokenLabel(title))
           detail
             .font(.callout)
             .foregroundStyle(.secondary)
@@ -166,19 +206,21 @@ struct StatusRow<Detail: View, Actions: View>: View {
 
 extension StatusRow where Detail == EmptyView {
   init(
-    symbol: String, tint: Color? = nil, title: Text, help: String? = nil,
+    symbol: String, severity: StatusSeverity = .neutral, title: Text, help: String? = nil,
     @ViewBuilder actions: () -> Actions
   ) {
     self.init(
-      symbol: symbol, tint: tint, title: title, help: help, detail: { EmptyView() },
+      symbol: symbol, severity: severity, title: title, help: help, detail: { EmptyView() },
       actions: actions)
   }
 }
 
 extension StatusRow where Detail == EmptyView, Actions == EmptyView {
-  init(symbol: String, tint: Color? = nil, title: Text, help: String? = nil) {
+  init(
+    symbol: String, severity: StatusSeverity = .neutral, title: Text, help: String? = nil
+  ) {
     self.init(
-      symbol: symbol, tint: tint, title: title, help: help, detail: { EmptyView() },
+      symbol: symbol, severity: severity, title: title, help: help, detail: { EmptyView() },
       actions: { EmptyView() })
   }
 }
@@ -223,7 +265,7 @@ struct DeviceTile: View {
   }
 
   private func symbol(_ name: String) -> some View {
-    Image(systemName: name).font(.system(size: 12, weight: .semibold))
+    Image(systemName: name).font(.callout.weight(.semibold))
   }
 }
 
@@ -242,17 +284,18 @@ struct ExpandingRowHeader: View {
         DeviceTile(tile: tile)
         VStack(alignment: .leading, spacing: 1) {
           Text(verbatim: name)
-            .lineLimit(1)
+            .fixedSize(horizontal: false, vertical: true)
           Text(verbatim: summary)
             .font(.callout)
             .foregroundStyle(.secondary)
-            .lineLimit(1)
+            .fixedSize(horizontal: false, vertical: true)
         }
         Spacer(minLength: 8)
         DisclosureChevron(isExpanded: isExpanded)
       }
     }
     .buttonStyle(MenuRowStyle())
+    .menuRowKeys(toggle)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(verbatim: DevicePresentation.rowLabel(name: name, summary: summary)))
     .accessibilityValue(

@@ -848,6 +848,23 @@
           }
         }
       }
+    },
+    "Ferry's helper has too many requests waiting. Try again in a moment." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry's helper has too many requests waiting. Try again in a moment."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El asistente de Ferry tiene demasiadas solicitudes en espera. Inténtalo de nuevo en un momento."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

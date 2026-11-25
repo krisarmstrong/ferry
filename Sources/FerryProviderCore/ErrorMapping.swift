@@ -20,9 +20,10 @@ public enum ErrorMapping {
     case .noDeviceConnected, .noStorage, .deviceBusy, .deviceDisconnected, .storageNotFound,
       .deviceNotFound:
       return NSFileProviderError(.serverUnreachable)
-    // The agent did not answer a metadata call in time (a wedged device): FileProvider tries
-    // again later rather than holding the request until its own watchdog.
-    case .agentNotResponding:
+    // The agent did not answer a metadata call in time (a wedged device), or refused one over
+    // its in-flight cap: FileProvider tries again later rather than holding the request until
+    // its own watchdog.
+    case .agentNotResponding, .agentBusy:
       return NSFileProviderError(.serverUnreachable)
     // FileProvider lists the folder again from its first page.
     case .pageExpired:

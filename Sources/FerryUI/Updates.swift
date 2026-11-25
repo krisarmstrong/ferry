@@ -6,6 +6,8 @@ import Network
 public protocol UpdateChecking: AnyObject {
   /// Shows Sparkle's window: the newer release with its notes, or that Ferry is up to date.
   func checkForUpdates()
+  /// Installs the update Sparkle downloaded for the next quit, and opens Ferry again.
+  func installUpdateAndRelaunch()
 }
 
 /// Where Sparkle finds releases, from the app's Info.plist. A build without a feed, or still
@@ -35,5 +37,16 @@ extension AppModel {
   /// The menu's Check for Updates….
   public func checkForUpdates() {
     updater?.checkForUpdates()
+  }
+
+  /// The updater has downloaded an update and installs it when Ferry quits: the menu offers
+  /// Update Ready — Restart Ferry.
+  public func updateIsReady() {
+    updateReady = true
+  }
+
+  /// Update Ready — Restart Ferry.
+  public func restartToUpdate() {
+    updater?.installUpdateAndRelaunch()
   }
 }

@@ -90,6 +90,20 @@ struct InfoRowsTests {
     #expect(rows.first { $0.label == "IP addresses" }?.value == others)
   }
 
+  /// The CyberScope is built on the EtherScope nXG's platform, so it names the same ports.
+  @Test(arguments: ["CyberScope", "CyberScope-nXG", "CyberScope XRF"])
+  func theCyberScopeNamesTheEtherScopesPorts(model: String) {
+    let info = AndroidDeviceInfo(
+      model: model, androidVersion: "8.1.0", build: "b", serial: "S", battery: nil,
+      addresses: [.init(interface: "eno0", address: "192.0.2.156")], storage: nil)
+    let labels = DevicePresentation.infoRows(info).map(\.label)
+    #expect(
+      labels == [
+        "Model", "Android version", "Build", "Serial number", "Wi-Fi Management",
+        "Wired Management", "Wired Test", "Wi-Fi Test",
+      ])
+  }
+
   /// A model Ferry does not know keeps the generic labels, matched on the whole model name.
   @Test(arguments: ["LinkRunner G2", "EtherScope", "etherscope_nxg"])
   func anyOtherModelKeepsTheGenericLabels(model: String) {

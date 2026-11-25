@@ -19,6 +19,7 @@ struct ErrorMappingTests {
       .directoryNotEmpty(try RemotePath("/a")), .changedOnDevice(try RemotePath("/a")),
       .macDiskFull(needed: 2, free: 1), .folderTooDeep(try RemotePath("/Deep")),
       .readOnly(try RemotePath("/Notes.rtfd/TXT.rtf")), .agentNotResponding, .pageExpired,
+      .agentBusy,
     ]
   }
 
@@ -116,6 +117,8 @@ struct ErrorMappingTests {
     case .agentNotResponding: .fileProvider(.serverUnreachable)
     // M9: an expired folder page makes FileProvider list the folder again.
     case .pageExpired: .fileProvider(.pageExpired)
+    // A request over the agent's in-flight cap is retried later.
+    case .agentBusy: .fileProvider(.serverUnreachable)
     }
   }
 }

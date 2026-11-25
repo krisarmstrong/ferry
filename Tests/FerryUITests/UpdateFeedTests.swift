@@ -116,4 +116,5 @@ final class FakeUpdater: UpdateChecking {
   let log: CallLog
   init(log: CallLog) { self.log = log }
   func checkForUpdates() { log.record("checkForUpdates") }
+  func installUpdateAndRelaunch() { log.record("installUpdateAndRelaunch") }
 }
