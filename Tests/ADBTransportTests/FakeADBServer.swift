@@ -45,7 +45,7 @@ final class FakeADBServer: Sendable {
   /// that connection, which is how a test sees a client hang up.
   ///
   /// A free port is picked outside the kernel's ephemeral range (49152 and up), as the real
-  /// server's 5037 is, and never one `ClosedPort` picks (20000 to 29999). An OS-assigned port
+  /// server's 5037 is. An OS-assigned port
   /// comes from the ephemeral range, which every outgoing connection's local port comes from
   /// too, and that made a rare connect fail for 10 s under parallel runs: a listener on port A
   /// that closed a connection first leaves its socket A ↔ B in TIME_WAIT for 30 s; the OS then

@@ -1,12 +1,13 @@
 import DeviceKit
 import Foundation
 import Testing
-import os
 
 @testable import ADBTransport
 
 /// Every connection the transport lets go of is closed, so routine cancellations cannot use up
-/// file descriptors on the Mac or `sync:` services on the device.
+/// file descriptors on the Mac or `sync:` services on the device. Each test waits for the server
+/// to see the connection end, with no deadline but the time limit.
+@Suite(.timeLimit(.minutes(1)))
 struct ADBSocketReleaseTests {
   let storage = ADBFixture.storage
 
@@ -23,21 +24,28 @@ struct ADBSocketReleaseTests {
         return try await session.item(at: RemotePath("/a.txt"), in: storage)
       }
       await #expect(throws: TransportError.cancelled) { _ = try await cancelled.value }
-      #expect(try await ADBFixture.eventually { device.openSyncs == 0 })
+      await device.waitUntilNone(.syncs)
     }
   }
 
-  /// A stream dropped without `close()` closes its socket.
+  private enum ServerSaw: Equatable { case connection, end }
+
+  /// A stream dropped without `close()` closes its socket. It is dropped where the scope that
+  /// holds the only reference to it ends, once the server has the connection.
   @Test func aDroppedStreamClosesItsSocket() async throws {
-    let closed = OSAllocatedUnfairLock(initialState: false)
+    let (saw, sees) = AsyncStream.makeStream(of: ServerSaw.self)
     let server = try await FakeADBServer.start { peer in
+      sees.yield(.connection)
       _ = try? await peer.stream.read(exactly: 1)
-      closed.withLock { $0 = true }
+      sees.yield(.end)
     }
     defer { server.stop() }
-    var stream: ADBStream? = try await ADBStream.open(port: server.port)
-    #expect(stream != nil)
-    stream = nil
-    #expect(try await ADBFixture.eventually { closed.withLock { $0 } })
+    var events = saw.makeAsyncIterator()
+    do {
+      let stream = try await ADBStream.open(port: server.port)
+      #expect(await events.next() == .connection)
+      withExtendedLifetime(stream) {}
+    }
+    #expect(await events.next() == .end)
   }
 }

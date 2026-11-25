@@ -5,6 +5,7 @@ import os
 
 @testable import ADBTransport
 
+@Suite(.timeLimit(.minutes(1)))
 struct ADBSyncTransferTests {
   typealias Peer = FakeADBServer.Peer
 
@@ -64,7 +65,7 @@ struct ADBSyncTransferTests {
   }
 
   @Test func receiveStoppedByProgressThrowsCancelledAndHangsUp() async throws {
-    let hungUp = Box(false)
+    let hungUp = Latch()
     let (sync, server) = try await sync([]) { peer in
       _ = try await peer.syncPathRequest()
       try await peer.raw(Peer.stat(mode: 0o100600, size: 200_000, mtime: 1))
@@ -72,7 +73,7 @@ struct ADBSyncTransferTests {
       try await peer.raw(Peer.data(Data(count: 65_536)) + Peer.data(Data(count: 65_536)))
       // The client abandons the transfer: its socket closes with the rest unsent.
       _ = try? await peer.stream.read(exactly: 1)
-      await hungUp.set(true)
+      hungUp.fire()
     }
     defer { server.stop() }
     let (url, handle) = try scratchFile()
@@ -80,8 +81,7 @@ struct ADBSyncTransferTests {
     await #expect(throws: ADBError.cancelled) {
       _ = try await sync.receive("/x", to: handle) { _, _ in false }
     }
-    for _ in 0..<100 where await !hungUp.value { try await Task.sleep(for: .milliseconds(20)) }
-    #expect(await hungUp.value)
+    await hungUp.wait()
     // Only the first chunk, the one the handler stopped on, reached the file.
     try handle.close()
     #expect(try Data(contentsOf: url) == Data(count: 65_536))
@@ -173,7 +173,7 @@ struct ADBSyncTransferTests {
 
   @Test func sendStoppedByProgressNeverSendsDone() async throws {
     let sawDone = Box(false)
-    let hungUp = Box(false)
+    let hungUp = Latch()
     let (sync, server) = try await sync([]) { peer in
       let header = try await peer.syncHeader()
       _ = try await peer.stream.read(exactly: Int(header.length))
@@ -184,7 +184,7 @@ struct ADBSyncTransferTests {
           if next.id == "DATA" { _ = try await peer.stream.read(exactly: Int(next.length)) }
         }
       } catch {
-        await hungUp.set(true)
+        hungUp.fire()
       }
     }
     defer { server.stop() }
@@ -194,25 +194,22 @@ struct ADBSyncTransferTests {
     await #expect(throws: ADBError.cancelled) {
       try await sync.send(handle, to: "/x", mode: 0o100644, mtime: .now) { _, _ in false }
     }
-    for _ in 0..<100 where await !hungUp.value { try await Task.sleep(for: .milliseconds(20)) }
-    #expect(await hungUp.value)
+    await hungUp.wait()
     #expect(await !sawDone.value)
   }
 
   // MARK: quit
 
   @Test func quitSendsQuitAndClosesTheConnection() async throws {
-    let saw = Box("")
+    let (headers, saw) = AsyncStream.makeStream(of: String.self)
     let (sync, server) = try await sync([]) { peer in
       let header = try await peer.syncHeader()
-      await saw.set("\(header.id) \(header.length)")
+      saw.yield("\(header.id) \(header.length)")
       _ = try? await peer.stream.read(exactly: 1)
     }
     defer { server.stop() }
     await sync.quit()
-    for _ in 0..<100 where await saw.value.isEmpty {
-      try await Task.sleep(for: .milliseconds(20))
-    }
-    #expect(await saw.value == "QUIT 0")
+    var seen = headers.makeAsyncIterator()
+    #expect(await seen.next() == "QUIT 0")
   }
 }

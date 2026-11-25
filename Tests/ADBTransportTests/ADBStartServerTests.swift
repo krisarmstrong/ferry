@@ -27,13 +27,12 @@ struct ADBStartServerTests {
   }
 
   @Test func withNoServerTheLocatedAdbStartsOne() async throws {
-    let closed = try ClosedPort()
     let launched = Box<[String]>([])
     let host = ADBHost(
-      port: closed.port, locator: Self.findsAdb,
-      launcher: { adb in await launched.set(launched.value + [adb.path]) }, backoff: Backoff())
+      port: 5037, locator: Self.findsAdb,
+      launcher: { adb in await launched.set(launched.value + [adb.path]) }, backoff: Backoff(),
+      opener: ADBHost.refusing)
     try await host.startServer()
     #expect(await launched.value == ["/opt/homebrew/bin/adb"])
-    withExtendedLifetime(closed) {}
   }
 }

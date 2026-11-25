@@ -5,6 +5,7 @@ import Testing
 
 @testable import ADBTransport
 
+@Suite(.timeLimit(.minutes(1)))
 struct ADBTrackDevicesTests {
   static let noAdb = ADBLocator(
     environment: [:], home: "/nonexistent", isExecutable: { _ in false })
@@ -101,15 +102,15 @@ struct ADBTrackDevicesTests {
   /// are counted, not timed.
   @Test(.timeLimit(.minutes(1)))
   func persistentOutageReportsNoDevicesOnceAndStartsTheServerOnce() async throws {
-    let closed = try ClosedPort()
     let launches = Box(0)
     let clock = ManualClock()
     let host = ADBHost(
-      port: closed.port,
+      port: 5037,
       locator: ADBLocator(
         environment: [:], home: "/x", isExecutable: { $0 == "/opt/homebrew/bin/adb" }),
       launcher: { _ in await launches.set(await launches.value + 1) },
-      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)), clock: clock)
+      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)), clock: clock,
+      opener: ADBHost.refusing)
     let reports = Mutex(0)
     let lists = host.trackDevices { reports.withLock { $0 += 1 } }
     // Each wait follows a failed connect, and the outage is reported and the server started
@@ -123,23 +124,22 @@ struct ADBTrackDevicesTests {
     #expect(await launches.value == 1)
     var iterator = lists.makeAsyncIterator()
     #expect(await iterator.next() == [])
-    withExtendedLifetime(closed) {}
   }
 
   /// No adb anywhere when the outage began (Ferry's fetched copy deleted): the start found
   /// nothing to run, which is no start. Once Ferry fetches adb again, the next retry starts it.
   @Test(.timeLimit(.minutes(1)))
   func anOutageWithNoAdbStartsTheServerOnceAdbArrives() async throws {
-    let closed = try ClosedPort()
     let present = Mutex(false)
     let launches = Box(0)
     let host = ADBHost(
-      port: closed.port,
+      port: 5037,
       locator: ADBLocator(
         environment: [:], home: "/x",
         isExecutable: { $0 == "/opt/homebrew/bin/adb" && present.withLock { $0 } }),
       launcher: { _ in await launches.set(await launches.value + 1) },
-      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)))
+      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)),
+      opener: ADBHost.refusing)
     let lists = Box<[[ADBDevice]]>([])
     let consumer = Task {
       for await list in host.trackDevices() { await lists.set(await lists.value + [list]) }
@@ -150,26 +150,25 @@ struct ADBTrackDevicesTests {
     #expect(try await eventually { await launches.value == 1 })
     consumer.cancel()
     await consumer.value
-    withExtendedLifetime(closed) {}
   }
 
   @Test func closedConnectionsAreCancelledByTheClient() async throws {
     let connections = Box(0)
-    let closed = Box(0)
+    let closed = Latch()
     let server = try await FakeADBServer.start { peer in
       await connections.set(await connections.value + 1)
       _ = try await peer.request()
       try await peer.okay()
       try await peer.send("zzzz")
       _ = try? await peer.stream.read(exactly: 1)
-      await closed.set(await closed.value + 1)
+      closed.fire()
     }
     defer { server.stop() }
     let host = ADBHost(
       port: server.port, locator: Self.noAdb, launcher: { _ in },
       backoff: Backoff(initial: .seconds(5), maximum: .seconds(5)))
     for await _ in host.trackDevices() { break }
-    #expect(try await eventually { await closed.value == 1 })
+    await closed.wait()
     #expect(await connections.value == 1)
   }
 
@@ -224,18 +223,17 @@ struct ADBTrackDevicesTests {
   }
 
   @Test func cancellingTheConsumerClosesTheSocket() async throws {
-    let hungUp = Box(false)
+    let hungUp = Latch()
     let server = try await FakeADBServer.start { peer in
       _ = try await peer.request()
       try await peer.okay()
       try await peer.send(String(data: ADBWire.frame("abc device\n"), encoding: .utf8)!)
       _ = try? await peer.stream.read(exactly: 1)
-      await hungUp.set(true)
+      hungUp.fire()
     }
     defer { server.stop() }
     for await _ in ADBHost(port: server.port, locator: Self.noAdb).trackDevices() { break }
-    for _ in 0..<100 where await !hungUp.value { try await Task.sleep(for: .milliseconds(20)) }
-    #expect(await hungUp.value)
+    await hungUp.wait()
   }
 
   @Test func backoffDoublesFromOneSecondToThirtyAndResets() {
