@@ -154,6 +154,17 @@ struct AgentTransferIntegrityTests {
     #expect(try await setup.contents("/Docs/report.txt") == Data("the original".utf8))
   }
 
+  /// Same length is not same file: only the bytes decide.
+  @Test func aCreateOverContentsOfTheSameLengthIsACollision() async throws {
+    let setup = try await setup()
+    defer { setup.harness.finish() }
+    // "the original" and "THE ORIGINAL" have the same length.
+    let reply = try await setup.create("report.txt", "THE ORIGINAL")
+
+    #expect(reply == .failure(.alreadyExists(try path("/Docs/report.txt"))))
+    #expect(try await setup.contents("/Docs/report.txt") == Data("the original".utf8))
+  }
+
   // MARK: Replacing on a device that cannot rename
 
   /// The upload of a save fails: the original is back, byte for byte, and FileProvider's retry

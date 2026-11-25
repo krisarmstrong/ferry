@@ -92,6 +92,8 @@ import os
   /// Where the system saved changes an eject removed before they reached the device. Shown while
   /// a location still holds something, so the user can find them after any later action.
   public internal(set) var preservedChanges: [URL] = []
+  /// Device files kept on the Mac until their device is reached again (see `StatusReport`).
+  private(set) var pendingBackups = 0
   /// Hidden locations, their device away, whose changes wait to be sent (see `StatusReport`).
   private(set) var waitingToSend: [String] = []
   /// Which row of the menu is expanded (see `MenuExpansion`).
@@ -340,6 +342,7 @@ import os
     remembered = report.remembered
     connectedAddresses = report.connectedAddresses
     waitingToSend = report.waitingToSend
+    pendingBackups = report.pendingBackups
     // Shown like an eject's saved changes, and only while the folder holds something.
     keepPreservedChanges(adding: report.setAside)
     unconfirmed = report.unconfirmed

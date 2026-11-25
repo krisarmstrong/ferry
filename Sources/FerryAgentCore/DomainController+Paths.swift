@@ -42,14 +42,4 @@ extension DomainController {
       for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
     ).appending(path: "io.github.krisarmstrong.ferry.agent/items", directoryHint: .isDirectory)
   }
-
-  /// The agent's replace backups, in its own Application Support folder: they must outlive a
-  /// restart and a reboot, since a backup may be the only copy of a file until it is put back.
-  public static func defaultReplaceBackups() throws -> ReplaceBackups {
-    ReplaceBackups(
-      folder: try FileManager.default.url(
-        for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
-      ).appending(
-        path: "io.github.krisarmstrong.ferry.agent/replace-backups", directoryHint: .isDirectory))
-  }
 }

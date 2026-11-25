@@ -59,6 +59,11 @@ extension SafeWriter {
       guard downloaded.listed.matches(replaced) else {
         throw TransportError.changedOnDevice(replaced.path)
       }
+      // All of it, or the original would go for a copy missing its end.
+      guard downloaded.received == replaced.size else {
+        throw TransportError.downloadSizeMismatch(
+          listed: replaced.size, received: downloaded.received)
+      }
       try backups.keepNewContents(source.file, for: id)
       return try backups.commit(
         ReplaceBackups.Manifest(
@@ -74,10 +79,16 @@ extension SafeWriter {
   }
 
   /// Uploads the backup to its path and checks the device holds it whole: by size, and by
-  /// SHA-256 when the file can be read back. Returns the file, the backup removed; `nil` when
-  /// the device does not hold it, the backup then kept for a later listing.
+  /// SHA-256 read back from the device. Returns the file; `nil` when the device does not hold
+  /// it. The backup is removed only once the read-back matches: one that cannot be read back
+  /// now is kept for a later listing to check. Bytes on the Mac that no longer match the
+  /// manifest are never uploaded: they are set aside for the user.
   func putBack(_ backup: ReplaceBackups.Backup, in storage: StorageID) async -> RemoteItem? {
     let manifest = backup.manifest
+    guard (try? LocalFile.sha256(backup.data)) == manifest.sha256 else {
+      setAside(backup, because: "its copy on the Mac no longer matches what was recorded")
+      return nil
+    }
     let item: RemoteItem
     do {
       // Not the caller's transfer: a cancelled replace must still get its original back.
@@ -91,13 +102,12 @@ extension SafeWriter {
       )
       return nil
     }
-    if let read = await readBack(item.path, in: storage) {
-      try? FileManager.default.removeItem(at: read.file)
-      if read.sha256 != manifest.sha256 {
-        Self.log.error("\(manifest.path.description, privacy: .private) came back altered")
-        await discard(item.path, in: storage)
-        return nil
-      }
+    guard let read = await readBack(item.path, in: storage) else { return item }
+    try? FileManager.default.removeItem(at: read.file)
+    guard read.sha256 == manifest.sha256 else {
+      Self.log.error("\(manifest.path.description, privacy: .private) came back altered")
+      await discard(item.path, in: storage)
+      return nil
     }
     backups.remove(manifest.id)
     return item
@@ -154,7 +164,12 @@ extension SafeWriter {
       backups.remove(manifest.id)
       return nil
     }
-    guard backups.isStartOfNewContents(read.file, for: manifest.id) else {
+    // The start of the new contents is an upload the device cut short; the start of the
+    // original, a restore it cut short. Either is this replace's own copy.
+    guard
+      backups.isStartOfNewContents(read.file, for: manifest.id)
+        || ReplaceBackups.isStart(read.file, of: backup.data)
+    else {
       setAside(backup, because: "its name holds another file")
       return nil
     }
@@ -178,7 +193,7 @@ extension SafeWriter {
   }
 
   /// Moves the backup out of the way of later listings, onto the Mac under its own name.
-  private func setAside(_ backup: ReplaceBackups.Backup, because reason: String) {
+  func setAside(_ backup: ReplaceBackups.Backup, because reason: String) {
     let original = backup.manifest.path.description
     guard let kept = backups.setAside(backup) else {
       Self.log.error("could not set aside the backup of \(original, privacy: .private)")

@@ -67,13 +67,6 @@ private func message(for error: TransportError) -> String {
 }
 
 /// Prints tab-separated fields, each with its control characters made visible.
-/// Where a replace on a device that cannot rename keeps the old file until the new one is in
-/// place. ferryctl is a developer tool, so the user's temporary folder will do: a listing in a
-/// later run puts back a file a cut-off replace left there.
-private let replaceBackups = ReplaceBackups(
-  folder: FileManager.default.temporaryDirectory.appending(
-    path: "ferryctl-replace-backups", directoryHint: .isDirectory))
-
 private func show(_ fields: String...) {
   print(fields.map(DisplayText.escaped).joined(separator: "\t"))
 }
@@ -92,7 +85,9 @@ private func withTarget(
       ).id
       try await body(
         Target(
-          session: session, writer: SafeWriter(session: session, backups: replaceBackups),
+          session: session,
+          // The agent's folder, so a backup ferryctl leaves is settled by either.
+          writer: SafeWriter(session: session, backups: try ReplaceBackups.standard()),
           storage: id))
     } catch {
       await session.close()

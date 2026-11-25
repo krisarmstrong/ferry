@@ -24,7 +24,7 @@ let toolStore: URL
 let adbServerRecord: URL
 do {
   itemStore = try DomainController.defaultItemStore()
-  replaceBackups = try DomainController.defaultReplaceBackups()
+  replaceBackups = try ReplaceBackups.standard()
   wirelessStore = try WirelessADB.defaultStore()
   toolStore = try ToolJournal.defaultStore()
   adbServerRecord = try ADBServerKeeper.defaultRecord()

@@ -26,4 +26,15 @@ struct AppModelWaitingTests {
     let line = WaitingChangesRow.line("Phone\u{202E}")
     #expect(line.text == "Phone\\u{202E}: changes wait to be sent. Reconnect it to finish.")
   }
+
+  /// Originals of replaces cut short wait on the Mac for their device: the menu counts them.
+  @Test func theModelCountsFilesWaitingToGoBack() async {
+    let log = CallLog()
+    let client = FakeClient(log: log)
+    client.setStatus([], pendingBackups: 2)
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.refresh()
+    #expect(model.pendingBackups == 2)
+    #expect(WaitingChangesRow.backupsLine(2).text == "Files waiting to go back to their device: 2")
+  }
 }

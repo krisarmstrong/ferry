@@ -18,6 +18,17 @@ public struct ReplaceBackups: Sendable {
     self.folder = folder
   }
 
+  /// Ferry's backups, in the agent's own Application Support folder: they must outlive a
+  /// restart and a reboot, since a backup may be the only copy of a file until it is put back.
+  /// ferryctl keeps its own here too, so the agent settles one it left.
+  public static func standard() throws -> ReplaceBackups {
+    ReplaceBackups(
+      folder: try FileManager.default.url(
+        for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+      ).appending(
+        path: "io.github.krisarmstrong.ferry.agent/replace-backups", directoryHint: .isDirectory))
+  }
+
   /// What a backup holds and what the replace meant to put in its place, so a later session can
   /// tell an unfinished replace (put the original back) from a finished one (drop the backup).
   ///
@@ -91,8 +102,13 @@ public struct ReplaceBackups: Sendable {
 
   /// Whether `file` holds the first bytes of the new contents of backup `id`, and fewer than all.
   func isStartOfNewContents(_ file: URL, for id: UUID) -> Bool {
+    Self.isStart(file, of: newFile(id))
+  }
+
+  /// Whether `file` holds the first bytes of `whole`, and fewer than all.
+  static func isStart(_ file: URL, of whole: URL) -> Bool {
     guard let start = try? FileHandle(forReadingFrom: file),
-      let whole = try? FileHandle(forReadingFrom: newFile(id))
+      let whole = try? FileHandle(forReadingFrom: whole)
     else { return false }
     defer {
       try? start.close()
@@ -110,14 +126,37 @@ public struct ReplaceBackups: Sendable {
     }
   }
 
+  /// Backups waiting for their device, and files set aside for the user, for the menu.
+  public func counts() -> (pending: Int, setAside: Int) {
+    let kept = (try? FileManager.default.contentsOfDirectory(atPath: setAsideFolder.path)) ?? []
+    return (manifests().count, kept.filter { !$0.hasPrefix(".") }.count)
+  }
+
   /// Records the backup whose bytes are complete at `dataFile(manifest.id)`.
   func commit(_ manifest: Manifest) throws(TransportError) -> Backup {
+    // On disk before the manifest says they are: a crash must not leave a manifest naming
+    // bytes the disk never got. PrivateFile flushes the manifest; the folder holds the names.
+    try Self.flush(dataFile(manifest.id))
+    try Self.flush(newFile(manifest.id))
     do {
       try PrivateFile.write(JSONEncoder().encode(manifest), to: manifestFile(manifest.id))
     } catch {
       throw .io("cannot record the backup: \(error.localizedDescription)")
     }
+    try Self.flush(folder)
     return Backup(manifest: manifest, data: dataFile(manifest.id))
+  }
+
+  /// Flushes `url`, a file or a folder, to the disk itself (`F_FULLFSYNC`).
+  private static func flush(_ url: URL) throws(TransportError) {
+    let descriptor = open(url.path, O_RDONLY | O_CLOEXEC)
+    guard descriptor >= 0 else {
+      throw .io("cannot open \(url.path) to flush it: \(String(cString: strerror(errno)))")
+    }
+    defer { close(descriptor) }
+    guard fcntl(descriptor, F_FULLFSYNC) == 0 || fsync(descriptor) == 0 else {
+      throw .io("cannot flush \(url.path): \(String(cString: strerror(errno)))")
+    }
   }
 
   /// The backups of files that were in `parent` on `storage`.

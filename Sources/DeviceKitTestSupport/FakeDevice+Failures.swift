@@ -30,9 +30,34 @@ extension FakeDevice {
     return failure
   }
 
-  /// The next download writes its first `afterBytes` bytes to the Mac, then throws `error`.
-  public func failDownload(afterBytes: UInt64, with error: TransportError) {
-    downloadFailure = (afterBytes, error)
+  struct DownloadFailure {
+    var skipping: Int
+    let afterBytes: UInt64
+    /// `nil`: the download reports success with only what arrived.
+    let error: TransportError?
+  }
+
+  /// After the next `skipping` downloads, the next one writes its first `afterBytes` bytes to the
+  /// Mac, then throws `error`.
+  public func failDownload(afterBytes: UInt64, with error: TransportError, skipping: Int = 0) {
+    downloadFailure = DownloadFailure(skipping: skipping, afterBytes: afterBytes, error: error)
+  }
+
+  /// The next download delivers only its first `bytes` bytes and reports itself done, as a
+  /// transport that loses the end of a file without noticing.
+  public func shortenNextDownload(to bytes: UInt64) {
+    downloadFailure = DownloadFailure(skipping: 0, afterBytes: bytes, error: nil)
+  }
+
+  func nextDownloadFailure() -> DownloadFailure? {
+    guard var failure = downloadFailure else { return nil }
+    if failure.skipping > 0 {
+      failure.skipping -= 1
+      downloadFailure = failure
+      return nil
+    }
+    downloadFailure = nil
+    return failure
   }
 
   /// Runs `hook` when the next download starts, as the device going away mid-transfer.

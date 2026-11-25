@@ -316,6 +316,7 @@ extension AgentService {
         addresses[device.id] = await tools.networkAddress(of: device.id)
       }
     }
+    let backups = domains.backups.counts()
     return StatusReport(
       devices: devices, provider: await domains.providerState(),
       transfers: await transfers.list(),
@@ -326,7 +327,8 @@ extension AgentService {
       recordings: await tools?.recordingsRunning() ?? [],
       usbWatchFailed: usbWatch?.failed ?? false, sessions: await hub.heldSessions(),
       connectedAddresses: addresses, waitingToSend: await domains.locationsWaitingToSend(),
-      needsReplug: await hub.stuckOfflineDevices(), setAside: [domains.backups.setAsideFolder])
+      needsReplug: await hub.stuckOfflineDevices(), setAside: [domains.backups.setAsideFolder],
+      pendingBackups: backups.pending, keptBackups: backups.setAside)
   }
 }
 

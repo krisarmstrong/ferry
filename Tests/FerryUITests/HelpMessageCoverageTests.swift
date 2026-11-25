@@ -164,6 +164,7 @@ extension HelpMessageCoverageTests {
     ("trouble-device", "Cancelled."),
     ("trouble-device", "Ferry can't watch USB for devices, so it looks for them every 30 seconds."),
     ("trouble-device", "Unsent changes were saved to %@"),
+    ("trouble-device", "Files waiting to go back to their device: %lld"),
     ("trouble-device", "%@: changes wait to be sent. Reconnect it to finish."),
     ("trouble-adb", "Waiting for Allow"),
     ("trouble-adb", "Allow USB debugging on the device"),

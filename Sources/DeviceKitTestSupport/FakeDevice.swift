@@ -35,7 +35,7 @@ public actor FakeDevice: DeviceSession {
   var disconnected = false
   private var suspensions: [SuspendableCall: Suspension] = [:]
   var uploadFailure: UploadFailure?
-  var downloadFailure: (afterBytes: UInt64, error: TransportError)?
+  var downloadFailure: DownloadFailure?
   /// Runs when the next download starts, before it reads the device's contents.
   var downloadHook: (@Sendable () async -> Void)?
   var uploadTruncation: UInt64?
@@ -293,8 +293,7 @@ extension FakeDevice {
     guard case .file(let data, let modified) = nodes[path] else { throw .notFound(path) }
     let total = UInt64(data.count)
     guard progress(0, total) else { throw .cancelled }
-    let failure = downloadFailure
-    downloadFailure = nil
+    let failure = nextDownloadFailure()
     let written = failure.map { data.prefix(Int(clamping: $0.afterBytes)) } ?? data
     do {
       try written.write(to: file, options: replacing ? [] : .withoutOverwriting)
@@ -303,11 +302,11 @@ extension FakeDevice {
     } catch {
       throw .io(error.localizedDescription)
     }
-    if let failure { throw failure.error }
+    if let error = failure?.error { throw error }
     guard progress(total, total) else { throw .cancelled }
     let listed = RemoteItem(
       path: path, kind: .file, size: reportedSizes[path] ?? total, modified: modified)
-    return Downloaded(listed: listed, received: total)
+    return Downloaded(listed: listed, received: UInt64(written.count))
   }
 }
 
