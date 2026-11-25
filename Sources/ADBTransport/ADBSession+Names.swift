@@ -34,6 +34,41 @@ extension ADBSession {
   func children(of folder: RemotePath, under root: String, exactSizes: Bool = true)
     async throws(TransportError) -> Children
   {
+    // Within a write that listed this folder, that listing, kept up to date with the write's
+    // own changes, serves its later checks (see `WriteListing`).
+    let scope = WriteListing.current
+    if let listed = scope?.value(for: Self.listingKey(folder, root), as: Children.self) {
+      return listed
+    }
+    let listed = try await freshChildren(of: folder, under: root, exactSizes: exactSizes)
+    scope?.record(listed, for: Self.listingKey(folder, root))
+    return listed
+  }
+
+  static func listingKey(_ folder: RemotePath, _ root: String) -> String {
+    "adb|\(root)|\(folder.description)"
+  }
+
+  /// Within a write that listed `folder`, records what the write just did there, so its next
+  /// check sees it: `added` is now in the folder, `removed` no longer is. A failed step drops
+  /// the listing instead (`nil`), and the next check lists again.
+  func recordInWrite(
+    in folder: RemotePath, under root: String, added: RemoteItem?, removed: RemotePath? = nil
+  ) {
+    guard let scope = WriteListing.current else { return }
+    let key = Self.listingKey(folder, root)
+    guard var listed = scope.value(for: key, as: Children.self), let added else {
+      scope.forget(key)
+      return
+    }
+    listed.items.removeAll { $0.path == added.path || $0.path == removed }
+    listed.items.append(added)
+    scope.record(listed, for: key)
+  }
+
+  private func freshChildren(of folder: RemotePath, under root: String, exactSizes: Bool)
+    async throws(TransportError) -> Children
+  {
     let location = try await location(of: folder, under: root)
     guard try await stat(at: location, as: folder)?.kind == .folder else {
       throw .notFound(folder)

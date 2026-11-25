@@ -138,6 +138,32 @@ struct ADBSessionRawNameTests {
 
   // MARK: Cost
 
+  /// A write lists its folder once: the existence check's listing serves the upload's and the
+  /// rename's collision checks.
+  @Test func aSafeWriterWriteListsItsFolderOnce() async throws {
+    let device = FakeAndroid()
+    device.addFolder("/Big")
+    for index in 0..<20 { device.addFile("/Big/f\(index).txt", Data("x".utf8)) }
+    let file = try ADBFixture.localFile(Data("new".utf8))
+    defer { try? FileManager.default.removeItem(at: file) }
+    let target = "/Big/new.txt"
+    // Listings of the folder itself: the write also reads the storages, which lists /storage.
+    let isListing = { (request: (id: String, path: String)) in
+      ["LIS2", "LIST"].contains(request.id) && request.path.hasSuffix("/Big")
+    }
+    let listings = try await ADBFixture.withSession(device) { session in
+      // The session learns the folders' spellings once; that is not the write's.
+      _ = try await session.list(RemotePath("/Big"), in: storage)
+      let before = device.syncRequests.filter(isListing).count
+      _ = try await SafeWriter(session: session, backups: .scratch()).write(
+        from: file, to: RemotePath(target), in: storage, replacing: false,
+        progress: ADBFixture.noProgress)
+      return device.syncRequests.filter(isListing).count - before
+    }
+    #expect(listings == 1)
+    #expect(device.contents(target) == Data("new".utf8))
+  }
+
   /// Only listings that report sizes re-read each file on a device without `ls_v2`: the
   /// session's own name checks list names alone.
   @Test func aSafeWriterWriteIntoALargeFolderStatsEachFileOnce() async throws {

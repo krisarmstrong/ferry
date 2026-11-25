@@ -66,6 +66,8 @@ public struct SafeWriter: Sendable {
   /// `expecting` is the file the caller checked before deciding to replace it: if the device
   /// now has another at `path` (another kind, size or date, or none), it is `.changedOnDevice`
   /// and nothing is written.
+  ///
+  /// The folder is listed once for the whole write (see `WriteListing`).
   public func write(
     from file: URL, to path: RemotePath, in storage: StorageID, replacing: Bool,
     expecting: RemoteItem? = nil, progress: ProgressHandler
@@ -84,7 +86,10 @@ public struct SafeWriter: Sendable {
     }
     // Read once, before the upload. A file the device swaps in during the upload is caught when
     // `commit` sets the old one aside: the backup must still be `existing`.
-    let existing = try await existing(path, in: storage)
+    let listing = WriteListing()
+    let existing = try await listing.run { () async throws(TransportError) in
+      try await existing(path, in: storage)
+    }
     if let expecting, existing != expecting {
       throw .changedOnDevice(path)
     }
@@ -95,10 +100,12 @@ public struct SafeWriter: Sendable {
     let partial = try parent.appending(Self.partialPrefix + UUID().uuidString)
     await session.partials.registerInFlight(partial, in: storage)
     do {
-      let item = try await commit(
-        Source(file: file, size: size, onFAT: target.isFATLike), via: partial,
-        to: Destination(path: path, name: name, replacing: existing), in: storage,
-        progress: progress)
+      let item = try await listing.run { () async throws(TransportError) in
+        try await commit(
+          Source(file: file, size: size, onFAT: target.isFATLike), via: partial,
+          to: Destination(path: path, name: name, replacing: existing), in: storage,
+          progress: progress)
+      }
       await session.partials.unregisterInFlight(partial, in: storage)
       return item
     } catch {
