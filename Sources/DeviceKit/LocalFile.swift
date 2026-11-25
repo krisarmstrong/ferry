@@ -24,10 +24,11 @@ public enum LocalFile {
   /// The prefix of the file a move on a device without MoveObject copies through.
   public static let moveScratchPrefix = "ferry-move-"
 
-  /// Throws `.macDiskFull` unless the volume holding `url` has `needed` bytes free.
+  /// Throws `.macDiskFull` unless the volume holding `url` has `needed` bytes free. A volume
+  /// whose free space cannot be read is no proof of room: that is `.io`.
   public static func requireSpace(_ needed: UInt64, at url: URL) throws(TransportError) {
     var info = statfs()
-    guard statfs(url.path, &info) == 0 else { return }
+    guard statfs(url.path, &info) == 0 else { throw freeSpaceUnknown(url.path) }
     try requireSpace(needed, free: available(info))
   }
 
@@ -37,8 +38,12 @@ public enum LocalFile {
     throws(TransportError)
   {
     var info = statfs()
-    guard fstatfs(descriptor, &info) == 0 else { return }
+    guard fstatfs(descriptor, &info) == 0 else { throw freeSpaceUnknown("an open file") }
     try requireSpace(needed, free: available(info))
+  }
+
+  private static func freeSpaceUnknown(_ place: String) -> TransportError {
+    .io("cannot read the free space for \(place): \(String(cString: strerror(errno)))")
   }
 
   private static func requireSpace(_ needed: UInt64, free: UInt64) throws(TransportError) {

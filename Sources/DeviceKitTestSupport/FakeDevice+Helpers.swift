@@ -4,6 +4,13 @@ import Foundation
 // MARK: Helpers
 
 extension FakeDevice {
+  /// The item as the device lists it, with any stale size it reports.
+  func listedItem(_ path: RemotePath, _ node: Node) -> RemoteItem {
+    let item = Self.item(path, node)
+    guard let size = reportedSizes[path] else { return item }
+    return RemoteItem(path: path, kind: item.kind, size: size, modified: item.modified)
+  }
+
   static func isSame(_ path: RemotePath, orInside ancestor: RemotePath) -> Bool {
     path.components.starts(with: ancestor.components)
   }
@@ -43,5 +50,13 @@ extension FakeDevice {
       if let seen = checked[key], listedItem(key, node).matches(seen) { continue }
       throw key == path ? .changedOnDevice(path) : .directoryNotEmpty(path)
     }
+  }
+}
+
+extension FakeDevice {
+  /// Counts the calls; the fake remembers nothing a reread would change.
+  func forgetCachedItemsOnDevice() async throws(TransportError) {
+    try requireAvailable()
+    forgetCount += 1
   }
 }

@@ -113,7 +113,7 @@ struct MTPSessionGateTests {
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("hello".utf8))
     await device.addFolder("dst", parent: SessionFixture.root)
     let session = MTPSession(device: device, scratch: TestScratch.root)
-    let writer = SafeWriter(session: session)
+    let writer = SafeWriter(session: session, backups: .scratch())
     let folder = try SessionFixture.path("/dst")
 
     let partials = Log<RemotePath>()

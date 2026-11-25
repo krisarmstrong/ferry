@@ -1,6 +1,49 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Files waiting to go back to their device: …" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivos que esperan volver a su dispositivo: …"
+          }
+        }
+      }
+    },
+    "Files waiting to go back to their device: %lld" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivos que esperan volver a su dispositivo: %lld"
+          }
+        }
+      }
+    },
+    "A file on a device was being replaced when the transfer stopped, before Ferry could put the original back. Ferry keeps the original on the Mac and puts it back the next time it reaches the same device and lists that folder." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se estaba reemplazando un archivo en un dispositivo cuando se detuvo la transferencia, antes de que Ferry pudiera devolver el original. Ferry guarda el original en el Mac y lo devuelve la próxima vez que llega al mismo dispositivo y muestra esa carpeta."
+          }
+        }
+      }
+    },
+    "Reconnect the device and open the file's folder in Finder; the line goes once the originals are back. A file Ferry cannot safely put back is listed under **Unsent changes were saved to …** instead, for you to copy back yourself." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve a conectar el dispositivo y abre la carpeta del archivo en Finder; la línea desaparece cuando los originales han vuelto. Un archivo que Ferry no puede devolver con seguridad aparece en **Unsent changes were saved to …**, para que lo copies tú."
+          }
+        }
+      }
+    },
     "adb refused the request. Check the address and that the device is on the network, then try again. (%@)" : {
 
     },

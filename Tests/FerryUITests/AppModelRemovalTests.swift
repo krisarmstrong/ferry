@@ -98,6 +98,32 @@ extension AppModelTests {
     #expect(log.all.last == "reveal \(saved.path)")
   }
 
+  /// The files reached no device, so the notice of where they are outlives later actions and a
+  /// second eject, and goes only once the location holds nothing.
+  @Test func theUnsentChangesNoticeStaysUntilItsLocationIsEmpty() async throws {
+    let first = try Self.savedFolder(holdingFile: true)
+    let second = try Self.savedFolder(holdingFile: true)
+    defer {
+      try? FileManager.default.removeItem(at: first)
+      try? FileManager.default.removeItem(at: second)
+    }
+    let client = FakeClient(log: log)
+    client.preserve([first])
+    let model = AppModel(client: client, services: FakeServices(log: log))
+    await model.eject(DeviceID(serial: "A1"))
+
+    await model.mount(DeviceID(serial: "A1"))
+    #expect(model.preservedChanges == [first])
+
+    client.preserve([second])
+    await model.eject(DeviceID(serial: "B1"))
+    #expect(model.preservedChanges == [first, second])
+
+    try FileManager.default.removeItem(at: first.appending(path: "report.txt"))
+    await model.mount(DeviceID(serial: "A1"))
+    #expect(model.preservedChanges == [second])
+  }
+
   /// The system can name a location it left empty, or none at all: nothing to show then.
   @Test func ejectShowsNoMessageForAnEmptyOrMissingLocation() async throws {
     let empty = try Self.savedFolder(holdingFile: false)

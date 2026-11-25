@@ -602,6 +602,12 @@ You ejected the device before some changes reached it. macOS kept those files in
 
 Click **Reveal in Finder**, then copy the files back onto the device once it is mounted again.
 
+**Files waiting to go back to their device: …**
+
+A file on a device was being replaced when the transfer stopped, before Ferry could put the original back. Ferry keeps the original on the Mac and puts it back the next time it reaches the same device and lists that folder.
+
+Reconnect the device and open the file's folder in Finder; the line goes once the originals are back. A file Ferry cannot safely put back is listed under **Unsent changes were saved to …** instead, for you to copy back yourself.
+
 **…: changes wait to be sent. Reconnect it to finish.**
 
 The device went away, or Ferry can no longer reach it, before some changes reached it. Its location left Finder, so the files that wait are not shown there. They stay on the Mac. An SD card has a location for each way Ferry reaches the device, so changes made on the card over a cable wait for the cable, even while the card shows over the network.

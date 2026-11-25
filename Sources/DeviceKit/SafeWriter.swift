@@ -7,7 +7,8 @@ import os
 /// A replace never deletes the old file before the new one is in place: the old file is renamed
 /// to a hidden `.ferry-backup-*` name, the partial renamed into place, and only then the backup
 /// deleted. If the partial cannot be renamed, the backup is renamed back. Only a device that
-/// cannot rename at all gets a direct upload, and then the old file must go first.
+/// cannot rename at all gets a direct upload, and then the old file must go first: it is copied
+/// to the Mac (`backups`) before, and put back if the upload fails.
 ///
 /// Every `SafeWriter` over a session shares the session's registry, which is what keeps
 /// `visibleList` from deleting a partial that a concurrent `write` is still uploading, or a
@@ -47,13 +48,17 @@ public struct SafeWriter: Sendable {
     return String(tail.dropFirst())
   }
 
-  private static let log = Logger(
+  static let log = Logger(
     subsystem: "io.github.krisarmstrong.ferry", category: "SafeWriter")
 
-  private let session: any DeviceSession
+  let session: any DeviceSession
+  /// Where a replace on a device that cannot rename keeps the old file until the new one is in
+  /// place: a folder of the caller's own, never the user's files (see `ReplaceBackups`).
+  let backups: ReplaceBackups
 
-  public init(session: any DeviceSession) {
+  public init(session: any DeviceSession, backups: ReplaceBackups) {
     self.session = session
+    self.backups = backups
   }
 
   /// Upload `file` to `path`. If `replacing`, an existing file at `path`, or one whose name
@@ -132,6 +137,15 @@ public struct SafeWriter: Sendable {
         visible.append(restored)
       }
     }
+    if await !partials.hasWriteInFlight(in: folder, storage: storage) {
+      for backup in backups.pending(in: folder, storage: storage) {
+        if let restored = await settleLocalBackup(backup, among: visible, in: storage) {
+          // It may have taken the place of an upload the device cut short.
+          visible.removeAll { $0.path == restored.path }
+          visible.append(restored)
+        }
+      }
+    }
     return visible
   }
 
@@ -178,7 +192,7 @@ public struct SafeWriter: Sendable {
     return nil
   }
 
-  private struct Source {
+  struct Source {
     let file: URL
     let size: UInt64
     /// The storage it goes to is FAT-based (see `StorageInfo.isFATLike`).
@@ -227,9 +241,10 @@ public struct SafeWriter: Sendable {
         throw error
       }
       guard case .unsupported = error else { throw error }
-      // No rename: nothing can be set aside, so the old file goes before a direct upload.
-      try await session.delete(replaced.path, in: storage, expecting: [replaced])
-      return try await upload(source, to: destination.path, in: storage, progress: progress)
+      // No rename: nothing can be set aside on the device, so the old file is copied to the Mac
+      // before it goes.
+      return try await replaceWithoutRename(
+        source, replacing: replaced, in: storage, progress: progress)
     }
     await session.partials.recordBackup(backup.path, in: storage)
     // What the rename set aside must be the file the write was checked against: the device can
@@ -255,7 +270,7 @@ public struct SafeWriter: Sendable {
   /// Uploads to `target`, removing whatever the device kept if the transfer fails or comes up
   /// short. The original error is always the one thrown.
   @discardableResult
-  private func upload(
+  func upload(
     _ source: Source, to target: RemotePath, in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
     let (file, size, onFAT) = (source.file, source.size, source.onFAT)
@@ -281,14 +296,18 @@ public struct SafeWriter: Sendable {
     }
     return item
   }
+}
 
+// MARK: Lookups
+
+extension SafeWriter {
   /// The item `path` collides with, or `nil` if there is none: the exact name, else one that
   /// differs only in case, since Android storage compares names that way. A missing parent is
   /// `nil` too; the upload then reports it.
   ///
   /// Two or more colliding items are `.alreadyExists`, naming one that would not be replaced:
   /// the rename would meet it after the old file was set aside.
-  private func existing(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
+  func existing(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
     -> RemoteItem?
   {
     guard let parent = path.parent, let name = path.name else { return nil }
@@ -309,7 +328,7 @@ public struct SafeWriter: Sendable {
     return chosen
   }
 
-  private func discard(_ path: RemotePath, in storage: StorageID) async {
+  func discard(_ path: RemotePath, in storage: StorageID) async {
     do {
       try await session.delete(path, in: storage)
     } catch .notFound {
@@ -340,45 +359,5 @@ extension SafeWriter {
         "could not restore \(original.description, privacy: .private) from its backup: \(reason, privacy: .private)"
       )
     }
-  }
-}
-
-/// Partials still being written, and backups this session made, so a concurrent listing leaves
-/// them alone. One per session; see `DeviceSession.partials`.
-public actor PartialRegistry {
-  private struct Entry: Hashable {
-    let storage: StorageID
-    let path: RemotePath
-  }
-
-  private var inFlight: Set<Entry> = []
-  private var backups: Set<Entry> = []
-
-  public init() {}
-
-  public func registerInFlight(_ path: RemotePath, in storage: StorageID) {
-    inFlight.insert(Entry(storage: storage, path: path))
-  }
-
-  public func unregisterInFlight(_ path: RemotePath, in storage: StorageID) {
-    inFlight.remove(Entry(storage: storage, path: path))
-  }
-
-  public func contains(_ path: RemotePath, in storage: StorageID) -> Bool {
-    inFlight.contains(Entry(storage: storage, path: path))
-  }
-
-  /// Whether a partial is being written in `folder`, so a replace there may be using a backup.
-  public func hasWriteInFlight(in folder: RemotePath, storage: StorageID) -> Bool {
-    inFlight.contains { $0.storage == storage && $0.path.parent == folder }
-  }
-
-  public func recordBackup(_ path: RemotePath, in storage: StorageID) {
-    backups.insert(Entry(storage: storage, path: path))
-  }
-
-  /// Whether this session made the backup at `path`.
-  public func isSessionBackup(_ path: RemotePath, in storage: StorageID) -> Bool {
-    backups.contains(Entry(storage: storage, path: path))
   }
 }

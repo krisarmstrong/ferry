@@ -1,5 +1,6 @@
 import DeviceKit
 import FerryIPC
+import Foundation
 
 // MARK: Resolving request paths
 
@@ -31,5 +32,14 @@ extension DomainController.Route {
     let path = try await path(of: id)
     if path.isInPackageFolder(isFolder: true) { throw .readOnly(path) }
     return path
+  }
+}
+
+extension DomainController {
+  /// The agent's item store, in its own Application Support folder.
+  public static func defaultItemStore() throws -> URL {
+    try FileManager.default.url(
+      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+    ).appending(path: "io.github.krisarmstrong.ferry.agent/items", directoryHint: .isDirectory)
   }
 }

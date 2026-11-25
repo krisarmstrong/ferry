@@ -55,7 +55,7 @@ extension DeviceTests {
 
       try await withSession { session in
         let storage = try #require(try await session.storages().first).id
-        let writer = SafeWriter(session: session)
+        let writer = SafeWriter(session: session, backups: .scratch())
         try await withTempFolder(session, in: storage) { folder in
           let path = try folder.appending("probe.bin")
           let written = try await writer.write(
@@ -100,7 +100,7 @@ extension DeviceTests {
       try await withSession { session in
         let storage = try #require(try await session.storages().first).id
         try await withTempFolder(session, in: storage) { folder in
-          let item = try await SafeWriter(session: session).write(
+          let item = try await SafeWriter(session: session, backups: .scratch()).write(
             from: source, to: folder.appending("large.bin"), in: storage, replacing: false,
             progress: Self.noProgress)
           #expect(item.size == size)

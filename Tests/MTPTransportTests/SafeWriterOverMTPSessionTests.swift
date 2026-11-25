@@ -16,10 +16,12 @@ struct SafeWriterOverMTPSessionTests {
   ) async throws -> RemoteItem {
     let file = try SessionFixture.localFile(data)
     defer { try? FileManager.default.removeItem(at: file) }
-    return try await SafeWriter(session: MTPSession(device: device, scratch: TestScratch.root))
-      .write(
-        from: file, to: SessionFixture.path(path), in: storage, replacing: replacing,
-        progress: SessionFixture.noProgress)
+    return try await SafeWriter(
+      session: MTPSession(device: device, scratch: TestScratch.root), backups: .scratch()
+    )
+    .write(
+      from: file, to: SessionFixture.path(path), in: storage, replacing: replacing,
+      progress: SessionFixture.noProgress)
   }
 
   func contents(of name: String, on device: StubMTPDevice) async -> Data? {
@@ -33,7 +35,8 @@ struct SafeWriterOverMTPSessionTests {
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("old".utf8))
     let file = try SessionFixture.localFile(Data(count: 1_000))
     defer { try? FileManager.default.removeItem(at: file) }
-    let writer = SafeWriter(session: MTPSession(device: device, scratch: TestScratch.root))
+    let writer = SafeWriter(
+      session: MTPSession(device: device, scratch: TestScratch.root), backups: .scratch())
 
     await #expect(throws: TransportError.cancelled) {
       _ = try await writer.write(
