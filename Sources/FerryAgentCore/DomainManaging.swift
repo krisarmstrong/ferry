@@ -34,7 +34,7 @@ public protocol DomainManaging: Sendable {
   /// Tells the system the domain's item identifiers it holds may no longer be the agent's, so it
   /// imports what it has on disk again, matching each item to the device's by name
   /// (`NSFileProviderManager.reimportItems(below:)`).
-  func reimport(_ identifier: String) async
+  func reimport(_ identifier: String) async throws
   /// Whether the user has enabled Ferry's domains, or none exists yet. New domains start disabled
   /// and only the user can enable them, so `.disabled` is a normal state.
   func providerState() async -> ProviderState

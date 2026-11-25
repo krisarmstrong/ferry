@@ -110,6 +110,10 @@ actor ItemTable {
   /// The current snapshot's generation, which every batch appended after it carries.
   var generation = 0
   var journalBytes = 0
+  /// Identifiers forgotten in this agent's run: items deleted, on the device or by Ferry. Kept in
+  /// memory only, so after a restart an identifier FileProvider still holds and the table lacks
+  /// reads as lost (see `DomainController.identifiersLost`), as a table that churned left them.
+  var forgotten: Set<ItemID> = []
   /// Set by `discard`: nothing is written any more.
   var discarded = false
   /// What saving and ordering have done so far.
@@ -179,6 +183,12 @@ actor ItemTable {
   /// The kind of the item at `path` as last reported, or `nil` if it was never reported.
   func kind(at path: RemotePath) -> ItemKind? {
     ids[path].flatMap { records[$0]?.reported?.kind }
+  }
+
+  /// Whether the table has not known `id` at any time in this agent's run: not now, and not as
+  /// an item it forgot (one deleted).
+  func neverKnew(_ id: ItemID) -> Bool {
+    id != .root && records[id] == nil && !forgotten.contains(id)
   }
 
   /// `nil` when the table does not know `id`: the item was deleted, or never reported.

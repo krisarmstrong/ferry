@@ -283,9 +283,9 @@ public actor AgentService: AgentHandling {
 extension AgentService {
   /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
   /// `body` recorded a change, even one followed by a failure. `folder` is where `body` puts an
-  /// item: one the table does not know means the system holds identifiers the table lost (see
-  /// `DomainController.identifiersLost`), and is answered as `.deviceDisconnected`, which it
-  /// retries once it has imported the domain again.
+  /// item: one the table never knew in this run means the system holds identifiers the table
+  /// lost, and the request that starts the reimport is answered `.deviceDisconnected`, which
+  /// the system retries (see `DomainController.identifiersLost`).
   func gated<T: Sendable>(
     _ domain: String, marksUse: Bool = true, into folder: ItemID? = nil,
     _ body: (DomainController.Route) async throws(TransportError) -> T
@@ -322,8 +322,7 @@ extension AgentService {
     case .success:
       await domains.resolveLockRefusal(domain)
     case .failure(.unknownItem):
-      if let folder, await route.items.path(for: folder) == nil {
-        await domains.identifiersLost(domain)
+      if let folder, await route.items.neverKnew(folder), await domains.identifiersLost(domain) {
         throw .deviceDisconnected
       }
     case .failure:

@@ -89,6 +89,7 @@ extension ItemTable {
     for (path, id) in entries {
       unbind(path)
       records[id] = nil
+      forgotten.insert(id)
       changeLog.record(.deleted(id))
       touch(id)
     }

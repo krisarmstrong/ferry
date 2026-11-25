@@ -26,16 +26,18 @@ struct AgentIdentityTests {
     ] {
       #expect(await service.handle(request, file: nil) == .failure(.unknownItem), "\(request)")
     }
-    // A new place for an item that the table does not know is lost identifiers, retried once
-    // the domain is imported again (see `AgentIdentityStabilityTests`).
-    for request: AgentRequest in [
-      .create(domain: domain, parent: unknown, name: "b", isFolder: true),
-      .move(
-        domain: domain, id: try await harness.id(path("/a.txt"), in: domain), toFolder: unknown),
-    ] {
-      #expect(
-        await service.handle(request, file: nil) == .failure(.deviceDisconnected), "\(request)")
-    }
+    // A folder the table never knew, named as the place for a new item, is lost identifiers: the
+    // first such request is retried once the domain is imported again, later ones are gone
+    // (see `AgentIdentityStabilityTests`).
+    #expect(
+      await service.handle(
+        .create(domain: domain, parent: unknown, name: "b", isFolder: true), file: nil)
+        == .failure(.deviceDisconnected))
+    #expect(
+      await service.handle(
+        .move(
+          domain: domain, id: try await harness.id(path("/a.txt"), in: domain), toFolder: unknown),
+        file: nil) == .failure(.unknownItem))
     // FileProvider's contract: deleting an item that is already gone succeeds.
     #expect(
       await service.handle(

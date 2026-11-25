@@ -71,8 +71,11 @@ public actor DomainController {
   /// Domains a request on which was refused because the device was locked (see
   /// `noteRefusedAsLocked`).
   var refusedAsLocked: Set<String> = []
-  /// Domains the system has been asked to import again (see `identifiersLost`).
-  var reimported: Set<String> = []
+  /// Domains whose reimport has been asked for, `true` once the system accepted it (see
+  /// `identifiersLost`).
+  var reimported: [String: Bool] = [:]
+  /// Retries a reimport the system refused, by domain.
+  var reimportTasks: [String: Task<Void, Never>] = [:]
   /// Set by `removeAll`: no domain is added, reconnected or disconnected afterwards.
   var retired = false
   /// Hub events handled so far.
@@ -355,6 +358,8 @@ extension DomainController {
   private func removeEveryDomain() async -> Result<[URL], TransportError> {
     retired = true
     listingRetryTask?.cancel()
+    for task in reimportTasks.values { task.cancel() }
+    reimportTasks = [:]
     domains = [:]
     for table in tables.values {
       await table.discard()

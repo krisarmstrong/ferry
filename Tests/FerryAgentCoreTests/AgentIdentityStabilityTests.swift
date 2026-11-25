@@ -10,6 +10,11 @@ import Testing
 /// keep its identifier through relists, the device being unplugged and plugged back in (locked
 /// or not), and agent restarts; otherwise every create into a folder FileProvider knows fails
 /// as "no such item".
+///
+/// The relist, reconnect and restart tests are guards: they pass without the fix, since the
+/// table always kept identifiers for paths the device still listed. The failure itself, a
+/// device listing ciphertext names before its first unlock, is reproduced end to end over a
+/// real ADB session in `ADBSessionLockedStorageTests`.
 @Suite(.timeLimit(.minutes(1)))
 struct AgentIdentityStabilityTests {
   static let folder = "/Download/ferry-e2e"
@@ -105,8 +110,9 @@ struct AgentIdentityStabilityTests {
     #expect(try await create(harness, domain, in: folder).isEntry)
   }
 
-  /// Plugged back in locked, as a restarted phone is before its first unlock: the domain stays
-  /// away until it is unlocked, and nothing the table knows is forgotten meanwhile.
+  /// Guard: plugged back in locked (the session reports it so, as ADB now does for storage that
+  /// lists ciphertext): the domain stays away until it is unlocked, and nothing the table knows
+  /// is forgotten meanwhile. See `ADBSessionLockedStorageTests` for the ciphertext listing.
   @Test func reconnectingLockedKeepsIdentifiers() async throws {
     let device = try await seeded()
     let harness = try AgentHarness(devices: [device])
@@ -171,11 +177,11 @@ struct AgentIdentityStabilityTests {
     #expect(try await create(restarted, domain, in: folder).isEntry)
   }
 
-  /// FileProvider names a folder the table does not know as the place for a new item: an
-  /// earlier agent lost identifiers FileProvider still holds. The domain is reimported, once, and
-  /// the request answered as one to retry: "no such item" would have FileProvider re-create the
-  /// folder chain by name.
-  @Test func aCreateIntoAFolderTheTableLostReimportsTheDomainOnce() async throws {
+  /// FileProvider names, as the place for a new item, a folder the table never knew: an earlier
+  /// agent lost identifiers FileProvider still holds. The domain is reimported once, and only
+  /// the request that started it is answered as one to retry; later ones are "no such item", so
+  /// FileProvider is never held off for good.
+  @Test func aCreateIntoAFolderTheTableNeverKnewReimportsTheDomainOnce() async throws {
     let device = try await seeded()
     let harness = try AgentHarness(devices: [device])
     defer { harness.finish() }
@@ -184,16 +190,59 @@ struct AgentIdentityStabilityTests {
     let lost = ItemID.random()
 
     #expect(try await create(harness, domain, in: lost) == .failure(.deviceDisconnected))
-    #expect(try await create(harness, domain, in: lost) == .failure(.deviceDisconnected))
+    await harness.manager.waitFor(.reimport(domain))
+    #expect(try await create(harness, domain, in: lost) == .failure(.unknownItem))
     let moved = await harness.service.handle(
       .move(domain: domain, id: try await harness.id(path(Self.file), in: domain), toFolder: lost),
       file: nil)
-    #expect(moved == .failure(.deviceDisconnected))
+    #expect(moved == .failure(.unknownItem))
 
     #expect(await harness.manager.calls.filter { $0 == .reimport(domain) }.count == 1)
   }
 
-  /// An unknown item is no sign of lost identifiers on its own: FileProvider may ask about one
+  /// A folder deleted on the device, which FileProvider has not caught up with yet, is gone,
+  /// not lost: a create into it is "no such item" and reimports nothing.
+  @Test func aCreateIntoAFolderDeletedOnTheDeviceIsNoSuchItem() async throws {
+    let device = try await seeded()
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    let domain = domainID(device)
+    let folder = try #require(try await browse(harness, domain)[Self.folder])
+
+    try await device.delete(path(Self.folder), in: storageID(device))
+    #expect(await harness.service.handle(.refresh(device.info.id), file: nil) == .done)
+
+    #expect(try await create(harness, domain, in: folder) == .failure(.unknownItem))
+    #expect(!(await harness.manager.calls.contains(.reimport(domain))))
+  }
+
+  /// A reimport the system refuses is asked for again, with back-off, until it is accepted.
+  @Test func aRefusedReimportIsAskedForAgain() async throws {
+    let device = try await seeded()
+    let harness = try AgentHarness(devices: [device])
+    defer { harness.finish() }
+    _ = await harness.manager.waitForCalls(1)
+    let domain = domainID(device)
+    await harness.manager.failReimports(2)
+
+    #expect(
+      try await create(harness, domain, in: ItemID.random()) == .failure(.deviceDisconnected))
+    await harness.manager.waitFor(.reimport(domain))
+    await harness.retryClock.waitForSleeper()
+    await harness.retryClock.advance(by: DomainController.reimportRetry)
+    await harness.retryClock.waitForSleeper()
+    await harness.retryClock.advance(by: DomainController.reimportRetry * 2)
+    while await harness.manager.calls.filter({ $0 == .reimport(domain) }).count < 3 {
+      _ = await harness.manager.waitForCalls(await harness.manager.calls.count + 1)
+    }
+    await harness.retryClock.waitUntilNoSleeper()
+
+    #expect(await harness.manager.calls.filter { $0 == .reimport(domain) }.count == 3)
+    #expect(await harness.controller.reimported[domain] == true)
+  }
+
+  /// Guard: an unknown item is no sign of lost identifiers on its own: FileProvider may ask about one
   /// the device deleted.
   @Test func anUnknownItemAloneReimportsNothing() async throws {
     let device = try await seeded()

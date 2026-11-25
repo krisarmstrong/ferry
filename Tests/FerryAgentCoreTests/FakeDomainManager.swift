@@ -133,8 +133,20 @@ actor FakeDomainManager: DomainManaging {
     changed()
   }
 
-  func reimport(_ identifier: String) async {
+  /// How many reimports fail before one succeeds.
+  private var reimportFailures = 0
+
+  func failReimports(_ count: Int) {
+    reimportFailures = count
+  }
+
+  /// Recorded whether it fails or not, so a test sees each attempt.
+  func reimport(_ identifier: String) async throws {
     record(.reimport(identifier))
+    if reimportFailures > 0 {
+      reimportFailures -= 1
+      throw CocoaError(.fileNoSuchFile)
+    }
   }
   /// Kept out of `calls`: every disconnect and reconnect comes with one, so tests of the order
   /// of system calls read the same either way. Tests check `hidden` instead.
