@@ -150,7 +150,7 @@ extension AppModel {
         return nil
       }
     }
-    preservedChanges = []
+    keepPreservedChanges()
     toolMessage = nil
     do {
       let response = try await client.send(request, file: file, progress: progress)
@@ -182,7 +182,7 @@ extension AppModel {
   public func chooseAndSendFiles(on device: DeviceID) async {
     let urls = await services.chooseFilesToSend()
     guard !urls.isEmpty else { return }
-    preservedChanges = []
+    keepPreservedChanges()
     toolMessage = nil
     let (notice, failed) = await FinderSender(agent: client).performReporting(
       .send(device), on: urls, deviceName: windowName(of: device))

@@ -9,7 +9,7 @@ extension SafeWriterTests {
   @Test(arguments: [false, true])
   func folderAtTargetIsNeverReplaced(replacing: Bool) async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let folder = try RemotePath("/A")
     let inside = try RemotePath("/A/b.txt")
     try await device.seed(inside, in: storageID, contents: Data([9]))
@@ -25,7 +25,7 @@ extension SafeWriterTests {
   /// Android storage compares names without case, and its rename may replace what is there.
   @Test func caseVariantIsTakenWhenNotReplacing() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let existing = try RemotePath("/foo.txt")
     try await device.seed(existing, in: storageID, contents: Data([9]))
     try await withTempFile(Data([1, 2])) { file in
@@ -39,7 +39,7 @@ extension SafeWriterTests {
 
   @Test func replacingACaseVariantReplacesThatItem() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/Foo.txt")
     try await device.seed(RemotePath("/foo.txt"), in: storageID, contents: Data([9]))
     try await withTempFile(Data([1, 2])) { file in
@@ -54,7 +54,7 @@ extension SafeWriterTests {
   @Test(arguments: [false, true])
   func twoCaseVariantsAreRefusedUpFront(replacing: Bool) async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let exact = try RemotePath("/foo.txt")
     let variant = try RemotePath("/FOO.txt")
     try await device.seed(variant, in: storageID, contents: Data([8]))
@@ -71,7 +71,7 @@ extension SafeWriterTests {
 
   @Test func folderCaseVariantIsNeverReplaced() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let folder = try RemotePath("/A")
     try await device.seed(RemotePath("/A/b.txt"), in: storageID, contents: Data([9]))
     try await withTempFile(Data([1, 2])) { file in

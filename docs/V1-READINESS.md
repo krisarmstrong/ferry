@@ -195,8 +195,11 @@ Legend: **Done** is in `main` and verified as stated. **Open** must land before 
   this. Try again; if it keeps failing, reconnect the device or reopen Ferry." Give it its own
   message. (M2, residual)
 - A create while the device refuses Ferry left a local-only `name 2.txt` beside the real file
-  that never reached the device (integration smoke test). Reproduce on hardware (owner checks 15
-  and 16), then fix so Finder never shows a copy as sent when it was not.
+  that never reached the device (integration smoke test). Likely path: the first create reached
+  the device but its reply did not reach FileProvider, whose retry met the file as a collision,
+  so FileProvider renamed its copy. A retried create now answers with a device file that holds
+  the same bytes (`AgentService+Transfers.swift`, `AgentTransferIntegrityTests`); confirm on
+  hardware (owner checks 15 and 16) that no `name 2` appears.
 
 **Later**
 - Sparkle's gentle reminders and an "Update ready" row (L15). Updates install when Ferry quits,

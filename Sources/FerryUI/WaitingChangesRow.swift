@@ -21,4 +21,11 @@ struct WaitingChangesRow: View {
         "\(DisplayText.escaped(name)): changes wait to be sent. Reconnect it to finish.",
         bundle: .module))
   }
+
+  /// Originals of replaces cut short, which Ferry keeps on the Mac until it can put them back.
+  static func backupsLine(_ count: Int) -> MenuNotice {
+    MenuNotice(
+      LocalizedStringResource(
+        "Files waiting to go back to their device: \(count)", bundle: .module))
+  }
 }

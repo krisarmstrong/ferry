@@ -147,6 +147,11 @@ public struct MenuContent: View {
       }
     }
     WaitingChangesRow(names: model.waitingToSend)
+    if model.pendingBackups > 0 {
+      let line = WaitingChangesRow.backupsLine(model.pendingBackups)
+      StatusRow(
+        symbol: "arrow.uturn.backward.circle", title: Text(verbatim: line.text), help: line.help)
+    }
     if model.agent == .running, model.usbWatchFailed {
       StatusRow(
         symbol: "info.circle", title: Text(MenuStatusText.usbWatchFailed),

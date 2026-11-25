@@ -32,15 +32,26 @@ public actor FakeDevice: DeviceSession {
   let deviceCapabilities: DeviceCapabilities
   var tree: [StorageID: [RemotePath: Node]]
   private var locked = false
-  private var disconnected = false
+  var disconnected = false
   private var suspensions: [SuspendableCall: Suspension] = [:]
-  var uploadFailure: (afterBytes: UInt64, error: TransportError)?
+  var uploadFailure: UploadFailure?
+  var downloadFailure: DownloadFailure?
+  /// Runs when the next download starts, before it reads the device's contents.
+  var downloadHook: (@Sendable () async -> Void)?
   var uploadTruncation: UInt64?
   var renameFailure: RenameFailure?
   /// Sizes listed for files instead of their real ones, as a device's stale metadata does.
   var reportedSizes: [RemotePath: UInt64] = [:]
   /// The name the device stores a backup under instead of the one it was sent.
   var backupStoredAs: String?
+
+  struct UploadFailure {
+    var skipping: Int
+    let afterBytes: UInt64
+    let error: TransportError
+    /// The device is gone once the failure strikes: every later call fails too.
+    let disconnects: Bool
+  }
 
   struct RenameFailure {
     var skipping: Int
@@ -73,7 +84,7 @@ public actor FakeDevice: DeviceSession {
   public private(set) var isOpen = false
   public private(set) var closeCount = 0
   /// Calls to `forgetCachedItems()`.
-  public private(set) var forgetCount = 0
+  public internal(set) var forgetCount = 0
   public private(set) var storagesCallCount = 0
   /// Calls to `list`, by folder.
   public internal(set) var listCalls: [RemotePath: Int] = [:]
@@ -119,34 +130,6 @@ public actor FakeDevice: DeviceSession {
     return listedItem(path, node)
   }
 
-  /// The item as the device lists it, with any stale size it reports.
-  func listedItem(_ path: RemotePath, _ node: Node) -> RemoteItem {
-    let item = Self.item(path, node)
-    guard let size = reportedSizes[path] else { return item }
-    return RemoteItem(path: path, kind: item.kind, size: size, modified: item.modified)
-  }
-
-  func downloadOnDevice(
-    _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
-    progress: ProgressHandler
-  ) async throws(TransportError) -> Downloaded {
-    let nodes = try nodes(in: storage)
-    guard case .file(let data, let modified) = nodes[path] else { throw .notFound(path) }
-    let total = UInt64(data.count)
-    guard progress(0, total) else { throw .cancelled }
-    do {
-      try data.write(to: file, options: replacing ? [] : .withoutOverwriting)
-    } catch CocoaError.fileWriteFileExists {
-      throw .alreadyExists(path)
-    } catch {
-      throw .io(error.localizedDescription)
-    }
-    guard progress(total, total) else { throw .cancelled }
-    let listed = RemoteItem(
-      path: path, kind: .file, size: reportedSizes[path] ?? total, modified: modified)
-    return Downloaded(listed: listed, received: total)
-  }
-
   func uploadOnDevice(
     from file: URL, to path: RemotePath, in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
@@ -156,7 +139,7 @@ public actor FakeDevice: DeviceSession {
     try requireFolder(parent, in: nodes)
     guard nodes[path] == nil else { throw .alreadyExists(path) }
 
-    let failure = uploadFailure
+    let failure = nextUploadFailure()
     let limit = failure?.afterBytes ?? uploadTruncation
     let data = try Self.read(file, upTo: limit)
     let total = UInt64(data.count)
@@ -166,7 +149,7 @@ public actor FakeDevice: DeviceSession {
     nodes[path] = node
     tree[storage] = nodes
     if let failure {
-      uploadFailure = nil
+      if failure.disconnects { disconnected = true }
       throw failure.error
     }
     guard progress(total, total) else {
@@ -247,7 +230,7 @@ public actor FakeDevice: DeviceSession {
 
   // MARK: Helpers
 
-  private func requireAvailable() throws(TransportError) {
+  func requireAvailable() throws(TransportError) {
     if disconnected { throw .deviceDisconnected }
     if locked { throw .deviceLocked }
   }
@@ -300,6 +283,33 @@ public actor FakeDevice: DeviceSession {
 
 }
 
+extension FakeDevice {
+  func downloadOnDevice(
+    _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
+    progress: ProgressHandler
+  ) async throws(TransportError) -> Downloaded {
+    await runDownloadHook()
+    let nodes = try nodes(in: storage)
+    guard case .file(let data, let modified) = nodes[path] else { throw .notFound(path) }
+    let total = UInt64(data.count)
+    guard progress(0, total) else { throw .cancelled }
+    let failure = nextDownloadFailure()
+    let written = failure.map { data.prefix(Int(clamping: $0.afterBytes)) } ?? data
+    do {
+      try written.write(to: file, options: replacing ? [] : .withoutOverwriting)
+    } catch CocoaError.fileWriteFileExists {
+      throw .alreadyExists(path)
+    } catch {
+      throw .io(error.localizedDescription)
+    }
+    if let error = failure?.error { throw error }
+    guard progress(total, total) else { throw .cancelled }
+    let listed = RemoteItem(
+      path: path, kind: .file, size: reportedSizes[path] ?? total, modified: modified)
+    return Downloaded(listed: listed, received: UInt64(written.count))
+  }
+}
+
 // MARK: Test controls
 
 extension FakeDevice {
@@ -309,15 +319,15 @@ extension FakeDevice {
     tree[id] = nil
   }
 
-  /// Creates missing parent folders and replaces an existing file at `path`.
-  public func seed(_ path: RemotePath, in storage: StorageID, contents: Data)
-    throws(TransportError)
-  {
+  /// Creates missing parent folders and replaces an existing file at `path`, dated `modified`.
+  public func seed(
+    _ path: RemotePath, in storage: StorageID, contents: Data, modified: Date = Date()
+  ) throws(TransportError) {
     guard let parent = path.parent else { throw .invalidName(path.description) }
     var nodes = try nodes(in: storage)
     try ensureFolders(parent, in: &nodes)
     if case .folder = nodes[path] { throw .alreadyExists(path) }
-    nodes[path] = .file(contents, modified: Date())
+    nodes[path] = .file(contents, modified: modified)
     tree[storage] = nodes
   }
 
@@ -381,12 +391,4 @@ extension FakeDevice {
     }
   }
 
-}
-
-extension FakeDevice {
-  /// Counts the calls; the fake remembers nothing a reread would change.
-  func forgetCachedItemsOnDevice() async throws(TransportError) {
-    try requireAvailable()
-    forgetCount += 1
-  }
 }

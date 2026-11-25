@@ -1,4 +1,5 @@
 import ADBTransport
+import DeviceKit
 import FerryAgentCore
 import FerryIPC
 import Foundation
@@ -17,11 +18,13 @@ guard let identity = FerryIdentity() else {
 }
 
 let itemStore: URL
+let replaceBackups: ReplaceBackups
 let wirelessStore: URL
 let toolStore: URL
 let adbServerRecord: URL
 do {
   itemStore = try DomainController.defaultItemStore()
+  replaceBackups = try ReplaceBackups.standard()
   wirelessStore = try WirelessADB.defaultStore()
   toolStore = try ToolJournal.defaultStore()
   adbServerRecord = try ADBServerKeeper.defaultRecord()
@@ -31,6 +34,8 @@ do {
 }
 
 FileTransfer.sweep()
+// A backup whose download never finished was made before the device's file was touched.
+replaceBackups.sweepIncomplete()
 
 // MTP and the user's adb server together: each device is served by the best method it offers.
 // What the network may serve, as WirelessADB decides; ADBTransport asks it on every scan. It
@@ -65,7 +70,8 @@ let hub = DeviceHub(
   transport: CompositeTransport(mtp: MTPTransport(), adb: adb),
   arrivals: merged(USBWatcher.ticks(state: usbWatch), merged(adb.arrivals, vouching.changes)))
 let manager = FileProviderDomains()
-let domains = DomainController(hub: hub, manager: manager, itemStore: itemStore)
+let domains = DomainController(
+  hub: hub, manager: manager, itemStore: itemStore, backups: replaceBackups)
 // Devices on the network: connected when the user asks, remembered, and reconnected. A host
 // claiming the serial of a device the hub serves is not believed without the user.
 let wireless = WirelessADB(

@@ -48,7 +48,7 @@ final class FakeClient: AgentSending {
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
     sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:],
-    waitingToSend: [String] = [], needsReplug: [DeviceID] = []
+    waitingToSend: [String] = [], needsReplug: [DeviceID] = [], pendingBackups: Int = 0
   ) {
     status.withLock {
       $0 = .status(
@@ -59,7 +59,7 @@ final class FakeClient: AgentSending {
           remembered: remembered, unconfirmed: unconfirmed, recordings: recordings,
           usbWatchFailed: usbWatchFailed, sessions: sessions,
           connectedAddresses: connectedAddresses, waitingToSend: waitingToSend,
-          needsReplug: needsReplug))
+          needsReplug: needsReplug, pendingBackups: pendingBackups))
     }
   }
 
