@@ -106,61 +106,28 @@ struct ProviderModifyTests {
     #expect(saved.item.documentSize == 12)
   }
 
-  /// A file made while the device was away, then saved again: FileProvider sends the save as a
-  /// modify of an item the device never got. It is created, not refused: "no such item" would
-  /// have FileProvider delete the edited file on the Mac.
-  @Test func aSaveOfAFileTheDeviceNeverGotCreatesIt() async throws {
+  /// A save of a file the device does not have (made while it was away, or whose identifier the
+  /// agent lost) is "no such item", never a create under a new identifier, which a modify must
+  /// not return. FileProvider then re-creates the item, local edits included, through createItem
+  /// (`NSFileProviderReplicatedExtension.h`, modifyItem's error cases), which uploads it.
+  @Test func aSaveOfAnUnknownFileIsNoSuchItemAndItsCreateUploadsIt() async throws {
     let agent = FakeAgent([try folder("/Docs")])
     let backend = ProviderBackend(domain: domain, client: agent)
     let dir = try scratchDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
     let docs = try await agent.id(try path("/Docs"))
-    let unknown = ItemID.random()
-
-    let saved = try await backend.modify(
-      NSFileProviderItemIdentifier(unknown),
-      to: ItemTemplate(parent: docs, filename: "new.txt", kind: .file), changed: .contents,
-      contents: try writeContents(Data("made offline".utf8), in: dir))
-
-    #expect(!saved.shouldFetchContent)
-    #expect(saved.item.itemIdentifier != NSFileProviderItemIdentifier(unknown))
-    #expect(saved.item.filename == "new.txt")
-    #expect(await agent.contents[try path("/Docs/new.txt")] == Data("made offline".utf8))
-    #expect(
-      await agent.requests == [
-        .replaceContents(domain: domain, id: unknown, base: nil, onConflict: .keepBoth),
-        .create(domain: domain, parent: docs, name: "new.txt", isFolder: false),
-      ])
-  }
-
-  /// The device has a file of that name: FileProvider renames its copy, the device's stays.
-  @Test func aSaveOfAnUnknownFileNeverOverwritesTheDevicesFile() async throws {
-    let agent = FakeAgent(
-      [try file("/new.txt", size: 1)], contents: [try path("/new.txt"): Data("d".utf8)])
-    let backend = ProviderBackend(domain: domain, client: agent)
-    let dir = try scratchDirectory()
-    defer { try? FileManager.default.removeItem(at: dir) }
-
-    await #expect(throws: NSFileProviderError(.filenameCollision)) {
-      try await backend.modify(
-        NSFileProviderItemIdentifier(ItemID.random()),
-        to: ItemTemplate(parent: .root, filename: "new.txt", kind: .file), changed: .contents,
-        contents: try writeContents(Data("mac".utf8), in: dir))
-    }
-    #expect(await agent.contents[try path("/new.txt")] == Data("d".utf8))
-  }
-
-  /// Without new contents there is nothing to create: the item is gone.
-  @Test func aRenameOfAnUnknownItemIsNoSuchItem() async throws {
-    let agent = FakeAgent([])
-    let backend = ProviderBackend(domain: domain, client: agent)
+    let template = ItemTemplate(parent: docs, filename: "new.txt", kind: .file)
+    let edited = try writeContents(Data("made offline".utf8), in: dir)
 
     await #expect(throws: NSFileProviderError(.noSuchItem)) {
       try await backend.modify(
-        NSFileProviderItemIdentifier(ItemID.random()),
-        to: ItemTemplate(parent: .root, filename: "b.txt", kind: .file), changed: .filename,
-        contents: nil)
+        NSFileProviderItemIdentifier(ItemID.random()), to: template, changed: .contents,
+        contents: edited)
     }
     #expect(await agent.requests.allSatisfy { if case .create = $0 { false } else { true } })
+
+    let created = try await backend.create(template, contents: edited, mayAlreadyExist: false)
+    #expect(created?.item.filename == "new.txt")
+    #expect(await agent.contents[try path("/Docs/new.txt")] == Data("made offline".utf8))
   }
 }

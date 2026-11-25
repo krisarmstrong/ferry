@@ -46,21 +46,50 @@ struct MayAlreadyExistTests {
       ])
   }
 
+  /// The Mac holds no contents of its own (the file is dataless): the device's version is the
+  /// file, and FileProvider fetches it.
   @Test(arguments: [(UInt64?(6), 0.0), (5, 1.0), (nil, 0.0)])
-  func aFileThatDiffersIsMatchedAndFetched(size: UInt64?, shift: Double) async throws {
+  func aDatalessFileThatDiffersIsMatchedAndFetched(size: UInt64?, shift: Double) async throws {
     let agent = FakeAgent([try file("/a.txt", size: 5, modified: modified)])
+    let template = ItemTemplate(
+      parent: .root, filename: "a.txt", kind: .file, size: size,
+      modified: modified.addingTimeInterval(shift))
+
+    let match = try #require(try await importing(template, from: agent))
+
+    #expect(match.item.itemIdentifier == (try await agent.identifier(try path("/a.txt"))))
+    #expect(match.shouldFetchContent)
+    #expect(await agent.requests == [.list(domain: domain, folder: .root)])
+  }
+
+  /// The Mac's contents may be edits never sent, so the device's version never replaces them:
+  /// the create collides with the device's file, FileProvider renames its copy and creates it
+  /// too, and both are kept.
+  @Test(arguments: [(UInt64?(6), 0.0), (5, 1.0), (nil, 0.0)])
+  func localContentsThatDifferAreNeverReplacedByTheDevices(size: UInt64?, shift: Double)
+    async throws
+  {
+    let agent = FakeAgent(
+      [try file("/a.txt", size: 5, modified: modified)],
+      contents: [try path("/a.txt"): Data("phone".utf8)])
     let dir = try scratchDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
     let template = ItemTemplate(
       parent: .root, filename: "a.txt", kind: .file, size: size,
       modified: modified.addingTimeInterval(shift))
+    let deviceItem = try await agent.identifier(try path("/a.txt"))
 
-    let match = try #require(
-      try await importing(
-        template, from: agent, contents: try writeContents(Data("mac!!!".utf8), in: dir)))
-
-    #expect(match.item.itemIdentifier == (try await agent.identifier(try path("/a.txt"))))
-    #expect(match.shouldFetchContent)
+    do {
+      _ = try await importing(
+        template, from: agent, contents: try writeContents(Data("mac!!!".utf8), in: dir))
+      Issue.record("the device's version was taken over the Mac's")
+    } catch let error as NSError {
+      #expect(error.domain == NSFileProviderErrorDomain)
+      #expect(error.code == NSFileProviderError.filenameCollision.rawValue)
+      let collided = error.userInfo[NSFileProviderErrorItemKey] as? NSFileProviderItem
+      #expect(collided?.itemIdentifier == deviceItem)
+    }
+    #expect(await agent.contents[try path("/a.txt")] == Data("phone".utf8))
     #expect(await agent.requests == [.list(domain: domain, folder: .root)])
   }
 
