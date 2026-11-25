@@ -88,3 +88,9 @@ let package = Package(
   ],
   swiftLanguageModes: [.v6]
 )
+
+// A compiler warning fails the build, so one cannot land unnoticed. Xcode builds these targets
+// too, so the app and the release follow the same rule.
+for target in package.targets where target.type != .system {
+  target.swiftSettings = (target.swiftSettings ?? []) + [.treatAllWarnings(as: .error)]
+}

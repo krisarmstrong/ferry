@@ -7,8 +7,7 @@ public enum NumericAddress {
   /// Dotted decimal, four parts, no leading zeros.
   public static func isIPv4(_ text: String) -> Bool {
     let allowed = text.utf8.allSatisfy { (0x30...0x39).contains($0) || $0 == UInt8(ascii: ".") }
-    var address = in_addr()
-    return allowed && roundTrips(text, family: AF_INET, into: &address)
+    return allowed && roundTrips(text, family: AF_INET, addressSize: MemoryLayout<in_addr>.size)
   }
 
   /// In the form `inet_ntop` writes: lowercase hex, zeros compressed, no zone.
@@ -17,16 +16,15 @@ public enum NumericAddress {
       (0x30...0x39).contains($0) || (0x61...0x66).contains($0) || $0 == UInt8(ascii: ":")
         || $0 == UInt8(ascii: ".")
     }
-    var address = in6_addr()
-    return allowed && roundTrips(text, family: AF_INET6, into: &address)
+    return allowed
+      && roundTrips(text, family: AF_INET6, addressSize: MemoryLayout<in6_addr>.size)
   }
 
-  private static func roundTrips<Address>(
-    _ text: String, family: Int32, into address: inout Address
-  ) -> Bool {
+  private static func roundTrips(_ text: String, family: Int32, addressSize: Int) -> Bool {
+    var address = [UInt8](repeating: 0, count: addressSize)
     guard inet_pton(family, text, &address) == 1 else { return false }
     var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
-    guard inet_ntop(family, &address, &buffer, socklen_t(buffer.count)) != nil else {
+    guard inet_ntop(family, address, &buffer, socklen_t(buffer.count)) != nil else {
       return false
     }
     let written = buffer.prefix { $0 != 0 }.map(UInt8.init(bitPattern:))
