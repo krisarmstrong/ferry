@@ -55,6 +55,11 @@ extension FakeDevice {
     uploadHook = hook
   }
 
+  /// Runs `hook` when the next move starts, as a device that stops answering mid-move.
+  public func onNextMove(_ hook: @escaping @Sendable () async -> Void) {
+    moveHook = hook
+  }
+
   /// Runs `hook` when the next delete starts, as an app on the device adding files meanwhile.
   public func onNextDelete(_ hook: @escaping @Sendable () async -> Void) {
     deleteHook = hook

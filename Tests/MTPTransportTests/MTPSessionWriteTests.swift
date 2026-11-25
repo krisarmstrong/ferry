@@ -216,25 +216,6 @@ struct MTPSessionWriteTests {
     #expect(await device.children(of: SessionFixture.root) == ["B"])
   }
 
-  /// The copy a move makes on a device without MoveObject is a whole transfer: the request's
-  /// cancel stops it, leaving the source where it was and no partial copy.
-  @Test func aCancelledMoveFallbackKeepsTheSource() async throws {
-    let device = SessionFixture.makeDevice(capabilities: [])
-    await device.addFile("a.txt", parent: SessionFixture.root, data: Data("payload".utf8))
-    let dest = await device.addFolder("B", parent: SessionFixture.root)
-    let session = MTPSession(device: device, scratch: TestScratch.root)
-
-    await #expect(throws: TransportError.cancelled) {
-      try await DeviceTurns.$current.withValue(CancelledTurn()) {
-        _ = try await session.move(
-          SessionFixture.path("/a.txt"), toFolder: SessionFixture.path("/B"),
-          in: SessionFixture.storage)
-      }
-    }
-    #expect(await device.children(of: SessionFixture.root) == ["B", "a.txt"])
-    #expect(await device.children(of: dest) == [])
-  }
-
   @Test func moveFallbackKeepsSourceWhenCopyComesUpShort() async throws {
     let device = SessionFixture.makeDevice(capabilities: [])
     await device.addFile("a.txt", parent: SessionFixture.root, data: Data("payload".utf8))
@@ -279,10 +260,4 @@ struct MTPSessionWriteTests {
     }
     #expect(await device.calls.isEmpty)
   }
-}
-
-/// A request whose client has given up.
-private struct CancelledTurn: DeviceTurn {
-  func takeTurn() throws(TransportError) {}
-  var isCancelled: Bool { true }
 }

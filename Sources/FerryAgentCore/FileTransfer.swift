@@ -114,11 +114,10 @@ public enum FileTransfer {
     guard fsync(target) == 0 else { throw .io("cannot flush file: \(errorText())") }
   }
 
-  /// Copies until the end of `input`; false, with the copy unfinished, once more than `limit`
-  /// bytes have been read.
+  /// Copies `input` into `output` a chunk at a time, until the end of `input`; false, with the
+  /// copy unfinished, once more than `limit` bytes have been read. A cancelled request stops at
+  /// the next chunk, so a large file the client gave up on is not copied to its end first.
   @discardableResult
-  /// Copies `input` into `output` a chunk at a time. A cancelled request stops at the next
-  /// chunk, so a large file the client gave up on is not copied to its end first.
   private static func copy(
     from input: Int32, to output: Int32, limit: UInt64? = nil,
     cancellation: RequestCancellation? = nil

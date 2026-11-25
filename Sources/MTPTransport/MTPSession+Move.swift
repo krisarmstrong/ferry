@@ -52,8 +52,11 @@ extension MTPSession {
     try LocalFile.requireSpace(source.size, at: local.deletingLastPathComponent())
     defer { try? FileManager.default.removeItem(at: local) }
     // libmtp reports progress on its own queue, where the request's task-local is not set.
-    let turn = DeviceTurns.current
-    let goOn: ProgressHandler = { _, _ in turn?.isCancelled != true }
+    let (turn, heartbeat) = (DeviceTurns.current, TransferHeartbeat.current)
+    let goOn: ProgressHandler = { _, _ in
+      heartbeat?.beat()
+      return turn?.isCancelled != true
+    }
     try await device.download(objectID: source.objectID, to: local, progress: goOn)
 
     let partialName = SafeWriter.partialPrefix + UUID().uuidString
@@ -80,8 +83,20 @@ extension MTPSession {
     }
     await partials.unregisterInFlight(partial, in: placement.storage)
 
-    try await mutating([parent], storage: storage) { () throws(TransportError) in
-      try await device.delete(objectID: source.objectID)
+    // The copy is of the source as it was read. If an app on the device changed it meanwhile,
+    // deleting it would lose the change: both stay, and the move fails saying so. libmtp shows
+    // a change only to a new connection, so the device is reopened to look.
+    let sourcePath = try parent.appending(source.name)
+    try await reopenForFreshInfo()
+    let raw = try await raw(placement.storage)
+    let now = try? await freshEntry(sourcePath, storage: raw)
+    guard let now, now.objectID == source.objectID, now.size == source.size,
+      now.modified == source.modified
+    else {
+      throw .changedOnDevice(sourcePath)
+    }
+    try await mutating([parent], storage: raw) { () throws(TransportError) in
+      try await device.delete(objectID: now.objectID)
     }
     return copy
   }

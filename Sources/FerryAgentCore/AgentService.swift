@@ -204,13 +204,22 @@ public actor AgentService: AgentHandling {
     }
   }
 
+  /// How long a move may go with no sign of progress before it is failed (see `StallWatch`).
+  /// A move the device does in one step never beats, so this is long enough for any of those.
+  static let moveStallLimit = Duration.seconds(60)
+
   private func move(_ id: ItemID, to folder: ItemID, in domain: String)
     async throws(TransportError) -> ProviderEntry
   {
     try await gated(domain) { route throws(TransportError) in
       let path = try await route.changeable(id)
       let destination = try await route.writableFolder(folder)
-      let item = try await route.session.move(path, toFolder: destination, in: route.storage)
+      let session = route.session
+      let storage = route.storage
+      let item = try await StallWatch.run(limit: Self.moveStallLimit, clock: hub.clock) {
+        () async throws(TransportError) -> RemoteItem in
+        try await session.move(path, toFolder: destination, in: storage)
+      }
       await route.items.moved(path, to: item.path)
       return await route.items.changed(item, id: id)
     }

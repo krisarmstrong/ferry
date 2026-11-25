@@ -52,6 +52,8 @@ public actor FakeDevice: DeviceSession {
   var uploadHook: (@Sendable () async -> Void)?
   /// Runs when the next delete starts, before it reads the device's contents.
   var deleteHook: (@Sendable () async -> Void)?
+  /// Runs when the next move starts.
+  var moveHook: (@Sendable () async -> Void)?
   var listFailure: TransportError?
   /// See `serialiseOperations()`.
   var serialised = false
@@ -126,27 +128,6 @@ public actor FakeDevice: DeviceSession {
     return RemoteItem(path: path, kind: item.kind, size: size, modified: item.modified)
   }
 
-  func downloadOnDevice(
-    _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
-    progress: ProgressHandler
-  ) async throws(TransportError) -> Downloaded {
-    let nodes = try nodes(in: storage)
-    guard case .file(let data, let modified) = nodes[path] else { throw .notFound(path) }
-    let total = UInt64(data.count)
-    guard progress(0, total) else { throw .cancelled }
-    do {
-      try data.write(to: file, options: replacing ? [] : .withoutOverwriting)
-    } catch CocoaError.fileWriteFileExists {
-      throw .alreadyExists(path)
-    } catch {
-      throw .io(error.localizedDescription)
-    }
-    guard progress(total, total) else { throw .cancelled }
-    let listed = RemoteItem(
-      path: path, kind: .file, size: reportedSizes[path] ?? total, modified: modified)
-    return Downloaded(listed: listed, received: total)
-  }
-
   func uploadOnDevice(
     from file: URL, to path: RemotePath, in storage: StorageID, progress: ProgressHandler
   ) async throws(TransportError) -> RemoteItem {
@@ -215,6 +196,10 @@ public actor FakeDevice: DeviceSession {
   func moveOnDevice(_ path: RemotePath, toFolder: RemotePath, in storage: StorageID)
     async throws(TransportError) -> RemoteItem
   {
+    if let hook = moveHook {
+      moveHook = nil
+      await hook()
+    }
     guard deviceCapabilities.contains(.move) else { throw .unsupported("move") }
     let nodes = try nodes(in: storage)
     guard let name = path.name else { throw .invalidName(path.description) }
@@ -298,6 +283,29 @@ public actor FakeDevice: DeviceSession {
     return listedItem(destination, node)
   }
 
+}
+
+extension FakeDevice {
+  func downloadOnDevice(
+    _ path: RemotePath, in storage: StorageID, to file: URL, replacing: Bool,
+    progress: ProgressHandler
+  ) async throws(TransportError) -> Downloaded {
+    let nodes = try nodes(in: storage)
+    guard case .file(let data, let modified) = nodes[path] else { throw .notFound(path) }
+    let total = UInt64(data.count)
+    guard progress(0, total) else { throw .cancelled }
+    do {
+      try data.write(to: file, options: replacing ? [] : .withoutOverwriting)
+    } catch CocoaError.fileWriteFileExists {
+      throw .alreadyExists(path)
+    } catch {
+      throw .io(error.localizedDescription)
+    }
+    guard progress(total, total) else { throw .cancelled }
+    let listed = RemoteItem(
+      path: path, kind: .file, size: reportedSizes[path] ?? total, modified: modified)
+    return Downloaded(listed: listed, received: total)
+  }
 }
 
 // MARK: Test controls
