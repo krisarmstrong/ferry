@@ -38,24 +38,34 @@ struct StallWatchTests {
   }
 
   /// A long transfer that keeps making progress runs to its end, past the limit many times.
+  /// The test beats for it and moves the clock itself, 50 s at a time, so no 60 s goes by
+  /// without a beat whatever order the tasks run in.
   @Test func workThatKeepsBeatingIsNotStopped() async throws {
     let clock = ManualClock()
-    let result = await clock.advancing(by: .seconds(10)) {
-      () async -> Result<Int, TransportError> in
+    let (started, start) = AsyncStream.makeStream(of: TransferHeartbeat.self)
+    let (released, release) = AsyncStream.makeStream(of: Void.self)
+    let work = Task { () async -> Result<Int, TransportError> in
       do throws(TransportError) {
         return .success(
           try await StallWatch.run(limit: .seconds(60), clock: clock) {
             () async throws(TransportError) -> Int in
-            for _ in 0..<30 {
-              TransferHeartbeat.current?.beat()
-              try? await clock.sleep(for: .seconds(10))
-            }
+            if let heartbeat = TransferHeartbeat.current { start.yield(heartbeat) }
+            for await _ in released {}
             return 7
           })
       } catch {
         return .failure(error)
       }
     }
-    #expect(result == .success(7))
+    var beats = started.makeAsyncIterator()
+    let heartbeat = try #require(await beats.next())
+    await clock.waitForSleeper()
+    for _ in 0..<10 {
+      heartbeat.beat()
+      await clock.advance(by: .seconds(50))
+    }
+    release.finish()
+
+    #expect(await work.value == .success(7))
   }
 }
