@@ -81,8 +81,7 @@ struct ADBWirelessServiceTests {
   /// No server: Ferry starts none for a connect, a pair or a disconnect, and runs no adb. A
   /// disconnect that reached no server did not disconnect anything, so it throws too.
   @Test func noServerIsUnavailable() async throws {
-    let closed = try ClosedPort()
-    let wireless = ADBWirelessTests.wireless(port: closed.port)
+    let wireless = ADBWirelessTests.wireless(port: 5037, opener: ADBHost.refusing)
     await #expect(throws: ADBError.serverUnavailable) {
       _ = try await wireless.connect(ADBWirelessTests.etherScope)
     }

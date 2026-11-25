@@ -36,9 +36,11 @@ struct ADBWirelessTests {
   }
 
   /// On a clock that never moves: every answer here comes, so no limit is reached.
-  static func wireless(port: UInt16) -> ADBWireless {
+  static func wireless(
+    port: UInt16, opener: @escaping ADBHost.Opener = ADBHost.socketOpener
+  ) -> ADBWireless {
     ADBWireless(
-      host: ADBHost(port: port, locator: ADBHostTests.noAdb),
+      host: ADBHost(port: port, locator: ADBHostTests.noAdb, opener: opener),
       answerLimit: ADBTransport.defaultAnswerLimit, commandLimit: ADBWireless.defaultCommandLimit,
       keeper: ADBServerKeeperTests.idle(), clock: ManualClock())
   }

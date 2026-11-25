@@ -101,15 +101,15 @@ struct ADBTrackDevicesTests {
   /// are counted, not timed.
   @Test(.timeLimit(.minutes(1)))
   func persistentOutageReportsNoDevicesOnceAndStartsTheServerOnce() async throws {
-    let closed = try ClosedPort()
     let launches = Box(0)
     let clock = ManualClock()
     let host = ADBHost(
-      port: closed.port,
+      port: 5037,
       locator: ADBLocator(
         environment: [:], home: "/x", isExecutable: { $0 == "/opt/homebrew/bin/adb" }),
       launcher: { _ in await launches.set(await launches.value + 1) },
-      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)), clock: clock)
+      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)), clock: clock,
+      opener: ADBHost.refusing)
     let reports = Mutex(0)
     let lists = host.trackDevices { reports.withLock { $0 += 1 } }
     // Each wait follows a failed connect, and the outage is reported and the server started
@@ -123,23 +123,22 @@ struct ADBTrackDevicesTests {
     #expect(await launches.value == 1)
     var iterator = lists.makeAsyncIterator()
     #expect(await iterator.next() == [])
-    withExtendedLifetime(closed) {}
   }
 
   /// No adb anywhere when the outage began (Ferry's fetched copy deleted): the start found
   /// nothing to run, which is no start. Once Ferry fetches adb again, the next retry starts it.
   @Test(.timeLimit(.minutes(1)))
   func anOutageWithNoAdbStartsTheServerOnceAdbArrives() async throws {
-    let closed = try ClosedPort()
     let present = Mutex(false)
     let launches = Box(0)
     let host = ADBHost(
-      port: closed.port,
+      port: 5037,
       locator: ADBLocator(
         environment: [:], home: "/x",
         isExecutable: { $0 == "/opt/homebrew/bin/adb" && present.withLock { $0 } }),
       launcher: { _ in await launches.set(await launches.value + 1) },
-      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)))
+      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)),
+      opener: ADBHost.refusing)
     let lists = Box<[[ADBDevice]]>([])
     let consumer = Task {
       for await list in host.trackDevices() { await lists.set(await lists.value + [list]) }
@@ -150,7 +149,6 @@ struct ADBTrackDevicesTests {
     #expect(try await eventually { await launches.value == 1 })
     consumer.cancel()
     await consumer.value
-    withExtendedLifetime(closed) {}
   }
 
   @Test func closedConnectionsAreCancelledByTheClient() async throws {
