@@ -8679,23 +8679,6 @@
         }
       }
     },
-    "AirCheck G3" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AirCheck G3"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AirCheck G3"
-          }
-        }
-      }
-    },
     "Connect an AirCheck G3" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9032,6 +9015,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Error: %@"
+          }
+        }
+      }
+    },
+    "AirCheck G3 (Wi-Fi tester)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirCheck G3 (Wi-Fi tester)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirCheck G3 (probador Wi-Fi)"
           }
         }
       }

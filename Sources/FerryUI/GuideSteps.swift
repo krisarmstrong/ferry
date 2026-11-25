@@ -19,7 +19,7 @@ public enum DeviceFamily: String, Sendable, CaseIterable, Hashable {
       LocalizedStringResource(
         "LinkRunner 10G, LinkRunner 100G, EtherScope nXG or CyberScope", bundle: .module)
     case .airCheckG3:
-      LocalizedStringResource("AirCheck G3", bundle: .module)
+      LocalizedStringResource("AirCheck G3 (Wi-Fi tester)", bundle: .module)
     case .otherAndroid8to9:
       LocalizedStringResource("Other Android phone (Android 8 or 9)", bundle: .module)
     case .otherAndroid10Plus:

@@ -163,7 +163,7 @@ En la app, **Cómo activar la depuración por USB** abre los pasos para activar 
 
 Si el dispositivo acepta ADB por la red, usa **Conectar por dirección…**.
 
-#### AirCheck G3
+#### AirCheck G3 (probador Wi-Fi)
 
 1. En el probador, abre **Configuración**, busca **Número de compilación** (normalmente en **Acerca de**) y tócalo hasta que se active el modo de desarrollador.
 2. En el probador, abre **Opciones para desarrolladores** en **Configuración** y activa **Depuración por USB**.

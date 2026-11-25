@@ -137,7 +137,7 @@
               "note": "If the device accepts ADB over the network, use **Connect by Address…**."
             },
             {
-              "title": "AirCheck G3",
+              "title": "AirCheck G3 (Wi-Fi tester)",
               "steps": [
                 "On the tester, open **Settings**, find **Build number** (usually under **About**) and tap it until developer mode is on.",
                 "On the tester, open **Developer options** in **Settings** and turn on **USB debugging**.",

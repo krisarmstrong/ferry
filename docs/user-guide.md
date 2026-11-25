@@ -163,7 +163,7 @@ In the app, **How to Turn On USB Debugging** opens the USB debugging steps.
 
 If the device accepts ADB over the network, use **Connect by Address…**.
 
-#### AirCheck G3
+#### AirCheck G3 (Wi-Fi tester)
 
 1. On the tester, open **Settings**, find **Build number** (usually under **About**) and tap it until developer mode is on.
 2. On the tester, open **Developer options** in **Settings** and turn on **USB debugging**.
