@@ -1,7 +1,7 @@
 # CI points this at the runner's newest Xcode.
 export DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 
-.PHONY: lint fmt fmt-check test build libmtp-pc app check-app guide release
+.PHONY: lint fmt fmt-check test test-tsan build libmtp-pc app check-app guide release
 
 lint:
 	swiftlint --strict
@@ -17,13 +17,20 @@ fmt-check:
 # (Package.swift), so a clean build is the only build.
 LIBMTP_PC_DIR := $(CURDIR)/.build/pkgconfig
 USER_PKG_CONFIG_PATH := $(PKG_CONFIG_PATH)
-test build: export PKG_CONFIG_PATH := $(LIBMTP_PC_DIR)$(if $(USER_PKG_CONFIG_PATH),:$(USER_PKG_CONFIG_PATH))
+test test-tsan build: export PKG_CONFIG_PATH := $(LIBMTP_PC_DIR)$(if $(USER_PKG_CONFIG_PATH),:$(USER_PKG_CONFIG_PATH))
 
 libmtp-pc:
 	PKG_CONFIG_PATH='$(USER_PKG_CONFIG_PATH)' scripts/libmtp-pkgconfig.sh '$(LIBMTP_PC_DIR)'
 
 test: libmtp-pc
 	swift test $(TEST_FLAGS)
+
+# The concurrency-heavy targets under Thread Sanitizer. Any race fails the run; none is suppressed.
+# The wall-clock benchmark is skipped: its millisecond bounds measure the sanitizer's slowdown, not
+# Ferry. Serial, because the instrumented tests are slow enough for timed waits to flake in parallel.
+test-tsan: libmtp-pc
+	swift test --sanitize=thread --no-parallel --skip ItemTableBenchmarkTests \
+		--filter 'FerryAgentCoreTests|FerryIPCTests|DeviceKitTests|ADBTransportTests'
 
 # docs/user-guide.md, rendered from Sources/FerryUI/help.json; a test fails if they differ.
 guide:

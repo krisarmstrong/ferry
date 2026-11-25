@@ -125,3 +125,58 @@ Sparkle never installs an older version over a newer one. To stop a bad release 
 offered, mark the previous release as the latest
 (`gh release edit vPREVIOUS --latest`): copies that have not updated yet stop seeing the bad one.
 Copies that already updated get the fix only from a newer release, so ship `vX.Y.Z+1`.
+
+## Losing a signing key
+
+Two keys sign a release, and Sparkle checks both: an update installs if the archive's EdDSA
+signature matches the `SUPublicEDKey` already in the installed app, **or** (when the EdDSA
+signature fails) the new app is signed by the same Developer ID team as the installed one. So
+one key can change at a time, never both in the same release. Rotate them one after the other,
+and ship a release between.
+
+Backups: the owner keeps the Sparkle private key (the output of `generate_keys -x`) and the
+Developer ID `.p12` and the notary `.p8` offline, in at least two places. They are never in the
+repository, a PR, an issue or a log. The Actions secrets (`SPARKLE_PRIVATE_KEY`,
+`DEVELOPER_ID_P12_BASE64`, `NOTARY_*`) are a working copy, not a backup: GitHub never shows them
+again.
+
+### Lost, not leaked
+
+Nothing is wrong yet for users: installed copies keep running and the feed keeps working. What
+breaks is the next release.
+
+- **Sparkle key lost, Developer ID intact.** Create a new key (`generate_keys`), put its public
+  half in `project.yml` (`FERRY_SPARKLE_PUBLIC_KEY`) and the private half in the `release`
+  environment secret `SPARKLE_PRIVATE_KEY` (`scripts/release-secrets.sh`). Ship the release
+  through a PR as usual. It is signed with the new key, which installed copies reject, and so
+  they fall back to the Developer ID check: same team, so it installs. From then on, copies
+  that updated hold the new key.
+- **Developer ID certificate lost or expired, Sparkle key intact.** Issue a new Developer ID
+  Application certificate in the same Apple team, export a new `.p12`, update the `release`
+  secrets, and ship. The team ID is unchanged, and the Sparkle signature still matches, so
+  copies update. Notarization uses the App Store Connect key, a separate secret.
+- **Both lost.** There is no automatic path. Copies cannot verify a new release by either
+  check, so users must download the new `Ferry.dmg` from the release page once and replace the
+  app. Say so in the release notes, and avoid this by keeping the backups above apart.
+
+### Leaked, or suspected leaked
+
+Rotate at once, and treat a leaked key as one an attacker can use to sign updates.
+
+1. Remove the leaked secret from the `release` environment, and stop the release workflow
+   running until the replacement is in place.
+2. **Developer ID:** revoke the certificate at developer.apple.com, issue a new one in the same
+   team, and update the secrets. **Sparkle:** do the rotation above.
+3. Ship a fixed release signed with the new key. If both leaked, rotate them in two releases.
+   Copies that installed an update built by an attacker are not recovered by this: say so
+   in an advisory.
+4. Publish a GitHub security advisory saying what leaked, the versions affected and that
+   users should install the new release.
+
+### Order, either way
+
+1. Recover or issue the replacement key, and store its backup offline first.
+2. Update `project.yml` (Sparkle public key, through a PR) and the `release` secrets.
+3. Run a release (`docs/RELEASING.md`, Each release) and check the build job's signing step.
+4. Install the previous release, check for updates, and confirm it offers and installs the new
+   one. Only then rotate the second key, if it too has to change.
