@@ -1,0 +1,41 @@
+name: Thread Sanitizer
+
+# The agent, the IPC layer and the transports are concurrent code; the sanitizer slows the
+# build and the tests several times over, so it runs on main and weekly, not on every PR.
+# Run it by hand for a branch with `make test-tsan`.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tsan-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  LIBMTP_VERSION: 1.1.23
+
+jobs:
+  tsan:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install libmtp
+        run: |
+          brew install libmtp pkgconf
+          installed="$(brew list --versions libmtp | awk '{print $2}')"
+          [ "$installed" = "$LIBMTP_VERSION" ] \
+            || { echo "::error::libmtp is $installed, CI expects $LIBMTP_VERSION"; exit 1; }
+      - name: Test under Thread Sanitizer
+        run: make test-tsan
