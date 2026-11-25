@@ -146,7 +146,7 @@ struct MTPSessionStaleObjectInfoTests {
     defer { try? FileManager.default.removeItem(at: local) }
 
     await #expect(throws: TransportError.changedOnDevice(try SessionFixture.path("/a.txt"))) {
-      _ = try await SafeWriter(session: session).write(
+      _ = try await SafeWriter(session: session, backups: .scratch()).write(
         from: local, to: SessionFixture.path("/a.txt"), in: storage, replacing: true,
         expecting: checked, progress: SessionFixture.noProgress)
     }
@@ -170,7 +170,7 @@ struct MTPSessionStaleObjectInfoTests {
     defer { try? FileManager.default.removeItem(at: local) }
 
     await #expect(throws: TransportError.changedOnDevice(try SessionFixture.path("/a.txt"))) {
-      _ = try await SafeWriter(session: session).write(
+      _ = try await SafeWriter(session: session, backups: .scratch()).write(
         from: local, to: SessionFixture.path("/a.txt"), in: storage, replacing: true,
         expecting: checked, progress: SessionFixture.noProgress)
     }

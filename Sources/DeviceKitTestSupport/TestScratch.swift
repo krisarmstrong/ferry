@@ -1,3 +1,4 @@
+import DeviceKit
 import Foundation
 
 /// Temporary files for tests: every one under a single folder for the test process, which is
@@ -80,5 +81,14 @@ public enum TestScratch {
       else { continue }
       try? FileManager.default.removeItem(at: temporary.appending(path: name))
     }
+  }
+}
+
+extension ReplaceBackups {
+  /// A new empty backup folder under the test scratch folder, so the size guard covers it.
+  public static func scratch() -> ReplaceBackups {
+    ReplaceBackups(
+      folder: TestScratch.root.appending(
+        path: "backups-\(UUID().uuidString)", directoryHint: .isDirectory))
   }
 }

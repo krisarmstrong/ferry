@@ -49,6 +49,9 @@ public actor DomainController {
   let hub: DeviceHub
   let manager: any DomainManaging
   let itemStore: URL
+  /// Where a replace on a device that cannot rename keeps the old file until the new one is in
+  /// place (see `SafeWriter`).
+  let backups: ReplaceBackups
   /// Times the retry of a hide or show that failed.
   let clock: any Clock<Duration>
   var visibilityRetryTask: Task<Void, Never>?
@@ -83,23 +86,17 @@ public actor DomainController {
   var requestsAwaitingAdoption: Int { adoptionWaiters.count }
 
   /// `itemStore` is the folder holding the item tables, one file per domain. It must be the
-  /// agent's own: the sandboxed extension can write to the app group's container. `clock` times
-  /// retries; the hub's by default.
+  /// agent's own: the sandboxed extension can write to the app group's container. `backups` is
+  /// the agent's own too. `clock` times retries; the hub's by default.
   public init(
-    hub: DeviceHub, manager: any DomainManaging, itemStore: URL,
+    hub: DeviceHub, manager: any DomainManaging, itemStore: URL, backups: ReplaceBackups,
     clock: (any Clock<Duration>)? = nil
   ) {
     self.hub = hub
     self.manager = manager
     self.itemStore = itemStore
+    self.backups = backups
     self.clock = clock ?? hub.clock
-  }
-
-  /// The agent's item store, in its own Application Support folder.
-  public static func defaultItemStore() throws -> URL {
-    try FileManager.default.url(
-      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
-    ).appending(path: "io.github.krisarmstrong.ferry.agent/items", directoryHint: .isDirectory)
   }
 
   /// Follows the hub until the calling task is cancelled. Call it once: it is the only consumer
@@ -143,7 +140,8 @@ public actor DomainController {
     let (storage, items) = try await connected(domain)
     let lease = try await leaseSession(of: storage.device)
     return Route(
-      storage: storage, session: lease.session, writer: SafeWriter(session: lease.session),
+      storage: storage, session: lease.session,
+      writer: SafeWriter(session: lease.session, backups: backups),
       items: items, lease: lease, hub: hub)
   }
 

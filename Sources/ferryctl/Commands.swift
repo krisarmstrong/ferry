@@ -83,7 +83,12 @@ private func withTarget(
       let id = try DeviceSelection.pickStorage(
         description: storage?.storage, from: await session.storages()
       ).id
-      try await body(Target(session: session, writer: SafeWriter(session: session), storage: id))
+      try await body(
+        Target(
+          session: session,
+          // The agent's folder, so a backup ferryctl leaves is settled by either.
+          writer: SafeWriter(session: session, backups: try ReplaceBackups.standard()),
+          storage: id))
     } catch {
       await session.close()
       throw error

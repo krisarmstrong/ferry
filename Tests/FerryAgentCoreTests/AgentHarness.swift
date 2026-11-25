@@ -56,6 +56,8 @@ struct AgentHarness {
   let retryClock = ManualClock()
   let scratch: URL
   let store: URL
+  /// The agent's replace backups, under the test scratch folder.
+  let backups: ReplaceBackups
   private let ticks: AsyncStream<Void>.Continuation
   private let runner: Task<Void, Never>
 
@@ -65,6 +67,8 @@ struct AgentHarness {
     changes: ((DomainController) -> ChangeWatch)? = nil
   ) throws {
     self.store = store
+    let backups = ReplaceBackups.scratch()
+    self.backups = backups
     self.manager = manager ?? FakeDomainManager(existing: existing)
     let mtp = FakeTransport(devices: devices)
     transport = mtp
@@ -75,7 +79,7 @@ struct AgentHarness {
       adb.map { CompositeTransport(mtp: mtp, adb: $0) } ?? mtp
     hub = DeviceHub(transport: served, arrivals: arrivals, clock: clock)
     controller = DomainController(
-      hub: hub, manager: self.manager, itemStore: store, clock: retryClock)
+      hub: hub, manager: self.manager, itemStore: store, backups: backups, clock: retryClock)
     scratch = TestScratch.root.appending(
       path: "ferry-agent-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)

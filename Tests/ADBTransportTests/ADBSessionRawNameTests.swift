@@ -147,7 +147,7 @@ struct ADBSessionRawNameTests {
     let file = try ADBFixture.localFile(Data("new".utf8))
     defer { try? FileManager.default.removeItem(at: file) }
     try await ADBFixture.withSession(device) { session in
-      _ = try await SafeWriter(session: session).write(
+      _ = try await SafeWriter(session: session, backups: .scratch()).write(
         from: file, to: RemotePath("/Big/new.txt"), in: storage, replacing: false,
         progress: ADBFixture.noProgress)
     }

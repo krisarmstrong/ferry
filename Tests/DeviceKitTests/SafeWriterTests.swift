@@ -35,7 +35,7 @@ struct SafeWriterTests {
 
   @Test func writesViaTempThenRenames() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/a.txt")
     try await withTempFile(Data([1, 2, 3, 4])) { file in
       let item = try await writer.write(from: file, to: path, replacing: false)
@@ -47,7 +47,7 @@ struct SafeWriterTests {
 
   @Test func disconnectMidUploadLeavesNoFinalName() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/a.txt")
     await device.failUpload(afterBytes: 2, with: .deviceDisconnected)
     try await withTempFile(Data([1, 2, 3, 4])) { file in
@@ -61,7 +61,7 @@ struct SafeWriterTests {
 
   @Test func listingHidesAndDeletesPartials() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     try await device.seed(RemotePath("/a.txt"), in: storageID, contents: Data([1]))
     try await device.seed(RemotePath("/.ferry-partial-X"), in: storageID, contents: Data([1]))
 
@@ -78,18 +78,24 @@ struct SafeWriterTests {
     try await device.seed(partial, in: storageID, contents: Data([1]))
     await device.partials.registerInFlight(partial, in: storageID)
 
-    #expect(try await SafeWriter(session: device).visibleList(.root, in: storageID).isEmpty)
-    #expect(try await SafeWriter(session: device).visibleList(.root, in: storageID).isEmpty)
+    #expect(
+      try await SafeWriter(session: device, backups: .scratch()).visibleList(.root, in: storageID)
+        .isEmpty)
+    #expect(
+      try await SafeWriter(session: device, backups: .scratch()).visibleList(.root, in: storageID)
+        .isEmpty)
     #expect(await device.allPaths(in: storageID) == [partial])
 
     await device.partials.unregisterInFlight(partial, in: storageID)
-    #expect(try await SafeWriter(session: device).visibleList(.root, in: storageID).isEmpty)
+    #expect(
+      try await SafeWriter(session: device, backups: .scratch()).visibleList(.root, in: storageID)
+        .isEmpty)
     #expect(await device.allPaths(in: storageID).isEmpty)
   }
 
   @Test func shortWriteThrowsSizeMismatchAndCleansUp() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     await device.truncateUploads(to: 1)
     try await withTempFile(Data([1, 2, 3, 4])) { file in
       await #expect(throws: TransportError.sizeMismatch(expected: 4, actual: 1)) {
@@ -104,7 +110,7 @@ struct SafeWriterTests {
   @Test(arguments: [true, false])
   func oversizeRejectionMapsToTooLargeOnlyOnFAT(isFATLike: Bool) async throws {
     let device = makeDevice(isFATLike: isFATLike)
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let size: UInt64 = 4_294_967_296
     // Sparse, in the watched test folder: it takes no space, and a fake that read it whole
     // could not write it out.
@@ -126,7 +132,7 @@ struct SafeWriterTests {
 
   @Test func insufficientSpaceRejectedBeforeUpload() async throws {
     let device = makeDevice(free: 2)
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     try await withTempFile(Data([1, 2, 3, 4])) { file in
       await #expect(throws: TransportError.insufficientSpace(needed: 4, free: 2)) {
         _ = try await writer.write(from: file, to: RemotePath("/a.txt"), replacing: false)
@@ -138,7 +144,7 @@ struct SafeWriterTests {
   /// An unknown storage must not read as "nothing there", which would skip the space check.
   @Test func unknownStorageIsRejectedBeforeUpload() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let unknown = StorageID(device: deviceID, key: "SD|vol9")
     try await withTempFile(Data([1, 2])) { file in
       await #expect(throws: TransportError.storageNotFound(unknown.key)) {
@@ -152,7 +158,7 @@ struct SafeWriterTests {
 
   @Test func replacingSwapsInTheNewFileThenDropsTheOld() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/a.txt")
     try await device.seed(path, in: storageID, contents: Data([9]))
     try await withTempFile(Data([1, 2])) { file in
@@ -164,7 +170,7 @@ struct SafeWriterTests {
 
   @Test func notReplacingThrowsAlreadyExists() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/a.txt")
     try await device.seed(path, in: storageID, contents: Data([9]))
     try await withTempFile(Data([1, 2])) { file in
@@ -179,7 +185,7 @@ struct SafeWriterTests {
   /// libmtp sends exactly the size it is told, so a link's own size would truncate the upload.
   @Test func symlinkUploadsTheTargetsFullSize() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/a.txt")
     let link = TestScratch.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: link) }
@@ -194,7 +200,7 @@ struct SafeWriterTests {
 
   @Test func renameFailureFallsBackToDirectUpload() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/a.txt")
     await device.failRename(with: .unsupported("rename"))
     try await withTempFile(Data([1, 2, 3])) { file in
@@ -206,7 +212,7 @@ struct SafeWriterTests {
 
   @Test func uploadOverNFDNameReplacesExisting() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     try await device.seed(RemotePath("/caf\u{00E9}.txt"), in: storageID, contents: Data([9]))
     try await withTempFile(Data([1, 2])) { file in
       _ = try await writer.write(
@@ -219,7 +225,7 @@ struct SafeWriterTests {
 
   @Test func renameAlreadyExistsKeepsTheOtherFileAndSurfaces() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/a.txt")
     try await device.seed(path, in: storageID, contents: Data([9]))
     // A false "not found" skips the replace delete, so the rename meets an occupied name.
@@ -236,7 +242,7 @@ struct SafeWriterTests {
 
   @Test func existenceCheckErrorOtherThanNotFoundPropagates() async throws {
     let device = makeDevice()
-    let writer = SafeWriter(session: device)
+    let writer = SafeWriter(session: device, backups: .scratch())
     let path = try RemotePath("/a.txt")
     try await device.seed(path, in: storageID, contents: Data([9]))
     await device.failList(with: .deviceBusy)

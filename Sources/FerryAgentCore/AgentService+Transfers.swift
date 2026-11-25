@@ -37,6 +37,12 @@ extension AgentService {
   }
 
   /// Copies `source` into a scratch file, then uploads that through the domain's writer.
+  ///
+  /// A file already at the name with exactly these bytes is this create, done before: one whose
+  /// reply never reached FileProvider (the extension or this agent went away first), which
+  /// FileProvider sends again. It is answered with that file. A collision there would make
+  /// FileProvider rename its own copy to "name 2" and send that too, a duplicate of a file the
+  /// device already has.
   func upload(
     _ source: Int32, as name: String, in parent: ItemID, of domain: String,
     progress: @escaping TransferProgressHandler
@@ -46,13 +52,39 @@ extension AgentService {
     defer { FileTransfer.remove(scratch) }
     return try await gated(domain) { route throws(TransportError) in
       let path = try await route.writableFolder(parent).appending(name)
-      let item = try await transfers.track(
-        Self.transfer(path, .toDevice, on: route), report: progress
-      ) { handler throws(TransportError) in
-        try await route.writer.write(
-          from: scratch, to: path, in: route.storage, replacing: false, progress: handler)
+      do throws(TransportError) {
+        let item = try await transfers.track(
+          Self.transfer(path, .toDevice, on: route), report: progress
+        ) { handler throws(TransportError) in
+          try await route.writer.write(
+            from: scratch, to: path, in: route.storage, replacing: false, progress: handler)
+        }
+        return await route.items.created(item)
+      } catch .alreadyExists(let taken) where taken == path {
+        guard let same = await sameFile(at: path, as: scratch, on: route) else {
+          throw .alreadyExists(taken)
+        }
+        return await route.items.observed(same)
       }
-      return await route.items.created(item)
+    }
+  }
+
+  /// The device's file at `path` if it holds exactly the bytes of `local`; `nil` if it holds
+  /// others or cannot be read.
+  private func sameFile(at path: RemotePath, as local: URL, on route: DomainController.Route)
+    async -> RemoteItem?
+  {
+    guard let item = try? await route.session.item(at: path, in: route.storage),
+      item.kind == .file, (try? LocalFile.regularFileSize(local)) == item.size
+    else { return nil }
+    let copy = FileTransfer.scratchURL(in: scratchFolder)
+    defer { FileTransfer.remove(copy) }
+    do throws(TransportError) {
+      try await route.session.download(
+        path, in: route.storage, to: copy, replacing: true, progress: { _, _ in true })
+      return try LocalFile.sha256(copy) == LocalFile.sha256(local) ? item : nil
+    } catch {
+      return nil
     }
   }
 
@@ -78,7 +110,12 @@ extension AgentService {
         let current = try await route.session.item(at: path, in: route.storage)
         // As FileProvider holds it: at the size a download delivered (see `delete`).
         let entry = await route.items.observed(current)
-        if entry.item.kind == .file, !ContentVersion(entry.item).matches(base) {
+        // A file an earlier failed replace put back holds the bytes the save was based on, though
+        // it is dated when it went back: a retry of that save is no conflict.
+        let restoredFrom = await route.session.partials.original(
+          ofRestored: current, in: route.storage)
+        let version = restoredFrom.map(ContentVersion.init) ?? ContentVersion(entry.item)
+        if entry.item.kind == .file, !version.matches(base) {
           return try await keepDevice(
             entry, onConflict, mac: scratch, on: route, report: progress)
         }

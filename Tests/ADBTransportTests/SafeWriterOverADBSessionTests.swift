@@ -16,7 +16,7 @@ struct SafeWriterOverADBSessionTests {
   ) async throws -> RemoteItem {
     let file = try ADBFixture.localFile(data)
     defer { try? FileManager.default.removeItem(at: file) }
-    return try await SafeWriter(session: session).write(
+    return try await SafeWriter(session: session, backups: .scratch()).write(
       from: file, to: ADBFixture.path(target), in: storage, replacing: replacing,
       progress: progress)
   }
@@ -83,7 +83,8 @@ struct SafeWriterOverADBSessionTests {
           Data(count: 100_000), to: "/a.txt", on: session, replacing: true
         ) { _, _ in false }
       }
-      let visible = try await SafeWriter(session: session).visibleList(.root, in: storage)
+      let visible = try await SafeWriter(session: session, backups: .scratch()).visibleList(
+        .root, in: storage)
       #expect(visible.map(\.path) == [try ADBFixture.path("/a.txt")])
     }
     #expect(device.contents("/a.txt") == Data("old".utf8))
@@ -95,7 +96,7 @@ struct SafeWriterOverADBSessionTests {
     device.addFile("/a.txt", Data("a".utf8))
     device.addFile("/.ferry-partial-X", Data("p".utf8))
     let visible = try await ADBFixture.withSession(device) { session in
-      try await SafeWriter(session: session).visibleList(.root, in: storage)
+      try await SafeWriter(session: session, backups: .scratch()).visibleList(.root, in: storage)
     }
     #expect(visible.map(\.path) == [try ADBFixture.path("/a.txt")])
     #expect(device.tree == ["/a.txt"])

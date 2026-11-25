@@ -3,9 +3,72 @@ import Foundation
 
 /// Test controls: injected failures and the device's contents.
 extension FakeDevice {
-  /// The next upload stores its first `afterBytes` bytes, then throws `error`.
-  public func failUpload(afterBytes: UInt64, with error: TransportError) {
-    uploadFailure = (afterBytes, error)
+  /// After the next `skipping` uploads, the next one stores its first `afterBytes` bytes, then
+  /// throws `error`.
+  public func failUpload(afterBytes: UInt64, with error: TransportError, skipping: Int = 0) {
+    uploadFailure = UploadFailure(
+      skipping: skipping, afterBytes: afterBytes, error: error, disconnects: false)
+  }
+
+  /// After the next `skipping` uploads, the next one stores its first `afterBytes` bytes and the
+  /// device goes away, as when the cable is pulled mid-transfer: nothing more reaches it, not
+  /// even the clean-up of what it kept.
+  public func disconnectDuringUpload(afterBytes: UInt64, skipping: Int = 0) {
+    uploadFailure = UploadFailure(
+      skipping: skipping, afterBytes: afterBytes, error: .deviceDisconnected, disconnects: true)
+  }
+
+  /// The failure the upload starting now meets, if any, counting down the uploads it skips.
+  func nextUploadFailure() -> UploadFailure? {
+    guard var failure = uploadFailure else { return nil }
+    if failure.skipping > 0 {
+      failure.skipping -= 1
+      uploadFailure = failure
+      return nil
+    }
+    uploadFailure = nil
+    return failure
+  }
+
+  struct DownloadFailure {
+    var skipping: Int
+    let afterBytes: UInt64
+    /// `nil`: the download reports success with only what arrived.
+    let error: TransportError?
+  }
+
+  /// After the next `skipping` downloads, the next one writes its first `afterBytes` bytes to the
+  /// Mac, then throws `error`.
+  public func failDownload(afterBytes: UInt64, with error: TransportError, skipping: Int = 0) {
+    downloadFailure = DownloadFailure(skipping: skipping, afterBytes: afterBytes, error: error)
+  }
+
+  /// The next download delivers only its first `bytes` bytes and reports itself done, as a
+  /// transport that loses the end of a file without noticing.
+  public func shortenNextDownload(to bytes: UInt64) {
+    downloadFailure = DownloadFailure(skipping: 0, afterBytes: bytes, error: nil)
+  }
+
+  func nextDownloadFailure() -> DownloadFailure? {
+    guard var failure = downloadFailure else { return nil }
+    if failure.skipping > 0 {
+      failure.skipping -= 1
+      downloadFailure = failure
+      return nil
+    }
+    downloadFailure = nil
+    return failure
+  }
+
+  /// Runs `hook` when the next download starts, as the device going away mid-transfer.
+  public func onNextDownload(_ hook: @escaping @Sendable () async -> Void) {
+    downloadHook = hook
+  }
+
+  func runDownloadHook() async {
+    guard let hook = downloadHook else { return }
+    downloadHook = nil
+    await hook()
   }
 
   /// Uploads keep only the first `bytes` bytes and report success. `nil` turns this off.
