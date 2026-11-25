@@ -87,8 +87,8 @@ public struct SafeWriter: Sendable {
     // Read once, before the upload. A file the device swaps in during the upload is caught when
     // `commit` sets the old one aside: the backup must still be `existing`.
     let listing = WriteListing()
-    let existing = try await listing.run { () async throws(TransportError) in
-      try await existing(path, in: storage)
+    let existing = try await listing.run { () async throws(TransportError) -> RemoteItem? in
+      try await self.existing(path, in: storage)
     }
     if let expecting, existing != expecting {
       throw .changedOnDevice(path)
@@ -100,7 +100,7 @@ public struct SafeWriter: Sendable {
     let partial = try parent.appending(Self.partialPrefix + UUID().uuidString)
     await session.partials.registerInFlight(partial, in: storage)
     do {
-      let item = try await listing.run { () async throws(TransportError) in
+      let item = try await listing.run { () async throws(TransportError) -> RemoteItem in
         try await commit(
           Source(file: file, size: size, onFAT: target.isFATLike), via: partial,
           to: Destination(path: path, name: name, replacing: existing), in: storage,
