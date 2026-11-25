@@ -12,6 +12,7 @@ actor FakeDomainManager: DomainManaging {
     case remove(String)
     case removeAll
     case signal(String)
+    case lockResolved(String)
   }
 
   private(set) var calls: [Call] = []
@@ -112,6 +113,10 @@ actor FakeDomainManager: DomainManaging {
   }
   func signal(_ identifier: String) async {
     record(.signal(identifier))
+  }
+
+  func lockResolved(_ identifier: String) async {
+    record(.lockResolved(identifier))
   }
   /// Kept out of `calls`: every disconnect and reconnect comes with one, so tests of the order
   /// of system calls read the same either way. Tests check `hidden` instead.
@@ -255,6 +260,13 @@ actor FakeDomainManager: DomainManaging {
 
   /// Returns every call so far, once there are at least `count` or the test is cancelled, as
   /// its time limit does, so a missing call fails the test instead of hanging it.
+  /// Returns once `call` has been made, or the test is cancelled.
+  func waitFor(_ call: Call) async {
+    while !calls.contains(call), !Task.isCancelled {
+      _ = await waitForCalls(calls.count + 1)
+    }
+  }
+
   func waitForCalls(_ count: Int) async -> [Call] {
     guard calls.count < count, !Task.isCancelled else { return calls }
     nextWaiter += 1

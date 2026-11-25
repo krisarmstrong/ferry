@@ -59,12 +59,17 @@ actor MTPSession: DeviceSession {
   /// Reopens the device between operations, then reads its storages again, since their raw
   /// IDs are per connection. A device that cannot be opened again is gone.
   func forgetCachedItems() async throws(TransportError) {
-    try await operation { () throws(TransportError) in
-      await resolver.invalidateAll()
-      try await device.reopen()
-      rawStorages = [:]
-      _ = try await refreshStorages()
-    }
+    try await operation { () throws(TransportError) in try await reopenForFreshInfo() }
+  }
+
+  /// Reopens the device, so the next reads see its items as they are now: libmtp keeps the
+  /// object info it first read for an object, and only a new connection reads it again. Call it
+  /// inside an operation.
+  func reopenForFreshInfo() async throws(TransportError) {
+    await resolver.invalidateAll()
+    try await device.reopen()
+    rawStorages = [:]
+    _ = try await refreshStorages()
   }
 
   func close() async {

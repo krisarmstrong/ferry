@@ -204,13 +204,22 @@ public actor AgentService: AgentHandling {
     }
   }
 
+  /// How long a move's copy may go with no sign of progress before it is failed (see
+  /// `StallWatch`). A move the device does in one step is never judged by it.
+  static let moveStallLimit = Duration.seconds(60)
+
   private func move(_ id: ItemID, to folder: ItemID, in domain: String)
     async throws(TransportError) -> ProviderEntry
   {
     try await gated(domain) { route throws(TransportError) in
       let path = try await route.changeable(id)
       let destination = try await route.writableFolder(folder)
-      let item = try await route.session.move(path, toFolder: destination, in: route.storage)
+      let session = route.session
+      let storage = route.storage
+      let item = try await StallWatch.run(limit: Self.moveStallLimit, clock: hub.clock) {
+        () async throws(TransportError) -> RemoteItem in
+        try await session.move(path, toFolder: destination, in: storage)
+      }
       await route.items.moved(path, to: item.path)
       return await route.items.changed(item, id: id)
     }
@@ -295,16 +304,36 @@ extension AgentService {
     if changed {
       await domains.signal(domain)
     }
-    if case .failure(.storageNotFound) = result {
+    switch result {
+    case .failure(.storageNotFound):
       // The device is still attached but the storage is gone (an SD card taken out). Its
       // storages are read again, so the domain disconnects rather than looking empty.
       await hub.recheck(route.storage.device)
+    case .failure(.deviceLocked):
+      // FileProvider now holds the domain's work until told the lock is gone. The device is
+      // read again: still locked, the domain disconnects and its reconnect tells FileProvider;
+      // unlocked already (a lock in passing), FileProvider is told now.
+      await domains.noteRefusedAsLocked(domain)
+      await hub.recheck(route.storage.device)
+      if await isReady(route.storage.device) { await domains.resolveLockRefusal(domain) }
+    case .success:
+      await domains.resolveLockRefusal(domain)
+    case .failure:
+      break
     }
     return try result.get()
   }
 }
 
 extension AgentService {
+  func isReady(_ device: DeviceID) async -> Bool {
+    guard let attached = await hub.devices().first(where: { $0.id == device }) else {
+      return false
+    }
+    if case .ready = attached.state { return true }
+    return false
+  }
+
   /// The menu's status, once the hub has scanned.
   func status() async -> StatusReport {
     await hub.firstScan()
