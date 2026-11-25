@@ -14,6 +14,17 @@ extension AppModel {
     return !(contents ?? []).isEmpty
   }
 
+  /// Adds `saved` to the locations shown and drops any that no longer hold anything (the user
+  /// moved the files back, or deleted them). A later action never hides one that still does:
+  /// the files there reached no device.
+  func keepPreservedChanges(adding saved: [URL] = []) {
+    var kept: [URL] = []
+    for location in preservedChanges + saved where !kept.contains(location) {
+      if Self.holdsSomething(location) { kept.append(location) }
+    }
+    preservedChanges = kept
+  }
+
   public func revealPreservedChanges() {
     services.reveal(preservedChanges)
   }

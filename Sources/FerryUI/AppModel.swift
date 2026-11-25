@@ -89,8 +89,8 @@ import os
   var probingRecordings: Set<DeviceID> = []
   /// What the last tool request said when it succeeded without a file to show.
   public internal(set) var toolMessage: String?
-  /// Where the system saved changes an eject removed before they reached the device. Shown until
-  /// the next action.
+  /// Where the system saved changes an eject removed before they reached the device. Shown while
+  /// a location still holds something, so the user can find them after any later action.
   public internal(set) var preservedChanges: [URL] = []
   /// Hidden locations, their device away, whose changes wait to be sent (see `StatusReport`).
   private(set) var waitingToSend: [String] = []
@@ -300,7 +300,7 @@ import os
   }
 
   func perform(_ request: AgentRequest) async {
-    if request != .recheckADB { preservedChanges = [] }
+    keepPreservedChanges()
     toolMessage = nil
     do {
       switch try await client.send(request, file: nil) {
@@ -308,7 +308,7 @@ import os
         actionError = nil
       case .removed(let preserved):
         actionError = nil
-        preservedChanges = preserved.filter(Self.holdsSomething)
+        keepPreservedChanges(adding: preserved)
       case .failure(let error):
         actionError = DevicePresentation.notice(for: error)
       default:
