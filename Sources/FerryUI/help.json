@@ -55,7 +55,7 @@
           "title": "Connect a network tester",
           "symbol": "cable.connector",
           "paragraphs": [
-            "For the LinkRunner 10G, EtherScope nXG and LinkRunner 100G."
+            "For the LinkRunner 10G, LinkRunner 100G, EtherScope nXG and CyberScope."
           ],
           "steps": [
             "Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac.",
@@ -66,6 +66,24 @@
           "link": {
             "title": "How to Connect",
             "target": "guide:netAllyAndroid8Board"
+          }
+        },
+        {
+          "id": "connect-aircheck",
+          "title": "Connect an AirCheck G3",
+          "symbol": "cable.connector",
+          "paragraphs": [
+            "These are Android's usual steps, which no AirCheck G3 has been checked against yet. If a name on the tester differs, look for the USB notification or the USB settings."
+          ],
+          "steps": [
+            "Connect the tester to the Mac with a USB cable.",
+            "On the tester, pull down the notification shade and tap the USB notification.",
+            "Under **USB preferences**, choose **File transfer**. Or open **Settings** → **Connected devices** → **USB**."
+          ],
+          "note": "The device appears in Finder once it shares files.",
+          "link": {
+            "title": "How to Connect",
+            "target": "guide:airCheckG3"
           }
         },
         {
@@ -108,13 +126,22 @@
           ],
           "groups": [
             {
-              "title": "LinkRunner 10G, LinkRunner 100G or EtherScope nXG",
+              "title": "LinkRunner 10G, LinkRunner 100G, EtherScope nXG or CyberScope",
               "steps": [
                 "Ask NetAlly to enable ADB on the tester.",
                 "After that, on the tester: **Settings** → **System** → **About tester**. Tap **Build number** until developer mode is on.",
                 "Go to **Settings** → **System** → **Developer options** and turn on **USB debugging**.",
                 "With the USB-C cable connected to the Mac, turn **USB debugging** off and on again. The tester offers ADB only after this.",
                 "On the device, tick **Always allow from this computer** and tap **OK**."
+              ],
+              "note": "If the device accepts ADB over the network, use **Connect by Address…**."
+            },
+            {
+              "title": "AirCheck G3 (Wi-Fi tester)",
+              "steps": [
+                "On the tester, open **Settings**, find **Build number** (usually under **About**) and tap it until developer mode is on.",
+                "On the tester, open **Developer options** in **Settings** and turn on **USB debugging**.",
+                "On the device, tick **Always allow from this computer** and tap **Allow**."
               ],
               "note": "If the device accepts ADB over the network, use **Connect by Address…**."
             },
@@ -1305,6 +1332,11 @@
               "fix": "Wait a moment and try again. If it keeps happening, quit Ferry and open it again."
             },
             {
+              "message": "Ferry's helper has too many requests waiting. Try again in a moment.",
+              "cause": "Ferry's helper was sent more requests at once than it takes, so it turned this one away.",
+              "fix": "Wait for copies in progress to finish, then try again. If it keeps happening, quit Ferry and open it again."
+            },
+            {
               "message": "Ferry was updated. Quit and reopen Ferry.",
               "cause": "A newer Ferry replaced this one while it was running.",
               "fix": "Click **Relaunch**."
@@ -1330,9 +1362,9 @@
               "fix": "Open System Settings → **General** → **Login Items & Extensions** and allow Ferry."
             },
             {
-              "message": "Could not remove Ferry. Make sure Ferry is running, then try again.",
-              "cause": "Ferry's helper did not answer, so its locations could not be removed.",
-              "fix": "Quit Ferry, open it again, then click **Remove Ferry…** again."
+              "message": "Could not remove Ferry. Try again; if it keeps failing, restart the Mac and try again.",
+              "cause": "macOS kept Ferry's locations in Finder, or would not stop Ferry's helper.",
+              "fix": "Click **Remove Ferry…** again. If it keeps failing, restart the Mac, open Ferry and remove it again."
             },
             {
               "message": "Help isn't available",
@@ -1342,15 +1374,14 @@
           ]
         },
         {
-          "id": "remove-ferry",
-          "title": "Remove Ferry",
-          "symbol": "trash",
+          "id": "copy-diagnostics",
+          "title": "Diagnostics for support",
+          "symbol": "doc.on.clipboard",
           "paragraphs": [
-            "Removes Ferry's locations from Finder, stops Ferry's helper, moves what Ferry keeps on this Mac to the Trash and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state; starting again then downloads adb from Google again.",
-            "Once the helper has stopped, Ferry moves ~/Library/Application Support/Ferry (the adb it downloaded, and that you accepted Google's license) and ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (its lists of your devices' files and the devices it reconnects over the network) to the Trash, so you can put them back if you removed Ferry by mistake. If Ferry's own adb is still running, Ferry stops it, including a shell you opened from Ferry's menu; an adb you installed yourself is left alone. Changes Finder had not sent to a device are kept, and shown in Finder.",
-            "Ferry also forgets that it ran on this Mac, so if you install it again the welcome opens again."
+            "When you ask for help with Ferry, click **Copy Diagnostics** and paste the report into your message. It goes on the clipboard and nowhere else: Ferry sends nothing.",
+            "The report lists the versions of Ferry, its helper and macOS; whether adb is installed and its server running, and the version of Ferry's own adb; each connected device's model, how Ferry reaches it and its state; and the last errors the menu showed, in their general wording. It leaves out serial numbers, network addresses, file names and folders."
           ],
-          "action": "removeFerry"
+          "action": "copyDiagnostics"
         }
       ]
     },
@@ -1362,7 +1393,7 @@
           "title": "Updates",
           "symbol": "arrow.down.circle",
           "paragraphs": [
-            "Ferry checks for a new version once a day. When there is one, it downloads it in the background and installs it the next time Ferry quits, so nothing stops while you work.",
+            "Ferry checks for a new version once a day. When there is one, it downloads it in the background and installs it the next time Ferry quits, so nothing stops while you work. Once it has downloaded, the Ferry menu shows **Update Ready — Restart Ferry** in place of Check for Updates…: choose it to install the update and open Ferry again now.",
             "To check now, choose **Check for Updates…** in the Ferry menu. Ferry shows what is new in the release and offers to install it.",
             "After an update, Ferry restarts its helper the first time it opens. Your devices leave Finder for a moment and come back; a copy that was running then stops, so copy it again.",
             "Ferry installs an update only when it carries the signature of Ferry's own release key and a valid code signature. Releases are signed with the developer's Developer ID and notarized by Apple. Ferry reads the list of releases from GitHub over a secure connection."
@@ -1378,11 +1409,23 @@
           ]
         },
         {
+          "id": "remove-ferry",
+          "title": "Remove Ferry",
+          "symbol": "trash",
+          "paragraphs": [
+            "Removes Ferry's locations from Finder, stops Ferry's helper, moves what Ferry keeps on this Mac to the Trash and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state; starting again then downloads adb from Google again. It works even when Ferry's helper is not responding.",
+            "To find it from the menu, hold Option while the Ferry menu is open: **Quit Ferry** becomes **Remove Ferry…**, which opens this page.",
+            "Once the helper has stopped, Ferry moves ~/Library/Application Support/Ferry (the adb it downloaded, and that you accepted Google's license) and ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (its lists of your devices' files and the devices it reconnects over the network) to the Trash, so you can put them back if you removed Ferry by mistake. If Ferry's own adb is still running, Ferry stops it, including a shell you opened from Ferry's menu; an adb you installed yourself is left alone. Changes Finder had not sent to a device are kept, and shown in Finder.",
+            "Ferry also forgets that it ran on this Mac, so if you install it again the welcome opens again."
+          ],
+          "action": "removeFerry"
+        },
+        {
           "id": "uninstall",
           "title": "Uninstall",
           "symbol": "xmark.bin",
           "steps": [
-            "In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, Ferry moves its data in ~/Library/Application Support to the Trash, and Ferry quits. Files on your devices are not touched.",
+            "In Ferry Help, under **About Ferry**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, Ferry moves its data in ~/Library/Application Support to the Trash, and Ferry quits. Files on your devices are not touched.",
             "Drag Ferry from Applications to the Trash.",
             "To remove Ferry's preferences too, delete ~/Library/Preferences/io.github.krisarmstrong.ferry.plist and Ferry's folder in ~/Library/Group Containers."
           ]

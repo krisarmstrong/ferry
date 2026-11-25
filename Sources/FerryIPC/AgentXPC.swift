@@ -23,8 +23,6 @@ public enum Refusal: Sendable {
   case badRequest
   /// The client's role may not send it (see `ClientRole.allows`).
   case notAllowed
-  /// The connection already has `AgentListenerDelegate.maxInFlightPerConnection` requests running.
-  case tooManyRequests
 }
 
 /// Serves agent requests from the app and the FileProvider extension.
@@ -68,7 +66,7 @@ extension AgentHandling {
 /// are limited to that role's (see `ClientRole.allows`).
 public final class AgentListenerDelegate: NSObject, NSXPCListenerDelegate, Sendable {
   /// The most requests one connection may have running at once; the next is refused with
-  /// `Refusal.tooManyRequests` until one finishes. A cancel is not a request and always passes.
+  /// `TransportError.agentBusy` until one finishes. A cancel is not a request and always passes.
   ///
   /// 128 is a backstop against a runaway or hostile client, set above anything Ferry's own
   /// clients send. It was derived from how they send, not measured against a running Finder:
@@ -204,7 +202,7 @@ final class AgentService: NSObject, AgentXPC, Sendable {
     }
     guard admit() else {
       Self.log.error("refused a request: the connection has \(self.maxInFlight) in flight")
-      reply(Self.encode(.failure(.io(handler.text(for: .tooManyRequests)))))
+      reply(Self.encode(.failure(.agentBusy)))
       return
     }
     // Registered before this call returns, so a cancel, which XPC delivers after it, finds it.

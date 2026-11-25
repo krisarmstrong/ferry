@@ -167,8 +167,13 @@ public struct FinderSender: Sendable {
   /// The folder sends go into; the agent reports a file there as `.alreadyExists` of it.
   private static let downloadFolder = try? RemotePath("/Download")
 
+  /// A file on the Mac that could not be opened for reading. The menu's Install App… says the
+  /// same, with the same Help.
+  public static let unreadableResource = LocalizedStringResource(
+    "The file can’t be read.", bundle: .module)
+
   private static var unreadable: String {
-    String(localized: LocalizedStringResource("The file can’t be read.", bundle: .module))
+    String(localized: unreadableResource)
   }
 }
 

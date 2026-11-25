@@ -329,7 +329,7 @@ struct AgentInFlightCapTests {
     var replies = try sendAll(Self.cap + 1, on: proxy).makeAsyncIterator()
     for _ in 0..<Self.cap { _ = await started.next() }
     let refused = await replies.next()
-    #expect(refused?.1 == .failure(.io(Refusal.tooManyRequests.testText)))
+    #expect(refused?.1 == .failure(.agentBusy))
     harness.release()
     var finished = 0
     while await replies.next() != nil {

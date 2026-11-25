@@ -42,12 +42,80 @@ extension AppModelTests {
       ])
   }
 
+  /// C4: the helper is the problem, so it cannot remove the locations: the app removes them
+  /// itself, then goes on as usual.
+  @Test func removeFerryWorksWithTheHelperDown() async throws {
+    let saved = try Self.savedFolder(holdingFile: true)
+    defer { try? FileManager.default.removeItem(at: saved) }
+    let client = FakeClient(log: log)
+    client.failRemoveAll()
+    let services = FakeServices(log: log)
+    services.preservedByRemoval = [saved]
+    let model = AppModel(client: client, services: services)
+    await model.removeFerry()
+    #expect(
+      log.all == [
+        "removeAllDomains", "unregisterAgent", "removeDomains", "removeData",
+        "reveal \(saved.path)", "readLoginItem", "opensAtLogin false", "quit",
+      ])
+    #expect(model.removalError == nil)
+  }
+
+  /// A helper that accepts the request and never answers does not hold Remove Ferry: after
+  /// `removalAgentWait` the app removes the locations itself.
+  @Test func removeFerryDoesNotWaitForeverOnAWedgedHelper() async {
+    let services = FakeServices(log: log)
+    let log = log
+    // The wait ends once the request is with the helper.
+    let model = AppModel(
+      client: SilentClient(log: log), services: services,
+      sleep: { _ in await log.waitFor("removeAllDomains") })
+    await model.removeFerry()
+    #expect(
+      log.all == [
+        "removeAllDomains", "unregisterAgent", "removeDomains", "removeData", "readLoginItem",
+        "opensAtLogin false", "quit",
+      ])
+  }
+
+  /// A helper macOS never registered cannot be unregistered: with no helper running, that is
+  /// not a reason to stop.
+  @Test func removeFerryGoesOnWhenNoHelperWasRegistered() async {
+    let client = FakeClient(log: log)
+    client.failRemoveAll()
+    let services = FakeServices(log: log)
+    services.failUnregister = true
+    services.agentRunning = { false }
+    let model = AppModel(client: client, services: services)
+    await model.removeFerry()
+    #expect(
+      log.all == [
+        "removeAllDomains", "unregisterAgent", "removeDomains", "removeData", "readLoginItem",
+        "opensAtLogin false", "quit",
+      ])
+  }
+
+  /// A helper still running that will not unregister would add the locations back: Remove
+  /// Ferry stops and says so.
+  @Test func removeFerryStopsWhenARunningHelperStays() async {
+    let services = FakeServices(log: log)
+    services.failUnregister = true
+    let model = AppModel(client: FakeClient(log: log), services: services)
+    await model.removeFerry()
+    #expect(log.all == ["removeAllDomains", "unregisterAgent"])
+    #expect(
+      model.removalError
+        == "Could not remove Ferry. Try again; if it keeps failing, restart the Mac and try again.")
+  }
+
   @Test func removeFerryStopsWhenDomainsRemain() async {
     let client = FakeClient(log: log)
     client.failRemoveAll()
-    let model = AppModel(client: client, services: FakeServices(log: log))
+    let services = FakeServices(log: log)
+    services.failRemoveDomains = true
+    let model = AppModel(client: client, services: services)
     await model.removeFerry()
-    #expect(log.all == ["removeAllDomains"])
+    #expect(log.all == ["removeAllDomains", "unregisterAgent", "removeDomains"])
     // Help shows it under Remove Ferry…; the menu's error row is for the menu's own actions.
     #expect(model.removalError != nil)
     #expect(model.actionError == nil)
@@ -58,6 +126,7 @@ extension AppModelTests {
     let client = FakeClient(log: log)
     client.failRemoveAll()
     let services = FakeServices(log: log)
+    services.failRemoveDomains = true
     services.failLoginItem = true
     let model = AppModel(client: client, services: services)
     model.requestOpensAtLogin(false)
@@ -76,11 +145,23 @@ extension AppModelTests {
   @Test func helpAppearingClearsAnOldRemovalError() async {
     let client = FakeClient(log: log)
     client.failRemoveAll()
-    let model = AppModel(client: client, services: FakeServices(log: log))
+    let services = FakeServices(log: log)
+    services.failRemoveDomains = true
+    let model = AppModel(client: client, services: services)
     await model.removeFerry()
     #expect(model.removalError != nil)
     model.helpAppeared()
     #expect(model.removalError == nil)
+  }
+
+  /// The menu's Option alternative of Quit Ferry opens Remove Ferry in Help, the one place it
+  /// confirms and shows a failure.
+  @Test func removeFerryFromTheMenuOpensItsHelp() {
+    let model = AppModel(client: FakeClient(log: log), services: FakeServices(log: log))
+    model.showRemoveFerry()
+    #expect(model.takeHelpRequest() == .topic("remove-ferry"))
+    #expect(String(localized: MenuFooter.quitTitle(optionHeld: false)) == "Quit Ferry")
+    #expect(String(localized: MenuFooter.quitTitle(optionHeld: true)) == "Remove Ferry…")
   }
 
   @Test func ejectShowsWhereUnsentChangesWereSaved() async throws {
@@ -160,5 +241,18 @@ extension AppModelTests {
         == ["removeAllDomains", "unregisterAgent", "removeData"] + reveal + [
           "readLoginItem", "opensAtLogin false", "quit",
         ])
+  }
+}
+
+/// Takes every request and never answers, until its task is cancelled.
+private struct SilentClient: AgentSending {
+  let log: CallLog
+
+  func send(
+    _ request: AgentRequest, file: FileHandle?, progress: TransferProgressHandler?
+  ) async throws(TransportError) -> AgentResponse {
+    if case .removeAllDomains = request { log.record("removeAllDomains") }
+    while !Task.isCancelled { await Task.yield() }
+    throw .cancelled
   }
 }

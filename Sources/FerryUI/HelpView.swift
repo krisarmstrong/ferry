@@ -303,6 +303,8 @@ private struct HelpBodyView: View {
       switch blocks.action {
       case .removeFerry?:
         RemoveFerryButton(model: model)
+      case .copyDiagnostics?:
+        CopyDiagnosticsButton(model: model)
       case .showWelcome?:
         Button {
           model.showWelcome()
@@ -316,6 +318,30 @@ private struct HelpBodyView: View {
         EmptyView()
       }
     }
+  }
+}
+
+/// Copy Diagnostics: puts the report on the pasteboard and says Copied beside the button.
+private struct CopyDiagnosticsButton: View {
+  let model: AppModel
+  @State private var copied = false
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Button {
+        model.copyDiagnostics()
+        copied = true
+      } label: {
+        Text("Copy Diagnostics", bundle: .module)
+      }
+      .buttonStyle(.bordered)
+      if copied {
+        Text(DevicePresentation.copiedResource)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .accessibilityElement(children: .contain)
   }
 }
 

@@ -67,7 +67,17 @@ import os
   /// Ferry's own copy of adb, from Google's platform tools (see `AppModel+PlatformTools`).
   var platformTools = PlatformToolsState()
   /// The last failed action, shown until the next one succeeds.
-  public internal(set) var actionError: MenuNotice?
+  public internal(set) var actionError: MenuNotice? {
+    didSet {
+      guard let actionError, actionError != oldValue else { return }
+      recentErrors.append(actionError.help ?? "unlisted error")
+      recentErrors.removeFirst(max(0, recentErrors.count - Self.recentErrorLimit))
+    }
+  }
+  /// The catalog keys of the last errors the menu showed, oldest first, for Copy Diagnostics:
+  /// the message as written, never the values shown with it.
+  @ObservationIgnored private(set) var recentErrors: [String] = []
+  static let recentErrorLimit = 10
   /// Screen recordings running, as of the last status.
   public private(set) var recordings: [ActiveRecording] = []
   /// Apps being installed from this menu, by device: the file's name and how much has reached
@@ -119,7 +129,8 @@ import os
   /// Set by the app when the build can update itself; the menu shows Check for Updates… only
   /// then.
   public var updater: (any UpdateChecking)?
-  /// Counts changes to the updater's settings, which are not observable, so the menu redraws.
+  /// An update is downloaded and waits for Ferry to quit (see `updateIsReady()`).
+  public internal(set) var updateReady = false
   /// The login item change being applied, how many have been requested, and how many applied.
   private var loginItemChange: Task<Void, Never>?
   /// The agent build launch restarted, recorded once that agent answers (see `startAgent()`).
@@ -204,58 +215,6 @@ import os
       helper = await services.helperStatus()
       return error == .deviceDisconnected ? .lost : .failed
     }
-  }
-
-  /// The menu's Refresh: asks the agent to list each ready device's folders again, so changes
-  /// made on the device reach Finder, and to try again every device it is not using (one not
-  /// sharing files, one ejected), then reads the status.
-  public func refreshDevices() async {
-    for device in devices {
-      let request: AgentRequest
-      switch device.state {
-      case .ready:
-        request = .refresh(device.id)
-      case .notSharingFiles, .ejected:
-        request = .recheck(device.id)
-      default:
-        continue
-      }
-      do {
-        _ = try await client.send(request, file: nil)
-      } catch {
-        Self.log.error("refresh failed: \(String(describing: error), privacy: .private)")
-      }
-    }
-    await refresh()
-  }
-
-  /// Refreshes now and every 2 s until the calling task is cancelled, which happens when the
-  /// menu closes.
-  public func watchWhileMenuOpen() async {
-    // How long the menu has been open since the agent first answered.
-    var answeredFor: Duration?
-    var loginItemRead = false
-    resetExpansion()
-    while !Task.isCancelled {
-      await refresh()
-      // The menu may have closed while the status was read.
-      guard !Task.isCancelled else { break }
-      loadExpandedDetailsIfDue()
-      // Once per opening, after the first status, so the devices never wait on macOS.
-      if !loginItemRead {
-        loginItemRead = true
-        await readLoginItem()
-      }
-      if agent == .running, answeredFor == nil { answeredFor = .zero }
-      if let answeredFor { considerEmptyGuide(openFor: answeredFor) }
-      do {
-        try await sleep(Self.pollInterval)
-      } catch {
-        break
-      }
-      answeredFor? += Self.pollInterval
-    }
-    cancelDetailReads()
   }
 
   /// The Open at Login row: shows `enabled` at once, then applies it after any change still
@@ -362,5 +321,60 @@ import os
       provider: \(report.provider.rawValue, privacy: .public) adb: \(adb, privacy: .public)
       """)
     guideNewDevices()
+  }
+}
+
+/// The menu's Refresh, and the polling while it is open.
+extension AppModel {
+  /// The menu's Refresh: asks the agent to list each ready device's folders again, so changes
+  /// made on the device reach Finder, and to try again every device it is not using (one not
+  /// sharing files, one ejected), then reads the status.
+  public func refreshDevices() async {
+    for device in devices {
+      let request: AgentRequest
+      switch device.state {
+      case .ready:
+        request = .refresh(device.id)
+      case .notSharingFiles, .ejected:
+        request = .recheck(device.id)
+      default:
+        continue
+      }
+      do {
+        _ = try await client.send(request, file: nil)
+      } catch {
+        Self.log.error("refresh failed: \(String(describing: error), privacy: .private)")
+      }
+    }
+    await refresh()
+  }
+
+  /// Refreshes now and every 2 s until the calling task is cancelled, which happens when the
+  /// menu closes.
+  public func watchWhileMenuOpen() async {
+    // How long the menu has been open since the agent first answered.
+    var answeredFor: Duration?
+    var loginItemRead = false
+    resetExpansion()
+    while !Task.isCancelled {
+      await refresh()
+      // The menu may have closed while the status was read.
+      guard !Task.isCancelled else { break }
+      loadExpandedDetailsIfDue()
+      // Once per opening, after the first status, so the devices never wait on macOS.
+      if !loginItemRead {
+        loginItemRead = true
+        await readLoginItem()
+      }
+      if agent == .running, answeredFor == nil { answeredFor = .zero }
+      if let answeredFor { considerEmptyGuide(openFor: answeredFor) }
+      do {
+        try await sleep(Self.pollInterval)
+      } catch {
+        break
+      }
+      answeredFor? += Self.pollInterval
+    }
+    cancelDetailReads()
   }
 }

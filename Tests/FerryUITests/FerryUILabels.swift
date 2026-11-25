@@ -26,6 +26,7 @@ enum FerryUILabels {
     "Build",
     "Cancel",
     "Choose Folder…",
+    "Copy Diagnostics",
     "Choose an Android app (.apk) to install.",
     "Choose files to send to the device’s Download folder.",
     "Choose your device",
@@ -151,5 +152,8 @@ enum FerryUILabels {
     """,
     "You can open this again from Help.",
     "Your device is in Finder's sidebar, under Locations.",
+    "Update Ready — Restart Ferry",
+    "Warning: %@",
+    "Error: %@",
   ]
 }

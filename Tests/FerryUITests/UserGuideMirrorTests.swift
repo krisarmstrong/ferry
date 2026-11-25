@@ -84,9 +84,9 @@ struct UserGuideMirrorTests {
   @Test(arguments: ["README.md", "docs/TESTING.md", "docs/user-guide.md", "docs/user-guide.es.md"])
   func theDocsNameModelsOnly(path: String) throws {
     let notice = """
-      NetAlly, LinkRunner, EtherScope and AirCheck are trademarks of NetAlly. Ferry is not \
-      affiliated
-      with or endorsed by NetAlly.
+      NetAlly, LinkRunner, EtherScope, CyberScope and AirCheck are trademarks of NetAlly. Ferry \
+      is not
+      affiliated with or endorsed by NetAlly.
       """
     let text = try Self.text(path).replacing(notice, with: "")
       .replacing("Ask NetAlly to enable ADB on the tester.", with: "")

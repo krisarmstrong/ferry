@@ -6,7 +6,8 @@ import Testing
 struct GuideStepsTests {
   @Test(arguments: [
     "LinkRunner-100G", "LinkRunner 100G", "linkrunner10g", "LinkRunner 10G", "EtherScope nXG",
-    "ETHERSCOPE-NXG", "NetAlly LinkRunner 10G",
+    "ETHERSCOPE-NXG", "NetAlly LinkRunner 10G", "CyberScope", "CyberScope nXG",
+    "NetAlly CyberScope",
   ])
   func guideStepsForNetAllyModels(model: String) {
     #expect(GuideSteps.family(forModel: model) == .netAllyAndroid8Board)
@@ -15,9 +16,26 @@ struct GuideStepsTests {
     #expect(steps.contains { $0.contains("Transfer files") })
   }
 
-  @Test(arguments: ["Pixel 8", "", "LinkRunner AT 4000", "AirCheck G3", "EtherScope"])
+  @Test(arguments: ["Pixel 8", "", "LinkRunner AT 4000", "AirCheck G2", "EtherScope"])
   func unknownModelHasNoFamily(model: String) {
     #expect(GuideSteps.family(forModel: model) == nil)
+  }
+
+  /// The AirCheck G3 runs on another board than the LinkRunners and the nXG units: it has its
+  /// own steps, which name the tester rather than a phone.
+  @Test(arguments: ["AirCheck G3", "AirCheck-G3", "NetAlly AirCheck G3", "aircheckg3pro"])
+  func theAirCheckG3HasItsOwnSteps(model: String) {
+    #expect(GuideSteps.family(forModel: model) == .airCheckG3)
+    for topic in GuideTopic.allCases {
+      let steps = GuideSteps.steps(for: .airCheckG3, topic: topic).map { String(localized: $0) }
+      #expect(steps.contains { $0.contains("tester") })
+      #expect(!steps.contains { $0.contains("phone") || $0.contains("left side") })
+    }
+    #expect(
+      GuideSteps.steps(for: .airCheckG3).map { String(localized: $0) }.contains {
+        $0.contains("File transfer")
+      })
+    #expect(GuideSteps.steps(for: .airCheckG3) != GuideSteps.steps(for: .otherAndroid10Plus))
   }
 
   @Test func genericAndroidStepsNameTheirSetting() {

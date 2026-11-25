@@ -17,6 +17,15 @@ struct DevicePresentationTests {
 
   private static let ready = DeviceState.ready([])
 
+  /// The agent refused a request over its in-flight cap: the menu says so in its own words,
+  /// not as a broken connection.
+  @Test func aRequestOverTheLimitSaysTheHelperIsBusy() {
+    let notice = DevicePresentation.notice(for: .agentBusy)
+    #expect(
+      notice.text == "Ferry's helper has too many requests waiting. Try again in a moment.")
+    #expect(notice.help == notice.text)
+  }
+
   /// A file-transfer device is offered USB debugging; one over ADB already has it.
   @Test(arguments: [
     (ConnectionMethod.usbFileTransfer, DevicePresentation.Hint?.some(.moreTools)),

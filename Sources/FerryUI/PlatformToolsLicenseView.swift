@@ -55,6 +55,7 @@ public struct PlatformToolsLicenseView: View {
       }
     }
     .padding(20)
-    .frame(width: 560, height: 520)
+    // Resizable (L8): the licence scrolls, and the buttons stay below it at any size.
+    .frame(minWidth: 480, idealWidth: 560, minHeight: 320, idealHeight: 520)
   }
 }

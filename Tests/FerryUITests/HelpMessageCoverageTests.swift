@@ -340,12 +340,16 @@ extension HelpMessageCoverageTests {
     ("trouble-helper", "macOS can't find Ferry's helper"),
     ("trouble-helper", "Ferry's helper is not responding. Quit Ferry and open it again."),
     ("trouble-helper", "Ferry's helper didn't answer in time. Try again in a moment."),
+    ("trouble-helper", "Ferry's helper has too many requests waiting. Try again in a moment."),
     ("trouble-helper", "Ferry was updated. Quit and reopen Ferry."),
     ("trouble-helper", "Ferry's helper couldn't read the request."),
     ("trouble-helper", "Ferry's helper doesn't take this request from here."),
     ("trouble-helper", "Could not change Open at Login."),
     ("trouble-helper", "Needs approval in System Settings"),
-    ("trouble-helper", "Could not remove Ferry. Make sure Ferry is running, then try again."),
+    (
+      "trouble-helper",
+      "Could not remove Ferry. Try again; if it keeps failing, restart the Mac and try again."
+    ),
     ("trouble-helper", "Help isn't available"),
   ]
 }
