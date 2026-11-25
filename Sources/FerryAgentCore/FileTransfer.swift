@@ -55,7 +55,7 @@ public enum FileTransfer {
     let (url, output) = try newScratch(for: source, in: folder)
     defer { close(output) }
     do throws(TransportError) {
-      try copy(from: source, to: output)
+      try copy(from: source, to: output, cancellation: RequestCancellation.current)
     } catch {
       remove(url)
       throw error
@@ -73,7 +73,8 @@ public enum FileTransfer {
     defer { close(output) }
     let whole: Bool
     do throws(TransportError) {
-      whole = try copy(from: source, to: output, limit: limit)
+      whole = try copy(
+        from: source, to: output, limit: limit, cancellation: RequestCancellation.current)
     } catch {
       remove(url)
       throw error
@@ -113,15 +114,18 @@ public enum FileTransfer {
     guard fsync(target) == 0 else { throw .io("cannot flush file: \(errorText())") }
   }
 
-  /// Copies until the end of `input`; false, with the copy unfinished, once more than `limit`
-  /// bytes have been read.
+  /// Copies `input` into `output` a chunk at a time, until the end of `input`; false, with the
+  /// copy unfinished, once more than `limit` bytes have been read. A cancelled request stops at
+  /// the next chunk, so a large file the client gave up on is not copied to its end first.
   @discardableResult
-  private static func copy(from input: Int32, to output: Int32, limit: UInt64? = nil)
-    throws(TransportError) -> Bool
-  {
+  private static func copy(
+    from input: Int32, to output: Int32, limit: UInt64? = nil,
+    cancellation: RequestCancellation? = nil
+  ) throws(TransportError) -> Bool {
     var buffer = [UInt8](repeating: 0, count: chunk)
     var offset: off_t = 0
     while true {
+      if cancellation?.isCancelled == true { throw .cancelled }
       let count = buffer.withUnsafeMutableBytes { pread(input, $0.baseAddress, chunk, offset) }
       if count < 0 {
         if errno == EINTR { continue }

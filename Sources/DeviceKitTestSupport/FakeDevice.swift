@@ -63,6 +63,8 @@ public actor FakeDevice: DeviceSession {
   var uploadHook: (@Sendable () async -> Void)?
   /// Runs when the next delete starts, before it reads the device's contents.
   var deleteHook: (@Sendable () async -> Void)?
+  /// Runs when the next move starts.
+  var moveHook: (@Sendable () async -> Void)?
   var listFailure: TransportError?
   /// See `serialiseOperations()`.
   var serialised = false
@@ -198,6 +200,10 @@ public actor FakeDevice: DeviceSession {
   func moveOnDevice(_ path: RemotePath, toFolder: RemotePath, in storage: StorageID)
     async throws(TransportError) -> RemoteItem
   {
+    if let hook = moveHook {
+      moveHook = nil
+      await hook()
+    }
     guard deviceCapabilities.contains(.move) else { throw .unsupported("move") }
     let nodes = try nodes(in: storage)
     guard let name = path.name else { throw .invalidName(path.description) }
