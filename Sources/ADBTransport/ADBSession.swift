@@ -35,6 +35,10 @@ public actor ADBSession: DeviceSession {
   private var knownStorages: Set<String> = []
   /// The device's own spelling of each name, by folder (see `ADBSession+Names.swift`).
   var rawNames: [[UInt8]: [String: String]] = [:]
+  /// Set once internal shared storage is known to list real names: the device has no file-based
+  /// encryption, or its credential-encrypted storage is unlocked, which it stays until the device
+  /// restarts and so ends this session (see `credentialStorageLocked`).
+  var credentialStorageReadable = false
   private(set) var disconnected = false
   /// The folder watches running (see `watch(_:)`), closed when the session ends.
   let watches = WatchConnections()

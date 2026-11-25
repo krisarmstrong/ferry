@@ -8,6 +8,12 @@ enum ADBStorages {
   static let internalDescription = "Internal shared storage"
   static let volumeDescription = "Removable storage"
   static let volumesFolder = "/storage"
+  /// `file` on a device with file-based encryption, whose shared storage is credential
+  /// encrypted (CE): until the user first unlocks after a restart, its names read as ciphertext.
+  static let cryptoTypeProperty = "ro.crypto.type"
+  /// `true` once the system has unlocked user 0's CE storage, whose `/storage/emulated/0` Ferry
+  /// serves.
+  static let credentialStorageProperty = "sys.user.0.ce_available"
 
   struct Space: Equatable {
     let capacity: UInt64
@@ -56,6 +62,10 @@ extension ADBSession {
       }
     }
     if internalStat?.isDirectory == true {
+      // Locked, the folder is there but lists ciphertext names: serving it would read as every
+      // item deleted and new ones made, and the device is locked as surely as when it shows no
+      // storage at all.
+      if try await credentialStorageLocked(step) { throw .deviceLocked }
       candidates.append((StorageKey.internal, ADBStorages.internalDescription))
     }
     let volumes = try await adb(step) { () async throws(ADBError) in
@@ -84,5 +94,25 @@ extension ADBSession {
           capacity: space.capacity, free: space.free))
     }
     return storages
+  }
+
+  /// Whether internal shared storage is credential encrypted and not unlocked yet. A device
+  /// without file-based encryption never is. A property `getprop` cannot read counts as unset.
+  private func credentialStorageLocked(_ step: Step) async throws(TransportError) -> Bool {
+    guard !credentialStorageReadable else { return false }
+    if try await property(ADBStorages.cryptoTypeProperty, step) == "file" {
+      credentialStorageReadable =
+        try await property(ADBStorages.credentialStorageProperty, step) == "true"
+    } else {
+      credentialStorageReadable = true
+    }
+    return !credentialStorageReadable
+  }
+
+  private func property(_ name: String, _ step: Step) async throws(TransportError) -> String {
+    let result = try await run("getprop", [name], step)
+    guard result.status == 0 else { return "" }
+    return String(bytes: result.stdout, encoding: .utf8)?
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
   }
 }
