@@ -130,53 +130,73 @@ public actor ProviderBackend {
   /// that names what the item already has sends nothing. The item keeps `id` throughout: a
   /// different identifier would tell FileProvider to merge the item into another. When the
   /// agent kept the device's newer file instead, FileProvider is told to fetch it.
+  ///
+  /// New contents for a file the device does not have (FileProvider kept an item whose create
+  /// never reached the device, or whose identifier the agent no longer knows) are created in the
+  /// template's folder under its name: "no such item" would have FileProvider delete the edited
+  /// file on the Mac. A name the device already uses is a collision, which FileProvider resolves
+  /// by renaming its copy, so the device's file is never overwritten unasked.
   public func modify(
     _ id: NSFileProviderItemIdentifier, to template: ItemTemplate, changed: ItemChanges,
     contents: URL?, base: ContentVersion? = nil, onConflict: ConflictPolicy = .keepBoth,
     progress: TransferProgressHandler? = nil
   ) async throws -> SyncedItem {
     let itemID = try Self.itemID(id)
-    var latest: ProviderEntry?
+    do {
+      var latest = try await relocate(itemID, to: template, changed)
+      if changed.contains(.contents), let contents {
+        let handle = try FileHandle(forReadingFrom: contents)
+        defer { try? handle.close() }
+        let response = try await send(
+          .replaceContents(domain: domain, id: itemID, base: base, onConflict: onConflict),
+          file: handle, progress: progress)
+        switch response {
+        case .entry(let entry):
+          latest = entry
+        case .keptOnDevice(let entry):
+          return SyncedItem(ProviderItem(entry), shouldFetchContent: true)
+        default:
+          throw Self.unexpected(response)
+        }
+      }
+      if let latest { return SyncedItem(ProviderItem(latest), shouldFetchContent: false) }
+      return SyncedItem(
+        ProviderItem(try await entry(.item(domain: domain, id: itemID))),
+        shouldFetchContent: false)
+    } catch let error as NSFileProviderError where error.code == .noSuchItem {
+      guard changed.contains(.contents), let contents, template.kind == .file else { throw error }
+      log.info("\(id.rawValue, privacy: .private) is not on the device; creating it")
+      return SyncedItem(
+        try await create(template, contents: contents, progress: progress),
+        shouldFetchContent: false)
+    }
+  }
 
-    if !changed.isDisjoint(with: [.parent, .filename]) {
-      var current = try await entry(.item(domain: domain, id: itemID))
-      // Refused before anything changes, so a move sent with it does not go ahead alone.
-      if Self.renamesFolderToPackageName(current, to: template, changed) {
-        throw Self.packageNameRefused
-      }
-      if changed.contains(.parent), current.parent != template.parent {
-        current = try await entry(.move(domain: domain, id: itemID, toFolder: template.parent))
-      }
-      if changed.contains(.filename), let parent = current.item.path.parent {
-        let renamed = try Self.mapped { () throws(TransportError) in
-          try parent.appending(template.filename)
-        }
-        // Compared as paths, so another normal form of the same name is no change, but a change
-        // of case is: the agent lets an item take a name only its own name collides with.
-        if renamed != current.item.path {
-          current = try await entry(.rename(domain: domain, id: itemID, to: template.filename))
-        }
-      }
-      latest = current
+  /// Moves, then renames, the item as `changed` says, and returns it as it is now; `nil` when
+  /// neither field changed.
+  private func relocate(_ itemID: ItemID, to template: ItemTemplate, _ changed: ItemChanges)
+    async throws -> ProviderEntry?
+  {
+    guard !changed.isDisjoint(with: [.parent, .filename]) else { return nil }
+    var current = try await entry(.item(domain: domain, id: itemID))
+    // Refused before anything changes, so a move sent with it does not go ahead alone.
+    if Self.renamesFolderToPackageName(current, to: template, changed) {
+      throw Self.packageNameRefused
     }
-    if changed.contains(.contents), let contents {
-      let handle = try FileHandle(forReadingFrom: contents)
-      defer { try? handle.close() }
-      let response = try await send(
-        .replaceContents(domain: domain, id: itemID, base: base, onConflict: onConflict),
-        file: handle, progress: progress)
-      switch response {
-      case .entry(let entry):
-        latest = entry
-      case .keptOnDevice(let entry):
-        return SyncedItem(ProviderItem(entry), shouldFetchContent: true)
-      default:
-        throw Self.unexpected(response)
+    if changed.contains(.parent), current.parent != template.parent {
+      current = try await entry(.move(domain: domain, id: itemID, toFolder: template.parent))
+    }
+    if changed.contains(.filename), let parent = current.item.path.parent {
+      let renamed = try Self.mapped { () throws(TransportError) in
+        try parent.appending(template.filename)
+      }
+      // Compared as paths, so another normal form of the same name is no change, but a change
+      // of case is: the agent lets an item take a name only its own name collides with.
+      if renamed != current.item.path {
+        current = try await entry(.rename(domain: domain, id: itemID, to: template.filename))
       }
     }
-    if let latest { return SyncedItem(ProviderItem(latest), shouldFetchContent: false) }
-    return SyncedItem(
-      ProviderItem(try await entry(.item(domain: domain, id: itemID))), shouldFetchContent: false)
+    return current
   }
 
   /// One page of the working set: every item the agent has reported in the domain, root
