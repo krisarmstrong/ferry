@@ -57,7 +57,9 @@ let package = Package(
       ]),
     .testTarget(
       name: "ADBTransportTests",
-      dependencies: ["ADBTransport", "DeviceKit", "DeviceKitTestSupport", "PlatformTools"]),
+      dependencies: [
+        "ADBTransport", "DeviceKit", "DeviceKitTestSupport", "FerryAgentCore", "PlatformTools",
+      ]),
     .testTarget(name: "PlatformToolsTests", dependencies: ["PlatformTools"]),
     .testTarget(
       name: "DeviceKitTests", dependencies: ["DeviceKit", "DeviceKitTestSupport"]),

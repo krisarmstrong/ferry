@@ -37,7 +37,10 @@ public actor ADBSession: DeviceSession {
   var rawNames: [[UInt8]: [String: String]] = [:]
   /// Set once internal shared storage is known to list real names: the device has no file-based
   /// encryption, or its credential-encrypted storage is unlocked, which it stays until the device
-  /// restarts and so ends this session (see `credentialStorageLocked`).
+  /// restarts and so ends this session (see `credentialStorageLocked`). It speaks for user 0,
+  /// whose `/storage/emulated/0` is the internal storage served. While it is unset and the
+  /// storage locked, the whole device reads as locked, so a removable card, which encryption
+  /// does not hide, is not served either until the unlock.
   var credentialStorageReadable = false
   private(set) var disconnected = false
   /// The folder watches running (see `watch(_:)`), closed when the session ends.
