@@ -57,8 +57,7 @@ struct WirelessADBServerReplacedTests {
     let file = Base.storeFile()
     defer { try? FileManager.default.removeItem(at: file) }
     await WirelessADBRememberedTests.rememberEtherScope(adb, file)
-    // The pass's connects are held, and the first finds no route, as through the server about to
-    // go.
+    // The pass's connect is held, and finds no route, as through the server about to go.
     await adb.set { $0.noRouteOnce = [Self.address] }
     await adb.holdConnects(to: [Self.address])
     let wireless = WirelessADB(adb: adb, store: file, timing: Base.fast)
@@ -66,17 +65,12 @@ struct WirelessADBServerReplacedTests {
     defer { running.cancel() }
     await adb.publish()
     #expect(try await eventually { await adb.inFlight == 1 })
-    await adb.resumeHeldConnects()
-    // The second connect is now held, mid-pass: the server goes and comes back.
-    #expect(
-      try await eventually {
-        let connects = await adb.calls.filter { $0 == .connect(Self.address) }.count
-        let busy = await adb.inFlight
-        return connects == 2 && busy == 1
-      })
+    // Mid-pass, the server goes and comes back: its list waits for the pass, which holds it
+    // until the connect is let go.
     await adb.serverGone()
-    await adb.releaseConnects()
     await adb.publish()
+    #expect(try await eventually { await wireless.queuedPass != nil })
+    await adb.releaseConnects()
     #expect(
       try await eventually { await adb.calls.filter { $0 == .connect(Self.address) }.count == 3 })
     #expect(try await eventually { await adb.listed[Self.address] == .device })

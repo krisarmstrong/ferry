@@ -8,10 +8,12 @@ import Testing
 
 /// T3 over real XPC: a metadata call's deadline runs from when its session operation holds the
 /// device, so one queued behind a transfer, on its own storage or another of the device's,
-/// waits for it; a call cancelled while queued never reaches the device.
+/// waits for it; a call cancelled while queued never reaches the device. The deadline runs on a
+/// clock the test moves: a call that must answer never times out because the machine is busy.
 @Suite(.timeLimit(.minutes(1)))
 struct AgentQueueDeadlineTests {
-  /// The agent's service behind an anonymous listener, a client with a short deadline, and an
+  /// The agent's service behind an anonymous listener, a client with a short deadline on `clock`,
+  /// and an
   /// upload parked on the device until `release`, holding its domain's gate and, on a device
   /// that serialises its operations, the device's session gate.
   private struct Setup {
@@ -21,6 +23,7 @@ struct AgentQueueDeadlineTests {
     let listener: NSXPCListener
     let delegate: AgentListenerDelegate
     let client: AgentClient
+    let clock: ManualClock
     let upload: Task<AgentResponse, Never>
     let release: AsyncStream<Void>.Continuation
 
@@ -74,10 +77,12 @@ struct AgentQueueDeadlineTests {
     let delegate = AgentListenerDelegate(handler: harness.service, role: .provider)
     listener.delegate = delegate
     listener.resume()
+    let clock = ManualClock()
     return Setup(
       harness: harness, device: device, domain: domain, listener: listener, delegate: delegate,
-      client: AgentClient(endpoint: listener.endpoint, replyDeadline: .milliseconds(100)),
-      upload: upload, release: release)
+      client: AgentClient(
+        endpoint: listener.endpoint, replyDeadline: .milliseconds(100), clock: clock),
+      clock: clock, upload: upload, release: release)
   }
 
   @Test func aListQueuedBehindATransferIsNotTimedOut() async throws {
@@ -88,7 +93,7 @@ struct AgentQueueDeadlineTests {
     try await setup.queued(1)
 
     // Queued behind the upload for four deadlines.
-    try await Task.sleep(for: .milliseconds(400))
+    await setup.clock.advance(by: .milliseconds(400))
     setup.release.finish()
 
     #expect(await setup.upload.value.isEntry)
@@ -137,7 +142,9 @@ struct AgentQueueDeadlineTests {
     defer { Task { await device.resume(.list) } }
 
     await #expect(throws: TransportError.agentNotResponding) {
-      try await client.send(.list(domain: domain, folder: .root), file: nil)
+      try await setup.clock.advancing(by: .milliseconds(100)) {
+        try await client.send(.list(domain: domain, folder: .root), file: nil)
+      }
     }
   }
 
@@ -152,7 +159,7 @@ struct AgentQueueDeadlineTests {
     try await setup.queuedAtTheDevice(1)
 
     // Queued behind the card's upload for four deadlines.
-    try await Task.sleep(for: .milliseconds(400))
+    await setup.clock.advance(by: .milliseconds(400))
     setup.release.finish()
 
     #expect(await setup.upload.value.isEntry)
@@ -199,13 +206,13 @@ struct AgentQueueDeadlineTests {
     try await setup.queuedAtTheDevice(1)
 
     // Queued behind the card's upload for four deadlines, then the device is its.
-    try await Task.sleep(for: .milliseconds(400))
+    await setup.clock.advance(by: .milliseconds(400))
     setup.release.finish()
 
     // If no deadline ever starts, the time limit cancels the list rather than hang the run.
     await #expect(throws: TransportError.agentNotResponding) {
       try await withTaskCancellationHandler {
-        try await listing.value
+        try await setup.clock.advancing(by: .milliseconds(100)) { try await listing.value }
       } onCancel: {
         listing.cancel()
       }

@@ -1,3 +1,4 @@
+import DeviceKitTestSupport
 import Foundation
 import Synchronization
 import Testing
@@ -96,32 +97,32 @@ struct ADBTrackDevicesTests {
     for server in await servers.value { server.stop() }
   }
 
-  @Test func persistentOutageReportsNoDevicesOnceAndStartsTheServerOnce() async throws {
+  /// The waits between reconnects run on a clock the test moves, so the reconnects that fail
+  /// are counted, not timed.
+  @Test(.timeLimit(.minutes(1)))
+  func persistentOutageReportsNoDevicesOnceAndStartsTheServerOnce() async throws {
     let closed = try ClosedPort()
     let launches = Box(0)
+    let clock = ManualClock()
     let host = ADBHost(
       port: closed.port,
       locator: ADBLocator(
         environment: [:], home: "/x", isExecutable: { $0 == "/opt/homebrew/bin/adb" }),
       launcher: { _ in await launches.set(await launches.value + 1) },
-      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)))
-    let lists = Box<[[ADBDevice]]>([])
-    let consumer = Task {
-      for await list in host.trackDevices() { await lists.set(await lists.value + [list]) }
+      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)), clock: clock)
+    let reports = Mutex(0)
+    let lists = host.trackDevices { reports.withLock { $0 += 1 } }
+    // Each wait follows a failed connect, and the outage is reported and the server started
+    // before the first: let ten more go by, and neither may repeat.
+    for waits in 1...10 {
+      await clock.waitForSleeps(waits)
+      await clock.advance(by: .milliseconds(10))
     }
-    // Wait for the outage to be reported and the server started, then let about thirty more
-    // failed connects at 10 ms go by: neither may repeat.
-    let reported = try await eventually {
-      let started = await launches.value
-      let seen = await lists.value
-      return started >= 1 && !seen.isEmpty
-    }
-    #expect(reported)
-    try await Task.sleep(for: .milliseconds(400))
-    consumer.cancel()
-    await consumer.value
-    #expect(await lists.value == [[]])
+    await clock.waitForSleeps(11)
+    #expect(reports.withLock { $0 } == 1)
     #expect(await launches.value == 1)
+    var iterator = lists.makeAsyncIterator()
+    #expect(await iterator.next() == [])
     withExtendedLifetime(closed) {}
   }
 
@@ -200,7 +201,10 @@ struct ADBTrackDevicesTests {
     #expect(received == ["d"])
   }
 
-  @Test func stoppingIterationStopsTheReconnectLoop() async throws {
+  /// The loop reconnects only once its wait on the clock passes. Stopped, that wait is cancelled:
+  /// nothing sleeps on the clock any more, and the one connection is all there is.
+  @Test(.timeLimit(.minutes(1)))
+  func stoppingIterationStopsTheReconnectLoop() async throws {
     let connections = Box(0)
     let server = try await FakeADBServer.start { peer in
       await connections.set(await connections.value + 1)
@@ -208,16 +212,15 @@ struct ADBTrackDevicesTests {
       try await peer.okay()
     }
     defer { server.stop() }
+    let clock = ManualClock()
     let host = ADBHost(
       port: server.port, locator: Self.noAdb, launcher: { _ in },
-      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)))
+      backoff: Backoff(initial: .milliseconds(10), maximum: .milliseconds(10)), clock: clock)
     for await _ in host.trackDevices() { break }
-    // Let any connect already in flight land, then watch: a loop still running at 10 ms would
-    // add dozens of connections in this window.
-    try await Task.sleep(for: .milliseconds(500))
-    let settled = await connections.value
-    try await Task.sleep(for: .milliseconds(500))
-    #expect(await connections.value == settled)
+    await clock.waitForSleeps(1)
+    await clock.waitUntilNoSleeper()
+    #expect(await clock.sleepCount == 1)
+    #expect(await connections.value == 1)
   }
 
   @Test func cancellingTheConsumerClosesTheSocket() async throws {
