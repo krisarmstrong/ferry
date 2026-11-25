@@ -17,6 +17,7 @@ struct ReplyOverdue: Error {}
 
 /// A reply deadline whose clock starts only when `start()` is called: when the agent says the
 /// request has its turn at the device. Until then the reply may take as long as the queue does.
+/// It runs on `clock`, which a test moves by hand.
 final class ReplyDeadline: Sendable {
   private struct State {
     var started = false
@@ -26,10 +27,12 @@ final class ReplyDeadline: Sendable {
   }
 
   let duration: Duration
+  private let clock: any Clock<Duration>
   private let state = Mutex(State())
 
-  init(_ duration: Duration) {
+  init(_ duration: Duration, clock: any Clock<Duration> = ContinuousClock()) {
     self.duration = duration
+    self.clock = clock
   }
 
   /// Starts the clock, once; `awaitReply` sets what happens when it runs out.
@@ -58,9 +61,9 @@ final class ReplyDeadline: Sendable {
 
   private func arm(_ state: inout State) {
     guard state.timer == nil, let expire = state.expire else { return }
-    let duration = duration
+    let (duration, clock) = (duration, clock)
     state.timer = Task {
-      guard (try? await Task.sleep(for: duration)) != nil else { return }
+      guard (try? await clock.sleep(for: duration)) != nil else { return }
       expire()
     }
   }

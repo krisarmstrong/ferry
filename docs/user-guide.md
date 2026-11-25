@@ -894,7 +894,7 @@ Some files reached the device and some did not. The next line names one that did
 
 Fix what the next line says, then send the rest again.
 
-**“…” wasn’t sent. …**
+**“…” wasn’t sent.**
 
 The file named did not reach the device. The reason follows.
 
@@ -924,7 +924,7 @@ Some apps installed and some did not. The next line names one that did not, and 
 
 Fix what the next line says, then install the rest again.
 
-**“…” wasn’t installed. …**
+**“…” wasn’t installed.**
 
 The app named did not install. The reason follows.
 

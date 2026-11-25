@@ -88,8 +88,10 @@ private struct CancelHarness {
     self.lost = lost
   }
 
-  func client(deadline: Duration = AgentClient.replyDeadline) -> AgentClient {
-    AgentClient(endpoint: listener.endpoint, replyDeadline: deadline)
+  func client(
+    deadline: Duration = AgentClient.replyDeadline, clock: any Clock<Duration> = ContinuousClock()
+  ) -> AgentClient {
+    AgentClient(endpoint: listener.endpoint, replyDeadline: deadline, clock: clock)
   }
 
   /// A bare connection, to send requests and lose it as a client process would. It exports
@@ -239,10 +241,13 @@ struct AgentCancelTests {
   @Test func aStartedCallWithNoReplyFailsAsNotResponding() async throws {
     let harness = CancelHarness()
     defer { harness.finish() }
-    let client = harness.client(deadline: .milliseconds(100))
+    let clock = ManualClock()
+    let client = harness.client(deadline: .milliseconds(100), clock: clock)
     var seen = harness.seen.makeAsyncIterator()
     await #expect(throws: TransportError.agentNotResponding) {
-      try await client.send(.list(domain: "d", folder: .root), file: nil)
+      try await clock.advancing(by: .milliseconds(100)) {
+        try await client.send(.list(domain: "d", folder: .root), file: nil)
+      }
     }
     #expect(await seen.next() == .cancelled)
   }
@@ -251,12 +256,13 @@ struct AgentCancelTests {
   @Test func aQueuedCallIsNotTimedOut() async throws {
     let harness = CancelHarness(starts: false)
     defer { harness.finish() }
-    let client = harness.client(deadline: .milliseconds(100))
+    let clock = ManualClock()
+    let client = harness.client(deadline: .milliseconds(100), clock: clock)
     var started = harness.started.makeAsyncIterator()
     let call = Task { try await client.send(.list(domain: "d", folder: .root), file: nil) }
     #expect(await started.next() == .list(domain: "d", folder: .root))
     // Queued for four deadlines.
-    try await Task.sleep(for: .milliseconds(400))
+    await clock.advance(by: .milliseconds(400))
     harness.release()
     #expect(try await call.value == .done)
   }
@@ -278,13 +284,14 @@ struct AgentCancelTests {
   @Test func aTransferIsNotTimedOut() async throws {
     let harness = CancelHarness()
     defer { harness.finish() }
-    let client = harness.client(deadline: .milliseconds(100))
+    let clock = ManualClock()
+    let client = harness.client(deadline: .milliseconds(100), clock: clock)
     let file = try scratchFile()
     defer { try? file.close() }
     var started = harness.started.makeAsyncIterator()
     let call = Task { try await client.send(fetch, file: file, progress: { _, _ in }) }
     #expect(await started.next() == fetch)
-    try await Task.sleep(for: .milliseconds(400))
+    await clock.advance(by: .milliseconds(400))
     harness.release()
     #expect(try await call.value == .done)
   }

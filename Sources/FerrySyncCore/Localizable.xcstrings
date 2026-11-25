@@ -9,6 +9,34 @@
             "state" : "translated",
             "value" : "Also not installed: %lld."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@others@"
+          },
+          "substitutions" : {
+            "others" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Tampoco se instaló: %arg."
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Tampoco se instalaron: %arg."
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -20,6 +48,34 @@
             "state" : "translated",
             "value" : "Also not sent: %lld."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@others@"
+          },
+          "substitutions" : {
+            "others" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Tampoco se envió: %arg."
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Tampoco se enviaron: %arg."
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -29,7 +85,57 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn’t install %1$lld apps on %2$@"
+            "value" : "Couldn’t install %#@apps@ on %2$@"
+          },
+          "substitutions" : {
+            "apps" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg app"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg apps"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@apps@ en %2$@"
+          },
+          "substitutions" : {
+            "apps" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "No se pudo instalar %arg app"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "No se pudieron instalar %arg apps"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -42,6 +148,12 @@
             "state" : "translated",
             "value" : "Couldn’t install “%1$@” on %2$@"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo instalar “%1$@” en %2$@"
+          }
         }
       }
     },
@@ -51,7 +163,57 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn’t send %1$lld files to %2$@"
+            "value" : "Couldn’t send %#@files@ to %2$@"
+          },
+          "substitutions" : {
+            "files" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg file"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg files"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@files@ a %2$@"
+          },
+          "substitutions" : {
+            "files" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "No se pudo enviar %arg archivo"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "No se pudieron enviar %arg archivos"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -64,6 +226,12 @@
             "state" : "translated",
             "value" : "Couldn’t send “%1$@” to %2$@"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo enviar “%1$@” a %2$@"
+          }
         }
       }
     },
@@ -74,6 +242,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download already had a file with that name, so it’s there as “%@”."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download ya tenía un archivo con ese nombre, así que está ahí como “%@”."
           }
         }
       }
@@ -86,6 +260,12 @@
             "state" : "translated",
             "value" : "Folders can’t be sent from this menu. Copy the folder into the device’s location in Finder, or compress it into a .zip first."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las carpetas no se pueden enviar desde este menú. Copia la carpeta a la ubicación del dispositivo en Finder, o comprímela primero en un .zip."
+          }
         }
       }
     },
@@ -97,6 +277,12 @@
             "state" : "translated",
             "value" : "Install on %@"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instalar en %@"
+          }
         }
       }
     },
@@ -106,7 +292,57 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installed %1$lld apps on %2$@"
+            "value" : "Installed %#@apps@ on %2$@"
+          },
+          "substitutions" : {
+            "apps" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg app"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg apps"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@apps@ en %2$@"
+          },
+          "substitutions" : {
+            "apps" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se instaló %arg app"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se instalaron %arg apps"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -117,7 +353,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installed %1$lld of %2$lld on %3$@"
+            "value" : "Installed %lld of %lld on %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@done@ de %2$lld en %3$@"
+          },
+          "substitutions" : {
+            "done" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se instaló %arg"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se instalaron %arg"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -130,6 +394,12 @@
             "state" : "translated",
             "value" : "Installed “%1$@” on %2$@"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se instaló “%1$@” en %2$@"
+          }
         }
       }
     },
@@ -140,6 +410,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "It’s in Download."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Está en Download."
           }
         }
       }
@@ -152,6 +428,12 @@
             "state" : "translated",
             "value" : "No device connected"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay ningún dispositivo conectado"
+          }
         }
       }
     },
@@ -162,6 +444,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Only files can be sent."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo se pueden enviar archivos."
           }
         }
       }
@@ -174,6 +462,12 @@
             "state" : "translated",
             "value" : "Packages and app bundles can’t be copied to the device. Compress it into a .zip first."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los paquetes de documentos y de apps no se pueden copiar al dispositivo. Primero comprime el paquete en un .zip."
+          }
         }
       }
     },
@@ -184,6 +478,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Select files to send"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecciona archivos para enviar"
           }
         }
       }
@@ -196,6 +496,12 @@
             "state" : "translated",
             "value" : "Send selected files to a device"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar los archivos seleccionados a un dispositivo"
+          }
         }
       }
     },
@@ -207,6 +513,12 @@
             "state" : "translated",
             "value" : "Send to %@"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar a %@"
+          }
         }
       }
     },
@@ -216,7 +528,57 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sent %1$lld files to %2$@"
+            "value" : "Sent %#@files@ to %2$@"
+          },
+          "substitutions" : {
+            "files" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg file"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg files"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@files@ a %2$@"
+          },
+          "substitutions" : {
+            "files" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se envió %arg archivo"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se enviaron %arg archivos"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -227,7 +589,35 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sent %1$lld of %2$lld to %3$@"
+            "value" : "Sent %lld of %lld to %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@done@ de %2$lld a %3$@"
+          },
+          "substitutions" : {
+            "done" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se envió %arg"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Se enviaron %arg"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -240,6 +630,12 @@
             "state" : "translated",
             "value" : "Sent “%1$@” to %2$@"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se envió “%1$@” a %2$@"
+          }
         }
       }
     },
@@ -250,6 +646,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Symbolic links and aliases can’t be copied to the device."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los enlaces simbólicos y los alias no se pueden copiar al dispositivo."
           }
         }
       }
@@ -262,6 +664,12 @@
             "state" : "translated",
             "value" : "The device can’t store a file with that name."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no puede guardar un archivo con ese nombre."
+          }
         }
       }
     },
@@ -272,6 +680,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The device doesn’t have enough free space."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo no tiene suficiente espacio libre."
           }
         }
       }
@@ -284,6 +698,12 @@
             "state" : "translated",
             "value" : "The device has a file named Download where its Download folder should be. Rename or remove it on the device, then try again."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El dispositivo tiene un archivo llamado Download donde debería estar su carpeta Download. Cámbiale el nombre o elimínalo en el dispositivo e inténtalo de nuevo."
+          }
         }
       }
     },
@@ -294,6 +714,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The file can’t be read."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se puede leer el archivo."
           }
         }
       }
@@ -306,6 +732,12 @@
             "state" : "translated",
             "value" : "The file is too large for the device’s storage."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El archivo es demasiado grande para el almacenamiento del dispositivo."
+          }
         }
       }
     },
@@ -316,6 +748,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "They’re in Download."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Están en Download."
           }
         }
       }
@@ -328,27 +766,45 @@
             "state" : "translated",
             "value" : "This Mac doesn’t have enough free space to copy the file."
           }
-        }
-      }
-    },
-    "“%@” wasn’t installed. %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
+        },
+        "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%1$@” wasn’t installed. %2$@"
+            "value" : "Esta Mac no tiene suficiente espacio libre para copiar el archivo."
           }
         }
       }
     },
-    "“%@” wasn’t sent. %@" : {
+    "“%@” wasn’t installed." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%1$@” wasn’t sent. %2$@"
+            "value" : "“%@” wasn’t installed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” no se instaló."
+          }
+        }
+      }
+    },
+    "“%@” wasn’t sent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” wasn’t sent."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” no se envió."
           }
         }
       }

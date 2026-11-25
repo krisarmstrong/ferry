@@ -50,6 +50,12 @@ public final class ManualClock: Clock, Sendable {
     await sleepers.waitForSleeper()
   }
 
+  /// Returns once nothing sleeps on this clock, every sleep having passed or been cancelled, or
+  /// the calling task is cancelled: a loop whose wait was cancelled waits no more.
+  public func waitUntilNoSleeper() async {
+    await sleepers.waitUntilIdle()
+  }
+
   /// Returns once `count` sleeps have been requested in all, finished or not, or the calling
   /// task is cancelled.
   public func waitForSleeps(_ count: Int) async {
@@ -103,6 +109,7 @@ private actor Sleepers {
   private var watchers: [Int: CheckedContinuation<Void, Never>] = [:]
   private var countWatchers: [Int: (count: Int, continuation: CheckedContinuation<Void, Never>)] =
     [:]
+  private var idleWatchers: [Int: CheckedContinuation<Void, Never>] = [:]
   private var nextWatcher = 0
 
   func sleep(until deadline: ManualClock.Instant) async throws {
@@ -141,6 +148,7 @@ private actor Sleepers {
     let due = sleeping.filter { $0.deadline <= now }
     sleeping.removeAll { $0.deadline <= now }
     for sleeper in due { sleeper.continuation.resume() }
+    resumeIdleWatchers()
   }
 
   /// Returns once something sleeps, or the calling task is cancelled, as a test's time limit
@@ -165,6 +173,31 @@ private actor Sleepers {
   private func stopWatching(_ id: Int) {
     watchers.removeValue(forKey: id)?.resume()
     countWatchers.removeValue(forKey: id)?.continuation.resume()
+    idleWatchers.removeValue(forKey: id)?.resume()
+  }
+
+  /// Returns once nothing sleeps, or the calling task is cancelled.
+  func waitUntilIdle() async {
+    guard !sleeping.isEmpty, !Task.isCancelled else { return }
+    nextWatcher += 1
+    let id = nextWatcher
+    await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        if Task.isCancelled {
+          continuation.resume()
+        } else {
+          idleWatchers[id] = continuation
+        }
+      }
+    } onCancel: {
+      Task { await self.stopWatching(id) }
+    }
+  }
+
+  private func resumeIdleWatchers() {
+    guard sleeping.isEmpty else { return }
+    for watcher in idleWatchers.values { watcher.resume() }
+    idleWatchers = [:]
   }
 
   /// Returns once `target` sleeps have been requested, or the calling task is cancelled.
@@ -191,5 +224,6 @@ private actor Sleepers {
       return
     }
     sleeping.remove(at: index).continuation.resume(throwing: CancellationError())
+    resumeIdleWatchers()
   }
 }

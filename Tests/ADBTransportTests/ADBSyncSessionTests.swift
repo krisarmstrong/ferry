@@ -186,13 +186,15 @@ struct ADBSyncSessionTests {
 
   // MARK: cancellation and teardown
 
+  /// The first reply waits until the queued request has been cancelled.
   @Test func aQueuedRequestInACancelledTaskDoesNotRunAndTheConnectionSurvives() async throws {
     let sawFirst = Box(false)
+    let (cancelled, cancelledQueued) = AsyncStream.makeStream(of: Void.self)
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       let first = try await peer.syncPathRequest()
       #expect(first.path == "/first")
       await sawFirst.set(true)
-      try await Task.sleep(for: .milliseconds(300))
+      for await _ in cancelled { break }
       try await peer.raw(Peer.lst2(mode: 0o100600, size: 1, mtime: 1))
       // The cancelled "/queued" request must never arrive: the next one is "/last".
       let next = try await peer.syncPathRequest()
@@ -205,6 +207,7 @@ struct ADBSyncSessionTests {
     let queued = Task { try await sync.stat("/queued") }
     #expect(try await eventually { await sync.queuedRequests == 1 })
     queued.cancel()
+    cancelledQueued.yield()
     #expect(try await first.value?.size == 1)
     await #expect(throws: ADBError.cancelled) { _ = try await queued.value }
     #expect(try await sync.stat("/last")?.size == 3)

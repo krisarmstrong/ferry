@@ -208,20 +208,22 @@ extension FinderSender {
       case (false, _):
         LocalizedStringResource("Sent \(done) of \(count) to \(device)", bundle: .module)
       }
-    let body =
+    let failed =
       install
-      ? LocalizedStringResource("“\(name)” wasn’t installed. \(reason)", bundle: .module)
-      : LocalizedStringResource("“\(name)” wasn’t sent. \(reason)", bundle: .module)
-    var text = String(localized: body)
+      ? LocalizedStringResource("“\(name)” wasn’t installed.", bundle: .module)
+      : LocalizedStringResource("“\(name)” wasn’t sent.", bundle: .module)
+    var sentences = [String(localized: failed), reason]
     let others = failures.count - 1
     if others > 0 {
       let more =
         install
         ? LocalizedStringResource("Also not installed: \(others).", bundle: .module)
         : LocalizedStringResource("Also not sent: \(others).", bundle: .module)
-      text += " " + String(localized: more)
+      sentences.append(String(localized: more))
     }
-    return FinderNotice(title: String(localized: title), body: text, help: title.key)
+    // Each sentence is its own catalog entry, so no translation has to carry another's words.
+    let body = sentences.joined(separator: " ")
+    return FinderNotice(title: String(localized: title), body: body, help: title.key)
   }
 
   private static func notice(for only: Outcome, install: Bool, device: String) -> FinderNotice {

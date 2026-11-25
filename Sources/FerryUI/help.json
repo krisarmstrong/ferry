@@ -993,7 +993,7 @@
               "fix": "Fix what the next line says, then send the rest again."
             },
             {
-              "message": "“%@” wasn’t sent. %@",
+              "message": "“%@” wasn’t sent.",
               "cause": "The file named did not reach the device. The reason follows.",
               "fix": "Fix the reason, then send it again."
             },
@@ -1018,7 +1018,7 @@
               "fix": "Fix what the next line says, then install the rest again."
             },
             {
-              "message": "“%@” wasn’t installed. %@",
+              "message": "“%@” wasn’t installed.",
               "cause": "The app named did not install. The reason follows.",
               "fix": "Fix the reason, then install it again."
             },
