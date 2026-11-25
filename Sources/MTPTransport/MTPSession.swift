@@ -209,13 +209,16 @@ actor MTPSession: DeviceSession {
   func folder(_ path: RemotePath, storage: UInt32) async throws(TransportError)
     -> Folder
   {
+    if let listed = try await listedInWrite(path, storage: storage) { return listed }
     await resolver.invalidate(.root, storage: storage)
     let children = try await resolver.entries(in: path, storage: storage)
     let id = try await resolver.objectID(for: path, storage: storage)
+    WriteListing.current?.record(true, for: Self.listingKey(path, storage))
     return Folder(id: id, children: children)
   }
 
-  /// Runs `body`, then drops the cached listings of `folders` whether or not it succeeded.
+  /// Runs `body`, then drops the cached listings of `folders` whether or not it succeeded, except
+  /// a write's listing after a success, which `body` keeps current (see `recordInWrite`).
   func mutating<T>(
     _ folders: [RemotePath], storage: UInt32, _ body: () async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
@@ -225,7 +228,11 @@ actor MTPSession: DeviceSession {
     } catch {
       result = .failure(error)
     }
+    let scope = WriteListing.current
     for folder in folders {
+      let key = Self.listingKey(folder, storage)
+      if case .success = result, scope?.value(for: key, as: Bool.self) == true { continue }
+      scope?.forget(key)
       await resolver.invalidate(folder, storage: storage)
     }
     return try result.get()
@@ -300,6 +307,7 @@ extension MTPSession {
       // MTP has no change events, so a listing re-reads the device; the cache serves resolution.
       await resolver.invalidate(folder, storage: raw)
       let entries = try await resolver.entries(in: folder, storage: raw)
+      WriteListing.current?.record(true, for: Self.listingKey(folder, raw))
       // MTP allows duplicate names; keep the one the resolver would pick, as the path names it.
       var byPath: [RemotePath: MTPEntry] = [:]
       for entry in entries {
@@ -326,63 +334,6 @@ extension MTPSession {
       }
       // Fresh: a save's or a delete's base check reads it to decide whether to change the file.
       return Self.item(try await freshEntry(path, storage: raw(storage)), at: path)
-    }
-  }
-}
-
-// MARK: Writing
-
-extension MTPSession {
-  func upload(
-    from file: URL, to path: RemotePath, in storage: StorageID, progress: ProgressHandler
-  ) async throws(TransportError) -> RemoteItem {
-    try await operation { () throws(TransportError) in
-      let (parent, name) = try Self.split(path)
-      let raw = try await raw(storage)
-      let target = try await folder(parent, storage: raw)
-      try target.requireFree(path)
-      return try await mutating([parent], storage: raw) { () throws(TransportError) in
-        let id = try await device.upload(
-          from: file, name: name, parent: target.id, storage: raw, progress: progress)
-        return try await stored(id, at: path, discardIfRenamed: true)
-      }
-    }
-  }
-
-  func makeFolder(_ path: RemotePath, in storage: StorageID) async throws(TransportError)
-    -> RemoteItem
-  {
-    try await operation { () throws(TransportError) in
-      guard path != .root else { throw .alreadyExists(path) }
-      let (parent, name) = try Self.split(path)
-      let raw = try await raw(storage)
-      let target = try await folder(parent, storage: raw)
-      try target.requireFree(path)
-      return try await mutating([parent], storage: raw) { () throws(TransportError) in
-        let id = try await device.createFolder(name: name, parent: target.id, storage: raw)
-        return try await stored(id, at: path)
-      }
-    }
-  }
-
-  func rename(_ path: RemotePath, to newName: String, in storage: StorageID)
-    async throws(TransportError) -> RemoteItem
-  {
-    try await operation { () throws(TransportError) in
-      let (parent, _) = try Self.split(path)
-      let renamed = try parent.appending(newName)
-      let (_, name) = try Self.split(renamed)
-      let raw = try await raw(storage)
-      let siblings = try await folder(parent, storage: raw)
-      // From the listing `folder` just read, so the device is listed once.
-      guard let source = try await resolver.entry(at: path, storage: raw) else {
-        throw .notFound(path)
-      }
-      try siblings.requireFree(renamed, except: source.objectID)
-      return try await mutating([parent], storage: raw) { () throws(TransportError) in
-        try await device.rename(objectID: source.objectID, to: name)
-        return try await stored(source.objectID, at: renamed)
-      }
     }
   }
 }

@@ -56,6 +56,21 @@ actor PathResolver {
       .min { $0.objectID < $1.objectID }
   }
 
+  /// The cached listing of `folder`, without reading the device; `nil` if none is cached.
+  func cachedEntries(in folder: RemotePath, storage: UInt32) -> [MTPEntry]? {
+    cache[Key(storage: storage, folder: folder)]
+  }
+
+  /// Records `entry`, which the session itself just created or changed in `folder`, in that
+  /// folder's cached listing, replacing what the listing had for its object.
+  func recorded(_ entry: MTPEntry, in folder: RemotePath, storage: UInt32) {
+    let key = Key(storage: storage, folder: folder)
+    guard var listing = cache[key] else { return }
+    listing.removeAll { $0.objectID == entry.objectID }
+    listing.append(entry)
+    cache[key] = listing
+  }
+
   /// Records that the object `id` at `path` is gone: it leaves its parent's cached listing, and
   /// any listing below it is dropped. The rest of the parent's listing stays cached.
   func removed(_ id: UInt32, at path: RemotePath, storage: UInt32) {

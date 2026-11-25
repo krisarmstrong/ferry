@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.7.0](https://github.com/krisarmstrong/ferry/compare/v0.6.0...v0.7.0) (2026-11-25)
+
+
+### Features
+
+* **l10n:** ship Spanish alongside English ([#46](https://github.com/krisarmstrong/ferry/issues/46)) ([56a4b83](https://github.com/krisarmstrong/ferry/commit/56a4b83b001cde52697af1257d32d25141329255))
+* **ui:** V1 accessibility, Update Ready, diagnostics and tester support ([#56](https://github.com/krisarmstrong/ferry/issues/56)) ([2015538](https://github.com/krisarmstrong/ferry/commit/20155389fb52a8e0110364176ec96ca9687c0d04))
+
+
+### Bug Fixes
+
+* actor review of the hub, domain controller and wireless ADB; skip idle mDNS poll (L3) ([#48](https://github.com/krisarmstrong/ferry/issues/48)) ([4592c28](https://github.com/krisarmstrong/ferry/commit/4592c2855f93754e602443fbbabb3dabd91a86ce))
+* cap in-flight XPC requests and scan for secrets in CI ([#45](https://github.com/krisarmstrong/ferry/issues/45)) ([a2fe368](https://github.com/krisarmstrong/ferry/commit/a2fe368b114bf4624a53bf12a1e2bdfd00ea683d))
+* **transfers:** cancellable move copies and scratch copies; resolve lock refusals ([#51](https://github.com/krisarmstrong/ferry/issues/51)) ([f8b7cb5](https://github.com/krisarmstrong/ferry/commit/f8b7cb57c2621d5201f2489d1745c1e0c1727844))
+* **transfers:** trustworthy replaces, creates and unsent-file pointers ([#50](https://github.com/krisarmstrong/ferry/issues/50)) ([177e17c](https://github.com/krisarmstrong/ferry/commit/177e17c885d74b5746004b571807fb610019f4e1))
+
+
+### Performance Improvements
+
+* **transfers:** list a write's folder once ([#55](https://github.com/krisarmstrong/ferry/issues/55)) ([3c26920](https://github.com/krisarmstrong/ferry/commit/3c26920c4618fe7cb53cfd9e93e4290a4429ea9f))
+
 ## [0.6.0](https://github.com/krisarmstrong/ferry/compare/v0.5.0...v0.6.0) (2026-11-21)
 
 
