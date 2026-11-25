@@ -27,7 +27,7 @@ extension ADBHost {
 
   private func forwardRequest(_ request: String) async throws(ADBError) {
     let framed = try ADBWire.frame(request)
-    let stream = try await ADBStream.open(port: port)
+    let stream = try await open()
     defer { stream.cancel() }
     try await stream.write(framed)
     try await stream.expectOkay()
