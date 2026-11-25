@@ -1,0 +1,40 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSDocumentsFolderUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry saves screenshots, screen recordings and device logs in a Ferry folder in Documents."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry guarda capturas de pantalla, grabaciones de pantalla y registros del dispositivo en una carpeta Ferry dentro de Documentos."
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry connects to Android devices on your network over Wi-Fi."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry se conecta por Wi-Fi a los dispositivos Android de tu red."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -1,3 +1,4 @@
+import DeviceKitTestSupport
 import Foundation
 import Testing
 
@@ -26,14 +27,35 @@ struct ProviderTextTests {
     #expect(
       String(localized: ProviderText.nameChanged(requested: "Résumé.txt", actual: "RESUME.TXT"))
         == "The device saved “Résumé.txt” as “RESUME.TXT”.")
+    // Its plural forms are checked compiled, below: an uncompiled catalog reads as its key.
     #expect(
-      String(localized: ProviderText.sizeMismatch(expected: 2, actual: 1))
-        == "The device stored 1 bytes where 2 were sent.")
+      ProviderText.sizeMismatch(expected: 2, actual: 1).key
+        == "The device stored %llu bytes where %llu were sent.")
     #expect(
       String(localized: ProviderText.folderTooDeep("Deep"))
         == "“Deep” holds folders nested more than 64 deep, which Ferry does not delete.")
     #expect(
       String(localized: ProviderText.link)
         == "Symbolic links and aliases can’t be copied to the device.")
+  }
+
+  /// A byte count agrees with its number, in English and in Spanish, once compiled.
+  @Test func byteCountsAgreeWithTheirNumber() async throws {
+    let key = "The device stored %llu bytes where %llu were sent."
+    let catalog = URL(filePath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+      .appending(path: "Sources/FerryProviderCore/Localizable.xcstrings")
+    func format(_ language: String) async throws -> String {
+      try await CompiledCatalog.strings(catalog, language: language)
+        .localizedString(forKey: key, value: nil, table: nil)
+    }
+    let english = try await format("en")
+    let spanish = try await format("es")
+    #expect(
+      String.localizedStringWithFormat(english, UInt64(0), UInt64(1))
+        == "The device stored 0 bytes where 1 was sent.")
+    #expect(
+      String.localizedStringWithFormat(spanish, UInt64(1), UInt64(2))
+        == "El dispositivo guardó 1 byte, pero se enviaron 2.")
   }
 }

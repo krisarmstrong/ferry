@@ -9,6 +9,12 @@
             "state" : "translated",
             "value" : "Connect the device and choose Transfer files to see its files."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecta el dispositivo y elige Transferir archivos para ver sus archivos."
+          }
         }
       }
     },
@@ -19,6 +25,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ferry's helper couldn't read the request."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El asistente de Ferry no pudo leer la solicitud."
           }
         }
       }
@@ -31,6 +43,12 @@
             "state" : "translated",
             "value" : "Ferry's helper couldn't start copying the recording."
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El asistente de Ferry no pudo empezar a copiar la grabación."
+          }
         }
       }
     },
@@ -41,6 +59,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ferry's helper doesn't take this request from here."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El asistente de Ferry no acepta esta solicitud desde aquí."
           }
         }
       }
@@ -53,6 +77,12 @@
             "state" : "translated",
             "value" : "conflict from Mac"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conflicto desde la Mac"
+          }
         }
       }
     },
@@ -63,6 +93,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "conflict from Mac %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conflicto desde la Mac %lld"
+          }
+        }
+      }
+    },
+    "%@ – SD card" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ – SD card"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ – tarjeta SD"
           }
         }
       }

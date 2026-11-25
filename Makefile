@@ -87,6 +87,21 @@ check-app:
 	@test -d "$(APP)/Contents/Resources/Ferry_FerryAgentCore.bundle/Contents/Resources/en.lproj" \
 	  || { echo "error: no FerryAgentCore strings in $(APP)/Contents/Resources" >&2; exit 1; }
 	@echo "FileProvider extension and agent carry their strings"
+	@# Ferry ships in English and Spanish: every strings bundle has both, the app translates its
+	@# usage descriptions, and the app and both extensions declare both, or macOS shows English.
+	@for strings in $$(find '$(APP)' -type d -name en.lproj -path '*Ferry_*.bundle*'); do \
+	  test -f "$$(dirname "$$strings")/es.lproj/Localizable.strings" \
+	    || { echo "error: no Spanish beside $$strings" >&2; exit 1; }; \
+	done
+	@test -f "$(APP)/Contents/Resources/es.lproj/InfoPlist.strings" \
+	  || { echo "error: no Spanish usage descriptions in $(APP)" >&2; exit 1; }
+	@for plist in '$(APP)/Contents/Info.plist' \
+	  '$(APP)/Contents/PlugIns/FerryProvider.appex/Contents/Info.plist' \
+	  '$(APP)/Contents/PlugIns/FerrySync.appex/Contents/Info.plist'; do \
+	  /usr/libexec/PlistBuddy -c 'Print :CFBundleLocalizations' "$$plist" | grep -qx ' *es' \
+	    || { echo "error: $$plist does not declare Spanish" >&2; exit 1; }; \
+	done
+	@echo "every strings bundle, the usage descriptions and every Info.plist carry Spanish"
 	@# The Dock and Finder icon, compiled from Design/Icon/Ferry.icon, and the symbol Finder's
 	@# sidebar shows beside each Ferry location.
 	@test -f "$(APP)/Contents/Resources/Ferry.icns" \

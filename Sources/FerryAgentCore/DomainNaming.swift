@@ -41,7 +41,7 @@ public enum DomainNaming {
   ///
   /// A domain is named after its device (`DeviceInfo.name`), with the end of its serial added
   /// when another listed device has the same name (see `DeviceNames`), as the menus name it,
-  /// and ` – SD card` added for every storage after the device's first.
+  /// and ` – SD card`, in the agent's language, added for every storage after the device's first.
   static func specs(for devices: [AttachedDevice]) -> [DomainSpec] {
     domains(for: devices).map(\.spec)
   }
@@ -59,7 +59,7 @@ public enum DomainNaming {
       return storages.enumerated().map { index, storage in
         let spec = DomainSpec(
           identifier: identifier(for: storage.id),
-          displayName: index == 0 ? base : base + " – SD card")
+          displayName: index == 0 ? base : String(localized: AgentText.cardLocation(base)))
         return Wanted(spec: spec, storage: storage.id)
       }
     }

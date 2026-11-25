@@ -1,13 +1,18 @@
 import Foundation
 
 /// The words the agent shows the user, from this target's String Catalog: in a conflict copy's
-/// name on the device, and in Finder for a device that is away.
+/// name on the device, and in Finder: an SD card's location name, and a device that is away.
 public enum AgentText {
   /// The marker in a conflict copy's name, without its brackets: `attempt` 1 has no number.
   static func conflictMarker(attempt: Int) -> LocalizedStringResource {
     attempt == 1
       ? LocalizedStringResource("conflict from Mac", bundle: .module)
       : LocalizedStringResource("conflict from Mac \(attempt)", bundle: .module)
+  }
+
+  /// The Finder location of a device's SD card, after the device's name.
+  static func cardLocation(_ device: String) -> LocalizedStringResource {
+    LocalizedStringResource("\(device) – SD card", bundle: .module)
   }
 
   /// Why a device's Finder location is disconnected, which Finder shows in the location.
@@ -28,7 +33,7 @@ public enum AgentText {
 
   /// Every string, with sample values, so a test can check each has its catalog entry.
   static let all: [LocalizedStringResource] = [
-    conflictMarker(attempt: 1), conflictMarker(attempt: 2), disconnected, badRequest,
-    notAllowed, recordingNotStaged,
+    conflictMarker(attempt: 1), conflictMarker(attempt: 2), cardLocation("Phone"), disconnected,
+    badRequest, notAllowed, recordingNotStaged,
   ]
 }

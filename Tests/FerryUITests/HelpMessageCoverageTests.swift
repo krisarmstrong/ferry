@@ -103,7 +103,7 @@ extension HelpMessageCoverageTests {
   /// Keys in the small catalogs that are not messages: names, notices of success, menu titles.
   private static let notMessages: [String: Set<String>] = [
     "FerryText": ["Unknown device"],
-    "FerryAgentCore": ["conflict from Mac", "conflict from Mac %lld"],
+    "FerryAgentCore": ["%@ – SD card", "conflict from Mac", "conflict from Mac %lld"],
     "FerryProviderCore": [],
     "FerrySyncCore": [
       "Download already had a file with that name, so it’s there as “%@”.", "Install on %@",
@@ -258,12 +258,12 @@ extension HelpMessageCoverageTests {
     ("trouble-send", "Couldn’t send “%@” to %@"),
     ("trouble-send", "Couldn’t send %lld files to %@"),
     ("trouble-send", "Sent %lld of %lld to %@"),
-    ("trouble-send", "“%@” wasn’t sent. %@"),
+    ("trouble-send", "“%@” wasn’t sent."),
     ("trouble-send", "Also not sent: %lld."),
     ("trouble-send", "Couldn’t install “%@” on %@"),
     ("trouble-send", "Couldn’t install %lld apps on %@"),
     ("trouble-send", "Installed %lld of %lld on %@"),
-    ("trouble-send", "“%@” wasn’t installed. %@"),
+    ("trouble-send", "“%@” wasn’t installed."),
     ("trouble-send", "Also not installed: %lld."),
     ("trouble-send", "Only files can be sent."),
     (
