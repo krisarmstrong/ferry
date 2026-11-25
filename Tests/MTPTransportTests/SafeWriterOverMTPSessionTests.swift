@@ -128,4 +128,30 @@ struct SafeWriterOverMTPSessionTests {
     }
     #expect(await device.calls.isEmpty)
   }
+
+  /// A write lists its folder once: the existence check's listing serves the upload's and the
+  /// rename's collision checks, which then follow the session's own changes. Each listing reads
+  /// every object in the folder from the device, so three per file made a large folder slow.
+  /// (A replace also deletes its backup, which lists the path afresh, as every delete does.)
+  @Test func aWriteListsItsFolderOnce() async throws {
+    let device = SessionFixture.makeDevice()
+    let folder = await device.addFolder("Big", parent: SessionFixture.root)
+    for index in 0..<50 {
+      await device.addFile("f\(index).txt", parent: folder, data: Data("x".utf8))
+    }
+    let session = MTPSession(device: device, scratch: TestScratch.root)
+    _ = try await session.list(SessionFixture.path("/Big"), in: storage)
+    let listed = await device.listCount
+    let file = try SessionFixture.localFile(Data("new".utf8))
+    defer { try? FileManager.default.removeItem(at: file) }
+
+    _ = try await SafeWriter(session: session, backups: .scratch()).write(
+      from: file, to: SessionFixture.path("/Big/new.txt"), in: storage, replacing: false,
+      progress: SessionFixture.noProgress)
+
+    #expect(await device.listCount - listed == 1)
+    #expect(
+      await device.objects.values.filter { $0.name == "new.txt" }.map(\.data)
+        == [Data("new".utf8)])
+  }
 }

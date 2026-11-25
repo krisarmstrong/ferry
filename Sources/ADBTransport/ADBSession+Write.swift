@@ -31,16 +31,22 @@ extension ADBSession {
         try await syncing { (sync) async throws(ADBError) in try await sync.stat(location) }
       }
       guard taken == nil else { throw .alreadyExists(path) }
-      try await adb(Step("upload", path, target: path)) { () async throws(ADBError) in
-        try await syncing { (sync) async throws(ADBError) in
-          try await sync.send(
-            handle, to: location, mode: Self.fileMode, mtime: modified, progress: progress)
+      do throws(TransportError) {
+        try await adb(Step("upload", path, target: path)) { () async throws(ADBError) in
+          try await syncing { (sync) async throws(ADBError) in
+            try await sync.send(
+              handle, to: location, mode: Self.fileMode, mtime: modified, progress: progress)
+          }
         }
+        guard let item = try await stat(at: location, as: path), item.kind == .file else {
+          throw TransportError.io("upload of \(path.description) left no file")
+        }
+        recordInWrite(in: parent, under: root, added: item)
+        return item
+      } catch {
+        recordInWrite(in: parent, under: root, added: nil)
+        throw error
       }
-      guard let item = try await stat(at: location, as: path), item.kind == .file else {
-        throw .io("upload of \(path.description) left no file")
-      }
-      return item
     }
   }
 
@@ -83,13 +89,21 @@ extension ADBSession {
       defer { forget(folder) }
       forget(source)
       let step = Step("rename", path, target: renamed)
-      if RemotePath.collisionKey(name) == RemotePath.collisionKey(newName) {
-        try await renameCaseOnly(source, to: target, step)
-      } else {
-        try await mv(source, to: target, step)
+      do throws(TransportError) {
+        if RemotePath.collisionKey(name) == RemotePath.collisionKey(newName) {
+          try await renameCaseOnly(source, to: target, step)
+        } else {
+          try await mv(source, to: target, step)
+        }
+        guard let item = try await stat(at: target, as: renamed) else {
+          throw TransportError.notFound(renamed)
+        }
+        recordInWrite(in: parent, under: root, added: item, removed: path)
+        return item
+      } catch {
+        recordInWrite(in: parent, under: root, added: nil)
+        throw error
       }
-      guard let item = try await stat(at: target, as: renamed) else { throw .notFound(renamed) }
-      return item
     }
   }
 

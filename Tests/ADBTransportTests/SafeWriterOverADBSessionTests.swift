@@ -88,7 +88,9 @@ struct SafeWriterOverADBSessionTests {
       #expect(visible.map(\.path) == [try ADBFixture.path("/a.txt")])
     }
     #expect(device.contents("/a.txt") == Data("old".utf8))
-    #expect(try await ADBFixture.eventually { device.tree == ["/a.txt"] })
+    // adbd unlinks the cancelled upload once its connection ends.
+    await device.waitUntilNone(.connections)
+    #expect(device.tree == ["/a.txt"])
   }
 
   @Test func listingHidesAndReapsAnAbandonedPartial() async throws {

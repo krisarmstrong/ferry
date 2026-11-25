@@ -18,7 +18,12 @@ extension ADBSession {
     async throws(TransportError)
   {
     try await operation(on: storage) { (root) throws(TransportError) in
-      guard path != .root else { throw .notFound(path) }
+      guard path != .root, let parent = path.parent else { throw .notFound(path) }
+      // A delete acts on what the device has now, never on a write's listing, and leaves none
+      // behind that would still show what it deleted.
+      let key = Self.listingKey(parent, root)
+      WriteListing.current?.forget(key)
+      defer { WriteListing.current?.forget(key) }
       let (top, location) = try await existing(path, under: root)
       if let expecting {
         let checked = Dictionary(
