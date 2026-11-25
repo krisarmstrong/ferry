@@ -12,8 +12,6 @@ public actor PartialRegistry {
   private var backups: Set<Entry> = []
   /// Local backups (see `ReplaceBackups`) a write or a listing is using now.
   private var localBackupsInUse: Set<UUID> = []
-  /// Local backups whose name holds another file: left alone for the rest of the session.
-  private var localBackupsKept: Set<UUID> = []
   /// Files a failed replace put back, each with the file it was before: a copy of the same
   /// bytes, but dated when it went back.
   private var restored: [Entry: (restored: RemoteItem, original: RemoteItem)] = [:]
@@ -46,18 +44,13 @@ public actor PartialRegistry {
     backups.contains(Entry(storage: storage, path: path))
   }
 
-  /// Takes backup `id` for the caller; `false` if another holds it or it is kept.
+  /// Takes backup `id` for the caller; `false` if another holds it.
   public func claimLocalBackup(_ id: UUID) -> Bool {
-    guard !localBackupsKept.contains(id) else { return false }
-    return localBackupsInUse.insert(id).inserted
+    localBackupsInUse.insert(id).inserted
   }
 
   public func releaseLocalBackup(_ id: UUID) {
     localBackupsInUse.remove(id)
-  }
-
-  public func keepLocalBackup(_ id: UUID) {
-    localBackupsKept.insert(id)
   }
 
   public func recordRestore(_ item: RemoteItem, of original: RemoteItem, in storage: StorageID) {

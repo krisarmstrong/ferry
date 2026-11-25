@@ -166,6 +166,9 @@ public struct StatusReport: Codable, Sendable, Equatable {
   /// USB devices adb keeps offline even after the agent asked it to reconnect them: only a
   /// replug brings them back.
   public let needsReplug: [DeviceID]
+  /// Folders on the Mac holding device files Ferry set aside rather than write back: the
+  /// original of a replace cut off on a device Ferry could not be sure was the same one.
+  public let setAside: [URL]
 
   public init(
     devices: [AttachedDevice], provider: ProviderState, transfers: [ActiveTransfer] = [],
@@ -174,7 +177,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     remembered: [RememberedDevice] = [], unconfirmed: [UnconfirmedAddress] = [],
     recordings: [ActiveRecording] = [], usbWatchFailed: Bool = false,
     sessions: [DeviceID: UInt64] = [:], connectedAddresses: [DeviceID: WirelessEndpoint] = [:],
-    waitingToSend: [String] = [], needsReplug: [DeviceID] = []
+    waitingToSend: [String] = [], needsReplug: [DeviceID] = [], setAside: [URL] = []
   ) {
     self.devices = devices
     self.provider = provider
@@ -190,6 +193,7 @@ public struct StatusReport: Codable, Sendable, Equatable {
     self.connectedAddresses = connectedAddresses
     self.waitingToSend = waitingToSend
     self.needsReplug = needsReplug
+    self.setAside = setAside
   }
 }
 

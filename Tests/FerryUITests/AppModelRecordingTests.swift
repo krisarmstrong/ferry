@@ -110,7 +110,8 @@ struct AppModelRecordingTests {
   @Test func aBackgroundSaveKeepsTheMenuAsItWas() async throws {
     let model = setUp()
     services.folders = [try TestScratch.folder("background")]
-    let kept = URL(filePath: "/tmp/kept-\(UUID().uuidString)")
+    let kept = try TestScratch.folder("kept")
+    try Data("x".utf8).write(to: kept.appending(path: "report.txt"))
     model.preservedChanges = [kept]
     model.toolMessage = "Installed “a.apk”."
     await model.refresh()

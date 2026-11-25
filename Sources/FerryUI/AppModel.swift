@@ -340,6 +340,8 @@ import os
     remembered = report.remembered
     connectedAddresses = report.connectedAddresses
     waitingToSend = report.waitingToSend
+    // Shown like an eject's saved changes, and only while the folder holds something.
+    keepPreservedChanges(adding: report.setAside)
     unconfirmed = report.unconfirmed
     recordings = report.recordings
     collectFinishedRecordings()

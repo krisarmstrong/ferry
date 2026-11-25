@@ -326,7 +326,7 @@ extension AgentService {
       recordings: await tools?.recordingsRunning() ?? [],
       usbWatchFailed: usbWatch?.failed ?? false, sessions: await hub.heldSessions(),
       connectedAddresses: addresses, waitingToSend: await domains.locationsWaitingToSend(),
-      needsReplug: await hub.stuckOfflineDevices())
+      needsReplug: await hub.stuckOfflineDevices(), setAside: [domains.backups.setAsideFolder])
   }
 }
 

@@ -150,8 +150,8 @@ extension SafeWriterTests {
   }
 
   /// A file at the name that is neither the original nor the new one (the user put something
-  /// else there meanwhile) is never overwritten, and the backup is kept.
-  @Test func aBackupWhoseNameHoldsSomethingElseIsKept() async throws {
+  /// else there meanwhile) is never overwritten: the original is set aside on the Mac.
+  @Test func aBackupWhoseNameHoldsSomethingElseIsSetAside() async throws {
     let (device, path) = try await noRenameDevice()
     let backups = ReplaceBackups.scratch()
     let writer = SafeWriter(session: device, backups: backups)
@@ -166,7 +166,79 @@ extension SafeWriterTests {
     _ = try await SafeWriter(session: later, backups: backups).visibleList(.root, in: storageID)
 
     #expect(await later.contents(of: path, in: storageID) == other)
-    #expect(backupFiles(backups).count == 3)
+    #expect(backupFiles(backups) == ["Kept"])
+    #expect(try Data(contentsOf: backups.setAsideFolder.appending(path: "a.txt")) == Self.original)
+  }
+
+  /// The name is free and the folder holds what it held beside the original: the replace was
+  /// cut off before its upload began, and the original goes back.
+  @Test func aFreeNameInTheSameFolderGetsTheOriginalBack() async throws {
+    let (device, path) = try await noRenameDevice()
+    let sibling = try RemotePath("/notes.txt")
+    try await device.seed(sibling, in: storageID, contents: Data("notes".utf8))
+    let backups = ReplaceBackups.scratch()
+    await device.disconnectDuringUpload(afterBytes: 0, skipping: 1)
+    try await withTempFile(Self.replacement) { file in
+      _ = try? await SafeWriter(session: device, backups: backups).write(
+        from: file, to: path, replacing: true)
+    }
+    let later = await device.newSession()
+    try await later.delete(path, in: storageID)
+
+    let listed = try await SafeWriter(session: later, backups: backups).visibleList(
+      .root, in: storageID)
+
+    #expect(Set(listed.map(\.path)) == [path, sibling])
+    #expect(Self.sha(await later.contents(of: path, in: storageID)) == Self.sha(Self.original))
+    #expect(backupFiles(backups).isEmpty)
+  }
+
+  /// Another unit reporting the same serial, with a storage of the same size: its folder is not
+  /// the one the backup came from, so nothing is written to it, and the original is set aside
+  /// on the Mac where the menu points to it.
+  @Test func aBackupIsNeverWrittenToAnotherUnitWithTheSameSerial() async throws {
+    let (device, path) = try await noRenameDevice()
+    try await device.seed(try RemotePath("/notes.txt"), in: storageID, contents: Data("n".utf8))
+    let backups = ReplaceBackups.scratch()
+    await device.disconnectDuringUpload(afterBytes: 0, skipping: 1)
+    try await withTempFile(Self.replacement) { file in
+      _ = try? await SafeWriter(session: device, backups: backups).write(
+        from: file, to: path, replacing: true)
+    }
+
+    let impostor = makeDevice()
+    let theirs = try RemotePath("/holiday.jpg")
+    try await impostor.seed(theirs, in: storageID, contents: Data("theirs".utf8))
+    let listed = try await SafeWriter(session: impostor, backups: backups).visibleList(
+      .root, in: storageID)
+
+    #expect(listed.map(\.path) == [theirs])
+    #expect(await impostor.allPaths(in: storageID) == [theirs])
+    #expect(backupFiles(backups) == ["Kept"])
+    #expect(try Data(contentsOf: backups.setAsideFolder.appending(path: "a.txt")) == Self.original)
+  }
+
+  /// A storage of another size is never the one the backup came from.
+  @Test func aBackupIsNeverWrittenToAStorageOfAnotherSize() async throws {
+    let (device, path) = try await noRenameDevice()
+    let backups = ReplaceBackups.scratch()
+    await device.disconnectDuringUpload(afterBytes: 3, skipping: 1)
+    try await withTempFile(Self.replacement) { file in
+      _ = try? await SafeWriter(session: device, backups: backups).write(
+        from: file, to: path, replacing: true)
+    }
+    let other = FakeDevice(
+      info: DeviceInfo(id: deviceID, manufacturer: "Fake", model: "Phone"),
+      storages: [
+        StorageInfo(
+          id: storageID, description: "Internal", capacity: 64_000_000_000, free: 5_000_000_000)
+      ])
+
+    #expect(
+      try await SafeWriter(session: other, backups: backups).visibleList(.root, in: storageID)
+        .isEmpty)
+    #expect(await other.allPaths(in: storageID).isEmpty)
+    #expect(backupFiles(backups) == ["Kept"])
   }
 
   /// Recovery is for this device's storage only.

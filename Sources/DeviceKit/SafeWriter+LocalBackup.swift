@@ -62,9 +62,11 @@ extension SafeWriter {
       try backups.keepNewContents(source.file, for: id)
       return try backups.commit(
         ReplaceBackups.Manifest(
-          id: id, storage: storage, path: replaced.path, size: downloaded.received,
-          sha256: try LocalFile.sha256(file), newSize: source.size,
-          newSHA256: try LocalFile.sha256(source.file)))
+          id: id, storage: storage, capacity: try await capacity(of: storage),
+          path: replaced.path, size: downloaded.received, modified: replaced.modified,
+          sha256: try LocalFile.sha256(file),
+          siblings: try await siblings(of: replaced.path, in: storage),
+          newSize: source.size, newSHA256: try LocalFile.sha256(source.file)))
     } catch {
       backups.remove(id)
       throw error
@@ -104,10 +106,13 @@ extension SafeWriter {
   /// A backup an earlier write left in this folder: its replace failed and the original could
   /// not be put back, or the device went away before the backup was removed.
   ///
-  /// If the name is free the original goes back. If the name holds the original or the new
-  /// contents, the replace was settled and the backup goes. If it holds the start of the new
-  /// contents (an upload the device lost mid-way), that copy is deleted and the original goes
-  /// back. Anything else is someone else's file: the backup is kept and nothing is overwritten.
+  /// The serial that found it proves nothing: another unit can report the same one. So the
+  /// backup is written back only on evidence that this is the device, and the folder, it came
+  /// from: the storage's capacity, and either the start of the new contents at the name (the
+  /// upload the device cut short) or, with the name free, every other item of the folder as
+  /// it was. A name holding the original or the new contents on that storage means the replace
+  /// was settled, and the backup goes. Anything else is set aside on the Mac under the file's
+  /// own name, for the user to find, and nothing is written to the device.
   func settleLocalBackup(
     _ backup: ReplaceBackups.Backup, among visible: [RemoteItem], in storage: StorageID
   ) async -> RemoteItem? {
@@ -123,27 +128,34 @@ extension SafeWriter {
     _ backup: ReplaceBackups.Backup, among visible: [RemoteItem], in storage: StorageID
   ) async -> RemoteItem? {
     let manifest = backup.manifest
+    // Not known now (the device went quiet): tried again at the next listing.
+    guard let capacity = try? await capacity(of: storage) else { return nil }
+    guard capacity == manifest.capacity else {
+      setAside(backup, because: "its storage is not the one it came from")
+      return nil
+    }
     let key = RemotePath.collisionKey(manifest.path.name ?? "")
     guard let taken = visible.first(where: { RemotePath.collisionKey($0.path.name ?? "") == key })
     else {
+      guard Self.folderIsAsLeft(visible, manifest) else {
+        setAside(backup, because: "its folder is not as the replace left it")
+        return nil
+      }
       return await putBack(backup, in: storage)
     }
-    // A file whose contents cannot be read now is tried again at the next listing.
-    guard taken.kind == .file, taken.path == manifest.path,
-      let read = await readBack(taken.path, in: storage)
-    else {
-      if taken.kind == .folder || taken.path != manifest.path {
-        await keep(backup, shadowedBy: taken)
-      }
+    guard taken.kind == .file, taken.path == manifest.path else {
+      setAside(backup, because: "its name holds another item")
       return nil
     }
+    // A file whose contents cannot be read now is tried again at the next listing.
+    guard let read = await readBack(taken.path, in: storage) else { return nil }
     defer { try? FileManager.default.removeItem(at: read.file) }
     if read.sha256 == manifest.sha256 || read.sha256 == manifest.newSHA256 {
       backups.remove(manifest.id)
       return nil
     }
     guard backups.isStartOfNewContents(read.file, for: manifest.id) else {
-      await keep(backup, shadowedBy: taken)
+      setAside(backup, because: "its name holds another file")
       return nil
     }
     do {
@@ -154,14 +166,47 @@ extension SafeWriter {
     return await putBack(backup, in: storage)
   }
 
-  /// Leaves the backup alone for the rest of the session, so later listings do not read the
-  /// file at its name again.
-  private func keep(_ backup: ReplaceBackups.Backup, shadowedBy taken: RemoteItem) async {
-    let (original, holder) = (backup.manifest.path.description, taken.path.description)
+  /// Whether every item the folder held beside the original, when the backup was made, is still
+  /// there unchanged. Items added since do not count against it; a folder that held nothing else
+  /// is no evidence at all.
+  static func folderIsAsLeft(_ visible: [RemoteItem], _ manifest: ReplaceBackups.Manifest)
+    -> Bool
+  {
+    guard !manifest.siblings.isEmpty else { return false }
+    let now = Set(visible.map(ReplaceBackups.Sibling.init))
+    return manifest.siblings.allSatisfy(now.contains)
+  }
+
+  /// Moves the backup out of the way of later listings, onto the Mac under its own name.
+  private func setAside(_ backup: ReplaceBackups.Backup, because reason: String) {
+    let original = backup.manifest.path.description
+    guard let kept = backups.setAside(backup) else {
+      Self.log.error("could not set aside the backup of \(original, privacy: .private)")
+      return
+    }
+    let place = kept.path
     Self.log.error(
-      "keeping the backup of \(original, privacy: .private): its name holds \(holder, privacy: .private)"
+      "set aside \(original, privacy: .private) at \(place, privacy: .private): \(reason, privacy: .private)"
     )
-    await session.partials.keepLocalBackup(backup.manifest.id)
+  }
+
+  private func capacity(of storage: StorageID) async throws(TransportError) -> UInt64 {
+    guard let info = try await session.storages().first(where: { $0.id == storage }) else {
+      throw .storageNotFound(storage.key)
+    }
+    return info.capacity
+  }
+
+  private func siblings(of path: RemotePath, in storage: StorageID) async throws(TransportError)
+    -> [ReplaceBackups.Sibling]
+  {
+    guard let parent = path.parent else { return [] }
+    return try await session.list(parent, in: storage)
+      .filter { item in
+        let name = item.path.name ?? ""
+        return item.path != path && !Self.isPartial(name) && !Self.isBackup(name)
+      }
+      .map(ReplaceBackups.Sibling.init)
   }
 
   /// The device's file at `path` read into a scratch file, with its SHA-256; `nil` if it cannot
