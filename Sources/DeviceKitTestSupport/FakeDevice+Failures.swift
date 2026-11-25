@@ -3,9 +3,47 @@ import Foundation
 
 /// Test controls: injected failures and the device's contents.
 extension FakeDevice {
-  /// The next upload stores its first `afterBytes` bytes, then throws `error`.
-  public func failUpload(afterBytes: UInt64, with error: TransportError) {
-    uploadFailure = (afterBytes, error)
+  /// After the next `skipping` uploads, the next one stores its first `afterBytes` bytes, then
+  /// throws `error`.
+  public func failUpload(afterBytes: UInt64, with error: TransportError, skipping: Int = 0) {
+    uploadFailure = UploadFailure(
+      skipping: skipping, afterBytes: afterBytes, error: error, disconnects: false)
+  }
+
+  /// After the next `skipping` uploads, the next one stores its first `afterBytes` bytes and the
+  /// device goes away, as when the cable is pulled mid-transfer: nothing more reaches it, not
+  /// even the clean-up of what it kept.
+  public func disconnectDuringUpload(afterBytes: UInt64, skipping: Int = 0) {
+    uploadFailure = UploadFailure(
+      skipping: skipping, afterBytes: afterBytes, error: .deviceDisconnected, disconnects: true)
+  }
+
+  /// The failure the upload starting now meets, if any, counting down the uploads it skips.
+  func nextUploadFailure() -> UploadFailure? {
+    guard var failure = uploadFailure else { return nil }
+    if failure.skipping > 0 {
+      failure.skipping -= 1
+      uploadFailure = failure
+      return nil
+    }
+    uploadFailure = nil
+    return failure
+  }
+
+  /// The next download writes its first `afterBytes` bytes to the Mac, then throws `error`.
+  public func failDownload(afterBytes: UInt64, with error: TransportError) {
+    downloadFailure = (afterBytes, error)
+  }
+
+  /// Runs `hook` when the next download starts, as the device going away mid-transfer.
+  public func onNextDownload(_ hook: @escaping @Sendable () async -> Void) {
+    downloadHook = hook
+  }
+
+  func runDownloadHook() async {
+    guard let hook = downloadHook else { return }
+    downloadHook = nil
+    await hook()
   }
 
   /// Uploads keep only the first `bytes` bytes and report success. `nil` turns this off.

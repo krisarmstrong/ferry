@@ -37,7 +37,7 @@ extension DomainControllerTests {
       transport: FakeTransport(devices: []), arrivals: arrivals, clock: ManualClock())
     let retryClock = ManualClock()
     let controller = DomainController(
-      hub: hub, manager: manager, itemStore: itemStore(), clock: retryClock)
+      hub: hub, manager: manager, itemStore: itemStore(), backups: .scratch(), clock: retryClock)
     _ = try await controller.removeAll()
     #expect(await controller.listingRetryTask == nil)
 
