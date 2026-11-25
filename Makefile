@@ -26,8 +26,9 @@ test: libmtp-pc
 	swift test $(TEST_FLAGS)
 
 # The concurrency-heavy targets under Thread Sanitizer. Any race fails the run; none is suppressed.
-# The wall-clock benchmark is skipped: its millisecond bounds measure the sanitizer's slowdown, not
-# Ferry. Serial, because the instrumented tests are slow enough for timed waits to flake in parallel.
+# The wall-clock benchmark, which only reports, is skipped: under the sanitizer its milliseconds
+# would measure the slowdown, not Ferry. Serial, because the instrumented tests are slow enough
+# for timed waits to flake in parallel.
 test-tsan: libmtp-pc
 	swift test --sanitize=thread --no-parallel --skip ItemTableBenchmarkTests \
 		--filter 'FerryAgentCoreTests|FerryIPCTests|DeviceKitTests|ADBTransportTests'

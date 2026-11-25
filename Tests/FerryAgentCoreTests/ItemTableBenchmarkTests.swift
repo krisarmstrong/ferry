@@ -6,14 +6,11 @@ import Testing
 
 @testable import FerryAgentCore
 
-/// The item table's cost per change and per working-set page on large tables (audit H1, M10).
-///
-/// Both sizes are measured and printed; the test asserts an upper bound per operation on the
-/// 40,000-item table. A cost that grows with the table (a whole-file rewrite, a sort per page)
-/// was 60-300 ms per change there in a release build, far above it. The bound is loose, since
-/// CI runs a debug build on shared runners, and the ratio between sizes is printed but not
-/// asserted: a journal fold now and then makes single runs swing. For the release numbers run
-/// `swift test -c release -Xswiftc -enable-testing --filter ItemTableBenchmarkTests`.
+/// The item table's time per change and per working-set page on large tables (audit H1, M10),
+/// measured and printed at both sizes. It reports and never fails: on a shared runner a debug
+/// build's milliseconds measure the machine as much as the table. `ItemTableCostTests` guards
+/// against a cost that grows with the table by counting the work instead. For the release
+/// numbers run `swift test -c release -Xswiftc -enable-testing --filter ItemTableBenchmarkTests`.
 @Suite(.serialized)
 struct ItemTableBenchmarkTests {
   private static let stamp = Date(timeIntervalSince1970: 1_700_000_000)
@@ -33,12 +30,11 @@ struct ItemTableBenchmarkTests {
     var bigListing: Duration
   }
 
-  /// One operation's cost at both sizes, and its bound at 40,000 items.
+  /// One operation's cost at both sizes.
   private struct Row {
     let name: String
     let at10k: Duration
     let at40k: Duration
-    let bound: Double
   }
 
   private func item(_ folder: Int, _ index: Int) throws -> RemoteItem {
@@ -119,19 +115,17 @@ struct ItemTableBenchmarkTests {
       + Double(duration.components.attoseconds) / 1e15
   }
 
-  @Test func aChangeOnALargeTableStaysCheap() async throws {
+  @Test func reportTheCostOfAChangeOnALargeTable() async throws {
     let small = try await measure(10_000)
     let large = try await measure(40_000)
-    // Each row with its bound at 40,000 items, in a debug build on a busy runner: one change,
-    // one page, or one listing of 1,000 items (1,000 lookups).
+    // One change, one page, or one listing of 1,000 items (1,000 lookups).
     let rows = [
-      Row(name: "observed", at10k: small.observe, at40k: large.observe, bound: 50),
-      Row(name: "created", at10k: small.create, at40k: large.create, bound: 50),
-      Row(name: "removed", at10k: small.remove, at40k: large.remove, bound: 50),
-      Row(name: "listed (unchanged 1,000)", at10k: small.relist, at40k: large.relist, bound: 250),
+      Row(name: "observed", at10k: small.observe, at40k: large.observe),
+      Row(name: "created", at10k: small.create, at40k: large.create),
+      Row(name: "removed", at10k: small.remove, at40k: large.remove),
+      Row(name: "listed (unchanged 1,000)", at10k: small.relist, at40k: large.relist),
       Row(
-        name: "working-set page (500)", at10k: small.workingSetPage, at40k: large.workingSetPage,
-        bound: 50),
+        name: "working-set page (500)", at10k: small.workingSetPage, at40k: large.workingSetPage),
     ]
     for row in rows {
       print(
@@ -148,14 +142,6 @@ struct ItemTableBenchmarkTests {
         String(
           format: "ItemTable benchmark: %@ %.1f ms at 10,000, %.1f ms at 40,000", name,
           milliseconds(at10k), milliseconds(at40k)))
-    }
-    // Inserting new identifiers one at a time into the order was O(n) each, so a big new
-    // folder cost O(n²); in a debug build this stays well under a second.
-    #expect(milliseconds(large.bigListing) < 5_000)
-    for row in rows {
-      #expect(
-        milliseconds(row.at40k) < row.bound,
-        "\(row.name) costs \(milliseconds(row.at40k)) ms at 40,000")
     }
   }
 }

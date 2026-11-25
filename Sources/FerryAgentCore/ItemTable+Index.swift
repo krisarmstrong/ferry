@@ -20,6 +20,7 @@ extension ItemTable {
     guard !unordered.isEmpty else { return }
     let new = unordered.sorted { $0.rawValue < $1.rawValue }
     unordered = []
+    work.sortedIDs += new.count
     var merged: [ItemID] = []
     merged.reserveCapacity(order.count + new.count)
     var (old, added) = (order.startIndex, new.startIndex)
