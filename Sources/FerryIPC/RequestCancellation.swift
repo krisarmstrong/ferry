@@ -91,15 +91,17 @@ extension AgentRequest {
   /// Whether the reply may take as long as the work does, so the client sets no deadline on it:
   /// a transfer, which reports its progress; a request answered only when it ends (a recording,
   /// a log stream); one that waits for transfers to finish (an eject, Remove Ferry) or walks
-  /// whole folder trees (Refresh, a recursive delete); and a network connect, which tries each
-  /// address with adb's own 30 s limit, one after another. The rest are metadata calls, answered
+  /// whole folder trees (Refresh, a recursive delete); a move, which on a device without
+  /// MoveObject is a copy of the whole file (`MTPSession.copyThenDelete`), and which a deadline
+  /// would cut off for FileProvider to start again from the beginning; and a network connect,
+  /// which tries each address with adb's own 30 s limit, one after another. The rest are metadata calls, answered
   /// within `AgentClient.replyDeadline` of starting (see `RequestCancellation.markStarted()`) or
   /// taken as an agent that stopped answering.
   public var mayTakeLong: Bool {
     switch self {
     case .fetch, .replaceContents, .sendFile, .installAPK, .saveRecording, .startRecording,
       .startLogcat, .eject, .removeAllDomains, .refresh, .connectAddress, .pair,
-      .connectWireless, .enableWireless, .confirmWireless:
+      .connectWireless, .enableWireless, .confirmWireless, .move:
       true
     case .create(_, _, _, let isFolder):
       !isFolder
@@ -107,7 +109,7 @@ extension AgentRequest {
       recursive
     case .status, .devices, .recheck, .recheckADB, .forgetWireless, .ignoreWireless, .screenshot,
       .stopRecording, .discardRecording, .stopLogcat, .forwards, .addForward, .removeForward,
-      .deviceInfo, .shellTarget, .item, .list, .rename, .move, .changes, .workingSet:
+      .deviceInfo, .shellTarget, .item, .list, .rename, .changes, .workingSet:
       false
     }
   }

@@ -97,6 +97,16 @@ struct FileProviderDomains: DomainManaging {
     }
   }
 
+  func lockResolved(_ identifier: String) async {
+    do {
+      try await manager(identifier).signalErrorResolved(NSFileProviderError(.notAuthenticated))
+    } catch {
+      log.error(
+        "resolving the lock of \(identifier, privacy: .private) failed: \(error, privacy: .private)"
+      )
+    }
+  }
+
   /// A failed listing reads as no domains: the menu then asks nothing of the user.
   func providerState() async -> ProviderState {
     do {

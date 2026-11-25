@@ -42,14 +42,19 @@ extension MTPSession {
   /// Move for a device without MoveObject. The copy goes up under a partial name and is renamed
   /// only once its size checks out, so a failure never leaves a short file under the real name;
   /// the source is deleted only after that. The partial is registered in `partials` until it is
-  /// renamed or discarded, so no `SafeWriter.visibleList` reaps it meanwhile.
+  /// renamed or discarded, so no `SafeWriter.visibleList` reaps it meanwhile. A copy can take
+  /// as long as any transfer, so the request's cancel stops it at its next block, before the
+  /// source is touched.
   private func copyThenDelete(
     _ source: MTPEntry, from parent: RemotePath, to placement: Placement, storage: UInt32
   ) async throws(TransportError) -> RemoteItem {
     let local = scratch.appendingPathComponent(LocalFile.moveScratchPrefix + UUID().uuidString)
     try LocalFile.requireSpace(source.size, at: local.deletingLastPathComponent())
     defer { try? FileManager.default.removeItem(at: local) }
-    try await device.download(objectID: source.objectID, to: local) { _, _ in true }
+    // libmtp reports progress on its own queue, where the request's task-local is not set.
+    let turn = DeviceTurns.current
+    let goOn: ProgressHandler = { _, _ in turn?.isCancelled != true }
+    try await device.download(objectID: source.objectID, to: local, progress: goOn)
 
     let partialName = SafeWriter.partialPrefix + UUID().uuidString
     let partial = try placement.folder.appending(partialName)
@@ -59,8 +64,8 @@ extension MTPSession {
       copy = try await mutating([placement.folder], storage: storage) {
         () throws(TransportError) in
         let id = try await device.upload(
-          from: local, name: partialName, parent: placement.id, storage: storage
-        ) { _, _ in true }
+          from: local, name: partialName, parent: placement.id, storage: storage,
+          progress: goOn)
         let uploaded = try await device.metadata(objectID: id)
         guard uploaded.size == source.size else {
           throw .sizeMismatch(expected: source.size, actual: uploaded.size)

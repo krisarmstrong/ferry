@@ -9,6 +9,13 @@
 public protocol DeviceTurn: Sendable {
   /// Throws to drop the operation.
   func takeTurn() throws(TransportError)
+  /// Whether the request's client has given up on it, so work it started stops at its next
+  /// step.
+  var isCancelled: Bool { get }
+}
+
+extension DeviceTurn {
+  public var isCancelled: Bool { false }
 }
 
 public enum DeviceTurns {

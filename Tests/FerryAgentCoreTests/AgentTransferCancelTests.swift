@@ -2,6 +2,7 @@ import DeviceKit
 import DeviceKitTestSupport
 import FerryIPC
 import Foundation
+import Synchronization
 import Testing
 
 @testable import FerryAgentCore
@@ -51,6 +52,30 @@ struct AgentTransferCancelTests {
     let storage = storageID(device)
     #expect(try await device.list(.root, in: storage).map(\.path) == [try path("/a.txt")])
     #expect(await device.contents(of: try path("/a.txt"), in: storage) == Data("old".utf8))
+  }
+
+  /// A request cancelled while the agent copies the client's file stops that copy: nothing
+  /// reaches the device, and no scratch copy is left on the Mac.
+  @Test func aCancelBeforeTheDeviceIsReachedStopsTheCopy() async throws {
+    let setup = try await setUp()
+    let (harness, device, domain) = (setup.harness, setup.device, setup.domain)
+    defer { harness.finish() }
+    let reached = Mutex(false)
+    await device.onNextUpload { reached.withLock { $0 = true } }
+    let cancellation = RequestCancellation()
+    cancellation.cancel()
+    let file = try harness.readable("big.txt", String(repeating: "x", count: 3 << 20))
+
+    let response = await RequestCancellation.$current.withValue(cancellation) {
+      await harness.service.handle(
+        .create(domain: domain, parent: .root, name: "big.txt", isFolder: false),
+        file: file)
+    }
+
+    #expect(response == .failure(.cancelled))
+    #expect(reached.withLock { $0 } == false)
+    #expect(
+      try FileManager.default.contentsOfDirectory(atPath: harness.scratch.path) == ["big.txt"])
   }
 
   @Test func aCancelledUploadLeavesNothing() async throws {

@@ -295,16 +295,36 @@ extension AgentService {
     if changed {
       await domains.signal(domain)
     }
-    if case .failure(.storageNotFound) = result {
+    switch result {
+    case .failure(.storageNotFound):
       // The device is still attached but the storage is gone (an SD card taken out). Its
       // storages are read again, so the domain disconnects rather than looking empty.
       await hub.recheck(route.storage.device)
+    case .failure(.deviceLocked):
+      // FileProvider now holds the domain's work until told the lock is gone. The device is
+      // read again: still locked, the domain disconnects and its reconnect tells FileProvider;
+      // unlocked already (a lock in passing), FileProvider is told now.
+      await domains.noteRefusedAsLocked(domain)
+      await hub.recheck(route.storage.device)
+      if await isReady(route.storage.device) { await domains.resolveLockRefusal(domain) }
+    case .success:
+      await domains.resolveLockRefusal(domain)
+    case .failure:
+      break
     }
     return try result.get()
   }
 }
 
 extension AgentService {
+  func isReady(_ device: DeviceID) async -> Bool {
+    guard let attached = await hub.devices().first(where: { $0.id == device }) else {
+      return false
+    }
+    if case .ready = attached.state { return true }
+    return false
+  }
+
   /// The menu's status, once the hub has scanned.
   func status() async -> StatusReport {
     await hub.firstScan()
