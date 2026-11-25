@@ -28,7 +28,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se estaba reemplazando un archivo en un dispositivo cuando se detuvo la transferencia, antes de que Ferry pudiera devolver el original. Ferry guarda el original en el Mac y lo devuelve la próxima vez que llega al mismo dispositivo y muestra esa carpeta."
+            "value" : "Se estaba reemplazando un archivo en un dispositivo cuando se detuvo la transferencia, antes de que Ferry pudiera devolver el original. Ferry guarda el original en la Mac y lo devuelve la próxima vez que llega al mismo dispositivo y muestra esa carpeta."
           }
         }
       }
@@ -39,7 +39,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vuelve a conectar el dispositivo y abre la carpeta del archivo en Finder; la línea desaparece cuando los originales han vuelto. Un archivo que Ferry no puede devolver con seguridad aparece en **Unsent changes were saved to …**, para que lo copies tú."
+            "value" : "Vuelve a conectar el dispositivo y abre la carpeta del archivo en Finder; la línea desaparece cuando los originales han vuelto. Un archivo que Ferry no puede devolver con seguridad aparece en **Los cambios sin enviar se guardaron en …**, para que lo copies tú."
           }
         }
       }

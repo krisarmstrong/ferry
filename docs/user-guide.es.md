@@ -602,6 +602,12 @@ Expulsaste el dispositivo antes de que algunos cambios llegaran a él. macOS con
 
 Haz clic en **Mostrar en Finder** y luego copia los archivos de vuelta al dispositivo cuando se monte de nuevo.
 
+**Archivos que esperan volver a su dispositivo: …**
+
+Se estaba reemplazando un archivo en un dispositivo cuando se detuvo la transferencia, antes de que Ferry pudiera devolver el original. Ferry guarda el original en la Mac y lo devuelve la próxima vez que llega al mismo dispositivo y muestra esa carpeta.
+
+Vuelve a conectar el dispositivo y abre la carpeta del archivo en Finder; la línea desaparece cuando los originales han vuelto. Un archivo que Ferry no puede devolver con seguridad aparece en **Los cambios sin enviar se guardaron en …**, para que lo copies tú.
+
 **…: hay cambios pendientes. Vuelve a conectarlo para terminar.**
 
 El dispositivo desapareció, o Ferry ya no puede acceder a él, antes de que algunos cambios llegaran a él. Su ubicación salió de Finder, así que los archivos pendientes no se muestran ahí. Siguen en la Mac. Una tarjeta SD tiene una ubicación para cada forma en que Ferry accede al dispositivo, así que los cambios hechos en la tarjeta por cable esperan al cable, aunque la tarjeta se muestre por la red.
