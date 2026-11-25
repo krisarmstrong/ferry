@@ -5,6 +5,7 @@ import Testing
 
 @testable import ADBTransport
 
+@Suite(.timeLimit(.minutes(1)))
 struct ADBTrackDevicesTests {
   static let noAdb = ADBLocator(
     environment: [:], home: "/nonexistent", isExecutable: { _ in false })
@@ -153,21 +154,21 @@ struct ADBTrackDevicesTests {
 
   @Test func closedConnectionsAreCancelledByTheClient() async throws {
     let connections = Box(0)
-    let closed = Box(0)
+    let closed = Latch()
     let server = try await FakeADBServer.start { peer in
       await connections.set(await connections.value + 1)
       _ = try await peer.request()
       try await peer.okay()
       try await peer.send("zzzz")
       _ = try? await peer.stream.read(exactly: 1)
-      await closed.set(await closed.value + 1)
+      closed.fire()
     }
     defer { server.stop() }
     let host = ADBHost(
       port: server.port, locator: Self.noAdb, launcher: { _ in },
       backoff: Backoff(initial: .seconds(5), maximum: .seconds(5)))
     for await _ in host.trackDevices() { break }
-    #expect(try await eventually { await closed.value == 1 })
+    await closed.wait()
     #expect(await connections.value == 1)
   }
 
@@ -222,18 +223,17 @@ struct ADBTrackDevicesTests {
   }
 
   @Test func cancellingTheConsumerClosesTheSocket() async throws {
-    let hungUp = Box(false)
+    let hungUp = Latch()
     let server = try await FakeADBServer.start { peer in
       _ = try await peer.request()
       try await peer.okay()
       try await peer.send(String(data: ADBWire.frame("abc device\n"), encoding: .utf8)!)
       _ = try? await peer.stream.read(exactly: 1)
-      await hungUp.set(true)
+      hungUp.fire()
     }
     defer { server.stop() }
     for await _ in ADBHost(port: server.port, locator: Self.noAdb).trackDevices() { break }
-    for _ in 0..<100 where await !hungUp.value { try await Task.sleep(for: .milliseconds(20)) }
-    #expect(await hungUp.value)
+    await hungUp.wait()
   }
 
   @Test func backoffDoublesFromOneSecondToThirtyAndResets() {

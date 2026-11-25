@@ -4,6 +4,7 @@ import Testing
 @testable import ADBTransport
 
 /// One sync connection's life: requests take turns, and an error ends it.
+@Suite(.timeLimit(.minutes(1)))
 struct ADBSyncSessionTests {
   typealias Peer = FakeADBServer.Peer
 
@@ -79,14 +80,14 @@ struct ADBSyncSessionTests {
   private static let closed = ADBError.connectionClosed
 
   @Test func afterAFailOnReceiveTheConnectionIsDead() async throws {
-    let hungUp = Box(false)
+    let hungUp = Latch()
     let (sync, server) = try await SyncFixture.sync([]) { peer in
       _ = try await peer.syncPathRequest()
       try await peer.raw(Peer.stat(mode: 0o100600, size: 1, mtime: 1))
       _ = try await peer.syncPathRequest()
       try await peer.raw(Peer.fail("open failed"))
       _ = try? await peer.stream.read(exactly: 1)
-      await hungUp.set(true)
+      hungUp.fire()
     }
     defer { server.stop() }
     let (url, handle) = try SyncFixture.scratchFile()
@@ -94,24 +95,22 @@ struct ADBSyncSessionTests {
     await #expect(throws: ADBError.failed("open failed")) {
       _ = try await sync.receive("/x", to: handle) { _, _ in true }
     }
-    for _ in 0..<100 where await !hungUp.value { try await Task.sleep(for: .milliseconds(20)) }
-    #expect(await hungUp.value)
+    await hungUp.wait()
     await #expect(throws: Self.closed) { _ = try await sync.stat("/y") }
     await #expect(throws: Self.closed) { _ = try await sync.list("/y").entries }
   }
 
   @Test func afterAnUnreadableReplyIdTheConnectionIsClosedAndDead() async throws {
-    let hungUp = Box(false)
+    let hungUp = Latch()
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
       try await peer.raw(Data([0xFF, 0xFE, 0xFF, 0xFE]))
       _ = try? await peer.stream.read(exactly: 1)
-      await hungUp.set(true)
+      hungUp.fire()
     }
     defer { server.stop() }
     await #expect { _ = try await sync.stat("/x") } throws: { isViolation($0) }
-    for _ in 0..<100 where await !hungUp.value { try await Task.sleep(for: .milliseconds(20)) }
-    #expect(await hungUp.value)
+    await hungUp.wait()
     await #expect(throws: Self.closed) { _ = try await sync.stat("/x") }
   }
 
@@ -188,12 +187,12 @@ struct ADBSyncSessionTests {
 
   /// The first reply waits until the queued request has been cancelled.
   @Test func aQueuedRequestInACancelledTaskDoesNotRunAndTheConnectionSurvives() async throws {
-    let sawFirst = Box(false)
+    let sawFirst = Latch()
     let (cancelled, cancelledQueued) = AsyncStream.makeStream(of: Void.self)
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       let first = try await peer.syncPathRequest()
       #expect(first.path == "/first")
-      await sawFirst.set(true)
+      sawFirst.fire()
       for await _ in cancelled { break }
       try await peer.raw(Peer.lst2(mode: 0o100600, size: 1, mtime: 1))
       // The cancelled "/queued" request must never arrive: the next one is "/last".
@@ -203,7 +202,7 @@ struct ADBSyncSessionTests {
     }
     defer { server.stop() }
     let first = Task { try await sync.stat("/first") }
-    #expect(try await eventually { await sawFirst.value })
+    await sawFirst.wait()
     let queued = Task { try await sync.stat("/queued") }
     #expect(try await eventually { await sync.queuedRequests == 1 })
     queued.cancel()
@@ -214,15 +213,15 @@ struct ADBSyncSessionTests {
   }
 
   @Test func quitReturnsAtOnceWhileARequestIsWedgedAndFailsIt() async throws {
-    let sawRequest = Box(false)
+    let sawRequest = Latch()
     let (sync, server) = try await SyncFixture.sync(["stat_v2"]) { peer in
       _ = try await peer.syncPathRequest()
-      await sawRequest.set(true)
+      sawRequest.fire()
       _ = try? await peer.stream.read(exactly: 1)
     }
     defer { server.stop() }
     let wedged = Task { try await sync.stat("/never-answered") }
-    #expect(try await eventually { await sawRequest.value })
+    await sawRequest.wait()
     await sync.quit()
     await #expect { _ = try await wedged.value } throws: { $0 is ADBError }
     await #expect(throws: Self.closed) { _ = try await sync.stat("/x") }

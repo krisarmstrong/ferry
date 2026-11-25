@@ -68,6 +68,10 @@ final class FakeAndroid: Sendable {
     var peers: [ADBStream] = []
     /// `sync:` connections the client has not yet closed.
     var openSyncs = 0
+    /// Connections `serve(serial:)` has not finished serving.
+    var serving = 0
+    /// Who waits for none of a kind of connection to be open.
+    var quietWaiters: [UUID: (kind: Open, continuation: CheckedContinuation<Void, Never>)] = [:]
     /// The errno `STA2` and `LST2` answer for a path, instead of its stat.
     var statErrors: [Path: UInt32] = [:]
     /// How many `host-serial:<serial>:features` queries were answered.

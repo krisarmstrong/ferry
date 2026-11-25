@@ -13,6 +13,8 @@ extension FakeAndroid {
   }
 
   private func handle(_ peer: Peer, serial: String) async throws {
+    opened(.connections)
+    defer { closed(.connections) }
     try await handle(peer, serial: serial, first: try await peer.request())
   }
 
@@ -81,8 +83,8 @@ extension FakeAndroid {
   private static let enoent: UInt32 = 2
 
   private func sync(_ peer: Peer) async throws {
-    state.withLock { $0.openSyncs += 1 }
-    defer { state.withLock { $0.openSyncs -= 1 } }
+    opened(.syncs)
+    defer { closed(.syncs) }
     while true {
       let (id, length) = try await peer.syncHeader()
       if id == "QUIT" { return }

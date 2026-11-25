@@ -59,14 +59,16 @@ struct ADBSessionWriteTests {
     #expect(device.tree.isEmpty)
   }
 
-  @Test func aCancelledUploadLeavesNoFile() async throws {
+  @Test(.timeLimit(.minutes(1))) func aCancelledUploadLeavesNoFile() async throws {
     let device = FakeAndroid()
     try await ADBFixture.withSession(device) { session in
       await #expect(throws: TransportError.cancelled) {
         _ = try await upload(Data(count: 100_000), to: "/a.bin", on: session) { _, _ in false }
       }
     }
-    #expect(try await ADBFixture.eventually { device.tree.isEmpty })
+    // adbd unlinks the file once it sees the connection end.
+    await device.waitUntilNone(.connections)
+    #expect(device.tree.isEmpty)
   }
 
   @Test func aFullDeviceIsInsufficientSpace() async throws {
