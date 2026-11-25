@@ -212,6 +212,8 @@ actor StubMTPDevice: MTPDeviceOperations {
       data = data.prefix(data.count / 2)
     }
     if failure != nil { data = data.prefix(data.count / 2) }
+    // As libmtp: progress is reported as blocks arrive, and a handler's stop ends the transfer.
+    guard progress(0, UInt64(object.data.count)) else { throw .cancelled }
     do { try data.write(to: file) } catch { throw .io(error.localizedDescription) }
     if let interloper = downloadInterloper {
       downloadInterloper = nil
