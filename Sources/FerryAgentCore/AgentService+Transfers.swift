@@ -50,7 +50,7 @@ extension AgentService {
     let name = try Self.creatable(name)
     let scratch = try await FileTransfer.copyIn(source, into: scratchFolder)
     defer { FileTransfer.remove(scratch) }
-    return try await gated(domain) { route throws(TransportError) in
+    return try await gated(domain, into: parent) { route throws(TransportError) in
       let path = try await route.writableFolder(parent).appending(name)
       do throws(TransportError) {
         let item = try await transfers.track(

@@ -8,6 +8,27 @@ enum ADBStorages {
   static let internalDescription = "Internal shared storage"
   static let volumeDescription = "Removable storage"
   static let volumesFolder = "/storage"
+  /// `file` on a device with file-based encryption, whose shared storage is credential
+  /// encrypted (CE): until the user first unlocks after a restart, its names read as ciphertext.
+  static let cryptoTypeProperty = "ro.crypto.type"
+  /// `true` once the system has unlocked user 0's CE storage, whose `/storage/emulated/0` Ferry
+  /// serves.
+  static let credentialStorageProperty = "sys.user.0.ce_available"
+  /// Folders shared storage has once in use, any one of which listed by name shows it unlocked.
+  static let wellKnownFolders: Set<String> = ["Android", "Download", "DCIM"]
+
+  /// Whether `names` read as fscrypt ciphertext, as a locked storage lists them: base64 of at
+  /// least 16 bytes (22 characters or more) in fscrypt's alphabet, which uses `+` and `,`.
+  static func lookEncrypted(_ names: [String]) -> Bool {
+    !names.isEmpty
+      && names.allSatisfy { name in
+        name.utf8.count >= 22
+          && name.unicodeScalars.allSatisfy {
+            ("A"..."Z").contains($0) || ("a"..."z").contains($0) || ("0"..."9").contains($0)
+              || $0 == "+" || $0 == ","
+          }
+      }
+  }
 
   struct Space: Equatable {
     let capacity: UInt64
@@ -56,6 +77,10 @@ extension ADBSession {
       }
     }
     if internalStat?.isDirectory == true {
+      // Locked, the folder is there but lists ciphertext names: serving it would read as every
+      // item deleted and new ones made, and the device is locked as surely as when it shows no
+      // storage at all.
+      if try await credentialStorageLocked(step) { throw .deviceLocked }
       candidates.append((StorageKey.internal, ADBStorages.internalDescription))
     }
     let volumes = try await adb(step) { () async throws(ADBError) in
@@ -84,5 +109,40 @@ extension ADBSession {
           capacity: space.capacity, free: space.free))
     }
     return storages
+  }
+
+  /// Whether internal shared storage is credential encrypted and not unlocked yet. A device
+  /// without file-based encryption never is; one with it is unlocked once the system says so.
+  /// A device that does not say (the property empty, or `getprop` failing) is judged by what
+  /// the storage lists: locked only if its names look encrypted and none is a folder shared
+  /// storage has once in use, so an odd property never locks a device out for good.
+  private func credentialStorageLocked(_ step: Step) async throws(TransportError) -> Bool {
+    guard !credentialStorageReadable else { return false }
+    var unlocked = try await property(ADBStorages.cryptoTypeProperty, step) != "file"
+    if !unlocked {
+      unlocked = try await property(ADBStorages.credentialStorageProperty, step) == "true"
+    }
+    if unlocked {
+      credentialStorageReadable = true
+      return false
+    }
+    let listing = try await adb(step) { () async throws(ADBError) in
+      try await syncing { (sync) async throws(ADBError) in
+        try await sync.list(ADBStorages.internalRoot)
+      }
+    }
+    let names = listing.entries.map(\.name)
+    if !ADBStorages.wellKnownFolders.isDisjoint(with: names) {
+      credentialStorageReadable = true
+      return false
+    }
+    return ADBStorages.lookEncrypted(names)
+  }
+
+  private func property(_ name: String, _ step: Step) async throws(TransportError) -> String {
+    let result = try await run("getprop", [name], step)
+    guard result.status == 0 else { return "" }
+    return String(bytes: result.stdout, encoding: .utf8)?
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
   }
 }

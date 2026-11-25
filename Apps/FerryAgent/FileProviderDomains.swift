@@ -107,6 +107,23 @@ struct FileProviderDomains: DomainManaging {
     }
   }
 
+  func reachable(_ identifier: String) async {
+    do {
+      try await manager(identifier).signalErrorResolved(NSFileProviderError(.serverUnreachable))
+    } catch {
+      log.error(
+        "resolving unreachable for \(identifier, privacy: .private) failed: \(error, privacy: .private)"
+      )
+    }
+  }
+
+  /// From the root: the lost identifiers include every folder above the one a request named, so
+  /// nothing smaller would match items to the device. The system rebuilds the domain's store
+  /// and may stop the extension meanwhile; local changes not yet sent come back as creates.
+  func reimport(_ identifier: String) async throws {
+    try await manager(identifier).reimportItems(below: .rootContainer)
+  }
+
   /// A failed listing reads as no domains: the menu then asks nothing of the user.
   func providerState() async -> ProviderState {
     do {

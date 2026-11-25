@@ -206,8 +206,9 @@ final class FakeAndroid: Sendable {
   }
 
   var commands: [[String]] { state.withLock { $0.commands } }
-  /// The commands that change something: all but `df`, which reading storages runs.
-  var changes: [[String]] { commands.filter { $0.first != "df" } }
+  /// The commands that change something: all but `df` and `getprop`, which reading storages
+  /// runs.
+  var changes: [[String]] { commands.filter { $0.first != "df" && $0.first != "getprop" } }
   var syncRequests: [(id: String, path: String)] { state.withLock { $0.syncRequests } }
   var openSyncs: Int { state.withLock { $0.openSyncs } }
   var featureQueries: Int { state.withLock { $0.featureQueries } }

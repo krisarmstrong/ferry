@@ -27,6 +27,14 @@ public protocol DomainManaging: Sendable {
   /// (`NSFileProviderError.notAuthenticated`) can run again: until then it holds them, however
   /// long the device has been unlocked.
   func lockResolved(_ identifier: String) async
+  /// Tells the system that requests it was told could not reach the device
+  /// (`NSFileProviderError.serverUnreachable`) can run again: until then it holds them on its
+  /// own back-off, uploads made while the device was away included.
+  func reachable(_ identifier: String) async
+  /// Tells the system the domain's item identifiers it holds may no longer be the agent's, so it
+  /// imports what it has on disk again, matching each item to the device's by name
+  /// (`NSFileProviderManager.reimportItems(below:)`).
+  func reimport(_ identifier: String) async throws
   /// Whether the user has enabled Ferry's domains, or none exists yet. New domains start disabled
   /// and only the user can enable them, so `.disabled` is a normal state.
   func providerState() async -> ProviderState

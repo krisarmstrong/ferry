@@ -13,6 +13,7 @@ actor FakeDomainManager: DomainManaging {
     case removeAll
     case signal(String)
     case lockResolved(String)
+    case reimport(String)
   }
 
   private(set) var calls: [Call] = []
@@ -57,9 +58,14 @@ actor FakeDomainManager: DomainManaging {
     let registered: Set<String>
     let hidden: Set<String>
     let disconnected: Set<String>
+    let madeReachable: [String]
   }
 
-  var state: State { State(registered: registered, hidden: hidden, disconnected: disconnected) }
+  var state: State {
+    State(
+      registered: registered, hidden: hidden, disconnected: disconnected,
+      madeReachable: madeReachable)
+  }
 
   /// Shown in Finder but disconnected: greyed out, with every read timing out. Never wanted.
   var shownButDisconnected: Set<String> { visible.intersection(disconnected) }
@@ -117,6 +123,30 @@ actor FakeDomainManager: DomainManaging {
 
   func lockResolved(_ identifier: String) async {
     record(.lockResolved(identifier))
+  }
+
+  /// Kept out of `calls`, as `setHidden` is: every reconnect comes with one.
+  private(set) var madeReachable: [String] = []
+
+  func reachable(_ identifier: String) async {
+    madeReachable.append(identifier)
+    changed()
+  }
+
+  /// How many reimports fail before one succeeds.
+  private var reimportFailures = 0
+
+  func failReimports(_ count: Int) {
+    reimportFailures = count
+  }
+
+  /// Recorded whether it fails or not, so a test sees each attempt.
+  func reimport(_ identifier: String) async throws {
+    record(.reimport(identifier))
+    if reimportFailures > 0 {
+      reimportFailures -= 1
+      throw CocoaError(.fileNoSuchFile)
+    }
   }
   /// Kept out of `calls`: every disconnect and reconnect comes with one, so tests of the order
   /// of system calls read the same either way. Tests check `hidden` instead.

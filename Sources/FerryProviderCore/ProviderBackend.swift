@@ -86,15 +86,22 @@ public actor ProviderBackend {
   /// item, not a collision: a folder for a folder (or for a package-named one, since a device
   /// folder is never a package), a file for a file. A matched file whose size or modification
   /// time (to the second, all MTP keeps) is not the template's is the device's version, so
-  /// FileProvider fetches it. With no match and no contents for a file there is nothing to
-  /// create: `nil`. A package with no match is `.excludedFromSync`, never `nil`: FileProvider
+  /// FileProvider fetches it, but only when the Mac has no contents of its own for it (the file
+  /// is dataless). Contents may be edits never sent (FileProvider imports again after it lost
+  /// its state, or after the agent asked it to), so they are never replaced by the device's:
+  /// the create is a collision with the device's file, which FileProvider resolves by renaming
+  /// its copy and creating that, keeping both. With no match and no contents for a file there is
+  /// nothing to create: `nil`. A package with no match is `.excludedFromSync`, never `nil`: FileProvider
   /// deletes an item answered `nil` from the Mac, a folder with all it holds.
   public func create(
     _ template: ItemTemplate, contents: URL?, mayAlreadyExist: Bool,
     progress: TransferProgressHandler? = nil
   ) async throws -> SyncedItem? {
     if mayAlreadyExist {
-      if let match = try await existing(matching: template) { return match }
+      if let match = try await existing(matching: template) {
+        guard match.shouldFetchContent, contents != nil else { return match }
+        throw NSError.fileProviderErrorForCollision(with: match.item)
+      }
       if template.kind == .package { throw NSFileProviderError(.excludedFromSync) }
       if template.kind == .file, contents == nil { return nil }
     }
