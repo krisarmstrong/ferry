@@ -118,9 +118,10 @@ struct HelpNavigatorTests {
     navigator.select(lastOfFirst)
     navigator.move(by: 1)
     #expect(navigator.selection == Self.help.categories[1].topics.first?.id)
-    navigator.select(try #require(ids.last))
+    let last = ids[ids.index(before: ids.endIndex)]
+    navigator.select(last)
     navigator.move(by: 1)
-    #expect(navigator.selection == ids.last)
+    #expect(navigator.selection == last)
   }
 
   /// With a search, the keys move among the matches only. From a selection the search hides,

@@ -63,7 +63,7 @@ struct CatalogKeysTests {
   }
 
   /// The menu's footer after Settings went: Open at Login, in title case, and its failure.
-  @Test func theFooterStringsHaveCatalogKeys() throws {
+  @Test @MainActor func theFooterStringsHaveCatalogKeys() throws {
     let keys = try catalogKeys()
     #expect(keys.contains(MenuFooter.openAtLoginResource.key))
     #expect(String(localized: MenuFooter.openAtLoginResource) == "Open at Login")

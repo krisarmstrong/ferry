@@ -1,7 +1,7 @@
 # CI points this at the runner's newest Xcode.
 export DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 
-.PHONY: lint fmt fmt-check test build app check-app guide release
+.PHONY: lint fmt fmt-check test build libmtp-pc app check-app guide release
 
 lint:
 	swiftlint --strict
@@ -12,14 +12,24 @@ fmt:
 fmt-check:
 	xcrun swift-format lint --strict -r Apps Sources Tests
 
-test:
+# Homebrew's libmtp.pc carries a flag SwiftPM warns about on every build; scripts/libmtp-pkgconfig.sh
+# writes a copy without it, which the swift builds read first. Compiler warnings are errors
+# (Package.swift), so a clean build is the only build.
+LIBMTP_PC_DIR := $(CURDIR)/.build/pkgconfig
+USER_PKG_CONFIG_PATH := $(PKG_CONFIG_PATH)
+test build: export PKG_CONFIG_PATH := $(LIBMTP_PC_DIR)$(if $(USER_PKG_CONFIG_PATH),:$(USER_PKG_CONFIG_PATH))
+
+libmtp-pc:
+	PKG_CONFIG_PATH='$(USER_PKG_CONFIG_PATH)' scripts/libmtp-pkgconfig.sh '$(LIBMTP_PC_DIR)'
+
+test: libmtp-pc
 	swift test $(TEST_FLAGS)
 
 # docs/user-guide.md, rendered from Sources/FerryUI/help.json; a test fails if they differ.
 guide:
 	python3 scripts/user-guide.py
 
-build:
+build: libmtp-pc
 	swift build -c release
 
 # The app bundle (Ferry.app with the agent and the FileProvider extension), built into

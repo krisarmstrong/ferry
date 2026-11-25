@@ -56,7 +56,7 @@ struct HelpLinkTests {
     }
   }
 
-  @Test func theFixedProblemLinesLinkToTheirEntries() {
+  @Test @MainActor func theFixedProblemLinesLinkToTheirEntries() {
     for resource in MenuStatusText.all {
       Self.expectExplained(MenuNotice(resource), "\(resource.key)")
     }
@@ -87,7 +87,7 @@ struct HelpLinkTests {
 
 /// Several problems can show at once, so VoiceOver must tell their Help links apart (audit L5).
 struct HelpLinkLabelTests {
-  @Test func eachLinkNamesItsProblem() {
+  @Test @MainActor func eachLinkNamesItsProblem() {
     #expect(
       HelpLinkButton.label(forMessage: "The device was disconnected. Reconnect it, then try again.")
         == "Help: The device was disconnected. Reconnect it, then try again.")
