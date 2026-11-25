@@ -71,6 +71,8 @@ public actor DomainController {
   /// Domains a request on which was refused because the device was locked (see
   /// `noteRefusedAsLocked`).
   var refusedAsLocked: Set<String> = []
+  /// Domains the system has been asked to import again (see `identifiersLost`).
+  var reimported: Set<String> = []
   /// Set by `removeAll`: no domain is added, reconnected or disconnected afterwards.
   var retired = false
   /// Hub events handled so far.
@@ -276,6 +278,9 @@ public actor DomainController {
       _ = await relistKnownFolders(of: identifier)
       await manager.signal(identifier)
       await resolveLockRefusal(identifier)
+      // Requests that failed while the device was away were told it was unreachable, and the
+      // system holds them until told otherwise.
+      await manager.reachable(identifier)
     }
     if existing.spec != spec {
       domains[identifier]?.spec = spec

@@ -186,7 +186,7 @@ public actor AgentService: AgentHandling {
     async throws(TransportError) -> ProviderEntry
   {
     let name = try Self.creatable(name)
-    return try await gated(domain) { route throws(TransportError) in
+    return try await gated(domain, into: parent) { route throws(TransportError) in
       let path = try await route.writableFolder(parent).appending(name)
       return await route.items.created(try await route.session.makeFolder(path, in: route.storage))
     }
@@ -211,7 +211,7 @@ public actor AgentService: AgentHandling {
   private func move(_ id: ItemID, to folder: ItemID, in domain: String)
     async throws(TransportError) -> ProviderEntry
   {
-    try await gated(domain) { route throws(TransportError) in
+    try await gated(domain, into: folder) { route throws(TransportError) in
       let path = try await route.changeable(id)
       let destination = try await route.writableFolder(folder)
       let session = route.session
@@ -282,9 +282,11 @@ public actor AgentService: AgentHandling {
 
 extension AgentService {
   /// Runs `body` on the domain's route inside its gate, then signals the domain's working set if
-  /// `body` recorded a change, even one followed by a failure.
+  /// `body` recorded a change, even one followed by a failure. `folder` is where `body` puts an
+  /// item: one the table does not know means the system holds identifiers the table lost (see
+  /// `DomainController.identifiersLost`).
   func gated<T: Sendable>(
-    _ domain: String, marksUse: Bool = true,
+    _ domain: String, marksUse: Bool = true, into folder: ItemID? = nil,
     _ body: (DomainController.Route) async throws(TransportError) -> T
   ) async throws(TransportError) -> T {
     let route = try await domains.route(domain)
@@ -318,6 +320,10 @@ extension AgentService {
       if await isReady(route.storage.device) { await domains.resolveLockRefusal(domain) }
     case .success:
       await domains.resolveLockRefusal(domain)
+    case .failure(.unknownItem):
+      if let folder, await route.items.path(for: folder) == nil {
+        await domains.identifiersLost(domain)
+      }
     case .failure:
       break
     }
