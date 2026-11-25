@@ -136,6 +136,17 @@ struct AppModelToolsTests {
     #expect(log.all.isEmpty)
   }
 
+  /// An `.apk` the Mac cannot read is the file's fault, not the device's: the menu says the file
+  /// can't be read, with its Help, and sends nothing.
+  @Test func anUnreadableAPKSaysTheFileCantBeRead() async throws {
+    let model = model(FakeClient(log: log))
+    let missing = try TestScratch.folder("apks").appending(path: "Gone.apk")
+    await model.installAPK(missing, on: id)
+    #expect(log.all.isEmpty)
+    #expect(model.actionError?.text == "The file can’t be read.")
+    #expect(model.actionError?.help == "The file can’t be read.")
+  }
+
   @Test func installAppAsksForAFile() async throws {
     let services = FakeServices(log: log)
     let model = model(FakeClient(log: log), services: services)

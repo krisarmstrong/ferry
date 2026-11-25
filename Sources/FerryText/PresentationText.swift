@@ -49,6 +49,7 @@ public enum PresentationText {
     case .folderTooDeep: TransportText.tooDeep
     case .readOnly: TransportText.readOnly
     case .pageExpired: TransportText.listingExpired
+    case .agentBusy: TransportText.helperBusy
     }
   }
 
@@ -226,6 +227,9 @@ private enum TransportText {
 
   static let helperSilent = LocalizedStringResource(
     "Ferry's helper didn't answer in time. Try again in a moment.", bundle: .module)
+
+  static let helperBusy = LocalizedStringResource(
+    "Ferry's helper has too many requests waiting. Try again in a moment.", bundle: .module)
 
   static let itemGone = LocalizedStringResource(
     "That item is no longer on the device. Refresh, then try again.", bundle: .module)

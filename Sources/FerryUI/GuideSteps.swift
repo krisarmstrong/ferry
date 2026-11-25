@@ -3,9 +3,12 @@ import Foundation
 /// The groups of devices that share one set of file-transfer steps. The raw value names the
 /// family in help links (`guide:<rawValue>`).
 public enum DeviceFamily: String, Sendable, CaseIterable, Hashable {
-  /// LinkRunner 10G, LinkRunner 100G and EtherScope nXG, which share one Android 8 board.
-  /// AirCheck G3 runs on a different board with different steps, and gets its own case later.
+  /// LinkRunner 10G, LinkRunner 100G and EtherScope nXG, which share one Android 8 board, and
+  /// the CyberScope, built on the EtherScope nXG.
   case netAllyAndroid8Board
+  /// The AirCheck G3, on a newer Android and another board. No unit has been checked against
+  /// its steps yet, so they are Android's own, worded for a tester.
+  case airCheckG3
   case otherAndroid8to9
   case otherAndroid10Plus
 
@@ -13,7 +16,10 @@ public enum DeviceFamily: String, Sendable, CaseIterable, Hashable {
   public var title: LocalizedStringResource {
     switch self {
     case .netAllyAndroid8Board:
-      LocalizedStringResource("LinkRunner 10G, LinkRunner 100G or EtherScope nXG", bundle: .module)
+      LocalizedStringResource(
+        "LinkRunner 10G, LinkRunner 100G, EtherScope nXG or CyberScope", bundle: .module)
+    case .airCheckG3:
+      LocalizedStringResource("AirCheck G3 (Wi-Fi tester)", bundle: .module)
     case .otherAndroid8to9:
       LocalizedStringResource("Other Android phone (Android 8 or 9)", bundle: .module)
     case .otherAndroid10Plus:
@@ -45,13 +51,17 @@ public enum GuideSteps {
   ]
 
   /// The family of a reported model name, ignoring case, spaces, hyphens and a leading
-  /// "NetAlly". `nil` for a model Ferry has no specific steps for.
+  /// "NetAlly". `nil` for a model Ferry has no specific steps for. The CyberScope and AirCheck
+  /// G3 are matched by the start of their names, which no unit's report has confirmed yet.
   public static func family(forModel model: String) -> DeviceFamily? {
     var key = String(
       String.UnicodeScalarView(
         model.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains)))
     if key.hasPrefix("netally") { key.removeFirst("netally".count) }
-    return netAllyAndroid8Models.contains(key) ? .netAllyAndroid8Board : nil
+    if netAllyAndroid8Models.contains(key) || key.hasPrefix("cyberscope") {
+      return .netAllyAndroid8Board
+    }
+    return key.hasPrefix("aircheckg3") ? .airCheckG3 : nil
   }
 
   /// The steps for `topic` on `family`: file transfer unless asked for USB debugging.
@@ -91,6 +101,7 @@ public enum GuideSteps {
           """, bundle: .module),
         promptOK,
       ]
+    case .airCheckG3: airCheckDebugging
     case .otherAndroid8to9:
       [
         unlockAndConnect,
@@ -120,6 +131,20 @@ public enum GuideSteps {
     }
   }
 
+  /// Android's own steps, worded for the tester: no unit has been checked against them.
+  private static let airCheckDebugging: [LocalizedStringResource] =
+    [
+      LocalizedStringResource(
+        """
+        On the tester, open **Settings**, find **Build number** (usually under **About**) and \
+        tap it until developer mode is on.
+        """, bundle: .module),
+      LocalizedStringResource(
+        "On the tester, open **Developer options** in **Settings** and turn on **USB debugging**.",
+        bundle: .module),
+      promptAllow,
+    ]
+
   private static func transferSteps(for family: DeviceFamily) -> [LocalizedStringResource] {
     switch family {
     case .netAllyAndroid8Board:
@@ -136,6 +161,14 @@ public enum GuideSteps {
           """, bundle: .module),
         LocalizedStringResource("Tap **Transfer files**.", bundle: .module),
       ]
+    case .airCheckG3:
+      [
+        LocalizedStringResource("Connect the tester to the Mac with a USB cable.", bundle: .module),
+        LocalizedStringResource(
+          "On the tester, pull down the notification shade and tap the USB notification.",
+          bundle: .module),
+        usbPreferences,
+      ]
     case .otherAndroid8to9:
       [
         unlockAndConnect,
@@ -150,14 +183,16 @@ public enum GuideSteps {
         LocalizedStringResource(
           "Pull down the notification shade and tap **Charging this device via USB**.",
           bundle: .module),
-        LocalizedStringResource(
-          """
-          Under **USB preferences**, choose **File transfer**. Or open **Settings** → \
-          **Connected devices** → **USB**.
-          """, bundle: .module),
+        usbPreferences,
       ]
     }
   }
+
+  private static let usbPreferences = LocalizedStringResource(
+    """
+    Under **USB preferences**, choose **File transfer**. Or open **Settings** → \
+    **Connected devices** → **USB**.
+    """, bundle: .module)
 
   /// The USB debugging prompt names its button OK on Android 8 and 9, Allow on 10 and newer.
   private static let promptOK = LocalizedStringResource(

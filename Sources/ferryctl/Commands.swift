@@ -22,9 +22,9 @@ struct Target {
 
 /// How to turn on file transfer; the testers' steps follow the AllyWare 3.x user guides.
 private let enableFileTransfer =
-  "LinkRunner 10G/100G, EtherScope nXG: connect the left USB-C port, then "
-  + "Settings > Connected devices > USB > Transfer files. Other Android: unlock it, tap the "
-  + "USB notification, choose File transfer."
+  "LinkRunner 10G/100G, EtherScope nXG, CyberScope: connect the left USB-C port, then "
+  + "Settings > Connected devices > USB > Transfer files. AirCheck G3 and other Android: "
+  + "unlock it, tap the USB notification, choose File transfer."
 
 private func message(for error: TransportError) -> String {
   switch error {
@@ -62,6 +62,7 @@ private func message(for error: TransportError) -> String {
   case .cancelled: "Cancelled."
   case .agentNotResponding: "Ferry's agent did not answer in time."
   case .pageExpired: "The listing expired; list the folder again."
+  case .agentBusy: "Ferry's agent has too many requests in flight; try again."
   case .io(let detail): "I/O error: \(detail)"
   }
 }

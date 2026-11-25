@@ -767,17 +767,6 @@
         }
       }
     },
-    "Removes Ferry's locations from Finder, stops Ferry's helper, moves what Ferry keeps on this Mac to the Trash and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state; starting again then downloads adb from Google again." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elimina las ubicaciones de Ferry de Finder, detiene el asistente de Ferry, mueve a la Papelera lo que Ferry guarda en esta Mac y sale de Ferry, después de pedirte confirmación. Los archivos de tus dispositivos no se tocan. Úsalo antes de mover Ferry a la Papelera, o para empezar de nuevo desde cero; al empezar de nuevo, adb se vuelve a descargar de Google."
-          }
-        }
-      }
-    },
     "Once the helper has stopped, Ferry moves ~/Library/Application Support/Ferry (the adb it downloaded, and that you accepted Google's license) and ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (its lists of your devices' files and the devices it reconnects over the network) to the Trash, so you can put them back if you removed Ferry by mistake. If Ferry's own adb is still running, Ferry stops it, including a shell you opened from Ferry's menu; an adb you installed yourself is left alone. Changes Finder had not sent to a device are kept, and shown in Finder." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -785,17 +774,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cuando el asistente se detiene, Ferry mueve a la Papelera ~/Library/Application Support/Ferry (el adb que descargó y tu aceptación de la licencia de Google) y ~/Library/Application Support/io.github.krisarmstrong.ferry.agent (sus listas de archivos de tus dispositivos y los dispositivos a los que se reconecta por la red), así que puedes recuperarlos si eliminaste Ferry por error. Si el adb propio de Ferry sigue en ejecución, Ferry lo detiene, incluido un shell que abriste desde el menú de Ferry; un adb que instalaste tú se deja intacto. Los cambios que Finder no había enviado a un dispositivo se conservan y se muestran en Finder."
-          }
-        }
-      }
-    },
-    "In Ferry Help, under **Troubleshooting**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, Ferry moves its data in ~/Library/Application Support to the Trash, and Ferry quits. Files on your devices are not touched." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En la Ayuda de Ferry, en **Solución de problemas**, haz clic en **Eliminar Ferry…** y confirma. Tus dispositivos desaparecen de Finder, el asistente de Ferry se detiene, Ferry mueve sus datos de ~/Library/Application Support a la Papelera y Ferry se cierra. Los archivos de tus dispositivos no se tocan."
           }
         }
       }
@@ -1811,16 +1789,6 @@
         }
       }
     },
-    "Could not remove Ferry. Make sure Ferry is running, then try again." : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudo eliminar Ferry. Asegúrate de que Ferry esté abierto e inténtalo de nuevo."
-          }
-        }
-      }
-    },
     "Debug" : {
       "localizations" : {
         "es" : {
@@ -2140,17 +2108,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Finder muestra cuánto lleva cada copia, y el menú de Ferry enumera las copias en curso bajo su dispositivo."
-          }
-        }
-      }
-    },
-    "For the LinkRunner 10G, EtherScope nXG and LinkRunner 100G." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para el LinkRunner 10G, el EtherScope nXG y el LinkRunner 100G."
           }
         }
       }
@@ -3853,16 +3810,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activar la depuración por USB"
-          }
-        }
-      }
-    },
-    "LinkRunner 10G, LinkRunner 100G or EtherScope nXG" : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LinkRunner 10G, LinkRunner 100G o EtherScope nXG"
           }
         }
       }
@@ -7729,28 +7676,6 @@
         }
       }
     },
-    "Ferry's helper did not answer, so its locations could not be removed." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El asistente de Ferry no respondió, así que no se pudieron eliminar sus ubicaciones."
-          }
-        }
-      }
-    },
-    "Quit Ferry, open it again, then click **Remove Ferry…** again." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sal de Ferry, ábrelo de nuevo y haz clic otra vez en **Eliminar Ferry…**."
-          }
-        }
-      }
-    },
     "Ferry's help is missing from the app." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7965,17 +7890,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Actualizaciones"
-          }
-        }
-      }
-    },
-    "Ferry checks for a new version once a day. When there is one, it downloads it in the background and installs it the next time Ferry quits, so nothing stops while you work." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ferry busca una versión nueva una vez al día. Cuando hay una, la descarga en segundo plano y la instala la próxima vez que Ferry se cierre, así nada se detiene mientras trabajas."
           }
         }
       }
@@ -8676,6 +8590,448 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Logcat %@ %@ a las %@"
+          }
+        }
+      }
+    },
+    "Ferry's helper has too many requests waiting. Try again in a moment." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry's helper has too many requests waiting. Try again in a moment."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El asistente de Ferry tiene demasiadas solicitudes en espera. Inténtalo de nuevo en un momento."
+          }
+        }
+      }
+    },
+    "Ferry's helper was sent more requests at once than it takes, so it turned this one away." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry's helper was sent more requests at once than it takes, so it turned this one away."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El asistente de Ferry recibió más solicitudes a la vez de las que admite, así que rechazó esta."
+          }
+        }
+      }
+    },
+    "Wait for copies in progress to finish, then try again. If it keeps happening, quit Ferry and open it again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wait for copies in progress to finish, then try again. If it keeps happening, quit Ferry and open it again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espera a que terminen las copias en curso e inténtalo de nuevo. Si sigue pasando, sal de Ferry y ábrelo de nuevo."
+          }
+        }
+      }
+    },
+    "LinkRunner 10G, LinkRunner 100G, EtherScope nXG or CyberScope" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LinkRunner 10G, LinkRunner 100G, EtherScope nXG or CyberScope"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LinkRunner 10G, LinkRunner 100G, EtherScope nXG o CyberScope"
+          }
+        }
+      }
+    },
+    "For the LinkRunner 10G, LinkRunner 100G, EtherScope nXG and CyberScope." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For the LinkRunner 10G, LinkRunner 100G, EtherScope nXG and CyberScope."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para el LinkRunner 10G, el LinkRunner 100G, el EtherScope nXG y el CyberScope."
+          }
+        }
+      }
+    },
+    "Connect an AirCheck G3" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect an AirCheck G3"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar un AirCheck G3"
+          }
+        }
+      }
+    },
+    "These are Android's usual steps, which no AirCheck G3 has been checked against yet. If a name on the tester differs, look for the USB notification or the USB settings." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These are Android's usual steps, which no AirCheck G3 has been checked against yet. If a name on the tester differs, look for the USB notification or the USB settings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estos son los pasos habituales de Android, que aún no se han comprobado en ningún AirCheck G3. Si un nombre en el probador es distinto, busca la notificación de USB o la configuración de USB."
+          }
+        }
+      }
+    },
+    "Connect the tester to the Mac with a USB cable." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect the tester to the Mac with a USB cable."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecta el probador a la Mac con un cable USB."
+          }
+        }
+      }
+    },
+    "On the tester, pull down the notification shade and tap the USB notification." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the tester, pull down the notification shade and tap the USB notification."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En el probador, desliza hacia abajo el panel de notificaciones y toca la notificación de USB."
+          }
+        }
+      }
+    },
+    "On the tester, open **Settings**, find **Build number** (usually under **About**) and tap it until developer mode is on." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the tester, open **Settings**, find **Build number** (usually under **About**) and tap it until developer mode is on."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En el probador, abre **Configuración**, busca **Número de compilación** (normalmente en **Acerca de**) y tócalo hasta que se active el modo de desarrollador."
+          }
+        }
+      }
+    },
+    "On the tester, open **Developer options** in **Settings** and turn on **USB debugging**." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the tester, open **Developer options** in **Settings** and turn on **USB debugging**."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En el probador, abre **Opciones para desarrolladores** en **Configuración** y activa **Depuración por USB**."
+          }
+        }
+      }
+    },
+    "Could not remove Ferry. Try again; if it keeps failing, restart the Mac and try again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not remove Ferry. Try again; if it keeps failing, restart the Mac and try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo eliminar Ferry. Inténtalo de nuevo; si sigue fallando, reinicia la Mac e inténtalo otra vez."
+          }
+        }
+      }
+    },
+    "macOS kept Ferry's locations in Finder, or would not stop Ferry's helper." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS kept Ferry's locations in Finder, or would not stop Ferry's helper."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS mantuvo las ubicaciones de Ferry en Finder, o no detuvo el asistente de Ferry."
+          }
+        }
+      }
+    },
+    "Click **Remove Ferry…** again. If it keeps failing, restart the Mac, open Ferry and remove it again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click **Remove Ferry…** again. If it keeps failing, restart the Mac, open Ferry and remove it again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haz clic en **Eliminar Ferry…** otra vez. Si sigue fallando, reinicia la Mac, abre Ferry y vuelve a eliminarlo."
+          }
+        }
+      }
+    },
+    "Removes Ferry's locations from Finder, stops Ferry's helper, moves what Ferry keeps on this Mac to the Trash and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state; starting again then downloads adb from Google again. It works even when Ferry's helper is not responding." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removes Ferry's locations from Finder, stops Ferry's helper, moves what Ferry keeps on this Mac to the Trash and quits Ferry, after asking you to confirm. Files on your devices are not touched. Use it before you move Ferry to the Trash, or to start again from a clean state; starting again then downloads adb from Google again. It works even when Ferry's helper is not responding."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina las ubicaciones de Ferry de Finder, detiene el asistente de Ferry, mueve a la Papelera lo que Ferry guarda en esta Mac y sale de Ferry, después de pedirte confirmación. Los archivos de tus dispositivos no se tocan. Úsalo antes de mover Ferry a la Papelera, o para empezar de nuevo desde cero; al empezar de nuevo, adb se vuelve a descargar de Google. Funciona incluso cuando el asistente de Ferry no responde."
+          }
+        }
+      }
+    },
+    "To find it from the menu, hold Option while the Ferry menu is open: **Quit Ferry** becomes **Remove Ferry…**, which opens this page." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To find it from the menu, hold Option while the Ferry menu is open: **Quit Ferry** becomes **Remove Ferry…**, which opens this page."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para encontrarlo desde el menú, mantén presionada la tecla Opción con el menú de Ferry abierto: **Salir de Ferry** pasa a ser **Eliminar Ferry…**, que abre esta página."
+          }
+        }
+      }
+    },
+    "In Ferry Help, under **About Ferry**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, Ferry moves its data in ~/Library/Application Support to the Trash, and Ferry quits. Files on your devices are not touched." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Ferry Help, under **About Ferry**, click **Remove Ferry…** and confirm. Your devices disappear from Finder, Ferry's helper stops, Ferry moves its data in ~/Library/Application Support to the Trash, and Ferry quits. Files on your devices are not touched."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En la Ayuda de Ferry, en **Acerca de Ferry**, haz clic en **Eliminar Ferry…** y confirma. Tus dispositivos desaparecen de Finder, el asistente de Ferry se detiene, Ferry mueve sus datos de ~/Library/Application Support a la Papelera y Ferry se cierra. Los archivos de tus dispositivos no se tocan."
+          }
+        }
+      }
+    },
+    "Copy Diagnostics" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Diagnostics"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar diagnóstico"
+          }
+        }
+      }
+    },
+    "When you ask for help with Ferry, click **Copy Diagnostics** and paste the report into your message. It goes on the clipboard and nowhere else: Ferry sends nothing." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you ask for help with Ferry, click **Copy Diagnostics** and paste the report into your message. It goes on the clipboard and nowhere else: Ferry sends nothing."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando pidas ayuda con Ferry, haz clic en **Copiar diagnóstico** y pega el informe en tu mensaje. Va al portapapeles y a ningún otro sitio: Ferry no envía nada."
+          }
+        }
+      }
+    },
+    "The report lists the versions of Ferry, its helper and macOS; whether adb is installed and its server running, and the version of Ferry's own adb; each connected device's model, how Ferry reaches it and its state; and the last errors the menu showed, in their general wording. It leaves out serial numbers, network addresses, file names and folders." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The report lists the versions of Ferry, its helper and macOS; whether adb is installed and its server running, and the version of Ferry's own adb; each connected device's model, how Ferry reaches it and its state; and the last errors the menu showed, in their general wording. It leaves out serial numbers, network addresses, file names and folders."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El informe indica las versiones de Ferry, de su asistente y de macOS; si adb está instalado y su servidor en marcha, y la versión del adb propio de Ferry; el modelo de cada dispositivo conectado, cómo lo alcanza Ferry y su estado; y los últimos errores que mostró el menú, con su redacción general. Omite números de serie, direcciones de red, nombres de archivo y carpetas."
+          }
+        }
+      }
+    },
+    "Diagnostics for support" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostics for support"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnóstico para soporte"
+          }
+        }
+      }
+    },
+    "Update Ready — Restart Ferry" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update Ready — Restart Ferry"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualización lista — Reiniciar Ferry"
+          }
+        }
+      }
+    },
+    "Ferry checks for a new version once a day. When there is one, it downloads it in the background and installs it the next time Ferry quits, so nothing stops while you work. Once it has downloaded, the Ferry menu shows **Update Ready — Restart Ferry** in place of Check for Updates…: choose it to install the update and open Ferry again now." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry checks for a new version once a day. When there is one, it downloads it in the background and installs it the next time Ferry quits, so nothing stops while you work. Once it has downloaded, the Ferry menu shows **Update Ready — Restart Ferry** in place of Check for Updates…: choose it to install the update and open Ferry again now."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferry busca una versión nueva una vez al día. Cuando hay una, la descarga en segundo plano y la instala la próxima vez que Ferry se cierre, así nada se detiene mientras trabajas. Cuando ya se ha descargado, el menú de Ferry muestra **Actualización lista — Reiniciar Ferry** en lugar de Buscar actualizaciones…: elígelo para instalar la actualización y volver a abrir Ferry ahora."
+          }
+        }
+      }
+    },
+    "Warning: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warning: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advertencia: %@"
+          }
+        }
+      }
+    },
+    "Error: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error: %@"
+          }
+        }
+      }
+    },
+    "AirCheck G3 (Wi-Fi tester)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirCheck G3 (Wi-Fi tester)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirCheck G3 (probador Wi-Fi)"
           }
         }
       }

@@ -20,10 +20,12 @@ public struct WelcomeView: View {
 
   public var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      header
-        .padding(.horizontal, MenuMetrics.rowPadding)
-        .padding(.bottom, 12)
-      steps
+      // Scrolls only when the window cannot be tall enough, as with large text; Not Now stays
+      // below it (L8).
+      ViewThatFits(in: .vertical) {
+        introduction
+        ScrollView { introduction }
+      }
       MenuSeparator()
       footer
         .padding(.horizontal, MenuMetrics.rowPadding)
@@ -34,6 +36,15 @@ public struct WelcomeView: View {
     .environment(model)
     .task { await model.watchWhileWelcomeOpen() }
     .onDisappear { model.welcomeClosed() }
+  }
+
+  private var introduction: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      header
+        .padding(.horizontal, MenuMetrics.rowPadding)
+        .padding(.bottom, 12)
+      steps
+    }
   }
 
   private var header: some View {
@@ -60,7 +71,7 @@ public struct WelcomeView: View {
     }
     if model.isWelcomeComplete {
       StatusRow(
-        symbol: "checkmark.circle.fill", tint: .green,
+        symbol: "checkmark.circle.fill", severity: .done,
         title: Text("Ferry is ready", bundle: .module)
       ) {
         Text("Your device is in Finder's sidebar, under Locations.", bundle: .module)
@@ -109,7 +120,7 @@ private struct WelcomeStepRow: View {
 
   var body: some View {
     if line.isDone {
-      StatusRow(symbol: "checkmark.circle.fill", tint: .green, title: Text(title))
+      StatusRow(symbol: "checkmark.circle.fill", severity: .done, title: Text(title))
         .accessibilityElement(children: .combine)
         .accessibilityValue(Text("Done", bundle: .module))
     } else {

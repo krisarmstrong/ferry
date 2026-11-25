@@ -31,7 +31,11 @@ extension AppModel {
     do {
       handle = try FileHandle(forReadingFrom: url)
     } catch {
-      actionError = DevicePresentation.notice(for: .io(error.localizedDescription))
+      // The file on the Mac, not the device: the menu must not suggest reconnecting it.
+      Self.log.error("reading the app to install failed: \(error, privacy: .private)")
+      actionError = MenuNotice(
+        text: String(localized: FinderSender.unreadableResource),
+        help: FinderSender.unreadableResource.key)
       return
     }
     defer { try? handle.close() }

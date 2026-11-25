@@ -10,9 +10,9 @@
 <p align="center">Android devices in Finder, over USB and Wi-Fi.</p>
 
 Ferry is a small menu-bar app that shows Android devices as locations in Finder. It was built
-for field engineers who carry network testers (LinkRunner 10G, EtherScope nXG,
-LinkRunner 100G) and need to move test results, captures and files between the tester and a
-Mac. It works with other Android phones too. macOS has no built-in way to browse an Android
+for field engineers who carry network testers (LinkRunner 10G, LinkRunner 100G, EtherScope
+nXG, CyberScope, AirCheck G3) and need to move test results, captures and files between the
+tester and a Mac. It works with other Android phones too. macOS has no built-in way to browse an Android
 device over USB; Ferry adds one that uses Finder itself, so you browse, open, copy, rename and
 delete with the tools you already know, including any app's Open and Save dialogs. With USB
 debugging and `adb`, Ferry also reaches devices over ADB, by cable or over Wi-Fi, which is faster
@@ -37,8 +37,8 @@ The images are drawn from the app's own views; `scripts/readme-images.sh` render
 
 - macOS 26 or later, Apple silicon
 - A USB cable that carries data
-- An Android device with file transfer (MTP): LinkRunner 10G, EtherScope nXG,
-  LinkRunner 100G, or an Android 8+ phone
+- An Android device with file transfer (MTP): LinkRunner 10G, LinkRunner 100G,
+  EtherScope nXG, CyberScope, AirCheck G3, or an Android 8+ phone
 - Optional, for USB debugging, Wi-Fi and the tools: `adb`, from Google's Android platform tools.
   Ferry uses one already on the Mac. Without one, the menu offers **Get Android Platform
   Tools…**: after you accept Google's Android SDK License, Ferry downloads Google's release once
@@ -64,13 +64,13 @@ signed with a Developer ID and notarized by Apple. See
 
 ## Quick start
 
-**LinkRunner 10G, EtherScope nXG, LinkRunner 100G**
+**LinkRunner 10G, LinkRunner 100G, EtherScope nXG, CyberScope**
 
 1. Connect a USB-C cable to the **USB-C port on the left side** of the unit and to the Mac.
 2. On the unit: **Settings** → **Connected devices** → **USB**.
 3. Tap **Transfer files**.
 
-**Other Android phones:** unlock the phone, tap the USB notification and choose
+**AirCheck G3 and other Android phones:** unlock the phone, tap the USB notification and choose
 **Transfer files** (Android 8–9) or **File transfer** (Android 10 and newer).
 
 The device appears in Finder's sidebar under **Locations**. If it does not, see
@@ -153,5 +153,5 @@ the app.
 
 Help → About Ferry → Acknowledgements lists all of these.
 
-NetAlly, LinkRunner, EtherScope and AirCheck are trademarks of NetAlly. Ferry is not affiliated
-with or endorsed by NetAlly. Android is a trademark of Google LLC.
+NetAlly, LinkRunner, EtherScope, CyberScope and AirCheck are trademarks of NetAlly. Ferry is not
+affiliated with or endorsed by NetAlly. Android is a trademark of Google LLC.

@@ -385,9 +385,6 @@ extension AgentService {
     switch refusal {
     case .badRequest: String(localized: AgentText.badRequest)
     case .notAllowed: String(localized: AgentText.notAllowed)
-    // Own words, Help entry and catalog row are a follow-up (they need the string catalogs and
-    // help.json); until then the generic helper message, which already has its Help entry.
-    case .tooManyRequests: String(localized: AgentText.badRequest)
     }
   }
 }

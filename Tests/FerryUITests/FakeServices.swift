@@ -146,8 +146,22 @@ final class FakeServices: SystemServicing {
   private var heldUnregister: CheckedContinuation<Void, Never>?
   let (unregistersHeld, unregisterHeld) = AsyncStream<Void>.makeStream()
 
+  /// Set: unregistering the agent throws, as `SMAppService` does for one it has not registered.
+  var failUnregister = false
+  /// Set: the app's own removal of the FileProvider domains fails.
+  var failRemoveDomains = false
+  /// Where the app's own removal of the domains says unsent changes were saved.
+  var preservedByRemoval: [URL] = []
+
+  func removeFileProviderDomains() async throws -> [URL] {
+    log.record("removeDomains")
+    if failRemoveDomains { throw CocoaError(.featureUnsupported) }
+    return preservedByRemoval
+  }
+
   func unregisterAgent() async throws {
     log.record("unregisterAgent")
+    if failUnregister { throw CocoaError(.featureUnsupported) }
     if holdsUnregister {
       await withCheckedContinuation { continuation in
         heldUnregister = continuation

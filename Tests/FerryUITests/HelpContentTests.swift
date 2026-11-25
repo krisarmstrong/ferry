@@ -94,6 +94,9 @@ struct HelpContentTests {
     let netAlly = try Self.topic("connect-tester")
     #expect(netAlly.body.steps == keys(.netAllyAndroid8Board))
     #expect(netAlly.body.link?.family == .netAllyAndroid8Board)
+    let airCheck = try Self.topic("connect-aircheck")
+    #expect(airCheck.body.steps == keys(.airCheckG3))
+    #expect(airCheck.body.link?.family == .airCheckG3)
     let android = try Self.topic("connect-android")
     #expect(
       android.groups.map(\.body.steps) == [keys(.otherAndroid8to9), keys(.otherAndroid10Plus)])
@@ -108,6 +111,7 @@ struct HelpContentTests {
     #expect(
       groups[DeviceFamily.netAllyAndroid8Board.title.key]?.steps
         == keys(.netAllyAndroid8Board))
+    #expect(groups[DeviceFamily.airCheckG3.title.key]?.steps == keys(.airCheckG3))
     #expect(groups["Android 8 or 9"]?.steps == keys(.otherAndroid8to9))
     #expect(groups["Android 10 or newer"]?.steps == keys(.otherAndroid10Plus))
     for group in section.groups { #expect(group.body.note == GuideSteps.debuggingNote.key) }
@@ -162,11 +166,14 @@ struct HelpContentTests {
     #expect(throws: DecodingError.self) { try Self.decode(json) }
   }
 
-  /// Remove Ferry… lives in Help, under Troubleshooting, and nowhere else.
-  @Test func removeFerryIsUnderTroubleshooting() throws {
-    let troubleshooting = try #require(
-      Self.help.categories.first { $0.title == "Troubleshooting" })
-    let topic = try #require(troubleshooting.topics.first { $0.body.action == .removeFerry })
+  /// Remove Ferry… lives in Help, under About Ferry beside Uninstall, and nowhere else in Help;
+  /// the menu's Option alternative opens this topic.
+  @Test func removeFerryIsBesideUninstall() throws {
+    let about = try #require(Self.help.categories.first { $0.title == "About Ferry" })
+    let topic = try #require(about.topics.first { $0.body.action == .removeFerry })
+    #expect(topic.id == AppModel.removeFerryHelpTopic)
+    let uninstall = try #require(about.topics.firstIndex { $0.id == "uninstall" })
+    #expect(about.topics.firstIndex { $0.id == topic.id } == uninstall - 1)
     #expect(topic.title == "Remove Ferry")
     let others = Self.help.topics.flatMap { [$0.body] + $0.groups.map(\.body) }
       .filter { $0.action == .removeFerry }
@@ -183,6 +190,15 @@ struct HelpContentTests {
     let bodies = Self.help.topics.flatMap { [$0.body] + $0.groups.map(\.body) }
     #expect(bodies.filter { $0.action == .showWelcome }.count == 1)
     #expect(Self.help.topics.first?.body.action == .showWelcome)
+  }
+
+  /// Copy Diagnostics is in Troubleshooting, once.
+  @Test func copyDiagnosticsIsInTroubleshooting() throws {
+    let troubleshooting = try #require(
+      Self.help.categories.first { $0.title == "Troubleshooting" })
+    #expect(troubleshooting.topics.contains { $0.body.action == .copyDiagnostics })
+    let bodies = Self.help.topics.flatMap { [$0.body] + $0.groups.map(\.body) }
+    #expect(bodies.filter { $0.action == .copyDiagnostics }.count == 1)
   }
 
   @Test func anUnknownActionIsRejected() {

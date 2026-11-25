@@ -29,8 +29,8 @@ TEXT = {
             "<!-- Generated from Sources/FerryUI/help.json by `make guide`. Edit help.json, not this file. -->",
             "",
             "Ferry shows Android devices as locations in Finder on your Mac. It was built first for "
-            "network testers, the LinkRunner 10G, EtherScope nXG and LinkRunner 100G, and it works "
-            "with other Android phones too.",
+            "network testers, the LinkRunner 10G, LinkRunner 100G, EtherScope nXG and CyberScope, "
+            "and it works with the AirCheck G3 and other Android phones too.",
             "",
             "This guide holds the same help as **Help** in the Ferry menu, plus how to install Ferry. "
             "Ferry is free and open source (MIT). It needs macOS 26 or later on an Apple silicon Mac.",
@@ -61,8 +61,8 @@ TEXT = {
             "No edites este archivo. -->",
             "",
             "Ferry muestra los dispositivos Android como ubicaciones en Finder en tu Mac. Se creó "
-            "primero para probadores de red, el LinkRunner 10G, el EtherScope nXG y el LinkRunner "
-            "100G, y también funciona con otros teléfonos Android.",
+            "primero para probadores de red, el LinkRunner 10G, el LinkRunner 100G, el EtherScope "
+            "nXG y el CyberScope, y también funciona con el AirCheck G3 y otros teléfonos Android.",
             "",
             "Esta guía contiene la misma ayuda que **Ayuda** en el menú de Ferry, y además cómo "
             "instalar Ferry. Ferry es gratuito y de código abierto (MIT). Necesita macOS 26 o "

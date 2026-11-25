@@ -36,11 +36,16 @@ struct AppModelReplacedTests {
     #expect(!log.all.contains("quit"))
   }
 
-  @Test func removeFerryFromAnUnchangedAppSaysToCheckFerryRuns() async {
-    let model = AppModel(client: UnreachableClient(), services: FakeServices(log: log))
+  /// An unchanged app removes the locations itself when the helper cannot; if that fails too,
+  /// it says to try again.
+  @Test func removeFerryFromAnUnchangedAppSaysToTryAgain() async {
+    let services = FakeServices(log: log)
+    services.failRemoveDomains = true
+    let model = AppModel(client: UnreachableClient(), services: services)
     await model.removeFerry()
     #expect(
-      model.removalError == "Could not remove Ferry. Make sure Ferry is running, then try again.")
+      model.removalError
+        == "Could not remove Ferry. Try again; if it keeps failing, restart the Mac and try again.")
   }
 
   @Test func relaunchOpensFerryAgain() {

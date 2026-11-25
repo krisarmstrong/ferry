@@ -135,17 +135,22 @@ Legend: **Done** is in `main` and verified as stated. **Open** must land before 
   both increased-contrast looks; `theDeviceTilesDraw`), `HelpSnapshotTests` in light and dark.
   Ferry uses no translucent materials, so Reduce Transparency changes nothing it draws.
 
+- A status row says its severity: VoiceOver reads "Warning:" or "Error:" before the title
+  (`StatusSeverity` in `MenuRow.swift`) (L6). *Verified:* `MenuAccessibilityTests`.
+- Larger text (L8): row titles, device names and the toggle wrap instead of being cut at one
+  line; the welcome and the setup guide scroll when their window cannot be tall enough, with
+  Not Now and Done below; the licence window resizes, its text scrolling above its buttons; the
+  tile symbol takes a text style, not a fixed 12 pt. SwiftUI's `dynamicTypeSize` changes
+  neither fonts nor `@ScaledMetric` on macOS (checked in a snapshot), so the widths stay.
+  *Verified:* `MenuAccessibilityTests` (`aLongRowTitleWraps`, `aLongDeviceNameWraps`).
+
 **Open**
-- A status row's warning is shown only by a yellow symbol, which is hidden from VoiceOver
-  (`StatusRow` in `MenuRow.swift`; used by `GetADBRow.swift` and the "Ferry was updated" row in
-  `MenuContent.swift`). Say the severity in the row's label. (L6)
-- No arrow-key movement between menu rows: the menu has no `onMoveCommand` or focus handling
-  (`MenuContent.swift`, `MenuRow.swift`). (L7)
-- Fixed sizes: the menu is 320 pt wide (`MenuContent.swift`), the welcome 400 pt
-  (`WelcomeView.swift`), the setup guide 460 pt (`SetupGuide.swift`), the licence window
-  560 × 520 (`PlatformToolsLicenseView.swift`), and the row symbols a fixed 12 pt
-  (`MenuRow.swift`). Let text and windows follow larger text sizes. (L8)
-- A live VoiceOver and Full Keyboard Access pass (owner check 7).
+- Menu keys (L7), in code and unchecked live: the arrows move the key focus between rows as
+  Tab does, Return or Space activates the focused row, Escape closes the menu
+  (`MenuKeyboard.swift`). Without Keyboard navigation the rows make themselves focusable. Only
+  the key mapping is tested (`MenuAccessibilityTests`); owner check 7 decides it.
+- A live VoiceOver and Full Keyboard Access pass (owner check 7), including arrows with Full
+  Keyboard Access off, and whether macOS's Text Size setting reaches Ferry at all.
 
 ## Localization
 
@@ -190,10 +195,6 @@ Legend: **Done** is in `main` and verified as stated. **Open** must land before 
   explanation (#14).
 
 **Open**
-- Install App… names a local-file failure as a device one: when the chosen `.apk` cannot be
-  opened, `AppModel+Tools.swift` wraps the error as `.io`, which reads "Ferry couldn't finish
-  this. Try again; if it keeps failing, reconnect the device or reopen Ferry." Give it its own
-  message. (M2, residual)
 - A create while the device refuses Ferry left a local-only `name 2.txt` beside the real file
   that never reached the device (integration smoke test). Likely path: the first create reached
   the device but its reply did not reach FileProvider, whose retry met the file as a collision,
@@ -201,10 +202,13 @@ Legend: **Done** is in `main` and verified as stated. **Open** must land before 
   the same bytes (`AgentService+Transfers.swift`, `AgentTransferIntegrityTests`); confirm on
   hardware (owner checks 15 and 16) that no `name 2` appears.
 
-**Later**
-- Sparkle's gentle reminders and an "Update ready" row (L15). Updates install when Ferry quits,
-  and a menu-bar app at login rarely quits, so an update can wait for days. Needs a user-driver
-  delegate in `SparkleUpdates.swift` and a menu row; owner check 8 first.
+**Done**
+- Install App… says "The file can’t be read." when the chosen `.apk` cannot be opened, not a
+  device failure (M2, residual). *Verified:* `AppModelToolsTests`.
+- Update Ready — Restart Ferry (L15): once Sparkle holds a downloaded update, the menu offers it
+  in place of Check for Updates… and installs and relaunches (`SparkleUpdates.swift`,
+  `willInstallUpdateOnQuit`). *Verified:* `UpdateConsentTests` for the menu; Sparkle's side needs
+  owner check 8.
 
 ## Docs and legal
 

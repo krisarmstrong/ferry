@@ -42,6 +42,9 @@ public enum TransportError: Error, Equatable, Sendable, Codable {
   /// A folder listing's page token the agent no longer holds (too many listings since, or the
   /// agent restarted): the listing must start again from its first page.
   case pageExpired
+  /// The agent refused the request: its client already has the most requests in flight one
+  /// connection may have (`AgentListenerDelegate.maxInFlightPerConnection`).
+  case agentBusy
   case io(String)
 }
 
