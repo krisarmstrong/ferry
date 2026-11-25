@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Dependabot rewrites a pinned `uses: owner/repo@<sha> # vX.Y.Z` to the new commit SHA and
+  # updates the version comment, so the pins stay.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: [minor, patch]
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: swift
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      swiftpm:
+        update-types: [minor, patch]
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
