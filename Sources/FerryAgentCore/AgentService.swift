@@ -204,8 +204,8 @@ public actor AgentService: AgentHandling {
     }
   }
 
-  /// How long a move may go with no sign of progress before it is failed (see `StallWatch`).
-  /// A move the device does in one step never beats, so this is long enough for any of those.
+  /// How long a move's copy may go with no sign of progress before it is failed (see
+  /// `StallWatch`). A move the device does in one step is never judged by it.
   static let moveStallLimit = Duration.seconds(60)
 
   private func move(_ id: ItemID, to folder: ItemID, in domain: String)

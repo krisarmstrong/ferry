@@ -4,10 +4,12 @@ import Synchronization
 
 /// Fails work that stops making progress. A move on a device without MoveObject is a whole
 /// copy, which may rightly take long (see `AgentRequest.mayTakeLong`); what it must not do is
-/// stop. Its transfer beats a `TransferHeartbeat` at each block, and once `limit` passes with no
-/// beat the request is cancelled, so the copy stops at its next block, and failed with
+/// stop. Its transfer arms a `TransferHeartbeat` and beats it at each block, and once `limit`
+/// passes with no beat the request is cancelled, so the copy stops at its next block, and failed with
 /// `.deviceBusy` at once, which FileProvider tries again later. A device stuck inside one call
-/// still holds its session until that call returns.
+/// still holds its session until that call returns. Work that never arms the heartbeat (a native
+/// MoveObject, which a device may take minutes over across storages, reporting nothing) is never
+/// failed: stopping Ferry's side would leave the device mid-move while Finder heard "busy".
 enum StallWatch {
   static func run<T: Sendable>(
     limit: Duration, clock: any Clock<Duration>,
@@ -27,7 +29,7 @@ enum StallWatch {
             return
           }
           let now = heartbeat.count
-          if now == seen {
+          if heartbeat.isArmed, now == seen {
             cancellation?.cancel()
             answer.give(.failure(.deviceBusy))
             return

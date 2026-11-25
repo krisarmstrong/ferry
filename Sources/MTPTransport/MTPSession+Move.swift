@@ -53,6 +53,7 @@ extension MTPSession {
     defer { try? FileManager.default.removeItem(at: local) }
     // libmtp reports progress on its own queue, where the request's task-local is not set.
     let (turn, heartbeat) = (DeviceTurns.current, TransferHeartbeat.current)
+    heartbeat?.arm()
     let goOn: ProgressHandler = { _, _ in
       heartbeat?.beat()
       return turn?.isCancelled != true
