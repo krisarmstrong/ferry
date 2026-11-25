@@ -39,6 +39,15 @@ public actor ADBHost {
   private let backoff: Backoff
   /// What the waits between reconnects are measured on.
   private let clock: any Clock<Duration>
+  /// Opens a connection to the server on a port: `ADBStream.open`, unless a test stands in.
+  private let opener: Opener
+
+  typealias Opener = @Sendable (UInt16) async throws(ADBError) -> ADBStream
+
+  /// A real connection on loopback.
+  static let socketOpener: Opener = { (port) async throws(ADBError) in
+    try await ADBStream.open(port: port)
+  }
 
   /// The server Ferry starts is the agent's child and ends with it (see `ADBServerKeeper`).
   public init(port: UInt16 = 5037, locator: ADBLocator, keeper: ADBServerKeeper) {
@@ -51,13 +60,20 @@ public actor ADBHost {
   init(
     port: UInt16, locator: ADBLocator,
     launcher: @escaping @Sendable (URL) async throws(ADBError) -> Void, backoff: Backoff,
-    clock: any Clock<Duration> = ContinuousClock()
+    clock: any Clock<Duration> = ContinuousClock(),
+    opener: @escaping Opener = socketOpener
   ) {
     self.port = port
     self.locator = locator
     self.launcher = launcher
     self.backoff = backoff
     self.clock = clock
+    self.opener = opener
+  }
+
+  /// A new connection to the server.
+  func open() async throws(ADBError) -> ADBStream {
+    try await opener(port)
   }
 
   /// The `adb` program the locator finds, if any.
@@ -76,7 +92,7 @@ public actor ADBHost {
   /// `host:kill`: the server answers OKAY and exits.
   public func kill() async throws(ADBError) {
     let framed = try ADBWire.frame("host:kill")
-    let stream = try await ADBStream.open(port: port)
+    let stream = try await open()
     do throws(ADBError) {
       try await stream.write(framed)
       try await stream.expectOkay()
@@ -160,7 +176,7 @@ public actor ADBHost {
       ?? "host:transport:\(serial)"
     let select = try ADBWire.frame(target)
     let start = try ADBWire.frame(service)
-    let stream = try await ADBStream.open(port: port)
+    let stream = try await open()
     do throws(ADBError) {
       try await stream.write(select)
       try await stream.expectOkay()
@@ -211,7 +227,7 @@ public actor ADBHost {
   /// A host service such as `connect:` or `pair:`, whose refusal is an answer, not a failure.
   func service(_ request: String) async throws(ADBError) -> ADBServiceAnswer {
     let framed = try ADBWire.frame(request)
-    let stream = try await ADBStream.open(port: port)
+    let stream = try await open()
     do throws(ADBError) {
       try await stream.write(framed)
       let answer = try await stream.readServiceAnswer()
@@ -225,7 +241,7 @@ public actor ADBHost {
 
   func query(_ request: String) async throws(ADBError) -> String {
     let framed = try ADBWire.frame(request)
-    let stream = try await ADBStream.open(port: port)
+    let stream = try await open()
     do throws(ADBError) {
       try await stream.write(framed)
       try await stream.expectOkay()
@@ -248,7 +264,7 @@ public actor ADBHost {
     while !Task.isCancelled {
       var connected = false
       do throws(ADBError) {
-        let stream = try await ADBStream.open(port: port)
+        let stream = try await open()
         connected = await follow(stream, emit: emit) {
           reportedGone = false
           startedThisOutage = false

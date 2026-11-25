@@ -143,11 +143,10 @@ struct ADBTransportScanTests {
 
   /// Check again with no `adb` to find is no error: the scan still says it is not installed.
   @Test func startingAdbThatIsNotInstalledChangesNothing() async throws {
-    let closed = try ClosedPort()
-    let transport = Fixture.transport(port: closed.port, locator: ADBHostTests.noAdb)
+    let transport = Fixture.transport(
+      port: 5037, locator: ADBHostTests.noAdb, opener: ADBHost.refusing)
     await transport.startADBServer()
     #expect(try await transport.scan().adbStatus == .notInstalled)
-    withExtendedLifetime(closed) {}
   }
 
   @Test func anAddressReusedByAnotherDeviceIsAskedAgain() async throws {
@@ -174,21 +173,18 @@ struct ADBTransportScanTests {
   }
 
   @Test func adbNotInstalledIsAnEmptyScanAndNotInstalled() async throws {
-    let closed = try ClosedPort()
-    let transport = Fixture.transport(port: closed.port, locator: ADBHostTests.noAdb)
+    let transport = Fixture.transport(
+      port: 5037, locator: ADBHostTests.noAdb, opener: ADBHost.refusing)
     let scan = try await transport.scan()
     #expect(scan == DeviceScan(devices: [], method: .usbADB, adbStatus: .notInstalled))
     #expect(await transport.status == .notInstalled)
-    withExtendedLifetime(closed) {}
   }
 
   @Test func installedWithNoServerIsServerDown() async throws {
-    let closed = try ClosedPort()
-    let transport = Fixture.transport(port: closed.port)
+    let transport = Fixture.transport(port: 5037, opener: ADBHost.refusing)
     #expect(
       try await transport.scan() == DeviceScan(devices: [], method: .usbADB, adbStatus: .serverDown)
     )
     #expect(await transport.status == .serverDown)
-    withExtendedLifetime(closed) {}
   }
 }

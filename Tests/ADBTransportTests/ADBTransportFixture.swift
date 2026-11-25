@@ -34,12 +34,13 @@ enum TransportFixture {
   static func transport(
     port: UInt16, locator: ADBLocator = findsAdb, clock: TestClock = TestClock(),
     answerLimit: Duration = .seconds(10), limits: any Clock<Duration> = ContinuousClock(),
-    serving: @escaping ADBNetworkPolicy = { _, _ in true }
+    serving: @escaping ADBNetworkPolicy = { _, _ in true },
+    opener: @escaping ADBHost.Opener = ADBHost.socketOpener
   ) -> ADBTransport {
     ADBTransport(
       host: ADBHost(
         port: port, locator: locator, launcher: { _ in },
-        backoff: Backoff(initial: .milliseconds(20), maximum: .milliseconds(100))),
+        backoff: Backoff(initial: .milliseconds(20), maximum: .milliseconds(100)), opener: opener),
       locator: locator, answerLimit: answerLimit, clock: limits, serving: serving,
       now: { clock.now })
   }
