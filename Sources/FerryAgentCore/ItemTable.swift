@@ -112,6 +112,21 @@ actor ItemTable {
   var journalBytes = 0
   /// Set by `discard`: nothing is written any more.
   var discarded = false
+  /// What saving and ordering have done so far.
+  var work = Work()
+
+  /// Counts of the work that grows with what changed, or with the whole table: a test guards
+  /// with them against a cost per change that grows with the table, as a timing cannot on a
+  /// shared machine.
+  struct Work: Equatable {
+    /// Whole-table snapshots written, and the records they held.
+    var snapshots = 0
+    var snapshotRows = 0
+    /// Records written or deleted in journal batches.
+    var journalRows = 0
+    /// Identifiers sorted into the working set's order.
+    var sortedIDs = 0
+  }
 
   init(domain: String, store: URL, changes: ChangeLog = ChangeLog()) {
     file = Self.file(for: domain, in: store)

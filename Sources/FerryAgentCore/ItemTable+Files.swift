@@ -116,6 +116,7 @@ extension ItemTable {
       }
     }
     touched = []
+    work.journalRows += batch.items.count + (batch.deleted?.count ?? 0)
     do {
       journalBytes += try Self.append(batch, to: journal)
     } catch {
@@ -145,6 +146,8 @@ extension ItemTable {
       rootListed: rootListed, generation: next)
     do {
       snapshotBytes = try Self.write(stored, to: file)
+      work.snapshots += 1
+      work.snapshotRows += stored.items.count
       generation = next
       Self.remove(journal)
       journalBytes = 0
