@@ -37,6 +37,8 @@ public actor ADBHost {
   private let locator: ADBLocator
   private let launcher: @Sendable (URL) async throws(ADBError) -> Void
   private let backoff: Backoff
+  /// What the waits between reconnects are measured on.
+  private let clock: any Clock<Duration>
 
   /// The server Ferry starts is the agent's child and ends with it (see `ADBServerKeeper`).
   public init(port: UInt16 = 5037, locator: ADBLocator, keeper: ADBServerKeeper) {
@@ -48,12 +50,14 @@ public actor ADBHost {
 
   init(
     port: UInt16, locator: ADBLocator,
-    launcher: @escaping @Sendable (URL) async throws(ADBError) -> Void, backoff: Backoff
+    launcher: @escaping @Sendable (URL) async throws(ADBError) -> Void, backoff: Backoff,
+    clock: any Clock<Duration> = ContinuousClock()
   ) {
     self.port = port
     self.locator = locator
     self.launcher = launcher
     self.backoff = backoff
+    self.clock = clock
   }
 
   /// The `adb` program the locator finds, if any.
@@ -271,7 +275,7 @@ public actor ADBHost {
       let delay = backoff.next()
       Self.log.info(
         "adb server unavailable; retrying in \(delay.components.seconds, privacy: .public)s")
-      if (try? await Task.sleep(for: delay)) == nil { break }
+      if (try? await clock.sleep(for: delay)) == nil { break }
     }
   }
 

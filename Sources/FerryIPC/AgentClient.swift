@@ -61,6 +61,7 @@ public actor AgentClient: AgentSending {
 
   private let target: Target
   private let replyDeadline: Duration
+  private let clock: any Clock<Duration>
   private var connection: NSXPCConnection?
   /// The progress handler of each request in flight, by the identifier it was sent under.
   private var progressHandlers: [String: TransferProgressHandler] = [:]
@@ -83,13 +84,21 @@ public actor AgentClient: AgentSending {
   }
 
   /// Connects to an anonymous listener in the same process, without checking its signature.
-  init(endpoint: NSXPCListenerEndpoint, replyDeadline: Duration = AgentClient.replyDeadline) {
-    self.init(target: .endpoint(endpoint), replyDeadline: replyDeadline)
+  /// The reply deadline runs on `clock`.
+  init(
+    endpoint: NSXPCListenerEndpoint, replyDeadline: Duration = AgentClient.replyDeadline,
+    clock: any Clock<Duration> = ContinuousClock()
+  ) {
+    self.init(target: .endpoint(endpoint), replyDeadline: replyDeadline, clock: clock)
   }
 
-  private init(target: Target, replyDeadline: Duration = AgentClient.replyDeadline) {
+  private init(
+    target: Target, replyDeadline: Duration = AgentClient.replyDeadline,
+    clock: any Clock<Duration> = ContinuousClock()
+  ) {
     self.target = target
     self.replyDeadline = replyDeadline
+    self.clock = clock
     (progressEvents, progressSink) = AsyncStream.makeStream(of: ProgressReceiver.Event.self)
     receiver = ProgressReceiver(progressSink, logs: logRouter)
   }
@@ -123,7 +132,7 @@ public actor AgentClient: AgentSending {
     }
     if Task.isCancelled { throw .cancelled }
     let connection = currentConnection()
-    let deadline = request.mayTakeLong ? nil : ReplyDeadline(replyDeadline)
+    let deadline = request.mayTakeLong ? nil : ReplyDeadline(replyDeadline, clock: clock)
     if let deadline { receiver.deadlines.withLock { $0[id] = deadline } }
     defer { receiver.deadlines.withLock { $0[id] = nil } }
     let reply = await awaitReply(deadline: deadline) { reply, failed in
